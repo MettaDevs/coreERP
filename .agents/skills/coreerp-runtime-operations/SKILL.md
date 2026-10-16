@@ -22,15 +22,21 @@ Verifikasi dari runtime UI/API: health, login, operasi bisnis terautentikasi, no
 
 Perubahan harus bertahan setelah recreate. Pertahankan digest image dan setting rilis aktif; nilai env lama tidak boleh menurunkan versi image. Recreate hanya layanan yang berubah, lalu periksa konfigurasi aktif kembali.
 
+Jangan merestart database runtime lokal bersama demi memperbaiki lingkungan tes. Database tes terpisah dalam cluster yang sama tetap berbagi proses PostgreSQL dan batas lock. Perubahan parameter yang memerlukan restart dilakukan pada cluster tes tersendiri; koordinasikan pemilik runtime sebelum menyentuh cluster bersama. Sebelum restart yang memang diperlukan, periksa jumlah database/berkas, waktu checkpoint, dan grace period shutdown agar tidak memicu recovery panjang.
+
 ## Load test dan tuning
 
 - Ikuti `docs/dev/20-load-and-concurrency-testing.md` dan gate proyek. Nyatakan gap topology, tenant, durasi, dan permukaan; satu instance tidak membuktikan multi-instance.
 - Uji business flow lewat sesi nyata. GET login hanya uji halaman login. Provision fixture lewat jalur tepercaya yang berlaku; setup dan smoke harus selesai sebelum pengukuran. Jangan mematikan limiter atau memalsukan konteks tenant agar setup lolos.
 - Pisahkan generator bila memungkinkan, tetapi periksa bebannya juga. Pakai fixture sama dan RUN_ID baru: idempotency key lama dapat mengembalikan dokumen selesai. Catat pertumbuhan data, warm-up, beban penuh, think time, dan drain terpisah.
+- Tunggu proses k6 selesai beserta drain sebelum mengganti konfigurasi; hasil yang tercampur dua konfigurasi tidak menjadi kontrol. Setelah reload, beri kontrol dan kandidat warm-up yang sama. Catat tenant yang benar-benar disentuh: fixture 128 tenant dengan pemilihan tetap per VU hanya menyentuh delapan tenant pada delapan VU, sehingga perbandingan antar-concurrency juga dapat mengubah campuran data.
 - Catat ukuran/cardinality respons dan header encoding klien. Pastikan parameter seperti `per_page` benar-benar membatasi hasil. Sesuaikan encoding dengan consumer yang diuji; jangan diam-diam mengganti compression antara baseline dan sesudah. Pisahkan waktu waiting/receiving dari proses di worker sebelum menyebut selisihnya antrean.
+- Untuk daftar bertahap, ukur batch pertama dan penelusuran cursor secara terpisah; search/filter/sort harus menemukan record di luar batch pertama. UI mengikuti scroll bertahap tanpa navigasi halaman sesuai `coreerp-ui`. Ulangi workload bisnis yang sama dengan encoding, fixture, worker, dan beban yang dicatat; jangan menyebut pengurangan payload batch pertama sebagai perbaikan throughput seluruh transaksi sebelum diukur.
+- Selaraskan monitor dengan waktu mulai/selesai setiap run; vmstat harus diberi timestamp atau dicatat ketelitian penyelarasannya. Pada VM, ukur CPU steal dan runnable queue selain CPU container. Steal tinggi membuktikan waktu CPU tertahan host virtualisasi, tetapi kontribusinya terhadap latensi perlu kontrol terpisah; jangan menyimpulkan bottleneck tunggal dari korelasi.
 - Bandingkan kandidat di bawah/atas konfigurasi awal. Ubah satu faktor, ukur pada concurrency tertahan, dan ulangi kontrol bila hasil dekat atau host berubah. Pilih dari latency, pekerjaan selesai, error, CPU/steal, waits dan koneksi; bukan jumlah worker terbanyak.
 - Pisahkan correctness, delivery, dan latency. Delivery harus gagal pada proxy rejection/timeout; nol pekerjaan selesai tidak boleh hijau. Hitung probe yang mendapat penolakan sah, bukan hanya percobaan. Status 0 bukan jawaban.
 - Cocokkan 5xx dengan upstream log proxy. Jangan menganggap semua 503 dari aplikasi atau semua 5xx dari proxy. Laporkan successful throughput dan completed flows terpisah dari request cepat ditolak; p95 yang didominasi 503 tidak membuktikan SLO.
+- Pisahkan DNS dari health aplikasi bila resolusi domain tersendat: bandingkan request normal dengan request ke IP yang sama sambil mempertahankan Host/TLS. HTTP 000 belum mengidentifikasi kerusakan PHP. Bedakan timeout, connection reset, dan EOF lewat error asli meskipun counter harness menggabungkannya.
 - Jalankan race yang sengaja berebut dan oracle SQL pada fixture. Buktikan oracle bisa merah bila belum pernah diverifikasi; gunakan rollback untuk suntikan sementara. Jangan menghapus baris tersimpan secara fisik.
 
 ## Profiling bila kapasitas tetap rendah
@@ -42,5 +48,7 @@ Pakai profiler/tracing yang tersedia. Instrumentasi tambahan perlu sementara, di
 ## Hasil dan penyimpanan
 
 Simpan konfigurasi sebelum/sesudah, manifest lingkungan, perintah pengulangan, metrics, trace/SQL tersanitasi, dan verifikasi pemulihan. Pisahkan pengukuran, inferensi, dan hal yang belum diuji. Dashboard/dependency baru tidak wajib.
+
+Ekspor k6 `--summary-export` dapat membawa `setup_data` berisi fixture beserta cookie sesi. Direktori hasil mentah harus private (0700, berkas 0600 pada Linux); buang `setup_data` dan periksa field autentikasi sebelum menyalin metrics ke artifact yang akan dibagikan. Ringkasan angka yang aman tidak membuat seluruh JSON mentah aman.
 
 Bila diminta commit/push, stage hanya pekerjaan ini, pisahkan format dari perilaku, push tanpa force, dan jelaskan bila branch masih perlu merge agar ikut rilis. Skill proyek di `.agents/skills/coreerp-runtime-operations/` adalah salinan yang tersimpan di Git; setelah diubah, sinkronkan instalasi personal dan verifikasi isinya sama.
