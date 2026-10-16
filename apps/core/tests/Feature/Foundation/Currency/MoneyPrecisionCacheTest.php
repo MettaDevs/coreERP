@@ -78,6 +78,28 @@ class MoneyPrecisionCacheTest extends TestCase
         $this->assertSame(1, $precision->amountDecimals($tenant, 'IDR'));
     }
 
+    public function test_reading_another_currency_does_not_discard_other_cached_values(): void
+    {
+        $tenant = (string) Str::ulid();
+        CurrencyPrecision::query()->create([
+            'tenant_id' => $tenant, 'currency_code' => 'USD', 'amount_decimals' => 3, 'unit_amount_decimals' => 3,
+        ]);
+        DB::enableQueryLog();
+        try {
+            $precision = app(MoneyPrecision::class);
+            foreach (['IDR' => 2, 'USD' => 3] as $currency => $decimals) {
+                $this->assertSame($decimals, $precision->amountDecimals($tenant, $currency));
+            }
+            foreach (['IDR' => 2, 'USD' => 3] as $currency => $decimals) {
+                $this->assertSame($decimals, $precision->amountDecimals($tenant, $currency));
+            }
+            $reads = array_filter(DB::getQueryLog(), fn (array $query): bool => str_contains($query['query'], 'currency_precisions'));
+            $this->assertCount(2, $reads);
+        } finally {
+            DB::disableQueryLog();
+        }
+    }
+
     public function test_new_scope_observes_updates_from_another_writer(): void
     {
         $tenant = (string) Str::ulid();
@@ -108,6 +130,7 @@ class MoneyPrecisionCacheTest extends TestCase
                 'id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'currency_code' => 'IDR',
                 'amount_decimals' => 0, 'unit_amount_decimals' => 3,
             ]);
+            $this->assertSame(2, $precision->amountDecimals($tenant, 'IDR'));
             DB::setDefaultConnection($copy);
             $this->assertSame(0, $precision->amountDecimals($tenant, 'IDR'));
             // Penulis lain tidak melewati dispatcher aplikasi; batas transaksi tetap harus menyegarkan.
