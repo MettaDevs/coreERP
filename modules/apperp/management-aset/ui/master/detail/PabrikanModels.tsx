@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { ActionButton } from '@apperp/ui/action-button';
 import {
     AlertDialog,
@@ -23,12 +22,12 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
+import { useState } from 'react';
 import { api, errorMessage } from '../../api';
+import { useRecordList } from '../../use-record-list';
 import type { MasterRecord, ParentSummary } from '../masters';
 import ModelAsetFormSheet from './ModelAsetFormSheet';
 import type { PabrikanModelRecord } from './pabrikanAsetDetail';
-
-type ListMeta = { current_page: number; last_page: number; total: number };
 
 export default function PabrikanModels({
     manufacturer,
@@ -49,18 +48,14 @@ export default function PabrikanModels({
     canReadAset: boolean;
     onChanged: () => void;
 }) {
-    const [items, setItems] = useState<PabrikanModelRecord[]>([]);
-    const [meta, setMeta] = useState<ListMeta>({
-        current_page: 1,
-        last_page: 1,
-        total: 0,
-    });
-    const [page, setPage] = useState(1);
     const [error, setError] = useState('');
     // Effect adalah satu-satunya pemilik pengambilan data; pemuatan ulang setelah
     // simpan atau arsip dinyatakan dengan menaikkan penanda ini.
     const [versiMuat, setVersiMuat] = useState(0);
-    const muatUlang = () => setVersiMuat((versi) => versi + 1);
+    const muatUlang = () => {
+        setError('');
+        setVersiMuat((versi) => versi + 1);
+    };
     const [editing, setEditing] = useState<
         PabrikanModelRecord | null | undefined
     >(undefined);
@@ -68,64 +63,13 @@ export default function PabrikanModels({
         null,
     );
 
-    // Isi tabel selalu berpasangan dengan parameter yang menghasilkannya. Selama
-    // pasangan itu belum sama dengan yang sedang diminta, layar masih memuat. Nilai ini
-    // dihitung saat render, jadi pindah halaman langsung menampilkan keadaan memuat
-    // tanpa effect yang perlu menyetel penanda lebih dulu. Nomor halaman sendiri tidak
-    // perlu disetel ulang saat ganti pabrikan: RecordDetailPane memasang `key`, jadi
-    // panel ini dipasang ulang dengan halaman pertama.
-    const kunciMuat = `${manufacturer.id}|${page}|${versiMuat}`;
-    const [kunciTermuat, setKunciTermuat] = useState<string | null>(null);
-    const loading = canReadModels && kunciTermuat !== kunciMuat;
-
-    useEffect(() => {
-        if (!canReadModels) {
-            return;
-        }
-
-        let dilepas = false;
-        const params = new URLSearchParams({
-            pabrikan_aset_id: manufacturer.id,
-            per_page: '20',
-            page: String(page),
-        });
-
-        // Pengambilan data lahir di dalam effect: state baru disetel setelah jawaban
-        // server tiba, bukan pada commit render yang sama, dan jawaban yang telat
-        // datang setelah panel dilepas dibuang lewat `dilepas`.
-        const muat = async () => {
-            try {
-                const result = await api<{
-                    data: PabrikanModelRecord[];
-                    meta: ListMeta;
-                }>(`/model-aset?${params}`);
-
-                if (dilepas) {
-                    return;
-                }
-
-                setItems(result.data);
-                setMeta(result.meta);
-                setError('');
-            } catch (caught) {
-                if (dilepas) {
-                    return;
-                }
-
-                setError(errorMessage(caught, 'Model belum dapat dimuat.'));
-            } finally {
-                if (!dilepas) {
-                    setKunciTermuat(kunciMuat);
-                }
-            }
-        };
-
-        void muat();
-
-        return () => {
-            dilepas = true;
-        };
-    }, [canReadModels, kunciMuat, manufacturer.id, page]);
+    const list = useRecordList<PabrikanModelRecord>(
+        '/model-aset',
+        '',
+        { pabrikan_aset_id: manufacturer.id, refresh: String(versiMuat) },
+        canReadModels,
+    );
+    const { items, loading } = list;
 
     async function archive() {
         if (!archiving) {
@@ -223,7 +167,7 @@ export default function PabrikanModels({
                 <div>
                     <p className="font-semibold">Model</p>
                     <p className="text-muted-foreground text-sm">
-                        {meta.total} model ditemukan untuk pabrikan ini.
+                        {items.length} model dimuat untuk pabrikan ini.
                     </p>
                 </div>
                 {canCreate && (
@@ -243,11 +187,13 @@ export default function PabrikanModels({
                 <Empty>
                     <EmptyDescription>Memuat model…</EmptyDescription>
                 </Empty>
-            ) : error ? (
+            ) : error || list.error ? (
                 <Empty>
                     <EmptyHeader>
                         <EmptyTitle>Model belum dapat ditampilkan</EmptyTitle>
-                        <EmptyDescription>{error}</EmptyDescription>
+                        <EmptyDescription>
+                            {error || list.error}
+                        </EmptyDescription>
                     </EmptyHeader>
                     <Button variant="outline" onClick={muatUlang}>
                         Coba lagi
@@ -265,6 +211,9 @@ export default function PabrikanModels({
             ) : (
                 <DataTable
                     columns={columns}
+                    incremental={list}
+                    sort={list.sort}
+                    onSortChange={list.onSortChange}
                     data={items}
                     getRowKey={(item) => item.id}
                     getRowLabel={(item) => item.nama}
@@ -279,29 +228,6 @@ export default function PabrikanModels({
                         }
                     }}
                 />
-            )}
-            {meta.last_page > 1 && (
-                <div className="text-muted-foreground flex items-center justify-end gap-3 text-sm">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={meta.current_page <= 1}
-                        onClick={() => setPage((current) => current - 1)}
-                    >
-                        Sebelumnya
-                    </Button>
-                    <span>
-                        Halaman {meta.current_page} dari {meta.last_page}
-                    </span>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={meta.current_page >= meta.last_page}
-                        onClick={() => setPage((current) => current + 1)}
-                    >
-                        Berikutnya
-                    </Button>
-                </div>
             )}
 
             {editing !== undefined && (

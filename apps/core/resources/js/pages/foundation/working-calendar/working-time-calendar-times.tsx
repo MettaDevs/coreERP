@@ -1,19 +1,20 @@
 import { Button } from '@apperp/ui/button';
 import { Checkbox } from '@apperp/ui/checkbox';
-import {
-    Dialog,
-    DialogAction,
-    DialogBody,
-    DialogCancel,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@apperp/ui/dialog';
+import { DialogCancel } from '@apperp/ui/dialog';
 import { Field, FieldError } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
+import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
+import {
+    PageDialog as Dialog,
+    PageDialogAction as DialogAction,
+    PageDialogBody as DialogBody,
+    PageDialogContent as DialogContent,
+    PageDialogDescription as DialogDescription,
+    PageDialogFooter as DialogFooter,
+    PageDialogHeader as DialogHeader,
+    PageDialogTitle as DialogTitle,
+} from '@apperp/ui/page-dialog';
 import {
     Table,
     TableBody,
@@ -222,9 +223,9 @@ export default function WorkingTimeCalendarTimes({
                 }
             />
 
-            <div className="flex min-h-[calc(100vh-4rem)] flex-col bg-background">
+            <ListPageLayout>
                 {/* Command Bar / Action Ribbon */}
-                <div className="sticky top-0 z-20 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-card px-4 py-2 text-xs">
+                <div className="sticky top-0 z-20 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-card px-4 py-2">
                     <div className="flex flex-wrap items-center gap-2">
                         <Link
                             href="/settings/working-time-calendars"
@@ -266,7 +267,7 @@ export default function WorkingTimeCalendarTimes({
                                 </div>
                             </div>
                         ) : (
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-muted-foreground">
                                 Belum ada kalender dibuat
                             </span>
                         )}
@@ -294,7 +295,7 @@ export default function WorkingTimeCalendarTimes({
                                         ? `/settings/compose-working-times?calendar_id=${calendar.id}`
                                         : '/settings/compose-working-times'
                                 }
-                                className="ml-1 inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+                                className="ml-1 inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-2.5 py-1 font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
                             >
                                 <Play className="size-3 fill-current text-primary" />
                                 <span>Halaman jadwal dari pola</span>
@@ -313,7 +314,7 @@ export default function WorkingTimeCalendarTimes({
                                 aria-label="Dari tanggal"
                                 value={filterFrom}
                                 onChange={(e) => setFilterFrom(e.target.value)}
-                                className="h-7 w-36 text-xs"
+                                className="w-36"
                             />
                             <span className="text-muted-foreground">s/d</span>
                             <Input
@@ -321,14 +322,14 @@ export default function WorkingTimeCalendarTimes({
                                 aria-label="Sampai tanggal"
                                 value={filterTo}
                                 onChange={(e) => setFilterTo(e.target.value)}
-                                className="h-7 w-36 text-xs"
+                                className="w-36"
                             />
                             <Button
                                 variant="outline"
                                 size="sm"
                                 type="button"
                                 onClick={handleApplyFilter}
-                                className="h-7 px-2.5 text-xs"
+                                className="px-2.5"
                             >
                                 Terapkan
                             </Button>
@@ -343,14 +344,14 @@ export default function WorkingTimeCalendarTimes({
                             <h3 className="mt-3 text-sm font-semibold text-foreground">
                                 Belum ada kalender kerja
                             </h3>
-                            <p className="mt-1 text-xs text-muted-foreground">
+                            <p className="mt-1 text-muted-foreground">
                                 Silakan buat kalender kerja terlebih dahulu di
                                 menu <strong>Kalender kerja</strong> sebelum
                                 melihat atau mengatur jadwal kerja.
                             </p>
                             <Link
                                 href="/settings/working-time-calendars"
-                                className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+                                className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 font-medium text-primary-foreground hover:bg-primary/90"
                             >
                                 Buka kalender kerja
                             </Link>
@@ -358,7 +359,7 @@ export default function WorkingTimeCalendarTimes({
                     </div>
                 ) : (
                     /* Hari kerja di atas, jam kerja hari terpilih di bawah */
-                    <div className="flex flex-1 flex-col gap-4 p-4">
+                    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-4">
                         {/* Daftar hari kerja */}
                         <div className="flex flex-col rounded-md border border-border bg-card">
                             <div className="border-b border-border px-4 py-2.5">
@@ -476,13 +477,13 @@ export default function WorkingTimeCalendarTimes({
                                                                 }
                                                             />
                                                         </TableCell>
-                                                        <TableCell className="font-mono text-xs font-semibold text-foreground">
+                                                        <TableCell className="font-mono font-semibold text-foreground">
                                                             {day.date}
                                                         </TableCell>
                                                         <TableCell>
                                                             {dayName}
                                                         </TableCell>
-                                                        <TableCell className="text-center font-mono text-xs">
+                                                        <TableCell className="text-center font-mono">
                                                             {weekNr}
                                                         </TableCell>
                                                         <TableCell>
@@ -491,7 +492,7 @@ export default function WorkingTimeCalendarTimes({
                                                         <TableCell className="text-center">
                                                             <span
                                                                 className={cn(
-                                                                    'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
+                                                                    'inline-flex items-center rounded-full px-2 py-0.5 font-medium',
                                                                     isOpen
                                                                         ? 'bg-success/15 text-success'
                                                                         : 'bg-muted text-muted-foreground',
@@ -509,7 +510,7 @@ export default function WorkingTimeCalendarTimes({
                                                                 '-'
                                                             )}
                                                         </TableCell>
-                                                        <TableCell className="text-right font-mono text-xs">
+                                                        <TableCell className="text-right font-mono">
                                                             {day.hours.toFixed(
                                                                 2,
                                                             )}{' '}
@@ -534,7 +535,7 @@ export default function WorkingTimeCalendarTimes({
                                                                     disabled={
                                                                         isUpdatingDay
                                                                     }
-                                                                    className="h-6 px-2 text-[11px]"
+                                                                    className="h-6 px-2"
                                                                 >
                                                                     {isOpen
                                                                         ? 'Jadikan libur'
@@ -563,7 +564,7 @@ export default function WorkingTimeCalendarTimes({
                                     )
                                 </span>
                                 {selectedDay && (
-                                    <span className="font-mono text-xs text-muted-foreground">
+                                    <span className="font-mono text-muted-foreground">
                                         Total: {selectedDay.hours.toFixed(2)}{' '}
                                         jam kerja
                                     </span>
@@ -614,15 +615,15 @@ export default function WorkingTimeCalendarTimes({
                                                         <TableCell className="font-semibold text-foreground">
                                                             {calendar.code}
                                                         </TableCell>
-                                                        <TableCell className="font-mono text-xs">
+                                                        <TableCell className="font-mono">
                                                             {line.from_time ||
                                                                 '-'}
                                                         </TableCell>
-                                                        <TableCell className="font-mono text-xs">
+                                                        <TableCell className="font-mono">
                                                             {line.to_time ||
                                                                 '-'}
                                                         </TableCell>
-                                                        <TableCell className="text-right font-mono text-xs">
+                                                        <TableCell className="text-right font-mono">
                                                             {line.efficiency.toFixed(
                                                                 2,
                                                             )}
@@ -632,7 +633,7 @@ export default function WorkingTimeCalendarTimes({
                                                             {line.property ||
                                                                 'Reguler'}
                                                         </TableCell>
-                                                        <TableCell className="text-right font-mono text-xs font-semibold">
+                                                        <TableCell className="text-right font-mono font-semibold">
                                                             {line.hours.toFixed(
                                                                 2,
                                                             )}{' '}
@@ -648,7 +649,7 @@ export default function WorkingTimeCalendarTimes({
                         </div>
                     </div>
                 )}
-            </div>
+            </ListPageLayout>
 
             {/* Dialog penyusunan jadwal dari pola jam kerja */}
             <Dialog open={isComposeOpen} onOpenChange={setIsComposeOpen}>
@@ -673,7 +674,7 @@ export default function WorkingTimeCalendarTimes({
                         />
 
                         {templates.length === 0 ? (
-                            <p className="text-xs text-destructive">
+                            <p className="text-destructive">
                                 Belum ada pola jam kerja aktif untuk perusahaan
                                 kalender ini. Buat polanya terlebih dahulu di
                                 menu <strong>Pola jam kerja</strong>.
@@ -748,7 +749,7 @@ export default function WorkingTimeCalendarTimes({
                             </Field>
                         </div>
 
-                        <div className="rounded-md bg-muted/60 p-3 text-xs text-muted-foreground">
+                        <div className="rounded-md bg-muted/60 p-3 text-muted-foreground">
                             <p className="font-semibold text-foreground">
                                 Catatan:
                             </p>

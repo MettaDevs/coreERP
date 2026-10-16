@@ -65,7 +65,7 @@ class ComposeWorkingTimesService
                 'date' => $date,
                 'day_of_week' => $dayOfWeek,
                 'control' => $linesForDay->isNotEmpty() && $totalHours > 0 ? 'open' : 'closed',
-                'closed_for_pickup' => $linesForDay->isNotEmpty() ? (bool) $linesForDay->first()->closed_for_pickup : true,
+                'closed_for_pickup' => $linesForDay->isEmpty() || $linesForDay->contains(fn ($line) => (bool) $line->closed_for_pickup),
                 'hours' => $totalHours,
                 'created_at' => $now,
                 'updated_at' => $now,

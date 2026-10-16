@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react';
 import { Button } from '@apperp/ui/button';
 import {
     Empty,
@@ -6,6 +5,7 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
+import { IncrementalListStatus } from '@apperp/ui/incremental-list-status';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
 import type { MasterConfig, MasterRecord } from '../masters';
@@ -22,7 +22,6 @@ const STATUS_ITEMS = ['Semua status', 'Aktif', 'Tidak aktif'];
 export default function RecordListPane({
     config,
     items,
-    total,
     hasMore,
     loading,
     error,
@@ -38,7 +37,6 @@ export default function RecordListPane({
 }: {
     config: MasterConfig;
     items: MasterRecord[];
-    total: number;
     hasMore: boolean;
     loading: boolean;
     error: string;
@@ -52,36 +50,9 @@ export default function RecordListPane({
     onLoadMore: () => void;
     onRetry: () => void;
 }) {
-    const sentinelRef = useRef<HTMLDivElement>(null);
-
-    /**
-     * Halaman berikutnya dimuat saat dasar daftar terlihat. Sengaja bukan "sebelumnya /
-     * berikutnya": mengganti halaman akan membuang record yang sedang dipilih dari daftar,
-     * dan panel detail ikut kosong tanpa pengguna meminta apa pun.
-     */
-    useEffect(() => {
-        const sentinel = sentinelRef.current;
-
-        if (!sentinel || !hasMore || loading) {
-            return;
-        }
-
-        const observer = new IntersectionObserver(
-            (entries) => {
-                if (entries.some((entry) => entry.isIntersecting)) {
-                    onLoadMore();
-                }
-            },
-            { rootMargin: '120px' },
-        );
-        observer.observe(sentinel);
-
-        return () => observer.disconnect();
-    }, [hasMore, loading, onLoadMore]);
-
     return (
         <aside
-            className="flex min-h-0 flex-col border-r"
+            className="flex h-full min-h-0 min-w-0 flex-col"
             aria-label={`Daftar ${config.singular}`}
         >
             <div className="shrink-0 space-y-2 border-b px-4 py-3">
@@ -130,7 +101,7 @@ export default function RecordListPane({
                     </div>
                 )}
 
-                {error ? (
+                {error && !items.length ? (
                     <Empty>
                         <EmptyHeader>
                             <EmptyTitle>
@@ -180,14 +151,16 @@ export default function RecordListPane({
                     })
                 )}
 
-                <div ref={sentinelRef} />
-                {(hasMore || loading) && (
-                    <p className="text-muted-foreground px-4 py-3 text-xs">
-                        {loading
-                            ? 'Memuat…'
-                            : `${items.length} dari ${total} data`}
-                    </p>
-                )}
+                <IncrementalListStatus
+                    state={{
+                        hasMore,
+                        loading,
+                        error,
+                        loadMore: onLoadMore,
+                        retry: onRetry,
+                    }}
+                    endMessage={`${items.length} data dimuat`}
+                />
             </div>
         </aside>
     );

@@ -1,7 +1,6 @@
-import { router } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
 import { Badge } from '@apperp/ui/badge';
-import { api } from '../../api';
+import { router } from '@inertiajs/react';
+import { useRecordOptions } from '../../use-record-list';
 
 /**
  * Bentuk data, kosakata status, dan navigasi permintaan pemeliharaan — dipakai bersama oleh
@@ -132,95 +131,30 @@ export const workOrderPath = (id: string) =>
 export const codeName = (kode?: string | null, nama?: string | null) =>
     [kode, nama].filter(Boolean).join(' · ');
 
-const NO_OPTIONS: Option[] = [];
-
-/**
- * Register aset untuk pemilih. `/aset` memulangkan seluruh register tanpa pencarian di server,
- * jadi penyaringan terjadi di kotak pencarian pemilih. Dimuat hanya saat diperlukan.
- */
-export function useAssets(enabled: boolean) {
-    const [loaded, setLoaded] = useState<{
-        options: Option[];
-        error: string;
-    } | null>(null);
-
-    useEffect(() => {
-        if (!enabled || loaded) {
-            return;
-        }
-
-        let cancelled = false;
-        api<{ data: Option[] }>('/aset')
-            .then((result) => {
-                if (!cancelled) {
-                    setLoaded({ options: result.data, error: '' });
-                }
-            })
-            .catch(() => {
-                if (!cancelled) {
-                    setLoaded({
-                        options: [],
-                        error: 'Daftar aset tidak dapat dimuat. Minta akses lihat register aset, atau isi lokasinya saja.',
-                    });
-                }
-            });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [enabled, loaded]);
-
-    return {
-        options: loaded?.options ?? NO_OPTIONS,
-        error: loaded?.error ?? '',
-    };
+/** Pemilih aset memakai batch server yang sama dengan register aset. */
+export function useAssets(
+    enabled: boolean,
+    selectedId: string | string[] = '',
+) {
+    return useRecordOptions<Option>(
+        enabled ? '/aset' : null,
+        (item) => codeName(item.kode, item.nama),
+        selectedId,
+    );
 }
 
-/**
- * Pilihan yang bergantung pada satu induk — jenis pekerjaan untuk aset, varian untuk jenis
- * pekerjaan. Hasil dicatat bersama induknya, jadi ganti induk langsung memberi pilihan kosong
- * pada render yang sama tanpa menyisakan pilihan milik induk sebelumnya.
- */
+/** Dependency tetap menjadi bagian sumber; mengganti induk membatalkan hasil sebelumnya. */
 export function useDependentOptions(
     parentId: string,
     buildPath: (parentId: string) => string,
     failure: string,
+    selectedId = '',
 ) {
-    const [loaded, setLoaded] = useState<{
-        parentId: string;
-        options: Option[];
-        error: string;
-    } | null>(null);
-    const current =
-        parentId && loaded?.parentId === parentId ? loaded : undefined;
+    const result = useRecordOptions<Option>(
+        parentId ? buildPath(parentId) : null,
+        (item) => codeName(item.kode, item.nama),
+        selectedId,
+    );
 
-    useEffect(() => {
-        if (!parentId) {
-            return;
-        }
-
-        let cancelled = false;
-        api<{ data: Option[] }>(buildPath(parentId))
-            .then((result) => {
-                if (!cancelled) {
-                    setLoaded({ parentId, options: result.data, error: '' });
-                }
-            })
-            .catch(() => {
-                if (!cancelled) {
-                    setLoaded({ parentId, options: [], error: failure });
-                }
-            });
-
-        return () => {
-            cancelled = true;
-        };
-        // `buildPath` dan `failure` ditulis tetap oleh pemanggil; hanya induk yang memicu muat ulang.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [parentId]);
-
-    return {
-        options: current?.options ?? NO_OPTIONS,
-        error: current?.error ?? '',
-    };
+    return { ...result, error: result.error ? failure : '' };
 }

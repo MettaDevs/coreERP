@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -27,9 +28,14 @@ final class MaintenanceSetupLinkController extends Controller
         $this->jobType($jobTypeId);
         $this->permission($request, 'maintenance-job-types', 'read');
 
-        return response()->json(['data' => MaintenanceJobTypeVariant::query()
+        $query = MaintenanceJobTypeVariant::query()
             ->where('maintenance_job_type_id', $jobTypeId)
-            ->orderBy('kode')->get(['id', 'kode', 'nama', 'keterangan', 'aktif', 'version'])]);
+            ->select(['id', 'kode', 'nama', 'keterangan', 'aktif', 'version']);
+
+        return response()->json(IncrementalList::query($request, $query->toBase(), [
+            'kode' => 'kode', 'nama' => 'nama',
+        ], ['kode', 'nama'], 'kode'));
+
     }
 
     // Persyaratan skill dan sertifikat job type dihapus. Keduanya adalah kompetensi milik

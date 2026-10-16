@@ -1,5 +1,7 @@
 import * as React from 'react';
 import type { DataTableColumn, DataTableSort } from './data-table';
+import { useIncrementalList } from './use-incremental-list';
+import type { ListBatch, ListRequest } from './use-incremental-list';
 
 export function lookupComparator<T>(
     columns: DataTableColumn<T>[],
@@ -29,7 +31,7 @@ export type LookupLoader<T> = (request: {
     signal: AbortSignal;
 }) => Promise<{ items: T[]; nextCursor: string | null }>;
 
-/** Popup dan daftar lengkap berbagi batas pemuatan, pembatalan, dan deduplikasi. */
+/** Popup dan daftar lengkap memakai mesin fetch yang sama dengan tabel operasional. */
 export function useInlineLookupData<T>({
     items = [],
     loadItems,
@@ -47,135 +49,63 @@ export function useInlineLookupData<T>({
     getSearchText: (item: T) => string;
     compareItems?: (left: T, right: T) => number;
 }) {
-    const [visibleCount, setVisibleCount] = React.useState(40);
-    const [state, setState] = React.useState<{
-        source?: LookupLoader<T>;
+    const [localWindow, setLocalWindow] = React.useState({
+        query,
+        source: items,
+        count: 40,
+    });
+    const visibleCount =
+        localWindow.query === query && localWindow.source === items
+            ? localWindow.count
+            : 40;
+    const cacheEpoch = React.useRef(0);
+    const cache = React.useRef<{
+        source: LookupLoader<T>;
         query: string;
-        items: T[];
-        nextCursor: string | null;
-        loading: boolean;
-        error: string;
-    }>({ query: '', items: [], nextCursor: null, loading: false, error: '' });
-    const cache = React.useRef<(typeof state & { loadedAt: number }) | null>(
-        null,
-    );
-    const controller = React.useRef<AbortController | null>(null);
-    const busy = React.useRef(false);
-    const keyOf = React.useRef(getItemValue);
-    keyOf.current = getItemValue;
-
-    const fetchBatch = React.useCallback(
-        async (cursor: string | null) => {
-            if (!loadItems || busy.current) {
-                return;
+        batch: ListBatch<T>;
+        loadedAt: number;
+    } | null>(null);
+    const loader = React.useCallback(
+        async (request: ListRequest) => {
+            if (!loadItems) {
+                return { items: [], nextCursor: null };
             }
 
-            busy.current = true;
-            const request = new AbortController();
-            controller.current = request;
-            setState((current) => ({
-                ...(cursor === null
-                    ? { source: loadItems, query, items: [], nextCursor: null }
-                    : current),
-                loading: true,
-                error: '',
-            }));
+            if (
+                !request.cursor &&
+                cache.current?.source === loadItems &&
+                cache.current.query === request.query &&
+                Date.now() - cache.current.loadedAt < 30_000
+            ) {
+                return cache.current.batch;
+            }
 
-            try {
-                const result = await loadItems({
-                    query,
-                    cursor,
-                    signal: request.signal,
-                });
+            const epoch = cacheEpoch.current;
+            const batch = await loadItems(request);
 
-                if (request.signal.aborted) {
-                    return;
-                }
-
-                const previous =
-                    cursor !== null &&
-                    cache.current?.source === loadItems &&
-                    cache.current.query === query
-                        ? cache.current.items
-                        : [];
-                const unique = new Map(
-                    previous.map((item) => [keyOf.current(item), item]),
-                );
-                result.items.forEach((item) =>
-                    unique.set(keyOf.current(item), item),
-                );
-                const next = {
+            if (
+                !request.cursor &&
+                !request.signal.aborted &&
+                epoch === cacheEpoch.current
+            ) {
+                cache.current = {
                     source: loadItems,
-                    query,
-                    items: [...unique.values()],
-                    nextCursor:
-                        result.nextCursor === cursor ? null : result.nextCursor,
-                    loading: false,
-                    error: '',
+                    query: request.query,
+                    batch,
+                    loadedAt: Date.now(),
                 };
-                cache.current = { ...next, loadedAt: Date.now() };
-                setState(next);
-            } catch (caught) {
-                if (!request.signal.aborted) {
-                    setState((current) => ({
-                        ...current,
-                        loading: false,
-                        error:
-                            caught instanceof Error
-                                ? caught.message
-                                : 'Pilihan belum dapat dimuat.',
-                    }));
-                }
-            } finally {
-                if (controller.current === request) {
-                    busy.current = false;
-                }
             }
+
+            return batch;
         },
-        [loadItems, query],
+        [loadItems],
     );
-
-    React.useEffect(() => {
-        setVisibleCount(40);
-
-        if (!active || !loadItems) {
-            return;
-        }
-
-        // Cache hanya milik field ini; perubahan scope/source dan aksi tulis membatalkannya.
-        if (
-            cache.current?.source === loadItems &&
-            cache.current.query === query &&
-            Date.now() - cache.current.loadedAt < 30_000
-        ) {
-            setState(cache.current);
-
-            return () => {
-                controller.current?.abort();
-                busy.current = false;
-            };
-        }
-
-        // Membuka daftar kosong langsung fetch; hanya pencarian ketikan yang menunggu debounce.
-        const timer =
-            query.trim() === ''
-                ? null
-                : setTimeout(() => void fetchBatch(null), 250);
-
-        if (timer === null) {
-            void fetchBatch(null);
-        }
-
-        return () => {
-            if (timer !== null) {
-                clearTimeout(timer);
-            }
-
-            controller.current?.abort();
-            busy.current = false;
-        };
-    }, [active, loadItems, fetchBatch, query]);
-
+    const remote = useIncrementalList({
+        loadItems: loader,
+        query,
+        active: active && Boolean(loadItems),
+        getKey: getItemValue,
+    });
     const normalized = query.trim().toLocaleLowerCase('id-ID');
     const filtered = loadItems
         ? []
@@ -189,26 +119,19 @@ export function useInlineLookupData<T>({
         filtered.sort(compareItems);
     }
 
-    const current = state.source === loadItems && state.query === query;
     const displayed = loadItems
-        ? current
-            ? state.items
-            : []
+        ? remote.items
         : filtered.slice(0, visibleCount);
-    const hasMore = loadItems
-        ? current && state.nextCursor !== null
-        : filtered.length > visibleCount;
-    const loading = Boolean(loadItems) && active && (!current || state.loading);
-    const error = current ? state.error : '';
+    const hasMore = loadItems ? remote.hasMore : filtered.length > visibleCount;
     const loadMore = () => {
-        if (loading || error || !hasMore) {
+        if (!hasMore || remote.loading || remote.error) {
             return;
         }
 
         if (loadItems) {
-            void fetchBatch(state.nextCursor);
+            remote.loadMore();
         } else {
-            setVisibleCount((count) => count + 40);
+            setLocalWindow({ query, source: items, count: visibleCount + 40 });
         }
     };
     const onScrollCapture: React.UIEventHandler<HTMLElement> = (event) => {
@@ -225,12 +148,15 @@ export function useInlineLookupData<T>({
     return {
         invalidate: () => {
             cache.current = null;
+            cacheEpoch.current++;
+            remote.reload();
         },
         items: displayed,
-        loading,
-        error,
+        loading: remote.loading,
+        error: remote.error,
         hasMore,
+        loadMore,
         onScrollCapture,
-        retry: () => void fetchBatch(state.nextCursor),
+        retry: remote.retry,
     };
 }

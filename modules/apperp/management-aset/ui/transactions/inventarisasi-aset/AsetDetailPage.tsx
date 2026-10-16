@@ -1,11 +1,3 @@
-import { usePage } from '@inertiajs/react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
-import { ChangeHistory } from '@/components/change-history';
-import type { ChangeHistoryPage } from '@/components/change-history';
-import { RecordFactBox } from '@/components/record-fact-box';
-import { useToday } from '@/hooks/use-work-date';
-import type { Workspace } from '@/types';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
@@ -18,12 +10,21 @@ import { Input } from '@apperp/ui/input';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import { Textarea } from '@apperp/ui/textarea';
+import { usePage } from '@inertiajs/react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import type { ChangeHistoryPage } from '@/components/change-history';
+import { ChangeHistory } from '@/components/change-history';
+import { RecordFactBox } from '@/components/record-fact-box';
+import { useToday } from '@/hooks/use-work-date';
+import type { Workspace } from '@/types';
 import EditShield from '../../_shared/EditShield';
 import { api, errorMessage, toastSaveError } from '../../api';
 import DynamicField from '../../master/DynamicField';
 import type { FieldValue } from '../../master/fields';
 import { emptyValue, payloadValue } from '../../master/fields';
 import { useMasterOptions } from '../../master/useMasterOptions';
+import { useRecordOptions } from '../../use-record-list';
 import AssetDowntimeSection from '../downtime/AssetDowntimeSection';
 import AssetInsuranceSection from '../insurance/AssetInsuranceSection';
 import AssetWarrantySection from '../warranty/AssetWarrantySection';
@@ -104,7 +105,6 @@ export default function AsetDetailPage({
         Record<string, FieldValue>
     >({});
     const [placements, setPlacements] = useState<Placement[]>([]);
-    const [aset, setAset] = useState<Aset[]>([]);
     const [alasanKoreksi, setAlasanKoreksi] = useState('');
 
     const readOnly = mode === 'view';
@@ -122,26 +122,41 @@ export default function AsetDetailPage({
             ? attributesMuatan.items
             : TANPA_ATRIBUT;
 
-    const { options: locationOptions } = useMasterOptions('lokasi-aset');
+    const { options: locationOptions } = useMasterOptions(
+        'lokasi-aset',
+        '',
+        [
+            String(references.lokasi_aset_id ?? ''),
+            ...placements.map((item) => item.lokasi_aset_id ?? ''),
+        ].filter(Boolean),
+    );
     const { options: unitOptions } = useMasterOptions(
         'reference-data/unit-kerja',
+        '',
+        [
+            String(references.usage_org_unit_id ?? ''),
+            ...placements.map((item) => item.usage_org_unit_id ?? ''),
+        ].filter(Boolean),
     );
     const { options: anggotaOptions } = useMasterOptions(
         'reference-data/anggota',
+        '',
+        [
+            String(references.custodian_user_id ?? ''),
+            ...placements.map((item) => item.custodian_user_id ?? ''),
+        ].filter(Boolean),
     );
 
     // Daftar aset hanya dibutuhkan untuk memilih induk, dan itu tidak berlaku saat
     // membaca: menariknya di mode baca berarti satu permintaan untuk kotak yang tidak
     // pernah dibuka.
-    useEffect(() => {
-        if (readOnly) {
-            return;
-        }
 
-        api<{ data: Aset[] }>('/aset')
-            .then((result) => setAset(result.data))
-            .catch(() => setAset([]));
-    }, [readOnly]);
+    const assetSource = useRecordOptions<Aset>(
+        '/aset',
+        (item) => (item.nama ? `${item.kode} \u00b7 ${item.nama}` : item.kode),
+        parentAsetId,
+    );
+    const aset = assetSource.options;
 
     useEffect(() => {
         if (!asetId) {
@@ -742,6 +757,7 @@ export default function AsetDetailPage({
                             ) : (
                                 <Field>
                                     <Select
+                                        {...assetSource.selectProps}
                                         label="Aset induk"
                                         items={parentOptions.map(
                                             (option) => option.label,

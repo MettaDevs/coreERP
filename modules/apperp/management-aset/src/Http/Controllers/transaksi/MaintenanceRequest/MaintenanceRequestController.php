@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\MaintenanceRequest;
 
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\RequestContext;
 use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Database\Eloquent\Builder;
@@ -58,7 +59,9 @@ final class MaintenanceRequestController extends Controller
             $query->where(self::TABLE.'.status', $filter['status']);
         }
 
-        return response()->json(['data' => $query->orderByDesc(self::TABLE.'.created_at')->limit(500)->toBase()->get()]);
+        $list = $query->toBase();
+
+        return response()->json(IncrementalList::query($request, $list, ['id' => 'id', 'kode' => 'kode', 'dibuat' => 'created_at', 'jenis' => 'jenis_permintaan_nama', 'objek' => 'aset_kode', 'deskripsi' => 'deskripsi', 'layanan' => 'tingkat_layanan_nama', 'status' => 'status', 'wo' => 'work_order_kode'], ['kode', 'deskripsi', 'aset_kode', 'aset_nama', 'lokasi_nama', 'jenis_permintaan_nama', 'work_order_kode'], 'dibuat', ['jumlah_baris', 'total_nilai'], 'desc'));
     }
 
     public function show(Request $request, string $id, AssetOrganizationDirectory $people): JsonResponse

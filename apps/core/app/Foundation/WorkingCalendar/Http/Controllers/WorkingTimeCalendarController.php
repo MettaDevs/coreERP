@@ -8,6 +8,7 @@ use App\Foundation\WorkingCalendar\Models\WorkingTimeCalendarDay;
 use App\Foundation\WorkingCalendar\Models\WorkingTimeCalendarLine;
 use App\Foundation\WorkingCalendar\Models\WorkingTimeLine;
 use App\Foundation\WorkingCalendar\Models\WorkingTimeTemplate;
+use App\Foundation\WorkingCalendar\Support\WorkingTimeIntervals;
 use App\Http\Controllers\Controller;
 use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Platform\Modules\Contracts\RowVersion;
@@ -27,9 +28,6 @@ use Inertia\Response;
 
 class WorkingTimeCalendarController extends Controller
 {
-    /** Jam `HH:MM` 00:00–23:59, atau `24:00` untuk akhir hari — bentuk yang juga disimpan pola jam kerja. */
-    private const TIME_PATTERN = '/^(?:(?:[01]\d|2[0-3]):[0-5]\d|24:00)$/';
-
     private const CHUNK = 500;
 
     public function index(Request $request): JsonResponse|Response
@@ -351,8 +349,8 @@ class WorkingTimeCalendarController extends Controller
             'control' => ['required', Rule::in(['open', 'closed'])],
             'closed_for_pickup' => ['nullable', 'boolean'],
             'lines' => ['nullable', 'array', 'max:24'],
-            'lines.*.from_time' => ['nullable', 'string', 'regex:'.self::TIME_PATTERN],
-            'lines.*.to_time' => ['nullable', 'string', 'regex:'.self::TIME_PATTERN],
+            'lines.*.from_time' => ['nullable', 'string', 'regex:'.WorkingTimeIntervals::TIME_PATTERN],
+            'lines.*.to_time' => ['nullable', 'string', 'regex:'.WorkingTimeIntervals::TIME_PATTERN],
             'lines.*.efficiency' => ['nullable', 'numeric', 'min:0', 'max:500'],
             'lines.*.property' => ['nullable', 'string', 'max:50'],
             'lines.*.hours' => ['nullable', 'numeric', 'min:0', 'max:24'],
@@ -361,7 +359,7 @@ class WorkingTimeCalendarController extends Controller
             'lines.*.to_time.regex' => 'Jam selesai ditulis JJ:MM, misalnya 17:00 atau 24:00.',
         ]);
 
-        $lines = isset($validated['lines']) ? $this->normalizeLines($validated['lines']) : null;
+        $lines = isset($validated['lines']) ? array_values(WorkingTimeIntervals::normalize($validated['lines'])) : null;
 
         // Hari dan barisnya milik kalender; yang diklaim kalendernya, record yang dibuka pengguna.
         DB::transaction(function () use ($request, $day, $validated, $calendar, $lines): void {
@@ -663,80 +661,6 @@ class WorkingTimeCalendarController extends Controller
         [$year, $month, $day] = [(int) $parts[1], (int) $parts[2], (int) $parts[3]];
 
         return checkdate($month, $day, $year) ? Carbon::createFromDate($year, $month, $day)->startOfDay() : null;
-    }
-
-    /**
-     * Rapikan baris jam satu hari: jam dihitung dari jam mulai dan selesai, jam terbalik atau
-     * bertumpuk ditolak, dan jumlahnya tidak boleh melebihi 24 jam. Baris tanpa jam mulai dan
-     * selesai tetap boleh — ia membawa jumlah jam seperti baris pola jam kerja.
-     *
-     * @param  array<int, array<string, mixed>>  $lines
-     * @return list<array{from_time: ?string, to_time: ?string, efficiency: float, property: ?string, hours: float}>
-     */
-    private function normalizeLines(array $lines): array
-    {
-        $errors = [];
-        $normalized = [];
-        $ranges = [];
-
-        foreach (array_values($lines) as $index => $line) {
-            $from = $line['from_time'] ?? null;
-            $to = $line['to_time'] ?? null;
-
-            if (($from === null) !== ($to === null)) {
-                $errors["lines.{$index}.to_time"] = 'Isi jam mulai dan jam selesai, atau kosongkan keduanya.';
-
-                continue;
-            }
-
-            $hours = (float) ($line['hours'] ?? 0);
-
-            if ($from !== null && $to !== null) {
-                $start = $this->minutes($from);
-                $end = $this->minutes($to);
-
-                if ($end <= $start) {
-                    $errors["lines.{$index}.to_time"] = 'Jam selesai harus setelah jam mulai.';
-
-                    continue;
-                }
-
-                $hours = round(($end - $start) / 60, 2);
-                $ranges[] = ['index' => $index, 'start' => $start, 'end' => $end];
-            }
-
-            $normalized[] = [
-                'from_time' => $from,
-                'to_time' => $to,
-                'efficiency' => (float) ($line['efficiency'] ?? 100),
-                'property' => $line['property'] ?? null,
-                'hours' => $hours,
-            ];
-        }
-
-        usort($ranges, fn (array $a, array $b): int => $a['start'] <=> $b['start']);
-        for ($i = 1; $i < count($ranges); $i++) {
-            if ($ranges[$i]['start'] < $ranges[$i - 1]['end']) {
-                $errors["lines.{$ranges[$i]['index']}.from_time"] = 'Rentang jam ini bertumpuk dengan baris lain.';
-            }
-        }
-
-        if ($errors === [] && array_sum(array_column($normalized, 'hours')) > 24) {
-            $errors['lines'] = 'Jumlah jam dalam satu hari tidak boleh lebih dari 24.';
-        }
-
-        if ($errors !== []) {
-            throw ValidationException::withMessages($errors);
-        }
-
-        return $normalized;
-    }
-
-    private function minutes(string $time): int
-    {
-        [$hours, $minutes] = array_map('intval', explode(':', $time));
-
-        return $hours * 60 + $minutes;
     }
 
     /** Salin seluruh hari dan jam kerja satu kalender ke kalender lain, dengan perintah massal. */

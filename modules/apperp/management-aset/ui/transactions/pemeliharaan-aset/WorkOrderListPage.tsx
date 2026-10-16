@@ -1,6 +1,3 @@
-import { FileOutput } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
 import { DataTable } from '@apperp/ui/data-table';
@@ -18,8 +15,10 @@ import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Switch } from '@apperp/ui/switch';
-import { api, errorMessage } from '../../api';
+import { FileOutput } from 'lucide-react';
+import { useState } from 'react';
 import { requestPrint } from '../../print';
+import { useRecordList } from '../../use-record-list';
 import type { WorkOrder } from './workOrder';
 import {
     STATUS,
@@ -41,57 +40,22 @@ export default function WorkOrderListPage({
     permissions: string[];
 }) {
     const can = izin(permissions);
-    const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
     const [hanyaPekerjaanSaya, setHanyaPekerjaanSaya] = useState(false);
-    const [pekerjaanSaya, setPekerjaanSaya] = useState<
-        Record<string, unknown>[]
-    >([]);
     const [search, setSearch] = useState('');
-
-    useEffect(() => {
-        api<{ data: WorkOrder[] }>('/pemeliharaan-aset')
-            .then((result) => setWorkOrders(result.data))
-            .catch((caught) =>
-                toast.error(
-                    errorMessage(caught, 'Work order belum dapat dimuat.'),
-                ),
-            );
-    }, []);
-
-    useEffect(() => {
-        if (!hanyaPekerjaanSaya) {
-            return;
-        }
-
-        api<{ data: Record<string, unknown>[] }>('/pemeliharaan-aset/saya')
-            .then((result) => setPekerjaanSaya(result.data))
-            .catch((caught) =>
-                toast.error(
-                    errorMessage(
-                        caught,
-                        'Daftar pekerjaan Anda belum dapat dimuat.',
-                    ),
-                ),
-            );
-    }, [hanyaPekerjaanSaya]);
-
-    const query = search.trim().toLowerCase();
-    const visibleWorkOrders =
-        query === ''
-            ? workOrders
-            : workOrders.filter((workOrder) =>
-                  [
-                      workOrder.kode,
-                      workOrder.tipe_work_order_nama,
-                      workOrder.keterangan,
-                      workOrder.tingkat_layanan_nama,
-                      STATUS[workOrder.status]?.label,
-                  ].some((value) =>
-                      String(value ?? '')
-                          .toLowerCase()
-                          .includes(query),
-                  ),
-              );
+    const workOrderList = useRecordList<WorkOrder>(
+        '/pemeliharaan-aset',
+        search,
+        {},
+        !hanyaPekerjaanSaya,
+    );
+    const jobList = useRecordList<Record<string, unknown> & { id: string }>(
+        '/pemeliharaan-aset/saya',
+        search,
+        {},
+        hanyaPekerjaanSaya,
+    );
+    const visibleWorkOrders = workOrderList.items;
+    const pekerjaanSaya = jobList.items;
 
     const workOrderColumns: DataTableColumn<WorkOrder>[] = [
         {
@@ -259,7 +223,7 @@ export default function WorkOrderListPage({
             }
         >
             {hanyaPekerjaanSaya ? (
-                !pekerjaanSaya.length ? (
+                !pekerjaanSaya.length && !jobList.loading && !jobList.error ? (
                     <Empty>
                         <EmptyHeader>
                             <EmptyTitle>
@@ -274,6 +238,9 @@ export default function WorkOrderListPage({
                 ) : (
                     <DataTable
                         columns={pekerjaanSayaColumns}
+                        incremental={jobList}
+                        sort={jobList.sort}
+                        onSortChange={jobList.onSortChange}
                         data={pekerjaanSaya}
                         getRowKey={(job) => String(job.id)}
                         getRowLabel={(job) =>
@@ -302,16 +269,6 @@ export default function WorkOrderListPage({
                         }}
                     />
                 )
-            ) : !workOrders.length ? (
-                <Empty>
-                    <EmptyHeader>
-                        <EmptyTitle>Belum ada work order</EmptyTitle>
-                        <EmptyDescription>
-                            Work order memuat baris pekerjaan per aset, sehingga
-                            satu perintah kerja dapat mencakup beberapa aset.
-                        </EmptyDescription>
-                    </EmptyHeader>
-                </Empty>
             ) : (
                 <div className="flex h-full min-h-0 flex-col">
                     <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end sm:justify-between">
@@ -334,6 +291,9 @@ export default function WorkOrderListPage({
                     <DataTable
                         className="min-h-0 flex-1"
                         columns={workOrderColumns}
+                        incremental={workOrderList}
+                        sort={workOrderList.sort}
+                        onSortChange={workOrderList.onSortChange}
                         data={visibleWorkOrders}
                         getRowKey={(workOrder) => workOrder.id}
                         getRowLabel={(workOrder) => workOrder.kode}

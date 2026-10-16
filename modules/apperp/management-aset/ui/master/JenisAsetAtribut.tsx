@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
 import { Button } from '@apperp/ui/button';
 import { Field, FieldLabel } from '@apperp/ui/field';
 import { Switch } from '@apperp/ui/switch';
 import { TransferList } from '@apperp/ui/transfer-list';
 import type { TransferListItem } from '@apperp/ui/transfer-list';
+import { useEffect, useState } from 'react';
 import { api, errorMessage } from '../api';
+import { useMasterOptions } from './useMasterOptions';
 import type { MasterOption } from './useMasterOptions';
 
 type Row = { tipe_atribut_id: string; wajib: boolean };
@@ -33,28 +34,27 @@ export default function JenisAsetAtribut({
     version: number;
     onVersionChange: (version: number) => void;
 }) {
-    const [types, setTypes] = useState<MasterOption[]>([]);
     const [rows, setRows] = useState<Row[]>([]);
+    const source = useMasterOptions(
+        'tipe-atribut',
+        '',
+        rows.map((row) => row.tipe_atribut_id),
+    );
+    const types = source.options;
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
-        Promise.all([
-            api<{ data: MasterOption[] }>(
-                '/tipe-atribut?per_page=100&aktif=true',
-            ),
-            api<{ data: Record<string, unknown>[] }>(
-                `/jenis-aset/${jenisAsetId}/atribut`,
-            ),
-        ])
-            .then(([typeList, assigned]) => {
+        api<{ data: Record<string, unknown>[] }>(
+            `/jenis-aset/${jenisAsetId}/atribut`,
+        )
+            .then((assigned) => {
                 if (cancelled) {
                     return;
                 }
 
-                setTypes(typeList.data);
                 setRows(
                     assigned.data.map((row) => ({
                         tipe_atribut_id: String(row.tipe_atribut_id ?? ''),
@@ -122,6 +122,7 @@ export default function JenisAsetAtribut({
     };
 
     const remaining: TransferListItem[] = types
+        .filter((type) => source.selectProps.visibleValues.includes(type.id))
         .filter((type) => !rows.some((row) => row.tipe_atribut_id === type.id))
         .map(itemOf);
     const selected: TransferListItem[] = rows.map((row) =>
@@ -178,6 +179,9 @@ export default function JenisAsetAtribut({
             </p>
 
             <TransferList
+                incremental={source.selectProps.incremental}
+                searchValue={source.selectProps.searchValue}
+                onSearchChange={source.selectProps.onSearchChange}
                 remaining={remaining}
                 selected={selected}
                 onChange={applyTransfer}

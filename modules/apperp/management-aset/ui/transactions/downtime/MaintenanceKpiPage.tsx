@@ -1,6 +1,3 @@
-import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
-import { useToday } from '@/hooks/use-work-date';
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
 import {
@@ -12,6 +9,9 @@ import {
 import { Input } from '@apperp/ui/input';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import { useToday } from '@/hooks/use-work-date';
 import { api, errorMessage } from '../../api';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import type { KpiFigures, KpiRow } from './downtime';
@@ -200,6 +200,7 @@ export default function MaintenanceKpiPage() {
                 </div>
                 <div className="w-full sm:w-56">
                     <Select
+                        {...types.selectProps}
                         label="Jenis aset"
                         items={[
                             { value: '', label: 'Semua jenis' },
@@ -216,6 +217,7 @@ export default function MaintenanceKpiPage() {
                 </div>
                 <div className="w-full sm:w-56">
                     <Select
+                        {...locations.selectProps}
                         label="Lokasi"
                         items={[
                             { value: '', label: 'Semua lokasi' },

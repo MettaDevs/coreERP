@@ -56,8 +56,8 @@ class ProfilPenyusutanTest extends TestCase
 
         $this->request('get', '/api/modules/management-aset/v1/profil-penyusutan')
             ->assertOk()
-            ->assertJsonPath('meta.total', 2)
-            ->assertJsonPath('meta.current_page', 1);
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('next_cursor', null);
     }
 
     /**

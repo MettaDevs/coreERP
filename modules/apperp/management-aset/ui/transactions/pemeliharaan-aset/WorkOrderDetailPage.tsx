@@ -1,6 +1,3 @@
-import { Printer } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
 import {
@@ -21,6 +18,9 @@ import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
+import { Printer } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import EditShield from '../../_shared/EditShield';
 import {
     api,
@@ -29,6 +29,7 @@ import {
     toastSaveError,
 } from '../../api';
 import { requestPrint } from '../../print';
+import { useRecordOptions } from '../../use-record-list';
 import WarrantyNotice from '../warranty/WarrantyNotice';
 import type {
     ChecklistRow,
@@ -55,7 +56,6 @@ import {
 type Mode = 'view' | 'edit' | 'create';
 
 /** Dipakai bersama saat varian jenis pekerjaan belum termuat, agar identitasnya tetap. */
-const TANPA_VARIAN: Option[] = [];
 
 function JobRow({
     job,
@@ -63,11 +63,6 @@ function JobRow({
     canRemove,
     readOnly,
     onRequestEdit,
-    aset,
-    asetItems,
-    jobTypes,
-    trades,
-    onAsetSearch,
     onChange,
     onRemove,
 }: {
@@ -79,51 +74,39 @@ function JobRow({
     /** Dipanggil saat pengguna menyentuh baris ini selagi mode baca. */
     onRequestEdit: () => void;
     /** Daftar penuh; dipakai untuk menampilkan aset yang sedang terpilih walau tersaring keluar. */
-    aset: Option[];
     /** Daftar yang lolos pencarian; hanya mengisi pilihan dropdown. */
-    asetItems: Option[];
-    jobTypes: Option[];
-    trades: Option[];
-    onAsetSearch: (query: string) => void;
     onChange: (change: Partial<JobLine>) => void;
     onRemove: () => void;
 }) {
-    // Varian dicatat bersama jenis pekerjaan yang memintanya; selama jenisnya belum
-    // cocok, pilihannya kosong. Dihitung saat render, jadi ganti jenis pekerjaan tidak
-    // pernah menyisakan satu frame berisi varian milik jenis sebelumnya.
-    const [variantsMuatan, setVariantsMuatan] = useState<{
-        jobTypeId: string;
-        items: Option[];
-    } | null>(null);
-    const jobTypeId = job.maintenance_job_type_id;
-    const variants =
-        jobTypeId && variantsMuatan?.jobTypeId === jobTypeId
-            ? variantsMuatan.items
-            : TANPA_VARIAN;
-
-    useEffect(() => {
-        if (!jobTypeId) {
-            return;
-        }
-
-        let dibatalkan = false;
-        api<{ data: Option[] }>(`/maintenance-job-types/${jobTypeId}/variants`)
-            .then((result) => {
-                if (!dibatalkan) {
-                    setVariantsMuatan({ jobTypeId, items: result.data });
-                }
-            })
-            .catch(() => {
-                if (!dibatalkan) {
-                    setVariantsMuatan({ jobTypeId, items: [] });
-                }
-            });
-
-        return () => {
-            dibatalkan = true;
-        };
-    }, [jobTypeId]);
-
+    const assetSource = useRecordOptions<Option>(
+        '/aset',
+        (item) => labelDari(item) ?? '',
+        job.aset_id,
+    );
+    const jobSource = useRecordOptions<Option>(
+        job.aset_id
+            ? `/pemeliharaan-aset/referensi/job-types?aset_id=${encodeURIComponent(job.aset_id)}`
+            : null,
+        (item) => labelDari(item) ?? '',
+        job.maintenance_job_type_id,
+    );
+    const variantSource = useRecordOptions<Option>(
+        job.maintenance_job_type_id
+            ? `/maintenance-job-types/${job.maintenance_job_type_id}/variants`
+            : null,
+        (item) => labelDari(item) ?? '',
+        job.variant_id,
+    );
+    const tradeSource = useRecordOptions<Option>(
+        '/trade?aktif=true',
+        (item) => labelDari(item) ?? '',
+        job.trade_id,
+    );
+    const aset = assetSource.options,
+        asetItems = aset,
+        jobTypes = jobSource.options,
+        variants = variantSource.options,
+        trades = tradeSource.options;
     const pilih = (options: Option[], id: string) =>
         options.find((option) => option.id === id);
     const teks = (label: string) => ({
@@ -157,6 +140,7 @@ function JobRow({
                         <Select
                             label="Aset"
                             required
+                            {...assetSource.selectProps}
                             items={asetItems.map(
                                 (aset) => labelDari(aset) ?? '',
                             )}
@@ -164,7 +148,6 @@ function JobRow({
                             placeholder="Pilih aset"
                             searchPlaceholder="Cari kode atau nama aset"
                             ariaLabel={`Aset baris ${index + 1}`}
-                            onSearchChange={onAsetSearch}
                             onValueChange={(value) =>
                                 onChange({
                                     aset_id: idDari(aset, value),
@@ -184,6 +167,7 @@ function JobRow({
                         <Select
                             label="Jenis pekerjaan"
                             required
+                            {...jobSource.selectProps}
                             items={jobTypes.map(
                                 (type) => labelDari(type) ?? '',
                             )}
@@ -213,6 +197,7 @@ function JobRow({
                     >
                         <Select
                             label="Varian pekerjaan"
+                            {...variantSource.selectProps}
                             items={variants.map(
                                 (variant) => labelDari(variant) ?? '',
                             )}
@@ -240,6 +225,7 @@ function JobRow({
                     >
                         <Select
                             label="Bidang keahlian"
+                            {...tradeSource.selectProps}
                             items={trades.map(
                                 (trade) => labelDari(trade) ?? '',
                             )}
@@ -560,16 +546,34 @@ export default function WorkOrderDetailPage({
     const [record, setRecord] = useState<EditableWorkOrder | undefined>(
         mode === 'create' ? emptyWorkOrder() : undefined,
     );
-    const [tipe, setTipe] = useState<Option[]>([]);
-    const [layanan, setLayanan] = useState<Option[]>([]);
-    const [aset, setAset] = useState<Option[]>([]);
-    const [jobTypesByAset, setJobTypesByAset] = useState<
-        Record<string, Option[]>
-    >({});
-    const [trades, setTrades] = useState<Option[]>([]);
-    const [faultCauses, setFaultCauses] = useState<Option[]>([]);
-    const [repairActions, setRepairActions] = useState<Option[]>([]);
-    const [asetSearch, setAsetSearch] = useState('');
+    const typeSource = useRecordOptions<Option>(
+        bolehSusun ? '/tipe-work-order?aktif=true' : null,
+        (item) => labelDari(item) ?? '',
+        record?.tipe_work_order_id ?? '',
+    );
+    const serviceSource = useRecordOptions<Option>(
+        bolehSusun ? '/tingkat-layanan?aktif=true' : null,
+        (item) => labelDari(item) ?? '',
+        record?.tingkat_layanan_id ?? '',
+    );
+    const faultSource = useRecordOptions<Option>(
+        bolehSusun ? '/sebab-kerusakan?aktif=true' : null,
+        (item) => labelDari(item) ?? '',
+        record?.details
+            .map((job) => job.sebab_kerusakan_id ?? '')
+            .filter(Boolean) ?? [],
+    );
+    const repairSource = useRecordOptions<Option>(
+        bolehSusun ? '/tindakan-perbaikan?aktif=true' : null,
+        (item) => labelDari(item) ?? '',
+        record?.details
+            .map((job) => job.tindakan_perbaikan_id ?? '')
+            .filter(Boolean) ?? [],
+    );
+    const tipe = typeSource.options,
+        layanan = serviceSource.options,
+        faultCauses = faultSource.options,
+        repairActions = repairSource.options;
     // Checklist dicatat bersama job yang alamatnya membukanya. Menutup checklist berarti
     // `checklistJobId` hilang dari alamat, dan isinya ikut hilang saat render itu juga —
     // tanpa effect yang perlu mengosongkannya lebih dulu.
@@ -578,24 +582,6 @@ export default function WorkOrderDetailPage({
         rows: ChecklistRow[];
     } | null>(null);
     const [saving, setSaving] = useState(false);
-
-    const loadJobTypesForAset = useCallback(async (asetId: string) => {
-        if (!asetId) {
-            return;
-        }
-
-        try {
-            const result = await api<{ data: Option[] }>(
-                `/pemeliharaan-aset/referensi/job-types?aset_id=${encodeURIComponent(asetId)}`,
-            );
-            setJobTypesByAset((current) => ({
-                ...current,
-                [asetId]: result.data,
-            }));
-        } catch {
-            toast.error('Jenis pekerjaan untuk aset belum dapat dimuat.');
-        }
-    }, []);
 
     // Effect di bawah adalah satu-satunya pembaca work order dari server. Setelah pindah
     // status atau simpan hasil pekerjaan, pembacaan ulang dinyatakan dengan menaikkan
@@ -645,9 +631,6 @@ export default function WorkOrderDetailPage({
                         catatan: job.catatan ?? '',
                     }),
                 );
-                await Promise.all(
-                    details.map((job) => loadJobTypesForAset(job.aset_id)),
-                );
 
                 if (dibatalkan) {
                     return;
@@ -676,51 +659,7 @@ export default function WorkOrderDetailPage({
         return () => {
             dibatalkan = true;
         };
-    }, [loadJobTypesForAset, mode, versiMuat, workOrderId]);
-
-    useEffect(() => {
-        if (!bolehSusun) {
-            return;
-        }
-
-        const muat = (
-            path: string,
-            set: (options: Option[]) => void,
-            gagal: string,
-        ) =>
-            api<{ data: Option[] }>(path)
-                .then((result) => set(result.data))
-                .catch(() => toast.error(gagal));
-        void muat(
-            '/tipe-work-order?per_page=100&aktif=true',
-            setTipe,
-            'Tipe work order belum dapat dimuat.',
-        );
-        void muat(
-            '/tingkat-layanan?per_page=100&aktif=true',
-            setLayanan,
-            'Tingkat layanan belum dapat dimuat.',
-        );
-        void muat(
-            '/trade?per_page=100&aktif=true',
-            setTrades,
-            'Bidang keahlian belum dapat dimuat.',
-        );
-        void muat(
-            '/sebab-kerusakan?per_page=100&aktif=true',
-            setFaultCauses,
-            'Sebab kerusakan belum dapat dimuat.',
-        );
-        void muat(
-            '/tindakan-perbaikan?per_page=100&aktif=true',
-            setRepairActions,
-            'Tindakan perbaikan belum dapat dimuat.',
-        );
-        // Register aset dikembalikan utuh oleh `/aset` tanpa parameter pencarian, jadi
-        // penyaringan dilakukan di sini. Mengirim `q` ke server hanya akan diabaikan diam-diam
-        // dan membuat kotak pencarian terlihat bekerja padahal tidak.
-        void muat('/aset', setAset, 'Aset belum dapat dimuat.');
-    }, [bolehSusun]);
+    }, [mode, versiMuat, workOrderId]);
 
     // Checklist yang terbuka ikut alamat: menutupnya berarti kembali ke alamat rincian,
     // sehingga tombol kembali peramban tidak membuka ulang checklist yang sudah ditutup.
@@ -756,16 +695,6 @@ export default function WorkOrderDetailPage({
         checklistJobId && checklistMuatan?.jobId === checklistJobId
             ? checklistMuatan.rows
             : undefined;
-
-    const asetQuery = asetSearch.trim().toLowerCase();
-    const asetTersaring =
-        asetQuery === ''
-            ? aset
-            : aset.filter((aset) =>
-                  `${aset.kode} ${aset.nama ?? ''}`
-                      .toLowerCase()
-                      .includes(asetQuery),
-              );
 
     const pindahStatus = async (ke: string, label: string) => {
         if (!record?.id || !record.kode) {
@@ -1070,6 +999,7 @@ export default function WorkOrderDetailPage({
                 return canEditExecution ? (
                     <div className="flex flex-col gap-2">
                         <Select
+                            {...faultSource.selectProps}
                             items={faultCauses.map(
                                 (option) => labelDari(option) ?? '',
                             )}
@@ -1128,6 +1058,7 @@ export default function WorkOrderDetailPage({
                 return canEditExecution ? (
                     <div className="flex flex-col gap-2">
                         <Select
+                            {...repairSource.selectProps}
                             items={repairActions.map(
                                 (option) => labelDari(option) ?? '',
                             )}
@@ -1319,6 +1250,7 @@ export default function WorkOrderDetailPage({
                                             <Select
                                                 label="Tipe work order"
                                                 required
+                                                {...typeSource.selectProps}
                                                 items={tipe.map(
                                                     (option) =>
                                                         labelDari(option) ?? '',
@@ -1356,6 +1288,7 @@ export default function WorkOrderDetailPage({
                                         >
                                             <Select
                                                 label="Tingkat layanan"
+                                                {...serviceSource.selectProps}
                                                 items={layanan.map(
                                                     (option) =>
                                                         labelDari(option) ?? '',
@@ -1513,16 +1446,9 @@ export default function WorkOrderDetailPage({
                                             ''
                                         ).slice(0, 10)}
                                         labelOf={(asetId) =>
-                                            labelDari(
-                                                aset.find(
-                                                    (option) =>
-                                                        option.id === asetId,
-                                                ),
-                                            ) ??
                                             record.details.find(
                                                 (job) => job.aset_id === asetId,
-                                            )?.aset_kode ??
-                                            'Aset'
+                                            )?.aset_kode ?? 'Aset'
                                         }
                                     />
                                     <div className="flex items-center justify-end">
@@ -1583,25 +1509,7 @@ export default function WorkOrderDetailPage({
                                                 }
                                                 readOnly={readOnly}
                                                 onRequestEdit={mintaSunting}
-                                                aset={aset}
-                                                asetItems={asetTersaring}
-                                                jobTypes={
-                                                    jobTypesByAset[
-                                                        job.aset_id
-                                                    ] ?? []
-                                                }
-                                                trades={trades}
-                                                onAsetSearch={setAsetSearch}
                                                 onChange={(change) => {
-                                                    if (
-                                                        'aset_id' in change &&
-                                                        change.aset_id
-                                                    ) {
-                                                        void loadJobTypesForAset(
-                                                            change.aset_id,
-                                                        );
-                                                    }
-
                                                     setRecord({
                                                         ...record,
                                                         details:

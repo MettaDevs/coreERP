@@ -4,7 +4,7 @@
   get:
     tags: [Pemeliharaan preventif]
     operationId: listCounterTypes
-    parameters: [$ref: '#/components/parameters/Search', $ref: '#/components/parameters/ActiveFilter', $ref: '#/components/parameters/Page', $ref: '#/components/parameters/PerPage']
+    parameters: [$ref: '#/components/parameters/Search', $ref: '#/components/parameters/ActiveFilter', $ref: '#/components/parameters/Cursor', $ref: '#/components/parameters/PerPage']
     responses: {'200': {description: Daftar jenis counter, content: {application/json: {schema: {$ref: '#/components/schemas/CounterTypeList'}}}}}
   post:
     tags: [Pemeliharaan preventif]
@@ -71,7 +71,7 @@
   get:
     tags: [Pemeliharaan preventif]
     operationId: listMaintenancePlans
-    parameters: [$ref: '#/components/parameters/Search', $ref: '#/components/parameters/ActiveFilter', $ref: '#/components/parameters/Page', $ref: '#/components/parameters/PerPage']
+    parameters: [$ref: '#/components/parameters/Search', $ref: '#/components/parameters/ActiveFilter', $ref: '#/components/parameters/Cursor', $ref: '#/components/parameters/PerPage']
     responses: {'200': {description: Daftar rencana pemeliharaan, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenancePlanList'}}}}}
   post:
     tags: [Pemeliharaan preventif]

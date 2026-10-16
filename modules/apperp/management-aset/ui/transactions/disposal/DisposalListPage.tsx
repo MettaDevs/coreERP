@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
+
 import { ActionButton } from '@apperp/ui/action-button';
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
@@ -12,7 +11,8 @@ import {
 import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
-import { api, errorMessage } from '../../api';
+import { useState } from 'react';
+import { useRecordList } from '../../use-record-list';
 import type { Disposal, DisposalResource } from './disposal';
 import {
     DISPOSALS,
@@ -38,53 +38,12 @@ export default function DisposalListPage({
 }) {
     const jenis = DISPOSALS[resource];
     const can = izin(resource, permissions);
-    const [daftar, setDaftar] = useState<Disposal[]>([]);
     const [search, setSearch] = useState('');
-    const [memuat, setMemuat] = useState(true);
 
-    useEffect(() => {
-        let dibatalkan = false;
-        api<{ data: Disposal[] }>(`/${resource}`)
-            .then((result) => {
-                if (!dibatalkan) {
-                    setDaftar(result.data);
-                }
-            })
-            .catch((caught) => {
-                if (!dibatalkan) {
-                    toast.error(
-                        errorMessage(caught, 'Dokumen belum dapat dimuat.'),
-                    );
-                }
-            })
-            .finally(() => {
-                if (!dibatalkan) {
-                    setMemuat(false);
-                }
-            });
-
-        return () => {
-            dibatalkan = true;
-        };
-    }, [resource]);
-
-    const query = search.trim().toLowerCase();
-    const terlihat =
-        query === ''
-            ? daftar
-            : daftar.filter((baris) =>
-                  [
-                      baris.kode,
-                      baris.aset_kode,
-                      baris.aset_nama,
-                      baris.keterangan,
-                      STATUS[baris.status]?.label,
-                  ].some((value) =>
-                      String(value ?? '')
-                          .toLowerCase()
-                          .includes(query),
-                  ),
-              );
+    const list = useRecordList<Disposal>(`/${resource}`, search);
+    const daftar = list.items;
+    const terlihat = daftar;
+    const memuat = list.loading;
 
     const columns: DataTableColumn<Disposal>[] = [
         {
@@ -173,6 +132,9 @@ export default function DisposalListPage({
             ) : (
                 <DataTable
                     columns={columns}
+                    incremental={list}
+                    sort={list.sort}
+                    onSortChange={list.onSortChange}
                     data={terlihat}
                     getRowKey={(baris) => baris.id}
                     getRowLabel={(baris) => baris.kode}

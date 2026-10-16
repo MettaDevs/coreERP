@@ -18,9 +18,9 @@ use App\Platform\Organization\Http\Requests\OrganizationRequest;
 use App\Platform\Organization\Http\Requests\UpdateOrganizationRequest;
 use App\Platform\Organization\Models\HierarchyPurpose;
 use App\Platform\Organization\Models\Organization;
-use App\Platform\Organization\Models\OrganizationHierarchy;
 use App\Platform\Organization\Models\OrganizationHierarchyNode;
 use App\Platform\Organization\Models\OrganizationHierarchyVersion;
+use App\Platform\Organization\Support\OrganizationPageRecords;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -47,44 +47,30 @@ class OrganizationController extends Controller
         $section = in_array($section, ['legal-entities', 'operating-units', 'hierarchies'], true)
             ? $section
             : 'legal-entities';
-        $organizations = Organization::query()
-            ->where('tenant_id', $membership->tenant_id)
-            ->with(['legalEntity', 'operatingUnit'])
-            ->orderBy('name')
-            ->get();
-
-        if ($request->is('api/*')) {
-            return response()->json(['data' => $organizations]);
+        if ($request->boolean('incremental')) {
+            return response()->json(OrganizationPageRecords::batch($request, $membership->tenant_id, $section));
         }
-
+        if ($request->is('api/*')) {
+            return response()->json(['data' => Organization::query()->where('tenant_id', $membership->tenant_id)->with(['legalEntity', 'operatingUnit'])->orderBy('name')->get()]);
+        }
+        $savedOrganizationId = $request->session()->get('saved_organization_id');
+        $savedHierarchyId = $request->session()->get('saved_hierarchy_id');
         $props = [
+            'scopeKey' => $membership->tenant_id,
             'canManage' => $membership->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE),
             'operatingUnitTypes' => config('coreerp.operating_unit_types'),
+            'organizations' => [],
         ];
         if ($section !== 'hierarchies') {
             return Inertia::render('platform/organization/'.$section, $props + [
-                'organizations' => $organizations->where('classification', $section === 'operating-units' ? 'operating_unit' : 'legal_entity')->values(),
+                'savedOrganization' => $savedOrganizationId ? Organization::query()->where('tenant_id', $membership->tenant_id)->with(['legalEntity', 'operatingUnit'])->find($savedOrganizationId) : null,
                 'timezones' => UserClock::options(),
             ]);
         }
 
-        $hierarchies = OrganizationHierarchy::query()
-            ->where('tenant_id', $membership->tenant_id)
-            ->with([
-                'purposes:id,code,name',
-                'purposes.allowedOrganizationTypes',
-                'versions' => fn ($query) => $query->orderByDesc('version_number'),
-                'versions.nodes.organization:id,name,classification',
-                'versions.nodes.organization.operatingUnit:organization_id,type,number',
-                'versions.nodes.parentNode:id,organization_id',
-                'versions.nodes.parentNode.organization:id,name',
-            ])
-            ->orderBy('name')
-            ->get();
-
         return Inertia::render('platform/organization/hierarchies', $props + [
-            'organizations' => $organizations,
-            'hierarchies' => $hierarchies,
+            'hierarchies' => [],
+            'savedHierarchy' => $savedHierarchyId ? OrganizationPageRecords::hierarchy($membership->tenant_id, $savedHierarchyId) : null,
             'purposes' => HierarchyPurpose::query()->orderBy('name')->get(['code', 'name', 'description']),
         ]);
     }
@@ -95,7 +81,7 @@ class OrganizationController extends Controller
 
         return $request->is('api/*')
             ? response()->json(['data' => $organization], 201, ['Location' => "/api/v1/organizations/{$organization->id}"])
-            : back()->with('status', 'Organisasi dibuat.');
+            : back()->with('saved_organization_id', $organization->id)->with('status', 'Organisasi dibuat.');
     }
 
     public function update(UpdateOrganizationRequest $request, Organization $organization, UpdateOrganization $action): JsonResponse|RedirectResponse
@@ -104,14 +90,14 @@ class OrganizationController extends Controller
 
         return $request->is('api/*')
             ? response()->json(['data' => $organization])
-            : back()->with('status', 'Organisasi diperbarui.');
+            : back()->with('saved_organization_id', $organization->id)->with('status', 'Organisasi diperbarui.');
     }
 
     public function storeHierarchy(HierarchyRequest $request, CreateOrganizationHierarchy $action): RedirectResponse
     {
-        $action->handle($this->currentMembership($request), $request->payload());
+        $hierarchy = $action->handle($this->currentMembership($request), $request->payload());
 
-        return back()->with('status', 'Draft hierarchy dibuat.');
+        return back()->with('saved_hierarchy_id', $hierarchy->id)->with('status', 'Draft hierarchy dibuat.');
     }
 
     public function place(Request $request, OrganizationHierarchyVersion $version, PlaceOrganizationInHierarchy $action): RedirectResponse
@@ -130,7 +116,7 @@ class OrganizationController extends Controller
             );
         });
 
-        return back()->with('status', 'Organisasi ditempatkan pada draft hierarchy.');
+        return back()->with('saved_hierarchy_id', $version->hierarchy_id)->with('status', 'Organisasi ditempatkan pada draft hierarchy.');
     }
 
     public function unplace(Request $request, OrganizationHierarchyVersion $version, OrganizationHierarchyNode $node, UnplaceOrganizationFromHierarchy $action): RedirectResponse
@@ -140,7 +126,7 @@ class OrganizationController extends Controller
             $action->handle($this->currentMembership($request), $version, $node);
         });
 
-        return back()->with('status', 'Penempatan organisasi dibatalkan.');
+        return back()->with('saved_hierarchy_id', $version->hierarchy_id)->with('status', 'Penempatan organisasi dibatalkan.');
     }
 
     public function createDraft(Request $request, OrganizationHierarchyVersion $version, CreateOrganizationHierarchyDraft $action): RedirectResponse
@@ -151,7 +137,7 @@ class OrganizationController extends Controller
             $action->handle($this->currentMembership($request), $version, $data['effective_from']);
         });
 
-        return back()->with('status', 'Draft versi baru dibuat. Susun perubahan lalu publikasikan.');
+        return back()->with('saved_hierarchy_id', $version->hierarchy_id)->with('status', 'Draft versi baru dibuat. Susun perubahan lalu publikasikan.');
     }
 
     public function publish(Request $request, OrganizationHierarchyVersion $version, PublishOrganizationHierarchy $action): RedirectResponse
@@ -161,7 +147,7 @@ class OrganizationController extends Controller
             $action->handle($this->currentMembership($request), $version);
         });
 
-        return back()->with('status', 'Hierarchy dipublikasikan.');
+        return back()->with('saved_hierarchy_id', $version->hierarchy_id)->with('status', 'Hierarchy dipublikasikan.');
     }
 
     /**

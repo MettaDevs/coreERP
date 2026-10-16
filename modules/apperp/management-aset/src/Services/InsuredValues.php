@@ -16,6 +16,13 @@ use Modules\Apperp\ManagementAset\Models\transaksi\Insurance\InsuranceCoverage;
  */
 final class InsuredValues
 {
+    public function perPolicyQuery(string $date): Builder
+    {
+        return $this->active($date)
+            ->groupBy('aset_tr_pertanggungan_asuransi.polis_asuransi_id')
+            ->selectRaw('aset_tr_pertanggungan_asuransi.polis_asuransi_id, sum(aset_tr_pertanggungan_asuransi.nilai_pertanggungan) as total');
+    }
+
     /**
      * Total per aset: `aset_id`, `total` — untuk digabung ke query aset.
      */
@@ -37,10 +44,8 @@ final class InsuredValues
         }
 
         $totals = [];
-        $rows = $this->active($date)
+        $rows = $this->perPolicyQuery($date)
             ->whereIn('aset_tr_pertanggungan_asuransi.polis_asuransi_id', $policyIds)
-            ->groupBy('aset_tr_pertanggungan_asuransi.polis_asuransi_id')
-            ->selectRaw('aset_tr_pertanggungan_asuransi.polis_asuransi_id, sum(aset_tr_pertanggungan_asuransi.nilai_pertanggungan) as total')
             ->get();
         foreach ($rows as $row) {
             $totals[(string) $row->polis_asuransi_id] = number_format((float) $row->total, 2, '.', '');

@@ -1,23 +1,46 @@
 import { ActionButton } from '@apperp/ui/action-button';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@apperp/ui/alert-dialog';
+import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import { Checkbox } from '@apperp/ui/checkbox';
 import {
     CollapsibleSection,
     CollapsibleSectionGroup,
 } from '@apperp/ui/collapsible-section';
+import { DataTable, DataTableText } from '@apperp/ui/data-table';
 import {
-    Dialog,
-    DialogAction,
-    DialogBody,
-    DialogCancel,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogToolbar,
-} from '@apperp/ui/dialog';
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyTitle,
+} from '@apperp/ui/empty';
+import { FieldHint, FieldLabel } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
+import { Label } from '@apperp/ui/label';
+import { ListPageLayout } from '@apperp/ui/list-page-layout';
+import { MasterDetailLayout } from '@apperp/ui/master-detail-layout';
+import {
+    PageDialog,
+    PageDialogAction,
+    PageDialogBody,
+    PageDialogContent,
+    PageDialogDescription,
+    PageDialogFooter,
+    PageDialogHeader,
+    PageDialogTitle,
+} from '@apperp/ui/page-dialog';
+import { RadioGroup, RadioGroupItem } from '@apperp/ui/radio-group';
+import { RecordActionBar } from '@apperp/ui/record-action-bar';
+import { RecordEditBoundary } from '@apperp/ui/record-edit-boundary';
 import { Switch } from '@apperp/ui/switch';
 import {
     Table,
@@ -27,10 +50,12 @@ import {
     TableHeader,
     TableRow,
 } from '@apperp/ui/table';
-import { Head, router } from '@inertiajs/react';
-import { Copy, Plus, Save, Search, Trash2, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { cn } from '@/lib/utils';
+import { useIncrementalList } from '@apperp/ui/use-incremental-list';
+import type { ListLoader } from '@apperp/ui/use-incremental-list';
+import { Head } from '@inertiajs/react';
+import { Copy, Info, Plus, Save, Search, Trash2, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { apiJson, errorText } from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
 
 // Urutan hari standar Dynamics 365: Senin, Selasa, Rabu, Kamis, Jumat, Sabtu, Minggu
@@ -45,56 +70,25 @@ const DAYS = [
 ];
 
 function formatTimeString(raw: string): string {
-    const clean = raw.trim().replace(/[^0-9:]/g, '');
+    const clean = raw.trim();
 
     if (!clean) {
         return '';
     }
 
-    if (clean === '24' || clean === '24:00' || clean === '2400') {
-        return '24:00';
-    }
-
-    if (clean.includes(':')) {
-        const parts = clean.split(':');
-        const h = parseInt(parts[0], 10);
-        const m = parseInt(parts[1], 10);
-
-        if (isNaN(h) || isNaN(m)) {
-            return '';
-        }
-
-        if (h === 24 && m === 0) {
-            return '24:00';
-        }
-
-        const validH = Math.min(23, Math.max(0, h));
-        const validM = Math.min(59, Math.max(0, m));
-
-        return `${String(validH).padStart(2, '0')}:${String(validM).padStart(2, '0')}`;
-    }
+    let candidate = clean;
 
     if (/^\d{1,2}$/.test(clean)) {
-        const h = Math.min(23, Math.max(0, parseInt(clean, 10)));
-
-        return `${String(h).padStart(2, '0')}:00`;
+        candidate = `${clean.padStart(2, '0')}:00`;
+    } else if (/^\d{3,4}$/.test(clean)) {
+        candidate = `${clean.slice(0, -2).padStart(2, '0')}:${clean.slice(-2)}`;
+    } else if (/^\d{1,2}:\d{2}$/.test(clean)) {
+        candidate = clean.padStart(5, '0');
     }
 
-    if (/^\d{3}$/.test(clean)) {
-        const h = parseInt(clean.slice(0, 1), 10);
-        const m = Math.min(59, Math.max(0, parseInt(clean.slice(1, 3), 10)));
-
-        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-    }
-
-    if (/^\d{4}$/.test(clean)) {
-        const h = Math.min(23, Math.max(0, parseInt(clean.slice(0, 2), 10)));
-        const m = Math.min(59, Math.max(0, parseInt(clean.slice(2, 4), 10)));
-
-        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-    }
-
-    return '';
+    return /^(?:(?:[01]\d|2[0-3]):[0-5]\d|24:00)$/.test(candidate)
+        ? candidate
+        : clean;
 }
 
 function computeHours(fromTime: string | null, toTime: string | null): number {
@@ -106,6 +100,13 @@ function computeHours(fromTime: string | null, toTime: string | null): number {
     const t = formatTimeString(toTime);
 
     if (!f || !t) {
+        return 0;
+    }
+
+    if (
+        !/^(?:(?:[01]\d|2[0-3]):[0-5]\d|24:00)$/.test(f) ||
+        !/^(?:(?:[01]\d|2[0-3]):[0-5]\d|24:00)$/.test(t)
+    ) {
         return 0;
     }
 
@@ -153,93 +154,150 @@ type LegalEntity = {
 
 type Props = {
     canManage: boolean;
-    templates: WorkingTimeTemplate[];
     currentLegalEntity?: LegalEntity | null;
 };
 
-export default function WorkingTimeTemplates({
-    canManage,
-    templates,
-    currentLegalEntity,
-}: Props) {
+const TEMPLATE_URL = '/settings/working-time-templates';
+type TemplateHeader = Pick<WorkingTimeTemplate, 'id' | 'code' | 'name'>;
+
+export default function WorkingTimeTemplates(props: Props) {
+    return (
+        <WorkingTimeTemplatePage
+            key={props.currentLegalEntity?.id ?? 'none'}
+            {...props}
+        />
+    );
+}
+
+function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
     const [searchFilter, setSearchFilter] = useState('');
-    const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
-        templates.length > 0
-            ? (templates.find((t) => t.code === 'PROD-DAY')?.id ??
-                  templates[0].id)
-            : null,
+    const [showDetail, setShowDetail] = useState(false);
+    const loader = useCallback<ListLoader<TemplateHeader>>(
+        async ({ query, cursor, sort, signal }) => {
+            const params = new URLSearchParams({ incremental: '1', q: query });
+
+            if (cursor) {
+                params.set('cursor', cursor);
+            }
+
+            if (sort) {
+                params.set('sort', sort.columnId);
+                params.set('direction', sort.direction);
+            }
+
+            const result = await apiJson<{
+                data: TemplateHeader[];
+                next_cursor: string | null;
+            }>(`${TEMPLATE_URL}?${params}`, { signal });
+
+            return { items: result.data, nextCursor: result.next_cursor };
+        },
+        [],
     );
-
-    const activeTemplate = useMemo(() => {
-        return (
-            templates.find((t) => t.id === selectedTemplateId) ??
-            (templates.length > 0 ? templates[0] : null)
-        );
-    }, [templates, selectedTemplateId]);
-
-    // Active Template Draft Lines & Headers
-    const [draftLines, setDraftLines] = useState<WorkingTimeLine[]>(
-        activeTemplate?.lines ?? [],
+    const list = useIncrementalList({
+        loadItems: loader,
+        query: searchFilter,
+        active: !!currentLegalEntity,
+        getKey: (item) => item.id,
+    });
+    const [activeTemplate, setActiveTemplate] =
+        useState<WorkingTimeTemplate | null>(null);
+    const [draftLines, setDraftLines] = useState<WorkingTimeLine[]>([]);
+    const [expandedDays, setExpandedDays] = useState<string[]>(['0']);
+    const [activeDay, setActiveDay] = useState(0);
+    const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(
+        null,
     );
-
-    // CollapsibleSectionGroup uses string[] values
-    const [expandedDays, setExpandedDays] = useState<string[]>(['1']);
-    const [activeDay, setActiveDay] = useState<number>(1);
-    const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(0);
     const [isSaving, setIsSaving] = useState(false);
-
-    // Edit Mode State: view vs edit mode
     const [isEditing, setIsEditing] = useState(false);
-    const [headerCode, setHeaderCode] = useState(activeTemplate?.code ?? '');
-    const [headerName, setHeaderName] = useState(activeTemplate?.name ?? '');
+    const [headerCode, setHeaderCode] = useState('');
+    const [headerName, setHeaderName] = useState('');
+    const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+    const [error, setError] = useState('');
+    const [modalError, setModalError] = useState('');
+    const detailRequest = useRef<AbortController | null>(null);
+    useEffect(() => () => detailRequest.current?.abort(), []);
 
-    // Adjust state during render when activeTemplate changes
-    const [prevTemplateId, setPrevTemplateId] = useState(activeTemplate?.id);
+    const openRecord = (record: WorkingTimeTemplate, edit = false) => {
+        setActiveTemplate(record);
+        setShowDetail(true);
+        setDraftLines(record.lines);
+        setHeaderCode(record.code);
+        setHeaderName(record.name);
+        setIsEditing(edit);
+        setSelectedRowIndex(null);
+        setError('');
+    };
+    const selectTemplate = async (id: string) => {
+        detailRequest.current?.abort();
+        const controller = new AbortController();
+        detailRequest.current = controller;
+        setActiveTemplate(null);
+        setIsLoadingDetail(true);
+        setError('');
 
-    if (activeTemplate && activeTemplate.id !== prevTemplateId) {
-        setPrevTemplateId(activeTemplate.id);
-        setDraftLines(activeTemplate.lines);
-        setHeaderCode(activeTemplate.code);
-        setHeaderName(activeTemplate.name);
-        setIsEditing(false);
-        setSelectedRowIndex(0);
-    }
+        try {
+            const result = await apiJson<{ data: WorkingTimeTemplate[] }>(
+                `${TEMPLATE_URL}?incremental=1&record_id=${encodeURIComponent(id)}`,
+                { signal: controller.signal },
+            );
 
-    const handleCancelEdit = () => {
-        if (activeTemplate) {
-            setDraftLines(activeTemplate.lines);
-            setHeaderCode(activeTemplate.code);
-            setHeaderName(activeTemplate.name);
+            if (!controller.signal.aborted) {
+                openRecord(result.data[0]);
+            }
+        } catch (caught) {
+            if (!controller.signal.aborted) {
+                setError(
+                    errorText(
+                        caught,
+                        'Pola jam kerja belum dapat dibuka. Pilih kembali untuk mencoba lagi.',
+                    ),
+                );
+            }
+        } finally {
+            if (!controller.signal.aborted) {
+                setIsLoadingDetail(false);
+            }
+        }
+    };
+    const [pendingSelection, setPendingSelection] = useState<string | null>(
+        null,
+    );
+    const handleSelectTemplate = (record: TemplateHeader) => {
+        if (isSaving) {
+            return;
         }
 
-        setIsEditing(false);
-    };
+        if (record.id === activeTemplate?.id) {
+            setShowDetail(true);
 
-    // Create Template Dialog
+            return;
+        }
+
+        if (isEditing) {
+            setPendingSelection(record.id);
+        } else {
+            void selectTemplate(record.id);
+        }
+    };
+    const handleCancelEdit = () => {
+        if (activeTemplate) {
+            openRecord(activeTemplate);
+        }
+    };
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [newCode, setNewCode] = useState('');
     const [newName, setNewName] = useState('');
     const [isCreating, setIsCreating] = useState(false);
-
-    // Copy Template Dialog
     const [isCopyTemplateOpen, setIsCopyTemplateOpen] = useState(false);
     const [copyNewCode, setCopyNewCode] = useState('');
     const [copyNewName, setCopyNewName] = useState('');
     const [isCopying, setIsCopying] = useState(false);
-
-    // Copy Day Modal state
+    const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+    const [isArchiving, setIsArchiving] = useState(false);
     const [isCopyDayOpen, setIsCopyDayOpen] = useState(false);
-    const [copyFromDay, setCopyFromDay] = useState<number>(1);
+    const [copyFromDay, setCopyFromDay] = useState(0);
     const [copyToDays, setCopyToDays] = useState<number[]>([]);
-
-    const filteredTemplates = useMemo(() => {
-        return templates.filter((t) => {
-            return (
-                t.code.toLowerCase().includes(searchFilter.toLowerCase()) ||
-                t.name.toLowerCase().includes(searchFilter.toLowerCase())
-            );
-        });
-    }, [templates, searchFilter]);
 
     const getDayLines = (dayIndex: number) => {
         return draftLines.filter((l) => l.day_of_week === dayIndex);
@@ -253,11 +311,6 @@ export default function WorkingTimeTemplates({
 
     const calculateDayHours = (dayIndex: number) => {
         const lines = getDayLines(dayIndex);
-        const closed = getDayClosed(dayIndex);
-
-        if (closed) {
-            return 0;
-        }
 
         return lines.reduce((acc, line) => {
             if (line.from_time && line.to_time) {
@@ -280,7 +333,7 @@ export default function WorkingTimeTemplates({
             to_time: '',
             efficiency: 100.0,
             property: null,
-            closed_for_pickup: false,
+            closed_for_pickup: getDayClosed(dayIndex),
             hours: 0.0,
         };
 
@@ -373,7 +426,7 @@ export default function WorkingTimeTemplates({
         }
     };
 
-    const handleSaveAll = () => {
+    const handleSaveAll = async () => {
         if (!activeTemplate) {
             return;
         }
@@ -397,32 +450,45 @@ export default function WorkingTimeTemplates({
                     day_of_week: l.day_of_week,
                     from_time: from || null,
                     to_time: to || null,
-                    efficiency: Number(l.efficiency) || 100,
+                    efficiency:
+                        l.efficiency === null ||
+                        l.efficiency === undefined ||
+                        String(l.efficiency).trim() === ''
+                            ? 100
+                            : Number(l.efficiency),
                     property: l.property ? l.property.trim() : null,
                     closed_for_pickup: Boolean(l.closed_for_pickup),
                     hours: hrs,
                 };
             });
 
-        router.put(
-            `/settings/working-time-templates/${activeTemplate.id}`,
-            {
-                code: headerCode.toUpperCase().trim(),
-                name: headerName.trim(),
-                lines: sanitizedLines,
-                version: activeTemplate.version,
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setIsEditing(false);
+        setError('');
+
+        try {
+            const result = await apiJson<{ data: WorkingTimeTemplate }>(
+                `${TEMPLATE_URL}/${activeTemplate.id}`,
+                {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        code: headerCode.toUpperCase().trim(),
+                        name: headerName.trim(),
+                        lines: sanitizedLines,
+                        version: activeTemplate.version,
+                    }),
                 },
-                onFinish: () => setIsSaving(false),
-                onError: (err) => {
-                    console.error('Gagal menyimpan pola jam kerja:', err);
-                },
-            },
-        );
+            );
+            openRecord(result.data);
+            list.reload();
+        } catch (caught) {
+            setError(
+                errorText(
+                    caught,
+                    'Pola jam kerja belum berhasil disimpan. Isianmu tetap tersedia untuk dicoba lagi.',
+                ),
+            );
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleExecuteCopyDay = () => {
@@ -447,57 +513,72 @@ export default function WorkingTimeTemplates({
         setDraftLines(updated);
         setIsCopyDayOpen(false);
         setCopyToDays([]);
+        setSelectedRowIndex(null);
     };
 
-    const handleCreateTemplate = () => {
-        if (!newCode.trim() || !newName.trim()) {
+    const handleCreateTemplate = async () => {
+        if (!newCode.trim() || !newName.trim() || isCreating) {
             return;
         }
 
         setIsCreating(true);
-        router.post(
-            '/settings/working-time-templates',
-            {
-                code: newCode.trim().toUpperCase(),
-                name: newName.trim(),
-                ...(currentLegalEntity
-                    ? { legal_entity_id: currentLegalEntity.id }
-                    : {}),
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setIsCreateOpen(false);
-                    setNewCode('');
-                    setNewName('');
+        setModalError('');
+
+        try {
+            const result = await apiJson<{ data: WorkingTimeTemplate }>(
+                TEMPLATE_URL,
+                {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        code: newCode.trim().toUpperCase(),
+                        name: newName.trim(),
+                        legal_entity_id: currentLegalEntity?.id,
+                    }),
                 },
-                onFinish: () => setIsCreating(false),
-            },
-        );
+            );
+            openRecord(result.data, true);
+            list.reload();
+            setIsCreateOpen(false);
+            setNewCode('');
+            setNewName('');
+        } catch (caught) {
+            setModalError(
+                errorText(
+                    caught,
+                    'Pola jam kerja belum berhasil dibuat. Coba lagi.',
+                ),
+            );
+        } finally {
+            setIsCreating(false);
+        }
     };
-
-    const handleDeleteTemplate = () => {
-        if (!activeTemplate) {
+    const handleDeleteTemplate = async () => {
+        if (!activeTemplate || isArchiving) {
             return;
         }
 
-        if (
-            !confirm(
-                `Arsipkan pola jam kerja "${activeTemplate.name}" (${activeTemplate.code})?`,
-            )
-        ) {
-            return;
+        setIsArchiving(true);
+        setModalError('');
+
+        try {
+            await apiJson(`${TEMPLATE_URL}/${activeTemplate.id}`, {
+                method: 'DELETE',
+                body: JSON.stringify({ version: activeTemplate.version }),
+            });
+            setActiveTemplate(null);
+            setIsArchiveOpen(false);
+            list.reload();
+        } catch (caught) {
+            setModalError(
+                errorText(
+                    caught,
+                    'Pola jam kerja belum berhasil diarsipkan. Coba lagi.',
+                ),
+            );
+        } finally {
+            setIsArchiving(false);
         }
-
-        router.delete(`/settings/working-time-templates/${activeTemplate.id}`, {
-            data: { version: activeTemplate.version },
-            preserveScroll: true,
-            onSuccess: () => {
-                setSelectedTemplateId(null);
-            },
-        });
     };
-
     const handleOpenCopyTemplate = () => {
         if (!activeTemplate) {
             return;
@@ -505,400 +586,454 @@ export default function WorkingTimeTemplates({
 
         setCopyNewCode(`${activeTemplate.code}-SALIN`);
         setCopyNewName(`${activeTemplate.name} (Salinan)`);
+        setModalError('');
         setIsCopyTemplateOpen(true);
     };
-
-    const handleExecuteCopyTemplate = () => {
-        if (!activeTemplate || !copyNewCode.trim() || !copyNewName.trim()) {
+    const handleExecuteCopyTemplate = async () => {
+        if (
+            !activeTemplate ||
+            !copyNewCode.trim() ||
+            !copyNewName.trim() ||
+            isCopying
+        ) {
             return;
         }
 
         setIsCopying(true);
-        router.post(
-            `/settings/working-time-templates/${activeTemplate.id}/copy`,
-            {
-                code: copyNewCode.trim().toUpperCase(),
-                name: copyNewName.trim(),
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setIsCopyTemplateOpen(false);
+        setModalError('');
+
+        try {
+            const result = await apiJson<{ data: WorkingTimeTemplate }>(
+                `${TEMPLATE_URL}/${activeTemplate.id}/copy`,
+                {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        code: copyNewCode.trim().toUpperCase(),
+                        name: copyNewName.trim(),
+                    }),
                 },
-                onFinish: () => setIsCopying(false),
-            },
-        );
+            );
+            openRecord(result.data, true);
+            list.reload();
+            setIsCopyTemplateOpen(false);
+        } catch (caught) {
+            setModalError(
+                errorText(
+                    caught,
+                    'Pola jam kerja belum berhasil disalin. Coba lagi.',
+                ),
+            );
+        } finally {
+            setIsCopying(false);
+        }
     };
 
     return (
         <>
             <Head title="Pola jam kerja" />
 
-            <div className="flex min-h-[calc(100vh-4rem)] flex-col bg-background">
-                {/* Command Bar / Action Ribbon: Standard CoreERP Action Toolbar */}
-                <div className="sticky top-0 z-20 flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card px-4 py-2 text-xs">
-                    <span className="mr-2 text-sm font-semibold text-foreground">
-                        Pola jam kerja
-                    </span>
-
-                    {isEditing ? (
-                        <>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                type="button"
-                                onClick={handleSaveAll}
-                                disabled={isSaving || !activeTemplate}
-                                className="border-success/40 text-success hover:bg-success/10 hover:text-success focus-visible:ring-success/30"
-                            >
-                                <Save className="size-4" />
-                                <span>
-                                    {isSaving ? 'Menyimpan…' : 'Simpan'}
-                                </span>
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                type="button"
-                                onClick={handleCancelEdit}
-                                disabled={isSaving}
-                                className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive focus-visible:ring-destructive/30"
-                            >
-                                <X className="size-4" />
-                                <span>Batal</span>
-                            </Button>
-                        </>
-                    ) : (
-                        <>
-                            {canManage && (
-                                <ActionButton
-                                    action="edit"
-                                    size="sm"
-                                    type="button"
-                                    disabled={!activeTemplate}
-                                    onClick={() => setIsEditing(true)}
-                                >
-                                    Ubah
-                                </ActionButton>
-                            )}
-
-                            {canManage && (
-                                <ActionButton
-                                    action="create"
-                                    size="sm"
-                                    type="button"
-                                    onClick={() => setIsCreateOpen(true)}
-                                >
-                                    Tambah template
-                                </ActionButton>
-                            )}
-
-                            {canManage && (
-                                <ActionButton
-                                    action="archive"
-                                    size="sm"
-                                    type="button"
-                                    disabled={!activeTemplate}
-                                    onClick={handleDeleteTemplate}
-                                >
-                                    Arsipkan
-                                </ActionButton>
-                            )}
-
-                            {canManage && (
+            <ListPageLayout
+                header={
+                    <RecordActionBar title="Pola jam kerja">
+                        {isEditing ? (
+                            <>
                                 <Button
                                     variant="outline"
                                     size="sm"
                                     type="button"
-                                    disabled={!activeTemplate}
-                                    onClick={handleOpenCopyTemplate}
+                                    onClick={handleSaveAll}
+                                    disabled={isSaving || !activeTemplate}
+                                    className="border-success/40 text-success hover:bg-success/10 hover:text-success focus-visible:ring-success/30"
                                 >
-                                    <Copy className="size-4" />
-                                    <span>Salin template</span>
+                                    <Save className="size-4" />
+                                    <span>
+                                        {isSaving ? 'Menyimpan…' : 'Simpan'}
+                                    </span>
                                 </Button>
-                            )}
-                        </>
-                    )}
-                </div>
-
-                {/* Main 2-Pane Layout: Left Pane Master List, Right Pane Detail Section */}
-                <div className="flex flex-1 flex-col divide-y divide-border md:flex-row md:divide-x md:divide-y-0">
-                    {/* Left Pane (Master List) */}
-                    <aside className="flex w-full shrink-0 flex-col bg-card md:w-64 lg:w-72">
-                        {/* Search Filter Box */}
-                        <div className="border-b border-border p-2.5">
-                            <div className="relative">
-                                <Search className="absolute top-2.5 left-2.5 size-3.5 text-muted-foreground" />
-                                <Input
-                                    type="search"
-                                    placeholder="Cari template…"
-                                    value={searchFilter}
-                                    onChange={(e) =>
-                                        setSearchFilter(e.target.value)
-                                    }
-                                    className="h-8 bg-background pl-8 text-xs"
-                                />
-                            </div>
-                        </div>
-
-                        {/* List of Templates */}
-                        <div className="divide-y divide-border overflow-y-auto">
-                            {filteredTemplates.length === 0 ? (
-                                <div className="p-4 text-center text-xs text-muted-foreground">
-                                    Tidak ada template ditemukan.
-                                </div>
-                            ) : (
-                                filteredTemplates.map((tmpl) => {
-                                    const isSelected =
-                                        tmpl.id === activeTemplate?.id;
-
-                                    return (
-                                        <button
-                                            key={tmpl.id}
-                                            type="button"
-                                            onClick={() =>
-                                                setSelectedTemplateId(tmpl.id)
-                                            }
-                                            className={`relative flex w-full flex-col px-3.5 py-2.5 text-left transition-colors ${
-                                                isSelected
-                                                    ? 'border-l-4 border-l-primary bg-accent/60'
-                                                    : 'border-l-4 border-l-transparent hover:bg-muted/50'
-                                            }`}
-                                        >
-                                            <span
-                                                className={`text-xs font-semibold ${
-                                                    isSelected
-                                                        ? 'text-primary'
-                                                        : 'text-foreground'
-                                                }`}
-                                            >
-                                                {tmpl.code}
-                                            </span>
-                                            <span className="line-clamp-1 text-[11px] text-muted-foreground">
-                                                {tmpl.name}
-                                            </span>
-                                        </button>
-                                    );
-                                })
-                            )}
-                        </div>
-                    </aside>
-
-                    {/* Right Pane (Detail Panel) */}
-                    <main className="min-w-0 flex-1 bg-background p-4 lg:p-6">
-                        {activeTemplate ? (
-                            <div className="max-w-4xl space-y-4">
-                                {/* Page Heading — text-xl per coreerp-page-standard */}
-                                <h1 className="text-xl font-semibold tracking-tight">
-                                    Pola jam kerja
-                                </h1>
-
-                                {/* Form Fields: Standard Input Component */}
-                                <div className="grid max-w-xl gap-4 sm:grid-cols-2">
-                                    <Input
-                                        label="Pola jam kerja"
-                                        value={
-                                            isEditing
-                                                ? headerCode
-                                                : activeTemplate.code
-                                        }
-                                        disabled={!isEditing || !canManage}
-                                        onChange={(e) =>
-                                            setHeaderCode(
-                                                e.target.value.toUpperCase(),
-                                            )
-                                        }
-                                        className="font-medium uppercase"
-                                    />
-
-                                    <Input
-                                        label="Nama"
-                                        value={
-                                            isEditing
-                                                ? headerName
-                                                : activeTemplate.name
-                                        }
-                                        disabled={!isEditing || !canManage}
-                                        onChange={(e) =>
-                                            setHeaderName(e.target.value)
-                                        }
-                                        className="font-medium"
-                                    />
-                                </div>
-
-                                {/* Standard Collapsible Section Group */}
-                                <CollapsibleSectionGroup
-                                    value={expandedDays}
-                                    onValueChange={setExpandedDays}
-                                    className="space-y-3"
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    type="button"
+                                    onClick={handleCancelEdit}
+                                    disabled={isSaving}
                                 >
-                                    {DAYS.map((day) => {
-                                        const dayLines = getDayLines(day.index);
-                                        const isClosed = getDayClosed(
-                                            day.index,
-                                        );
-                                        const totalHours = calculateDayHours(
-                                            day.index,
-                                        );
+                                    <X className="size-4" />
+                                    <span>Batal</span>
+                                </Button>
+                            </>
+                        ) : (
+                            <>
+                                {canManage && (
+                                    <ActionButton
+                                        action="edit"
+                                        size="sm"
+                                        type="button"
+                                        disabled={!activeTemplate}
+                                        onClick={() => {
+                                            setIsEditing(true);
+                                            setShowDetail(true);
+                                        }}
+                                    >
+                                        Ubah
+                                    </ActionButton>
+                                )}
 
-                                        return (
-                                            <CollapsibleSection
-                                                key={day.index}
-                                                value={String(day.index)}
-                                                title={day.name}
-                                            >
-                                                {/* Day Toolbar: Tambah, Hapus, Salin hari — clean flat actions */}
-                                                <div className="flex items-center gap-1 pb-2">
-                                                    {canManage && (
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            size="xs"
-                                                            onClick={() =>
-                                                                handleAddLine(
-                                                                    day.index,
-                                                                )
-                                                            }
-                                                            disabled={isClosed}
-                                                            className="gap-1.5 font-medium text-primary hover:bg-primary/10 hover:text-primary"
-                                                        >
-                                                            <Plus className="size-3.5" />
-                                                            Tambah
-                                                        </Button>
-                                                    )}
+                                {canManage && (
+                                    <ActionButton
+                                        action="create"
+                                        size="sm"
+                                        type="button"
+                                        disabled={isLoadingDetail}
+                                        onClick={() => {
+                                            setModalError('');
+                                            setIsCreateOpen(true);
+                                        }}
+                                    >
+                                        Tambah pola
+                                    </ActionButton>
+                                )}
 
-                                                    {canManage && (
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            size="xs"
-                                                            onClick={() =>
-                                                                handleRemoveLine(
-                                                                    day.index,
-                                                                )
-                                                            }
-                                                            disabled={
-                                                                dayLines.length ===
-                                                                    0 ||
-                                                                isClosed
-                                                            }
-                                                            className="gap-1.5 font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                                        >
-                                                            <Trash2 className="size-3.5" />
-                                                            Hapus
-                                                        </Button>
-                                                    )}
+                                {canManage && (
+                                    <ActionButton
+                                        action="archive"
+                                        size="sm"
+                                        type="button"
+                                        disabled={!activeTemplate}
+                                        onClick={() => {
+                                            setModalError('');
+                                            setIsArchiveOpen(true);
+                                        }}
+                                    >
+                                        Arsipkan
+                                    </ActionButton>
+                                )}
 
-                                                    {canManage && (
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            size="xs"
-                                                            onClick={() => {
-                                                                setCopyFromDay(
+                                {canManage && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        type="button"
+                                        disabled={!activeTemplate}
+                                        onClick={handleOpenCopyTemplate}
+                                    >
+                                        <Copy className="size-4" />
+                                        <span>Salin pola</span>
+                                    </Button>
+                                )}
+                            </>
+                        )}
+                    </RecordActionBar>
+                }
+            >
+                {/* Main 2-Pane Layout: Left Pane Master List, Right Pane Detail Section */}
+                <MasterDetailLayout
+                    detailOpen={showDetail}
+                    onDetailOpenChange={setShowDetail}
+                    list={
+                        <aside className="flex h-full min-h-0 min-w-0 flex-col">
+                            {/* Search Filter Box */}
+                            <div className="border-b border-border p-2.5">
+                                <div className="relative">
+                                    <Search className="absolute top-2.5 left-2.5 size-3.5 text-muted-foreground" />
+                                    <Input
+                                        type="search"
+                                        placeholder="Cari template…"
+                                        value={searchFilter}
+                                        onChange={(e) =>
+                                            setSearchFilter(e.target.value)
+                                        }
+                                        aria-label="Cari pola jam kerja"
+                                        className="bg-background pl-8"
+                                    />
+                                </div>
+                            </div>
+
+                            <DataTable
+                                data={list.items}
+                                getRowKey={(item) => item.id}
+                                columns={[
+                                    {
+                                        id: 'code',
+                                        header: 'Pola jam kerja',
+                                        sortValue: (item) => item.code,
+                                        cell: (item) => (
+                                            <div>
+                                                <DataTableText>
+                                                    {item.code}
+                                                </DataTableText>
+                                                <span className="text-muted-foreground">
+                                                    <DataTableText>
+                                                        {item.name}
+                                                    </DataTableText>
+                                                </span>
+                                            </div>
+                                        ),
+                                    },
+                                ]}
+                                activeRowKey={activeTemplate?.id}
+                                rowActivation="single-click"
+                                onRowClick={handleSelectTemplate}
+                                sort={list.sort}
+                                onSortChange={list.onSortChange}
+                                serverSort
+                                incremental={list}
+                                emptyMessage={
+                                    currentLegalEntity
+                                        ? 'Belum ada pola jam kerja yang cocok.'
+                                        : 'Pilih perusahaan terlebih dahulu.'
+                                }
+                            />
+                        </aside>
+                    }
+                >
+                    <RecordEditBoundary
+                        editing={isEditing}
+                        canEdit={canManage && !!activeTemplate}
+                        disabled={isSaving}
+                        onEdit={() => setIsEditing(true)}
+                        className="flex h-full min-h-0 min-w-0 flex-col"
+                    >
+                        <main
+                            className="min-h-0 min-w-0 flex-1 overflow-auto bg-background p-4 lg:p-6"
+                            scroll-region=""
+                        >
+                            {error && (
+                                <p
+                                    role="alert"
+                                    className="mb-4 text-destructive"
+                                >
+                                    {error}
+                                </p>
+                            )}
+                            {activeTemplate ? (
+                                <fieldset
+                                    className="w-full min-w-0 space-y-4"
+                                    disabled={isSaving}
+                                >
+                                    {/* Form Fields: Standard Input Component */}
+                                    <div className="grid w-full gap-4 sm:grid-cols-2">
+                                        <Input
+                                            label="Kode pola jam kerja"
+                                            required
+                                            maxLength={50}
+                                            value={
+                                                isEditing
+                                                    ? headerCode
+                                                    : activeTemplate.code
+                                            }
+                                            readOnly={!isEditing || !canManage}
+                                            onChange={(e) =>
+                                                setHeaderCode(
+                                                    e.target.value.toUpperCase(),
+                                                )
+                                            }
+                                            className="font-medium uppercase"
+                                        />
+
+                                        <Input
+                                            label="Nama"
+                                            required
+                                            maxLength={150}
+                                            value={
+                                                isEditing
+                                                    ? headerName
+                                                    : activeTemplate.name
+                                            }
+                                            readOnly={!isEditing || !canManage}
+                                            onChange={(e) =>
+                                                setHeaderName(e.target.value)
+                                            }
+                                            className="font-medium"
+                                        />
+                                    </div>
+
+                                    {/* Standard Collapsible Section Group */}
+                                    <CollapsibleSectionGroup
+                                        value={expandedDays}
+                                        onValueChange={setExpandedDays}
+                                        className="space-y-3"
+                                    >
+                                        {DAYS.map((day) => {
+                                            const dayLines = getDayLines(
+                                                day.index,
+                                            );
+                                            const isClosed = getDayClosed(
+                                                day.index,
+                                            );
+                                            const totalHours =
+                                                calculateDayHours(day.index);
+
+                                            return (
+                                                <CollapsibleSection
+                                                    key={day.index}
+                                                    value={String(day.index)}
+                                                    title={day.name}
+                                                >
+                                                    {/* Day Toolbar: Tambah, Hapus, Salin hari — clean flat actions */}
+                                                    <div className="flex items-center gap-1 pb-2">
+                                                        {canManage && (
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="xs"
+                                                                onClick={() =>
+                                                                    handleAddLine(
+                                                                        day.index,
+                                                                    )
+                                                                }
+
+                                                                className="gap-1.5 font-medium text-primary hover:bg-primary/10 hover:text-primary"
+                                                            >
+                                                                <Plus className="size-3.5" />
+                                                                Tambah
+                                                            </Button>
+                                                        )}
+
+                                                        {canManage && (
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="xs"
+                                                                onClick={() =>
+                                                                    handleRemoveLine(
+                                                                        day.index,
+                                                                    )
+                                                                }
+                                                                disabled={
+                                                                    dayLines.length ===
+                                                                    0
+                                                                }
+                                                                className="gap-1.5 font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                                            >
+                                                                <Trash2 className="size-3.5" />
+                                                                Hapus
+                                                            </Button>
+                                                        )}
+
+                                                        {canManage && (
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="xs"
+                                                                onClick={() => {
+                                                                    setCopyFromDay(
+                                                                        day.index,
+                                                                    );
+                                                                    setCopyToDays(
+                                                                        [],
+                                                                    );
+                                                                    setIsCopyDayOpen(
+                                                                        true,
+                                                                    );
+                                                                }}
+
+                                                                className="gap-1.5 font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                            >
+                                                                <Copy className="size-3.5" />
+                                                                Salin hari
+                                                            </Button>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Lines Table using Standard @apperp/ui/table */}
+                                                    <div className="overflow-x-auto rounded-md border border-border bg-card">
+                                                        <RadioGroup
+                                                            value={
+                                                                activeDay ===
+                                                                    day.index &&
+                                                                selectedRowIndex !==
+                                                                    null
+                                                                    ? String(
+                                                                          selectedRowIndex,
+                                                                      )
+                                                                    : ''
+                                                            }
+                                                            onValueChange={(
+                                                                value,
+                                                            ) => {
+                                                                setActiveDay(
                                                                     day.index,
                                                                 );
-                                                                setCopyToDays(
-                                                                    [],
-                                                                );
-                                                                setIsCopyDayOpen(
-                                                                    true,
+                                                                setSelectedRowIndex(
+                                                                    Number(
+                                                                        value,
+                                                                    ),
                                                                 );
                                                             }}
-                                                            disabled={isClosed}
-                                                            className="gap-1.5 font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                            aria-label={`Pilih baris ${day.name}`}
                                                         >
-                                                            <Copy className="size-3.5" />
-                                                            Salin hari
-                                                        </Button>
-                                                    )}
-                                                </div>
-
-                                                {/* Lines Table using Standard @apperp/ui/table */}
-                                                <div className="overflow-x-auto rounded-md border border-border bg-card">
-                                                    <Table>
-                                                        <TableHeader>
-                                                            <TableRow>
-                                                                <TableHead className="w-10 text-center"></TableHead>
-                                                                <TableHead className="w-28 font-medium">
-                                                                    Dari
-                                                                </TableHead>
-                                                                <TableHead className="w-28 font-medium">
-                                                                    Sampai
-                                                                </TableHead>
-                                                                <TableHead className="w-28 font-medium">
-                                                                    Efisiensi
-                                                                    (%)
-                                                                </TableHead>
-                                                                <TableHead className="font-medium">
-                                                                    Properti
-                                                                </TableHead>
-                                                                {isEditing && (
-                                                                    <TableHead className="w-10 text-center"></TableHead>
-                                                                )}
-                                                            </TableRow>
-                                                        </TableHeader>
-                                                        <TableBody>
-                                                            {dayLines.length ===
-                                                            0 ? (
-                                                                <TableRow>
-                                                                    <TableCell
-                                                                        colSpan={
-                                                                            isEditing
-                                                                                ? 6
-                                                                                : 5
-                                                                        }
-                                                                        className="py-6 text-center text-xs text-muted-foreground"
-                                                                    >
-                                                                        Belum
-                                                                        ada jam
-                                                                        kerja
-                                                                        untuk
-                                                                        hari
-                                                                        ini.
-                                                                        {isEditing &&
-                                                                            ' Klik "Tambah" di atas untuk menambahkan.'}
-                                                                    </TableCell>
-                                                                </TableRow>
-                                                            ) : (
-                                                                dayLines.map(
-                                                                    (
-                                                                        line,
-                                                                        idx,
-                                                                    ) => {
-                                                                        const isSelected =
-                                                                            selectedRowIndex ===
-                                                                                idx &&
-                                                                            activeDay ===
-                                                                                day.index;
-
-                                                                        return (
-                                                                            <TableRow
-                                                                                key={
-                                                                                    idx
+                                                            <Table>
+                                                                <TableHeader>
+                                                                    <TableRow>
+                                                                        <TableHead className="w-10 text-center">
+                                                                            <span className="sr-only">
+                                                                                Pilih
+                                                                                baris
+                                                                            </span>
+                                                                        </TableHead>
+                                                                        <TableHead className="w-28 font-medium">
+                                                                            Dari
+                                                                        </TableHead>
+                                                                        <TableHead className="w-28 font-medium">
+                                                                            Sampai
+                                                                        </TableHead>
+                                                                        <TableHead className="w-28 font-medium">
+                                                                            Efisiensi
+                                                                            (%)
+                                                                        </TableHead>
+                                                                        <TableHead className="font-medium">
+                                                                            Properti
+                                                                        </TableHead>
+                                                                        {isEditing && (
+                                                                            <TableHead className="w-10 text-center">
+                                                                                <span className="sr-only">
+                                                                                    Aksi
+                                                                                </span>
+                                                                            </TableHead>
+                                                                        )}
+                                                                    </TableRow>
+                                                                </TableHeader>
+                                                                <TableBody>
+                                                                    {dayLines.length ===
+                                                                    0 ? (
+                                                                        <TableRow>
+                                                                            <TableCell
+                                                                                colSpan={
+                                                                                    isEditing
+                                                                                        ? 6
+                                                                                        : 5
                                                                                 }
-                                                                                onClick={() => {
-                                                                                    setSelectedRowIndex(
-                                                                                        idx,
-                                                                                    );
-                                                                                    setActiveDay(
-                                                                                        day.index,
-                                                                                    );
-                                                                                }}
-                                                                                className={`cursor-pointer ${
-                                                                                    isSelected
-                                                                                        ? 'bg-accent/60'
-                                                                                        : ''
-                                                                                }`}
+                                                                                className="py-6 text-center text-muted-foreground"
                                                                             >
-                                                                                <TableCell className="text-center">
-                                                                                    <input
-                                                                                        type="radio"
-                                                                                        name={`select-row-${day.index}`}
-                                                                                        checked={
-                                                                                            isSelected
+                                                                                Belum
+                                                                                ada
+                                                                                jam
+                                                                                kerja
+                                                                                untuk
+                                                                                hari
+                                                                                ini.
+                                                                                {isEditing &&
+                                                                                    ' Klik "Tambah" di atas untuk menambahkan.'}
+                                                                            </TableCell>
+                                                                        </TableRow>
+                                                                    ) : (
+                                                                        dayLines.map(
+                                                                            (
+                                                                                line,
+                                                                                idx,
+                                                                            ) => {
+                                                                                const isSelected =
+                                                                                    selectedRowIndex ===
+                                                                                        idx &&
+                                                                                    activeDay ===
+                                                                                        day.index;
+
+                                                                                return (
+                                                                                    <TableRow
+                                                                                        key={
+                                                                                            idx
                                                                                         }
-                                                                                        onChange={() => {
+                                                                                        onClick={() => {
                                                                                             setSelectedRowIndex(
                                                                                                 idx,
                                                                                             );
@@ -906,482 +1041,527 @@ export default function WorkingTimeTemplates({
                                                                                                 day.index,
                                                                                             );
                                                                                         }}
-                                                                                        className="size-3.5 accent-primary"
-                                                                                    />
-                                                                                </TableCell>
-                                                                                {isEditing ? (
-                                                                                    <>
-                                                                                        <TableCell>
-                                                                                            <Input
-                                                                                                type="text"
-                                                                                                inputMode="numeric"
-                                                                                                maxLength={
-                                                                                                    5
-                                                                                                }
-                                                                                                value={
-                                                                                                    line.from_time
+                                                                                        className={`cursor-pointer ${
+                                                                                            isSelected
+                                                                                                ? 'bg-accent/60'
+                                                                                                : ''
+                                                                                        }`}
+                                                                                    >
+                                                                                        <TableCell className="text-center">
+                                                                                            <RadioGroupItem
+                                                                                                value={String(
+                                                                                                    idx,
+                                                                                                )}
+                                                                                                aria-label={`Baris ${idx + 1}, ${day.name}`}
+                                                                                            />
+                                                                                        </TableCell>
+                                                                                        {isEditing ? (
+                                                                                            <>
+                                                                                                <TableCell>
+                                                                                                    <Input
+                                                                                                        aria-label={`Dari jam ${day.name}, baris ${idx + 1}`}
+                                                                                                        type="text"
+                                                                                                        inputMode="numeric"
+                                                                                                        maxLength={
+                                                                                                            5
+                                                                                                        }
+                                                                                                        value={
+                                                                                                            line.from_time
+                                                                                                                ? line.from_time.slice(
+                                                                                                                      0,
+                                                                                                                      5,
+                                                                                                                  )
+                                                                                                                : ''
+                                                                                                        }
+
+                                                                                                        onChange={(
+                                                                                                            e,
+                                                                                                        ) => {
+                                                                                                            let val =
+                                                                                                                e.target.value.replace(
+                                                                                                                    /[^0-9:]/g,
+                                                                                                                    '',
+                                                                                                                );
+
+                                                                                                            if (
+                                                                                                                val.length >
+                                                                                                                5
+                                                                                                            ) {
+                                                                                                                val =
+                                                                                                                    val.slice(
+                                                                                                                        0,
+                                                                                                                        5,
+                                                                                                                    );
+                                                                                                            }
+
+                                                                                                            handleUpdateLine(
+                                                                                                                day.index,
+                                                                                                                idx,
+                                                                                                                'from_time',
+                                                                                                                val,
+                                                                                                            );
+                                                                                                        }}
+                                                                                                        onBlur={(
+                                                                                                            e,
+                                                                                                        ) => {
+                                                                                                            const formatted =
+                                                                                                                formatTimeString(
+                                                                                                                    e
+                                                                                                                        .target
+                                                                                                                        .value,
+                                                                                                                );
+                                                                                                            handleUpdateLine(
+                                                                                                                day.index,
+                                                                                                                idx,
+                                                                                                                'from_time',
+                                                                                                                formatted,
+                                                                                                            );
+
+                                                                                                            if (
+                                                                                                                formatted &&
+                                                                                                                line.to_time
+                                                                                                            ) {
+                                                                                                                const hrs =
+                                                                                                                    computeHours(
+                                                                                                                        formatted,
+                                                                                                                        line.to_time,
+                                                                                                                    );
+                                                                                                                handleUpdateLine(
+                                                                                                                    day.index,
+                                                                                                                    idx,
+                                                                                                                    'hours',
+                                                                                                                    hrs,
+                                                                                                                );
+                                                                                                            }
+                                                                                                        }}
+                                                                                                        className="w-20"
+                                                                                                        placeholder="08:00"
+                                                                                                    />
+                                                                                                </TableCell>
+                                                                                                <TableCell>
+                                                                                                    <Input
+                                                                                                        aria-label={`Sampai jam ${day.name}, baris ${idx + 1}`}
+                                                                                                        type="text"
+                                                                                                        inputMode="numeric"
+                                                                                                        maxLength={
+                                                                                                            5
+                                                                                                        }
+                                                                                                        value={
+                                                                                                            line.to_time
+                                                                                                                ? line.to_time.slice(
+                                                                                                                      0,
+                                                                                                                      5,
+                                                                                                                  )
+                                                                                                                : ''
+                                                                                                        }
+
+                                                                                                        onChange={(
+                                                                                                            e,
+                                                                                                        ) => {
+                                                                                                            let val =
+                                                                                                                e.target.value.replace(
+                                                                                                                    /[^0-9:]/g,
+                                                                                                                    '',
+                                                                                                                );
+
+                                                                                                            if (
+                                                                                                                val.length >
+                                                                                                                5
+                                                                                                            ) {
+                                                                                                                val =
+                                                                                                                    val.slice(
+                                                                                                                        0,
+                                                                                                                        5,
+                                                                                                                    );
+                                                                                                            }
+
+                                                                                                            handleUpdateLine(
+                                                                                                                day.index,
+                                                                                                                idx,
+                                                                                                                'to_time',
+                                                                                                                val,
+                                                                                                            );
+                                                                                                        }}
+                                                                                                        onBlur={(
+                                                                                                            e,
+                                                                                                        ) => {
+                                                                                                            const formatted =
+                                                                                                                formatTimeString(
+                                                                                                                    e
+                                                                                                                        .target
+                                                                                                                        .value,
+                                                                                                                );
+                                                                                                            handleUpdateLine(
+                                                                                                                day.index,
+                                                                                                                idx,
+                                                                                                                'to_time',
+                                                                                                                formatted,
+                                                                                                            );
+
+                                                                                                            if (
+                                                                                                                line.from_time &&
+                                                                                                                formatted
+                                                                                                            ) {
+                                                                                                                const hrs =
+                                                                                                                    computeHours(
+                                                                                                                        line.from_time,
+                                                                                                                        formatted,
+                                                                                                                    );
+                                                                                                                handleUpdateLine(
+                                                                                                                    day.index,
+                                                                                                                    idx,
+                                                                                                                    'hours',
+                                                                                                                    hrs,
+                                                                                                                );
+                                                                                                            }
+                                                                                                        }}
+                                                                                                        className="w-20"
+                                                                                                        placeholder="17:00"
+                                                                                                    />
+                                                                                                </TableCell>
+                                                                                                <TableCell>
+                                                                                                    <Input
+                                                                                                        aria-label={`Efisiensi ${day.name}, baris ${idx + 1}`}
+                                                                                                        type="text"
+                                                                                                        inputMode="decimal"
+                                                                                                        value={
+                                                                                                            line.efficiency ??
+                                                                                                            ''
+                                                                                                        }
+
+                                                                                                        onChange={(
+                                                                                                            e,
+                                                                                                        ) => {
+                                                                                                            const val =
+                                                                                                                e.target.value.replace(
+                                                                                                                    /[^0-9.]/g,
+                                                                                                                    '',
+                                                                                                                );
+                                                                                                            handleUpdateLine(
+                                                                                                                day.index,
+                                                                                                                idx,
+                                                                                                                'efficiency',
+                                                                                                                val,
+                                                                                                            );
+                                                                                                        }}
+                                                                                                        onBlur={(
+                                                                                                            e,
+                                                                                                        ) => {
+                                                                                                            const val =
+                                                                                                                e.target.value.trim();
+
+                                                                                                            if (
+                                                                                                                !val ||
+                                                                                                                isNaN(
+                                                                                                                    parseFloat(
+                                                                                                                        val,
+                                                                                                                    ),
+                                                                                                                )
+                                                                                                            ) {
+                                                                                                                handleUpdateLine(
+                                                                                                                    day.index,
+                                                                                                                    idx,
+                                                                                                                    'efficiency',
+                                                                                                                    100,
+                                                                                                                );
+                                                                                                            } else {
+                                                                                                                const num =
+                                                                                                                    Math.min(
+                                                                                                                        100,
+                                                                                                                        Math.max(
+                                                                                                                            0,
+                                                                                                                            parseFloat(
+                                                                                                                                val,
+                                                                                                                            ),
+                                                                                                                        ),
+                                                                                                                    );
+                                                                                                                handleUpdateLine(
+                                                                                                                    day.index,
+                                                                                                                    idx,
+                                                                                                                    'efficiency',
+                                                                                                                    num,
+                                                                                                                );
+                                                                                                            }
+                                                                                                        }}
+                                                                                                        className="w-20"
+                                                                                                        placeholder="100"
+                                                                                                    />
+                                                                                                </TableCell>
+                                                                                                <TableCell>
+                                                                                                    <Input
+                                                                                                        aria-label={`Properti ${day.name}, baris ${idx + 1}`}
+                                                                                                        type="text"
+                                                                                                        value={
+                                                                                                            line.property ??
+                                                                                                            ''
+                                                                                                        }
+
+                                                                                                        onChange={(
+                                                                                                            e,
+                                                                                                        ) =>
+                                                                                                            handleUpdateLine(
+                                                                                                                day.index,
+                                                                                                                idx,
+                                                                                                                'property',
+                                                                                                                e
+                                                                                                                    .target
+                                                                                                                    .value,
+                                                                                                            )
+                                                                                                        }
+                                                                                                        className="w-full min-w-28"
+                                                                                                        placeholder="Catatan / jenis pekerjaan"
+                                                                                                    />
+                                                                                                </TableCell>
+                                                                                            </>
+                                                                                        ) : (
+                                                                                            <>
+                                                                                                <TableCell>
+                                                                                                    {line.from_time
                                                                                                         ? line.from_time.slice(
                                                                                                               0,
                                                                                                               5,
                                                                                                           )
-                                                                                                        : ''
-                                                                                                }
-                                                                                                disabled={
-                                                                                                    isClosed
-                                                                                                }
-                                                                                                onChange={(
-                                                                                                    e,
-                                                                                                ) => {
-                                                                                                    let val =
-                                                                                                        e.target.value.replace(
-                                                                                                            /[^0-9:]/g,
-                                                                                                            '',
-                                                                                                        );
-
-                                                                                                    if (
-                                                                                                        val.length >
-                                                                                                        5
-                                                                                                    ) {
-                                                                                                        val =
-                                                                                                            val.slice(
-                                                                                                                0,
-                                                                                                                5,
-                                                                                                            );
-                                                                                                    }
-
-                                                                                                    handleUpdateLine(
-                                                                                                        day.index,
-                                                                                                        idx,
-                                                                                                        'from_time',
-                                                                                                        val,
-                                                                                                    );
-                                                                                                }}
-                                                                                                onBlur={(
-                                                                                                    e,
-                                                                                                ) => {
-                                                                                                    const formatted =
-                                                                                                        formatTimeString(
-                                                                                                            e
-                                                                                                                .target
-                                                                                                                .value,
-                                                                                                        );
-                                                                                                    handleUpdateLine(
-                                                                                                        day.index,
-                                                                                                        idx,
-                                                                                                        'from_time',
-                                                                                                        formatted,
-                                                                                                    );
-
-                                                                                                    if (
-                                                                                                        formatted &&
-                                                                                                        line.to_time
-                                                                                                    ) {
-                                                                                                        const hrs =
-                                                                                                            computeHours(
-                                                                                                                formatted,
-                                                                                                                line.to_time,
-                                                                                                            );
-                                                                                                        handleUpdateLine(
-                                                                                                            day.index,
-                                                                                                            idx,
-                                                                                                            'hours',
-                                                                                                            hrs,
-                                                                                                        );
-                                                                                                    }
-                                                                                                }}
-                                                                                                className="h-7 w-20 text-xs"
-                                                                                                placeholder="08:00"
-                                                                                            />
-                                                                                        </TableCell>
-                                                                                        <TableCell>
-                                                                                            <Input
-                                                                                                type="text"
-                                                                                                inputMode="numeric"
-                                                                                                maxLength={
-                                                                                                    5
-                                                                                                }
-                                                                                                value={
-                                                                                                    line.to_time
+                                                                                                        : '-'}
+                                                                                                </TableCell>
+                                                                                                <TableCell>
+                                                                                                    {line.to_time
                                                                                                         ? line.to_time.slice(
                                                                                                               0,
                                                                                                               5,
                                                                                                           )
-                                                                                                        : ''
-                                                                                                }
-                                                                                                disabled={
-                                                                                                    isClosed
-                                                                                                }
-                                                                                                onChange={(
-                                                                                                    e,
-                                                                                                ) => {
-                                                                                                    let val =
-                                                                                                        e.target.value.replace(
-                                                                                                            /[^0-9:]/g,
-                                                                                                            '',
-                                                                                                        );
-
-                                                                                                    if (
-                                                                                                        val.length >
-                                                                                                        5
-                                                                                                    ) {
-                                                                                                        val =
-                                                                                                            val.slice(
-                                                                                                                0,
-                                                                                                                5,
-                                                                                                            );
-                                                                                                    }
-
-                                                                                                    handleUpdateLine(
-                                                                                                        day.index,
-                                                                                                        idx,
-                                                                                                        'to_time',
-                                                                                                        val,
-                                                                                                    );
-                                                                                                }}
-                                                                                                onBlur={(
-                                                                                                    e,
-                                                                                                ) => {
-                                                                                                    const formatted =
-                                                                                                        formatTimeString(
-                                                                                                            e
-                                                                                                                .target
-                                                                                                                .value,
-                                                                                                        );
-                                                                                                    handleUpdateLine(
-                                                                                                        day.index,
-                                                                                                        idx,
-                                                                                                        'to_time',
-                                                                                                        formatted,
-                                                                                                    );
-
-                                                                                                    if (
-                                                                                                        line.from_time &&
-                                                                                                        formatted
-                                                                                                    ) {
-                                                                                                        const hrs =
-                                                                                                            computeHours(
-                                                                                                                line.from_time,
-                                                                                                                formatted,
-                                                                                                            );
-                                                                                                        handleUpdateLine(
+                                                                                                        : '-'}
+                                                                                                </TableCell>
+                                                                                                <TableCell>
+                                                                                                    {`${Number(
+                                                                                                        line.efficiency ||
+                                                                                                            0,
+                                                                                                    ).toFixed(
+                                                                                                        2,
+                                                                                                    )}%`}
+                                                                                                </TableCell>
+                                                                                                <TableCell>
+                                                                                                    {line.property ||
+                                                                                                        '-'}
+                                                                                                </TableCell>
+                                                                                            </>
+                                                                                        )}
+                                                                                        {isEditing && (
+                                                                                            <TableCell className="text-center">
+                                                                                                <Button
+                                                                                                    variant="ghost"
+                                                                                                    size="icon"
+                                                                                                    aria-label="Hapus baris ini"
+                                                                                                    type="button"
+                                                                                                    title="Hapus baris ini"
+                                                                                                    onClick={(
+                                                                                                        e,
+                                                                                                    ) => {
+                                                                                                        e.stopPropagation();
+                                                                                                        handleDeleteSpecificLine(
                                                                                                             day.index,
                                                                                                             idx,
-                                                                                                            'hours',
-                                                                                                            hrs,
                                                                                                         );
-                                                                                                    }
-                                                                                                }}
-                                                                                                className="h-7 w-20 text-xs"
-                                                                                                placeholder="17:00"
-                                                                                            />
-                                                                                        </TableCell>
-                                                                                        <TableCell>
-                                                                                            <Input
-                                                                                                type="text"
-                                                                                                inputMode="decimal"
-                                                                                                value={
-                                                                                                    line.efficiency ??
-                                                                                                    ''
-                                                                                                }
-                                                                                                disabled={
-                                                                                                    isClosed
-                                                                                                }
-                                                                                                onChange={(
-                                                                                                    e,
-                                                                                                ) => {
-                                                                                                    const val =
-                                                                                                        e.target.value.replace(
-                                                                                                            /[^0-9.]/g,
-                                                                                                            '',
-                                                                                                        );
-                                                                                                    handleUpdateLine(
-                                                                                                        day.index,
-                                                                                                        idx,
-                                                                                                        'efficiency',
-                                                                                                        val,
-                                                                                                    );
-                                                                                                }}
-                                                                                                onBlur={(
-                                                                                                    e,
-                                                                                                ) => {
-                                                                                                    const val =
-                                                                                                        e.target.value.trim();
+                                                                                                    }}
+                                                                                                    className="text-destructive"
+                                                                                                >
+                                                                                                    <Trash2 className="size-3.5" />
+                                                                                                </Button>
+                                                                                            </TableCell>
+                                                                                        )}
+                                                                                    </TableRow>
+                                                                                );
+                                                                            },
+                                                                        )
+                                                                    )}
+                                                                </TableBody>
+                                                            </Table>
+                                                        </RadioGroup>
+                                                    </div>
 
-                                                                                                    if (
-                                                                                                        !val ||
-                                                                                                        isNaN(
-                                                                                                            parseFloat(
-                                                                                                                val,
-                                                                                                            ),
-                                                                                                        )
-                                                                                                    ) {
-                                                                                                        handleUpdateLine(
-                                                                                                            day.index,
-                                                                                                            idx,
-                                                                                                            'efficiency',
-                                                                                                            100,
-                                                                                                        );
-                                                                                                    } else {
-                                                                                                        const num =
-                                                                                                            Math.min(
-                                                                                                                100,
-                                                                                                                Math.max(
-                                                                                                                    0,
-                                                                                                                    parseFloat(
-                                                                                                                        val,
-                                                                                                                    ),
-                                                                                                                ),
-                                                                                                            );
-                                                                                                        handleUpdateLine(
-                                                                                                            day.index,
-                                                                                                            idx,
-                                                                                                            'efficiency',
-                                                                                                            num,
-                                                                                                        );
-                                                                                                    }
-                                                                                                }}
-                                                                                                className="h-7 w-20 text-xs"
-                                                                                                placeholder="100"
-                                                                                            />
-                                                                                        </TableCell>
-                                                                                        <TableCell>
-                                                                                            <Input
-                                                                                                type="text"
-                                                                                                value={
-                                                                                                    line.property ??
-                                                                                                    ''
-                                                                                                }
-                                                                                                disabled={
-                                                                                                    isClosed
-                                                                                                }
-                                                                                                onChange={(
-                                                                                                    e,
-                                                                                                ) =>
-                                                                                                    handleUpdateLine(
-                                                                                                        day.index,
-                                                                                                        idx,
-                                                                                                        'property',
-                                                                                                        e
-                                                                                                            .target
-                                                                                                            .value,
-                                                                                                    )
-                                                                                                }
-                                                                                                className="h-7 w-full min-w-28 text-xs"
-                                                                                                placeholder="Catatan / jenis pekerjaan"
-                                                                                            />
-                                                                                        </TableCell>
-                                                                                    </>
-                                                                                ) : (
-                                                                                    <>
-                                                                                        <TableCell className="text-xs">
-                                                                                            {line.from_time
-                                                                                                ? line.from_time.slice(
-                                                                                                      0,
-                                                                                                      5,
-                                                                                                  )
-                                                                                                : '-'}
-                                                                                        </TableCell>
-                                                                                        <TableCell className="text-xs">
-                                                                                            {line.to_time
-                                                                                                ? line.to_time.slice(
-                                                                                                      0,
-                                                                                                      5,
-                                                                                                  )
-                                                                                                : '-'}
-                                                                                        </TableCell>
-                                                                                        <TableCell className="text-xs">
-                                                                                            {`${Number(
-                                                                                                line.efficiency ||
-                                                                                                    0,
-                                                                                            ).toFixed(
-                                                                                                2,
-                                                                                            )}%`}
-                                                                                        </TableCell>
-                                                                                        <TableCell className="text-xs">
-                                                                                            {line.property ||
-                                                                                                '-'}
-                                                                                        </TableCell>
-                                                                                    </>
-                                                                                )}
-                                                                                {isEditing && (
-                                                                                    <TableCell className="text-center">
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            title="Hapus baris ini"
-                                                                                            onClick={(
-                                                                                                e,
-                                                                                            ) => {
-                                                                                                e.stopPropagation();
-                                                                                                handleDeleteSpecificLine(
-                                                                                                    day.index,
-                                                                                                    idx,
-                                                                                                );
-                                                                                            }}
-                                                                                            className="inline-flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus:outline-hidden"
-                                                                                        >
-                                                                                            <Trash2 className="size-3.5" />
-                                                                                        </button>
-                                                                                    </TableCell>
-                                                                                )}
-                                                                            </TableRow>
-                                                                        );
-                                                                    },
-                                                                )
-                                                            )}
-                                                        </TableBody>
-                                                    </Table>
-                                                </div>
-
-                                                {/* Bottom Row: Tutup untuk pengambilan (left) & Jam kerja (right) */}
-                                                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 pt-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <Switch
-                                                            id={`closed-${day.index}`}
-                                                            checked={isClosed}
-                                                            disabled={
-                                                                !isEditing ||
-                                                                !canManage
-                                                            }
-                                                            onCheckedChange={(
-                                                                checked,
-                                                            ) =>
-                                                                handleToggleClosed(
-                                                                    day.index,
+                                                    {/* Bottom Row: Tutup untuk pengambilan (left) & Jam kerja (right) */}
+                                                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 pt-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <Switch
+                                                                id={`closed-${day.index}`}
+                                                                checked={
+                                                                    isClosed
+                                                                }
+                                                                disabled={
+                                                                    !canManage
+                                                                }
+                                                                onCheckedChange={(
                                                                     checked,
-                                                                )
-                                                            }
-                                                        />
-                                                        <label
-                                                            htmlFor={`closed-${day.index}`}
-                                                            className="cursor-pointer text-xs font-medium text-muted-foreground select-none"
-                                                        >
-                                                            Tutup untuk
-                                                            pengambilan
-                                                        </label>
-                                                    </div>
+                                                                ) =>
+                                                                    handleToggleClosed(
+                                                                        day.index,
+                                                                        checked,
+                                                                    )
+                                                                }
+                                                            />
+                                                            <FieldLabel
+                                                                htmlFor={`closed-${day.index}`}
+                                                                className="cursor-pointer font-medium text-muted-foreground select-none"
+                                                            >
+                                                                Tutup untuk
+                                                                pengambilan
+                                                            </FieldLabel>
+                                                            <FieldHint hint="Membatasi pengambilan barang pada hari ini. Jam kerja tetap berlaku.">
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    aria-label="Bantuan tutup untuk pengambilan"
+                                                                >
+                                                                    <Info className="size-4" />
+                                                                </Button>
+                                                            </FieldHint>
+                                                        </div>
 
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-xs text-muted-foreground">
-                                                            Total jam kerja:
-                                                        </span>
-                                                        <span className="inline-flex items-center rounded-md border border-border bg-muted/60 px-2.5 py-1 text-xs font-semibold text-foreground">
-                                                            {totalHours.toFixed(
-                                                                2,
-                                                            )}{' '}
-                                                            jam
-                                                        </span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-muted-foreground">
+                                                                Total jam kerja:
+                                                            </span>
+                                                            <Badge variant="secondary">
+                                                                {totalHours.toFixed(
+                                                                    2,
+                                                                )}{' '}
+                                                                jam
+                                                            </Badge>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </CollapsibleSection>
-                                        );
-                                    })}
-                                </CollapsibleSectionGroup>
-                            </div>
-                        ) : (
-                            <div className="flex h-64 items-center justify-center text-xs text-muted-foreground">
-                                Pilih template atau buat template baru.
-                            </div>
+                                                </CollapsibleSection>
+                                            );
+                                        })}
+                                    </CollapsibleSectionGroup>
+                                </fieldset>
+                            ) : (
+                                <Empty>
+                                    <EmptyHeader>
+                                        <EmptyTitle>
+                                            {isLoadingDetail
+                                                ? 'Memuat pola jam kerja...'
+                                                : 'Pilih pola jam kerja'}
+                                        </EmptyTitle>
+                                        <EmptyDescription>
+                                            {isLoadingDetail
+                                                ? 'Rincian hari sedang dimuat.'
+                                                : 'Pilih pola dari daftar untuk melihat jam kerja setiap harinya.'}
+                                        </EmptyDescription>
+                                    </EmptyHeader>
+                                </Empty>
+                            )}
+                        </main>
+                    </RecordEditBoundary>
+                </MasterDetailLayout>
+            </ListPageLayout>
+
+            <PageDialog
+                open={isCreateOpen}
+                onOpenChange={(open) => {
+                    if (!isCreating) {
+                        setIsCreateOpen(open);
+                    }
+                }}
+            >
+                <PageDialogContent>
+                    <PageDialogHeader>
+                        <PageDialogTitle>Pola jam kerja baru</PageDialogTitle>
+                        <PageDialogDescription>
+                            Buat pola, lalu isi jam kerja setiap harinya.
+                        </PageDialogDescription>
+                    </PageDialogHeader>
+                    <PageDialogBody className="space-y-4">
+                        {modalError && (
+                            <p role="alert" className="text-destructive">
+                                {modalError}
+                            </p>
                         )}
-                    </main>
-                </div>
-            </div>
-
-            {/* Create Template Modal */}
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-                <DialogContent size="compact">
-                    <DialogHeader>
-                        <div className="flex items-center gap-3">
-                            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
-                                <Plus className="size-5" />
-                            </div>
-                            <div>
-                                <DialogTitle>Pola Jam Kerja Baru</DialogTitle>
-                                <DialogDescription>
-                                    Buat template pola jam kerja baru untuk
-                                    kalender kerja.
-                                </DialogDescription>
-                            </div>
-                        </div>
-                    </DialogHeader>
-
-                    <DialogBody className="space-y-4 py-4">
                         <Input
-                            label="Pola jam kerja"
-                            placeholder="mis. 24HR-DAY, PROD-DAY, STD-DAY"
+                            label="Kode pola jam kerja"
                             value={newCode}
-                            onChange={(e) => setNewCode(e.target.value)}
-                            className="text-xs uppercase"
+                            onChange={(event) =>
+                                setNewCode(event.target.value.toUpperCase())
+                            }
+                            maxLength={50}
                             required
+                            autoFocus
+                            readOnly={isCreating}
                         />
-
                         <Input
                             label="Nama"
-                            placeholder="mis. Hari Kerja Produksi"
                             value={newName}
-                            onChange={(e) => setNewName(e.target.value)}
-                            className="text-xs"
+                            onChange={(event) => setNewName(event.target.value)}
+                            maxLength={150}
                             required
+                            readOnly={isCreating}
                         />
-                    </DialogBody>
-
-                    <DialogFooter>
-                        <DialogAction
+                    </PageDialogBody>
+                    <PageDialogFooter>
+                        <PageDialogAction
                             onClick={handleCreateTemplate}
                             disabled={
                                 isCreating || !newCode.trim() || !newName.trim()
                             }
                         >
-                            {isCreating ? 'Menyimpan...' : 'Tambah template'}
-                        </DialogAction>
-                        <DialogCancel onClick={() => setIsCreateOpen(false)} />
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                            {isCreating ? 'Menyimpan...' : 'Buat pola'}
+                        </PageDialogAction>
+                        <Button
+                            variant="outline"
+                            onClick={() => setIsCreateOpen(false)}
+                            disabled={isCreating}
+                        >
+                            Batal
+                        </Button>
+                    </PageDialogFooter>
+                </PageDialogContent>
+            </PageDialog>
 
-            {/* Copy Template Modal */}
-            <Dialog
+            <PageDialog
                 open={isCopyTemplateOpen}
-                onOpenChange={setIsCopyTemplateOpen}
+                onOpenChange={(open) => {
+                    if (!isCopying) {
+                        setIsCopyTemplateOpen(open);
+                    }
+                }}
             >
-                <DialogContent size="compact">
-                    <DialogHeader>
-                        <div className="flex items-center gap-3">
-                            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
-                                <Copy className="size-5" />
-                            </div>
-                            <div>
-                                <DialogTitle>Salin Pola Jam Kerja</DialogTitle>
-                                <DialogDescription>
-                                    Duplikasi pola jam kerja{' '}
-                                    <span className="font-semibold text-primary">
-                                        {activeTemplate?.code}
-                                    </span>{' '}
-                                    beserta seluruh baris jam kerja harian.
-                                </DialogDescription>
-                            </div>
-                        </div>
-                    </DialogHeader>
-
-                    <DialogBody className="space-y-4 py-4">
+                <PageDialogContent>
+                    <PageDialogHeader>
+                        <PageDialogTitle>Salin pola jam kerja</PageDialogTitle>
+                        <PageDialogDescription>
+                            Salin {activeTemplate?.code} beserta seluruh jam
+                            kerja hariannya ke pola baru.
+                        </PageDialogDescription>
+                    </PageDialogHeader>
+                    <PageDialogBody className="space-y-4">
+                        {modalError && (
+                            <p role="alert" className="text-destructive">
+                                {modalError}
+                            </p>
+                        )}
                         <Input
-                            label="Kode Template Baru"
+                            label="Kode pola baru"
                             value={copyNewCode}
-                            onChange={(e) => setCopyNewCode(e.target.value)}
-                            className="text-xs uppercase"
+                            onChange={(event) =>
+                                setCopyNewCode(event.target.value.toUpperCase())
+                            }
+                            maxLength={50}
                             required
+                            autoFocus
+                            readOnly={isCopying}
                         />
-
                         <Input
-                            label="Nama Template Baru"
+                            label="Nama pola baru"
                             value={copyNewName}
-                            onChange={(e) => setCopyNewName(e.target.value)}
-                            className="text-xs"
+                            onChange={(event) =>
+                                setCopyNewName(event.target.value)
+                            }
+                            maxLength={150}
                             required
+                            readOnly={isCopying}
                         />
-                    </DialogBody>
-
-                    <DialogFooter>
-                        <DialogAction
+                    </PageDialogBody>
+                    <PageDialogFooter>
+                        <PageDialogAction
                             onClick={handleExecuteCopyTemplate}
                             disabled={
                                 isCopying ||
@@ -1389,156 +1569,190 @@ export default function WorkingTimeTemplates({
                                 !copyNewName.trim()
                             }
                         >
-                            {isCopying ? 'Menyalin...' : 'Salin template'}
-                        </DialogAction>
-                        <DialogCancel
+                            {isCopying ? 'Menyalin...' : 'Salin pola'}
+                        </PageDialogAction>
+                        <Button
+                            variant="outline"
                             onClick={() => setIsCopyTemplateOpen(false)}
-                        />
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Copy Day Modal */}
-            <Dialog open={isCopyDayOpen} onOpenChange={setIsCopyDayOpen}>
-                <DialogContent size="compact">
-                    <DialogHeader>
-                        <div className="flex items-center gap-3">
-                            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
-                                <Copy className="size-5" />
-                            </div>
-                            <div>
-                                <DialogTitle>
-                                    Salin Jam Kerja Hari{' '}
-                                    {
-                                        DAYS.find(
-                                            (d) => d.index === copyFromDay,
-                                        )?.name
-                                    }
-                                </DialogTitle>
-                                <DialogDescription>
-                                    Salin jadwal jam kerja dari hari{' '}
-                                    <span className="font-semibold text-primary">
-                                        {
-                                            DAYS.find(
-                                                (d) => d.index === copyFromDay,
-                                            )?.name
-                                        }
-                                    </span>{' '}
-                                    ke hari lainnya.
-                                </DialogDescription>
-                            </div>
-                        </div>
-                    </DialogHeader>
-
-                    <DialogToolbar className="flex items-center gap-2 px-6 py-2.5">
-                        <span className="mr-1 text-xs font-medium text-muted-foreground">
-                            Pilih cepat:
-                        </span>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="xs"
-                            className="h-7 text-xs font-normal"
-                            onClick={() => {
-                                setCopyToDays(
-                                    [0, 1, 2, 3, 4].filter(
-                                        (idx) => idx !== copyFromDay,
-                                    ),
-                                );
-                            }}
+                            disabled={isCopying}
                         >
-                            Senin – Jumat
+                            Batal
                         </Button>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="xs"
-                            className="h-7 text-xs font-normal"
-                            onClick={() => {
-                                setCopyToDays(
-                                    DAYS.map((d) => d.index).filter(
-                                        (idx) => idx !== copyFromDay,
-                                    ),
-                                );
-                            }}
-                        >
-                            Semua Hari
-                        </Button>
-                        {copyToDays.length > 0 && (
+                    </PageDialogFooter>
+                </PageDialogContent>
+            </PageDialog>
+
+            <PageDialog open={isCopyDayOpen} onOpenChange={setIsCopyDayOpen}>
+                <PageDialogContent>
+                    <PageDialogHeader>
+                        <PageDialogTitle>
+                            Salin jam kerja{' '}
+                            {
+                                DAYS.find((day) => day.index === copyFromDay)
+                                    ?.name
+                            }
+                        </PageDialogTitle>
+                        <PageDialogDescription>
+                            Jam kerja pada hari tujuan akan diganti. Perubahan
+                            baru tersimpan setelah menekan Simpan pada pola jam
+                            kerja.
+                        </PageDialogDescription>
+                    </PageDialogHeader>
+                    <PageDialogBody className="space-y-4">
+                        <div className="flex flex-wrap gap-2">
                             <Button
-                                type="button"
-                                variant="ghost"
-                                size="xs"
-                                className="h-7 text-xs text-muted-foreground hover:text-destructive"
-                                onClick={() => setCopyToDays([])}
+                                variant="outline"
+                                onClick={() =>
+                                    setCopyToDays(
+                                        [0, 1, 2, 3, 4].filter(
+                                            (day) => day !== copyFromDay,
+                                        ),
+                                    )
+                                }
                             >
-                                Reset
+                                Senin-Jumat
                             </Button>
-                        )}
-                    </DialogToolbar>
-
-                    <DialogBody className="py-4">
-                        <div className="grid grid-cols-2 gap-2.5">
-                            {DAYS.filter((d) => d.index !== copyFromDay).map(
-                                (d) => {
-                                    const isChecked = copyToDays.includes(
-                                        d.index,
-                                    );
-
-                                    return (
-                                        <label
-                                            key={d.index}
-                                            className={cn(
-                                                'flex cursor-pointer items-center gap-3 rounded-lg border p-3 text-xs transition-colors select-none',
-                                                isChecked
-                                                    ? 'border-primary/50 bg-primary/5 font-medium text-foreground shadow-xs'
-                                                    : 'border-border/70 bg-card text-foreground hover:border-border hover:bg-accent/40',
-                                            )}
-                                        >
-                                            <Checkbox
-                                                checked={isChecked}
-                                                onCheckedChange={(checked) => {
-                                                    if (checked === true) {
-                                                        setCopyToDays(
-                                                            (prev) => [
-                                                                ...prev,
-                                                                d.index,
-                                                            ],
-                                                        );
-                                                    } else {
-                                                        setCopyToDays((prev) =>
-                                                            prev.filter(
-                                                                (idx) =>
-                                                                    idx !==
-                                                                    d.index,
-                                                            ),
-                                                        );
-                                                    }
-                                                }}
-                                            />
-                                            <span className="text-xs">
-                                                {d.name}
-                                            </span>
-                                        </label>
-                                    );
-                                },
-                            )}
+                            <Button
+                                variant="outline"
+                                onClick={() =>
+                                    setCopyToDays(
+                                        DAYS.map((day) => day.index).filter(
+                                            (day) => day !== copyFromDay,
+                                        ),
+                                    )
+                                }
+                            >
+                                Semua hari
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                onClick={() => setCopyToDays([])}
+                                disabled={!copyToDays.length}
+                            >
+                                Kosongkan pilihan
+                            </Button>
                         </div>
-                    </DialogBody>
-
-                    <DialogFooter>
-                        <DialogAction
-                            disabled={copyToDays.length === 0}
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            {DAYS.filter(
+                                (day) => day.index !== copyFromDay,
+                            ).map((day) => (
+                                <Label
+                                    key={day.index}
+                                    className="flex items-center gap-2"
+                                >
+                                    <Checkbox
+                                        checked={copyToDays.includes(day.index)}
+                                        onCheckedChange={(checked) =>
+                                            setCopyToDays((previous) =>
+                                                checked === true
+                                                    ? [...previous, day.index]
+                                                    : previous.filter(
+                                                          (index) =>
+                                                              index !==
+                                                              day.index,
+                                                      ),
+                                            )
+                                        }
+                                    />
+                                    {day.name}
+                                </Label>
+                            ))}
+                        </div>
+                    </PageDialogBody>
+                    <PageDialogFooter>
+                        <PageDialogAction
+                            disabled={!copyToDays.length}
                             onClick={handleExecuteCopyDay}
                         >
-                            {copyToDays.length > 0
-                                ? `Salin ke ${copyToDays.length} Hari`
-                                : 'Salin Jam Kerja'}
-                        </DialogAction>
-                        <DialogCancel onClick={() => setIsCopyDayOpen(false)} />
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                            Salin ke {copyToDays.length} hari
+                        </PageDialogAction>
+                        <Button
+                            variant="outline"
+                            onClick={() => setIsCopyDayOpen(false)}
+                        >
+                            Batal
+                        </Button>
+                    </PageDialogFooter>
+                </PageDialogContent>
+            </PageDialog>
+
+            <AlertDialog
+                open={isArchiveOpen}
+                onOpenChange={(open) => {
+                    if (!isArchiving) {
+                        setIsArchiveOpen(open);
+                    }
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Arsipkan pola jam kerja?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {activeTemplate?.code} - {activeTemplate?.name} akan
+                            disembunyikan dari daftar pola yang tersedia.
+                            Kalender yang sudah menggunakannya tetap tersimpan.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    {modalError && (
+                        <p role="alert" className="text-destructive">
+                            {modalError}
+                        </p>
+                    )}
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isArchiving}>
+                            Batal
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            disabled={isArchiving}
+                            onClick={(event) => {
+                                event.preventDefault();
+                                void handleDeleteTemplate();
+                            }}
+                        >
+                            {isArchiving ? 'Mengarsipkan...' : 'Arsipkan'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog
+                open={pendingSelection !== null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setPendingSelection(null);
+                    }
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Tinggalkan perubahan?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Perubahan yang belum disimpan akan hilang jika
+                            membuka pola lain.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>
+                            Kembali menyunting
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={() => {
+                                if (pendingSelection) {
+                                    setIsEditing(false);
+                                    void selectTemplate(pendingSelection);
+                                    setPendingSelection(null);
+                                }
+                            }}
+                        >
+                            Tinggalkan perubahan
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     );
 }

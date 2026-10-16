@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master\AssetClassifications;
 
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -38,12 +39,10 @@ final class AssetClassificationController extends Controller
         if (isset($data['aktif'])) {
             $query->where('aktif', $data['aktif'] === 'true');
         }
-        $page = $query->orderBy('label')->orderBy('effective_from')->paginate($data['per_page'] ?? 20);
+        $batch = IncrementalList::query($request, $query->toBase(), ['id' => 'id', 'kode' => 'template_key', 'nama' => 'label'], [], 'nama');
+        $batch['data'] = KelompokHartaFiskal::hydrate($batch['data']->map(fn ($row) => (array) $row)->all())->map(fn (KelompokHartaFiskal $record) => $this->present($record));
 
-        return response()->json([
-            'data' => collect($page->items())->map(fn (KelompokHartaFiskal $record) => $this->present($record)),
-            'meta' => ['current_page' => $page->currentPage(), 'last_page' => $page->lastPage(), 'total' => $page->total()],
-        ]);
+        return response()->json($batch);
     }
 
     public function store(Request $request): JsonResponse

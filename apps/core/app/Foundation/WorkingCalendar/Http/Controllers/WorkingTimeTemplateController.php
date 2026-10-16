@@ -4,8 +4,10 @@ namespace App\Foundation\WorkingCalendar\Http\Controllers;
 
 use App\Foundation\WorkingCalendar\Models\WorkingTimeLine;
 use App\Foundation\WorkingCalendar\Models\WorkingTimeTemplate;
+use App\Foundation\WorkingCalendar\Support\WorkingTimeIntervals;
 use App\Http\Controllers\Controller;
 use App\Platform\Environment\Support\CurrentWorkspace;
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Organization\Models\Organization;
 use Illuminate\Http\JsonResponse;
@@ -13,6 +15,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -34,34 +37,32 @@ class WorkingTimeTemplateController extends Controller
 
         $selectedLegalEntityId = $workspaceLegalEntity?->id;
 
-        $templates = $selectedLegalEntityId
-            ? WorkingTimeTemplate::query()
-                ->where('tenant_id', $membership->tenant_id)
-                ->where('legal_entity_id', $selectedLegalEntityId)
-                ->with(['legalEntity.legalEntity', 'lines' => fn ($q) => $q->orderBy('day_of_week')->orderBy('from_time')])
-                ->orderBy('code')
-                ->get()
-                ->map(fn (WorkingTimeTemplate $t): array => [
-                    'id' => $t->id,
-                    'code' => $t->code,
-                    'name' => $t->name,
-                    'description' => $t->description,
-                    'legal_entity_id' => $t->legal_entity_id,
-                    'legal_entity_name' => $t->legalEntity?->name,
-                    'company_code' => $t->legalEntity?->legalEntity?->company_code,
-                    'is_active' => (bool) $t->is_active,
-                    'version' => $t->version,
-                    'lines' => $t->lines->map(fn (WorkingTimeLine $l): array => [
-                        'id' => $l->id,
-                        'day_of_week' => (int) $l->day_of_week,
-                        'from_time' => $l->from_time ? substr((string) $l->from_time, 0, 5) : null,
-                        'to_time' => $l->to_time ? substr((string) $l->to_time, 0, 5) : null,
-                        'efficiency' => (float) $l->efficiency,
-                        'property' => $l->property,
-                        'closed_for_pickup' => (bool) $l->closed_for_pickup,
-                        'hours' => (float) $l->hours,
-                    ])->all(),
-                ])
+        $query = WorkingTimeTemplate::query()
+            ->where('tenant_id', $membership->tenant_id)
+            ->where('legal_entity_id', $selectedLegalEntityId)
+            ->when(! $selectedLegalEntityId, fn ($query) => $query->whereRaw('1 = 0'));
+
+        if ($request->boolean('incremental')) {
+            if ($request->filled('record_id')) {
+                $request->validate(['record_id' => ['required', 'ulid']]);
+                $template = (clone $query)->whereKey($request->string('record_id')->toString())->firstOrFail();
+
+                return response()->json(['data' => [$this->presentTemplate($template)], 'next_cursor' => null]);
+            }
+
+            return response()->json(IncrementalList::query(
+                $request,
+                $query->select(['id', 'code', 'name', 'legal_entity_id', 'is_active', 'version'])->toBase(),
+                ['code' => 'code', 'name' => 'name'],
+                ['code', 'name'],
+                'code',
+            ));
+        }
+
+        // Pemakai JSON lama tetap menerima bentuk semula; halaman memuat header per batch.
+        $templates = ($request->wantsJson() || $request->is('api/*'))
+            ? $query->with(['legalEntity.legalEntity', 'lines' => fn ($query) => $query->orderBy('day_of_week')->orderBy('from_time')])
+                ->orderBy('code')->get()->map(fn (WorkingTimeTemplate $template): array => $this->presentTemplate($template))
             : collect();
 
         $currentLegalEntityData = $workspaceLegalEntity ? [
@@ -84,6 +85,34 @@ class WorkingTimeTemplateController extends Controller
             'currentLegalEntity' => $currentLegalEntityData,
             'canManage' => $request->user()?->can('manage-reference-data') ?? false,
         ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function presentTemplate(WorkingTimeTemplate $template): array
+    {
+        $template->loadMissing(['legalEntity.legalEntity', 'lines' => fn ($query) => $query->orderBy('day_of_week')->orderBy('from_time')]);
+
+        return [
+            'id' => $template->id,
+            'code' => $template->code,
+            'name' => $template->name,
+            'description' => $template->description,
+            'legal_entity_id' => $template->legal_entity_id,
+            'legal_entity_name' => $template->legalEntity?->name,
+            'company_code' => $template->legalEntity?->legalEntity?->company_code,
+            'is_active' => (bool) $template->is_active,
+            'version' => $template->version,
+            'lines' => $template->lines->map(fn (WorkingTimeLine $l): array => [
+                'id' => $l->id,
+                'day_of_week' => (int) $l->day_of_week,
+                'from_time' => $l->from_time ? substr((string) $l->from_time, 0, 5) : null,
+                'to_time' => $l->to_time ? substr((string) $l->to_time, 0, 5) : null,
+                'efficiency' => (float) $l->efficiency,
+                'property' => $l->property,
+                'closed_for_pickup' => (bool) $l->closed_for_pickup,
+                'hours' => (float) $l->hours,
+            ])->all(),
+        ];
     }
 
     public function store(Request $request): RedirectResponse|JsonResponse
@@ -130,7 +159,7 @@ class WorkingTimeTemplateController extends Controller
         ]);
 
         if ($request->wantsJson() || $request->is('api/*')) {
-            return response()->json(['data' => $template], 201);
+            return response()->json(['data' => $this->presentTemplate($template->refresh())], 201);
         }
 
         return back()->with('success', 'Pola jam kerja berhasil dibuat.');
@@ -150,12 +179,16 @@ class WorkingTimeTemplateController extends Controller
             'is_active' => ['nullable', 'boolean'],
             'lines' => ['nullable', 'array'],
             'lines.*.day_of_week' => ['required_with:lines', 'integer', 'between:0,6'],
-            'lines.*.from_time' => ['nullable', 'string'],
-            'lines.*.to_time' => ['nullable', 'string'],
+            'lines.*.from_time' => ['nullable', 'string', 'regex:'.WorkingTimeIntervals::TIME_PATTERN],
+            'lines.*.to_time' => ['nullable', 'string', 'regex:'.WorkingTimeIntervals::TIME_PATTERN],
             'lines.*.efficiency' => ['nullable', 'numeric', 'between:0,100'],
             'lines.*.property' => ['nullable', 'string', 'max:50'],
             'lines.*.closed_for_pickup' => ['nullable', 'boolean'],
-            'lines.*.hours' => ['nullable', 'numeric'],
+            'lines.*.hours' => ['nullable', 'numeric', 'between:0,24'],
+        ], [
+            'lines.*.from_time.regex' => 'Jam mulai ditulis JJ:MM, misalnya 08:00.',
+            'lines.*.to_time.regex' => 'Jam selesai ditulis JJ:MM, misalnya 17:00 atau 24:00.',
+            'lines.*.hours.between' => 'Jumlah jam dalam satu hari harus antara 0 dan 24.',
         ]);
 
         DB::transaction(function () use ($request, $template, $membership, $validated): void {
@@ -173,7 +206,7 @@ class WorkingTimeTemplateController extends Controller
         });
 
         if ($request->wantsJson() || $request->is('api/*')) {
-            return response()->json(['data' => $template->refresh()->load('lines')]);
+            return response()->json(['data' => $this->presentTemplate($template->refresh())]);
         }
 
         return back()->with('success', 'Pola jam kerja berhasil diperbarui.');
@@ -238,7 +271,7 @@ class WorkingTimeTemplateController extends Controller
         });
 
         if ($request->wantsJson() || $request->is('api/*')) {
-            return response()->json(['data' => $newTemplate], 201);
+            return response()->json(['data' => $this->presentTemplate($newTemplate->refresh())], 201);
         }
 
         return back()->with('success', 'Pola jam kerja berhasil diduplikasi.');
@@ -254,12 +287,16 @@ class WorkingTimeTemplateController extends Controller
         $validated = $request->validate([
             'lines' => ['present', 'array'],
             'lines.*.day_of_week' => ['required', 'integer', 'between:0,6'],
-            'lines.*.from_time' => ['nullable', 'string'],
-            'lines.*.to_time' => ['nullable', 'string'],
+            'lines.*.from_time' => ['nullable', 'string', 'regex:'.WorkingTimeIntervals::TIME_PATTERN],
+            'lines.*.to_time' => ['nullable', 'string', 'regex:'.WorkingTimeIntervals::TIME_PATTERN],
             'lines.*.efficiency' => ['nullable', 'numeric', 'between:0,100'],
             'lines.*.property' => ['nullable', 'string', 'max:50'],
             'lines.*.closed_for_pickup' => ['nullable', 'boolean'],
-            'lines.*.hours' => ['nullable', 'numeric'],
+            'lines.*.hours' => ['nullable', 'numeric', 'between:0,24'],
+        ], [
+            'lines.*.from_time.regex' => 'Jam mulai ditulis JJ:MM, misalnya 08:00.',
+            'lines.*.to_time.regex' => 'Jam selesai ditulis JJ:MM, misalnya 17:00 atau 24:00.',
+            'lines.*.hours.between' => 'Jumlah jam dalam satu hari harus antara 0 dan 24.',
         ]);
 
         // Baris jam milik pola ini; yang diklaim polanya, supaya dua penggantian baris tidak saling menimpa.
@@ -269,7 +306,7 @@ class WorkingTimeTemplateController extends Controller
         });
 
         if ($request->wantsJson() || $request->is('api/*')) {
-            return response()->json(['data' => $template->refresh()->load('lines')]);
+            return response()->json(['data' => $this->presentTemplate($template->refresh())]);
         }
 
         return back()->with('success', 'Baris jam kerja berhasil disimpan.');
@@ -280,91 +317,32 @@ class WorkingTimeTemplateController extends Controller
      */
     private function syncLines(WorkingTimeTemplate $template, string $tenantId, array $lines): void
     {
+        $days = [];
+        foreach ($lines as $index => $line) {
+            $days[(int) $line['day_of_week']][$index] = $line;
+        }
+        $normalized = [];
+        foreach ($days as $dayLines) {
+            $closed = (bool) (reset($dayLines)['closed_for_pickup'] ?? false);
+            foreach ($dayLines as $index => $line) {
+                if ((bool) ($line['closed_for_pickup'] ?? false) !== $closed) {
+                    throw ValidationException::withMessages(["lines.{$index}.closed_for_pickup" => 'Status tutup untuk pengambilan harus sama pada semua baris dalam satu hari.']);
+                }
+            }
+            foreach (WorkingTimeIntervals::normalize($dayLines) as $index => $interval) {
+                $normalized[] = [...$interval, 'day_of_week' => (int) $dayLines[$index]['day_of_week'], 'closed_for_pickup' => $closed];
+            }
+        }
         $template->lines()->delete();
-
-        foreach ($lines as $line) {
-            $from = $this->normalizeTime($line['from_time'] ?? null);
-            $to = $this->normalizeTime($line['to_time'] ?? null);
-            $closed = ! empty($line['closed_for_pickup']);
-            $hours = 0.0;
-
-            // Abaikan baris kosong yang tidak punya jam dan bukan status closed
-            if (! $closed && ! $from && ! $to && empty($line['hours'])) {
+        foreach ($normalized as $line) {
+            if (! $line['closed_for_pickup'] && $line['from_time'] === null && $line['to_time'] === null && $line['hours'] === 0.0) {
                 continue;
             }
-
-            if ($from && $to) {
-                $start = $from === '24:00' ? 86400 : (strtotime("1970-01-01 $from:00 UTC") ?: 0);
-                $end = $to === '24:00' ? 86400 : (strtotime("1970-01-01 $to:00 UTC") ?: 0);
-                if ($end > $start) {
-                    $hours = round(($end - $start) / 3600, 2);
-                }
-            } elseif (! empty($line['hours'])) {
-                $hours = (float) $line['hours'];
-            }
-
             WorkingTimeLine::create([
+                ...$line,
                 'tenant_id' => $tenantId,
                 'working_time_template_id' => $template->id,
-                'day_of_week' => (int) $line['day_of_week'],
-                'from_time' => $from,
-                'to_time' => $to,
-                'efficiency' => isset($line['efficiency']) ? (float) $line['efficiency'] : 100.0,
-                'property' => $line['property'] ?? null,
-                'closed_for_pickup' => $closed,
-                'hours' => $hours,
             ]);
         }
-    }
-
-    private function normalizeTime(?string $time): ?string
-    {
-        if ($time === null || trim($time) === '') {
-            return null;
-        }
-
-        $clean = trim($time);
-        if ($clean === '24' || $clean === '24:00' || $clean === '24:00:00' || $clean === '2400') {
-            return '24:00';
-        }
-
-        if (str_contains($clean, ':')) {
-            $parts = explode(':', $clean);
-            $h = (int) $parts[0];
-            $m = (int) ($parts[1] ?? 0);
-            if ($h === 24 && $m === 0) {
-                return '24:00';
-            }
-            $h = min(23, max(0, $h));
-            $m = min(59, max(0, $m));
-
-            return sprintf('%02d:%02d', $h, $m);
-        }
-
-        if (preg_match('/^\d{1,2}$/', $clean)) {
-            $h = min(23, max(0, (int) $clean));
-
-            return sprintf('%02d:00', $h);
-        }
-
-        if (preg_match('/^\d{3}$/', $clean)) {
-            $h = (int) substr($clean, 0, 1);
-            $m = min(59, max(0, (int) substr($clean, 1, 2)));
-
-            return sprintf('%02d:%02d', $h, $m);
-        }
-
-        if (preg_match('/^\d{4}$/', $clean)) {
-            $h = (int) substr($clean, 0, 2);
-            $m = min(59, max(0, (int) substr($clean, 2, 2)));
-            if ($h === 24 && $m === 0) {
-                return '24:00';
-            }
-            $h = min(23, max(0, $h));
-
-            return sprintf('%02d:%02d', $h, $m);
-        }
-
-        return null;
     }
 }

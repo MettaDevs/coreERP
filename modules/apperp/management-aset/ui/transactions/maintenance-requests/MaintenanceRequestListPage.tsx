@@ -1,6 +1,3 @@
-import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
-import { useDateTimeFormat } from '@/hooks/use-date-time';
 import { ActionButton } from '@apperp/ui/action-button';
 import { DataTable } from '@apperp/ui/data-table';
 import type {
@@ -17,7 +14,10 @@ import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
-import { api, errorMessage } from '../../api';
+import { useState } from 'react';
+import { toast } from 'sonner';
+import { useDateTimeFormat } from '@/hooks/use-date-time';
+import { useRecordList } from '../../use-record-list';
 import type { MaintenanceRequest } from './maintenanceRequest';
 import {
     STATUS,
@@ -51,62 +51,19 @@ export default function MaintenanceRequestListPage({
 }) {
     const can = permissionCheck(permissions);
     const formatDateTime = useDateTimeFormat();
-    const [rows, setRows] = useState<MaintenanceRequest[]>([]);
     const [status, setStatus] = useState('');
     const [search, setSearch] = useState('');
-    const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        let cancelled = false;
-
-        api<{ data: MaintenanceRequest[] }>(
-            `/permintaan-pemeliharaan${status ? `?status=${status}` : ''}`,
-        )
-            .then((result) => {
-                if (!cancelled) {
-                    setRows(result.data);
-                }
-            })
-            .catch((caught) => {
-                if (!cancelled) {
-                    toast.error(
-                        errorMessage(
-                            caught,
-                            'Permintaan pemeliharaan belum dapat dimuat.',
-                        ),
-                    );
-                }
-            })
-            .finally(() => {
-                if (!cancelled) {
-                    setLoading(false);
-                }
-            });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [status]);
-
-    const query = search.trim().toLowerCase();
-    const visible =
-        query === ''
-            ? rows
-            : rows.filter((row) =>
-                  [
-                      row.kode,
-                      row.deskripsi,
-                      row.aset_kode,
-                      row.aset_nama,
-                      row.lokasi_nama,
-                      row.jenis_permintaan_nama,
-                      row.work_order_kode,
-                  ].some((value) =>
-                      String(value ?? '')
-                          .toLowerCase()
-                          .includes(query),
-                  ),
-              );
+    const list = useRecordList<MaintenanceRequest>(
+        '/permintaan-pemeliharaan',
+        search,
+        Object.fromEntries(
+            Object.entries({ status }).filter(([, value]) => value !== ''),
+        ),
+    );
+    const rows = list.items;
+    const visible = rows;
+    const loading = list.loading;
 
     const columns: DataTableColumn<MaintenanceRequest>[] = [
         {
@@ -216,7 +173,6 @@ export default function MaintenanceRequestListPage({
                             value={status || ALL}
                             ariaLabel="Saring berdasarkan status"
                             onValueChange={(value) => {
-                                setLoading(true);
                                 setStatus(!value || value === ALL ? '' : value);
                             }}
                         />
@@ -240,6 +196,9 @@ export default function MaintenanceRequestListPage({
             ) : (
                 <DataTable
                     columns={columns}
+                    incremental={list}
+                    sort={list.sort}
+                    onSortChange={list.onSortChange}
                     data={visible}
                     getRowKey={(row) => row.id}
                     getRowLabel={(row) => row.kode}

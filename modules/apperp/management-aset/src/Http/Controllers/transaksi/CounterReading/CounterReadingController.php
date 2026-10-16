@@ -2,6 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\CounterReading;
 
+use App\Platform\Modules\Contracts\IncrementalList;
+use App\Platform\Modules\Contracts\OrganizationDirectory;
 use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
@@ -65,10 +67,13 @@ final class CounterReadingController extends Controller
         }
 
         $tenant = $this->tenant($request);
-        $rows = $query->orderByDesc(self::TABLE.'.dibaca_pada')->orderByDesc(self::TABLE.'.id')->limit(500)->toBase()->get()
-            ->map(fn (stdClass $row): stdClass => $this->withPerson($row, $tenant, $people));
+        $list = $query->toBase();
+        app(OrganizationDirectory::class)->addNames($list, $tenant, [], ['dicatat_oleh_nama' => self::TABLE.'.created_by_user_id']);
 
-        return response()->json(['data' => $rows]);
+        return response()->json(IncrementalList::query($request, $list, [
+            'id' => 'id', 'waktu' => 'dibaca_pada', 'aset' => 'aset_kode', 'counter' => 'jenis_counter_nama',
+            'nilai' => 'nilai', 'total' => 'nilai_total', 'oleh' => 'dicatat_oleh_nama', 'keterangan' => 'keterangan',
+        ], ['aset_kode', 'aset_nama', 'jenis_counter_nama', 'keterangan'], 'waktu', ['nilai', 'nilai_total'], 'desc'));
     }
 
     /**

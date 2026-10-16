@@ -83,12 +83,14 @@ ActiveFilter:
   in: query
   schema:
     type: boolean
-Page:
-  name: page
+Cursor:
+  name: cursor
   in: query
+  description: Cursor opaque dari next_cursor pada batch sebelumnya. Kosong untuk batch
+    pertama.
   schema:
-    type: integer
-    minimum: 1
+    type: string
+    maxLength: 2000
 PerPage:
   name: per_page
   in: query
@@ -96,7 +98,7 @@ PerPage:
     type: integer
     minimum: 1
     maximum: 100
-    default: 20
+    default: 40
 PabrikanAsetFilter:
   name: pabrikan_aset_id
   in: query

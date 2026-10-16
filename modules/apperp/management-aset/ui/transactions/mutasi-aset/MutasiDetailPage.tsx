@@ -1,7 +1,3 @@
-import { FileText, Plus, Trash2 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { toast } from 'sonner';
-import { useWorkDate } from '@/hooks/use-work-date';
 import { ActionButton } from '@apperp/ui/action-button';
 import {
     AlertDialog,
@@ -31,6 +27,10 @@ import {
     TableRow,
 } from '@apperp/ui/table';
 import { Textarea } from '@apperp/ui/textarea';
+import { FileText, Plus, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { useWorkDate } from '@/hooks/use-work-date';
 import EditShield from '../../_shared/EditShield';
 import {
     ApiError,
@@ -43,6 +43,7 @@ import AssetConditionSelect from '../../master/AssetConditionSelect';
 import { defaultDepartmentOf } from '../../master/locationDefaults';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import { requestPrint } from '../../print';
+import { useRecordOptions } from '../../use-record-list';
 import type { Context, EditableMutasi, Mutasi, MutasiLine } from './mutasi';
 import {
     StatusBadge,
@@ -102,7 +103,6 @@ export default function MutasiDetailPage({
     const [galat, setGalat] = useState<Record<string, string[]>>({});
     const [konfirmasiSelesai, setKonfirmasiSelesai] = useState(false);
     const [konfirmasiArsip, setKonfirmasiArsip] = useState(false);
-    const [aset, setAset] = useState<Aset[]>([]);
     const lokasi = useMasterOptions('lokasi-aset');
     // Unit kerja dan orang milik Core. Keduanya dibaca lewat endpoint referensi module,
     // bukan diketik sebagai ULID: tidak ada pengguna yang mengenali rekannya dari ULID.
@@ -114,13 +114,12 @@ export default function MutasiDetailPage({
     const readOnly = mode === 'view';
     const selesai = tersimpan?.status === 'selesai';
 
-    useEffect(() => {
-        api<{ data: Aset[] }>('/aset')
-            .then((result) => setAset(result.data))
-            .catch((caught) =>
-                toast.error(errorMessage(caught, 'Aset belum dapat dimuat.')),
-            );
-    }, []);
+    const assetSource = useRecordOptions<Aset>(
+        '/aset',
+        (item) => (item.nama ? `${item.kode} \u00b7 ${item.nama}` : item.kode),
+        record.details.map((row) => row.aset_id),
+    );
+    const aset = assetSource.options;
 
     useEffect(() => {
         if (!mutasiId) {
@@ -443,6 +442,7 @@ export default function MutasiDetailPage({
                                             }
                                         >
                                             <Select
+                                                {...lokasi.selectProps}
                                                 label="Lokasi tujuan"
                                                 items={lokasi.options.map(
                                                     optionLabel,
@@ -499,6 +499,7 @@ export default function MutasiDetailPage({
                                             }
                                         >
                                             <Select
+                                                {...unitKerja.selectProps}
                                                 label="Unit kerja tujuan"
                                                 required
                                                 items={unitKerja.options.map(
@@ -572,6 +573,7 @@ export default function MutasiDetailPage({
                                             }
                                         >
                                             <Select
+                                                {...anggota.selectProps}
                                                 label="Diserahkan oleh"
                                                 items={anggota.options.map(
                                                     optionLabel,
@@ -621,6 +623,7 @@ export default function MutasiDetailPage({
                                             }
                                         >
                                             <Select
+                                                {...anggota.selectProps}
                                                 label="Diterima oleh"
                                                 items={anggota.options.map(
                                                     optionLabel,
@@ -745,6 +748,7 @@ export default function MutasiDetailPage({
                                                                     </span>
                                                                 ) : (
                                                                     <Select
+                                                                        {...assetSource.selectProps}
                                                                         items={aset.map(
                                                                             (
                                                                                 item,

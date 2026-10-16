@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Foundation\Vendor\ModuleServices;
 
 use App\Foundation\Vendor\Models\Vendor;
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\VendorDirectory;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 
 /**
  * Membaca vendor untuk module, sebagai baris biasa, bukan model Core.
@@ -16,6 +18,34 @@ use Illuminate\Database\Eloquent\Builder;
  */
 final class VendorDirectoryCore implements VendorDirectory
 {
+    public function findMany(string $tenantId, array $ids): array
+    {
+        return Vendor::query()->with('party:id,name')->where('tenant_id', $tenantId)->whereIn('id', $ids)
+            ->get()->mapWithKeys(fn (Vendor $vendor) => [$vendor->id => self::row($vendor)])->all();
+    }
+
+    public function addNames(\Illuminate\Database\Query\Builder $query, string $tenantId, array $fields): void
+    {
+        foreach ($fields as $alias => $column) {
+            $query->selectSub(Vendor::query()->join('parties as directory_party', function ($join): void {
+                $join->on('directory_party.id', '=', 'vendors.party_id')->on('directory_party.tenant_id', '=', 'vendors.tenant_id');
+            })->where('vendors.tenant_id', $tenantId)->whereNull('directory_party.deleted_at')
+                ->whereColumn('vendors.id', $column)->select('directory_party.name')->toBase()->limit(1), $alias);
+        }
+    }
+
+    public function lookup(string $tenantId, string $legalEntityId, array $input): array
+    {
+        $query = Vendor::query()->join('parties as list_party', function ($join): void {
+            $join->on('list_party.id', '=', 'vendors.party_id')->on('list_party.tenant_id', '=', 'vendors.tenant_id');
+        })->where('vendors.tenant_id', $tenantId)->where('vendors.legal_entity_id', $legalEntityId)
+            ->where('vendors.status', Vendor::ACTIVE)->whereNull('list_party.deleted_at')
+            ->select(['vendors.id', 'vendors.number', 'list_party.name', 'vendors.tax_number', 'vendors.status', 'vendors.legal_entity_id']);
+
+        return IncrementalList::query(Request::create('/lookup', 'GET', $input), $query->toBase(),
+            ['id' => 'id', 'number' => 'number', 'name' => 'name'], ['number', 'name'], 'number');
+    }
+
     public function active(string $tenantId, string $legalEntityId, string $search = '', int $limit = 20): array
     {
         $search = trim($search);

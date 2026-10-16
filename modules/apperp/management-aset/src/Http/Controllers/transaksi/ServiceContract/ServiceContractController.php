@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\ServiceContract;
 
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\RequestContext;
 use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Modules\Contracts\VendorDirectory;
@@ -60,7 +61,11 @@ class ServiceContractController extends Controller
         $tenant = $this->tenant($request);
         $today = $this->today();
 
-        return response()->json(['data' => $query->limit(500)->get()->map(fn (ServiceContract $contract): array => $this->present($tenant, $contract, $today))]);
+        $batch = IncrementalList::query($request, $query->toBase(), ['id' => 'id', 'periode' => 'berlaku_sampai'], ['kode', 'nomor_kontrak', 'keterangan'], 'periode', [], 'desc');
+        $vendors = app(VendorDirectory::class)->findMany($tenant, $batch['data']->pluck('vendor_id')->filter()->map(strval(...))->unique()->values()->all());
+        $batch['data'] = ServiceContract::hydrate($batch['data']->map(fn ($row) => (array) $row)->all())->map(fn (ServiceContract $contract): array => $this->present($tenant, $contract, $today, $vendors));
+
+        return response()->json($batch);
     }
 
     public function show(Request $request, string $id): JsonResponse
@@ -285,9 +290,9 @@ class ServiceContractController extends Controller
     }
 
     /** @return array<string, mixed> */
-    private function present(string $tenant, ServiceContract $contract, string $today): array
+    private function present(string $tenant, ServiceContract $contract, string $today, ?array $vendors = null): array
     {
-        $vendor = app(VendorDirectory::class)->find($tenant, $contract->vendor_id);
+        $vendor = $vendors !== null ? ($vendors[$contract->vendor_id] ?? null) : app(VendorDirectory::class)->find($tenant, $contract->vendor_id);
         $end = $contract->berlaku_sampai->toDateString();
 
         return [

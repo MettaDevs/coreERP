@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import {
     Card,
     CardAction,
     CardContent,
-    CardFooter,
     CardHeader,
     CardTitle,
 } from '@apperp/ui/card';
@@ -22,7 +20,9 @@ import {
 } from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
+import { useMemo, useState } from 'react';
 import { api, errorMessage } from '../api';
+import { useRecordList } from '../use-record-list';
 import GroupBookMatrix from './GroupBookMatrix';
 import MasterForm from './MasterForm';
 import type {
@@ -33,10 +33,8 @@ import type {
     Permission,
 } from './masters';
 import { parentSummaryOf, permission } from './masters';
+import MasterSelect from './MasterSelect';
 import TipeAtributNilai from './TipeAtributNilai';
-
-type ListMeta = { current_page: number; last_page: number; total: number };
-const emptyMeta: ListMeta = { current_page: 1, last_page: 1, total: 0 };
 
 const optionLabel = (option: ParentSummary) =>
     `${option.kode} — ${option.nama}`;
@@ -92,35 +90,18 @@ export default function MasterPage({
     const parents = useMemo(() => config.parents ?? [], [config.parents]);
     const can = (action: MasterAction) =>
         permissions.includes(permission(config.resource, action));
-    const [items, setItems] = useState<MasterRecord[]>([]);
-    const [meta, setMeta] = useState<ListMeta>(emptyMeta);
     const [search, setSearch] = useState('');
     const [activeFilter, setActiveFilter] = useState('semua');
     /** Filter induk per kolom foreign key; beberapa induk dapat disaring sekaligus. */
     const [parentFilter, setParentFilter] = useState<Record<string, string>>(
         {},
     );
-    const [page, setPage] = useState(1);
     const [editing, setEditing] = useState<MasterRecord | null | undefined>();
-    const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [parentOptions, setParentOptions] = useState<
-        Record<string, ParentSummary[]>
-    >({});
-    const [parentOptionsError, setParentOptionsError] = useState<
-        Record<string, string>
-    >({});
     const [picked, setPicked] = useState<string[]>([]);
 
     const query = useMemo(() => {
-        const params = new URLSearchParams({
-            per_page: '20',
-            page: String(page),
-        });
-
-        if (search.trim()) {
-            params.set('q', search.trim());
-        }
+        const params = new URLSearchParams();
 
         if (activeFilter !== 'semua') {
             params.set('aktif', activeFilter);
@@ -136,7 +117,17 @@ export default function MasterPage({
         }
 
         return params.toString();
-    }, [search, activeFilter, parentFilter, page, parents]);
+    }, [activeFilter, parentFilter, parents]);
+
+    const list = useRecordList<MasterRecord>(
+        `/${config.resource}?${query}`,
+        search,
+    );
+    const { items, setItems, loading } = list;
+    const load = () => {
+        setError('');
+        list.reload();
+    };
 
     // Pilihan hanya berlaku atas baris yang sedang tampil. Dengan menyaringnya saat
     // render, ganti filter atau ganti halaman membuat sisa pilihan lama gugur sendiri
@@ -145,81 +136,6 @@ export default function MasterPage({
         () => picked.filter((id) => items.some((item) => item.id === id)),
         [picked, items],
     );
-
-    const load = useCallback(async () => {
-        setLoading(true);
-        setError('');
-
-        try {
-            const list = await api<{ data: MasterRecord[]; meta: ListMeta }>(
-                `/${config.resource}?${query}`,
-            );
-            setItems(list.data);
-            setMeta(list.meta);
-        } catch (caught) {
-            setError(errorMessage(caught, 'Data belum dapat dimuat.'));
-        } finally {
-            setLoading(false);
-        }
-    }, [config.resource, query]);
-
-    // Tidak ada pengosongan pilihan di awal effect ini: App memasang `key` berisi
-    // resource aktif, jadi pindah master selalu memasang ulang layar dengan state
-    // yang sudah kosong, dan `parents` sendiri berasal dari tabel statis masters.ts.
-    useEffect(() => {
-        if (!parents.length) {
-            return;
-        }
-
-        let cancelled = false;
-
-        // Induk saling lepas, jadi seluruh pilihan dimuat berbarengan; gagalnya satu
-        // induk tidak menghalangi induk lain tampil.
-        for (const parent of parents) {
-            api<{ data: MasterRecord[] }>(
-                `/${parent.resource}?per_page=100&aktif=true`,
-            )
-                .then((result) => {
-                    if (cancelled) {
-                        return;
-                    }
-
-                    const options = result.data.map(({ id, kode, nama }) => ({
-                        id,
-                        kode,
-                        nama,
-                    }));
-                    setParentOptions((current) => ({
-                        ...current,
-                        [parent.field]: options,
-                    }));
-                })
-                .catch(() => {
-                    if (cancelled) {
-                        return;
-                    }
-
-                    setParentOptions((current) => ({
-                        ...current,
-                        [parent.field]: [],
-                    }));
-                    setParentOptionsError((current) => ({
-                        ...current,
-                        [parent.field]: `Pilihan ${parent.label.toLowerCase()} belum dapat dimuat. Anda memerlukan akses lihat untuk memilih induk.`,
-                    }));
-                });
-        }
-
-        return () => {
-            cancelled = true;
-        };
-    }, [parents]);
-
-    useEffect(() => {
-        const timer = window.setTimeout(load, 250);
-
-        return () => window.clearTimeout(timer);
-    }, [load]);
 
     async function toggle(item: MasterRecord) {
         try {
@@ -470,7 +386,7 @@ export default function MasterPage({
                                 Daftar {config.singular}
                             </p>
                             <p className="text-muted-foreground text-sm">
-                                {meta.total} data ditemukan
+                                {items.length} data dimuat
                             </p>
                         </div>
                         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
@@ -484,57 +400,33 @@ export default function MasterPage({
                                     setSearch(event.target.value);
                                     // Nomor halaman disetel ulang di tempat filternya
                                     // diubah, bukan lewat effect susulan.
-                                    setPage(1);
                                 }}
                             />
-                            {parents.map((parent) => {
-                                const options =
-                                    parentOptions[parent.field] ?? [];
-                                const selected = options.find(
-                                    (option) =>
-                                        option.id ===
-                                        parentFilter[parent.field],
-                                );
-
-                                return (
-                                    <div
-                                        key={parent.field}
-                                        className="w-full sm:w-52"
-                                    >
-                                        <Select
-                                            items={[
-                                                allLabel(parent.label),
-                                                ...options.map(optionLabel),
-                                            ]}
-                                            value={
-                                                selected
-                                                    ? optionLabel(selected)
-                                                    : allLabel(parent.label)
-                                            }
-                                            searchPlaceholder={`Cari ${parent.label.toLowerCase()}`}
-                                            emptyMessage={`${parent.label} tidak ditemukan.`}
-                                            ariaLabel={`Saring berdasarkan ${parent.label.toLowerCase()}`}
-                                            onValueChange={(item) => {
-                                                setParentFilter((current) => ({
-                                                    ...current,
-                                                    [parent.field]:
-                                                        item ===
-                                                        allLabel(parent.label)
-                                                            ? 'semua'
-                                                            : (options.find(
-                                                                  (option) =>
-                                                                      optionLabel(
-                                                                          option,
-                                                                      ) ===
-                                                                      item,
-                                                              )?.id ?? 'semua'),
-                                                }));
-                                                setPage(1);
-                                            }}
-                                        />
-                                    </div>
-                                );
-                            })}
+                            {parents.map((parent) => (
+                                <div
+                                    key={parent.field}
+                                    className="w-full sm:w-52"
+                                >
+                                    <MasterSelect
+                                        resource={parent.resource}
+                                        label={parent.label}
+                                        value={
+                                            parentFilter[parent.field] ===
+                                            'semua'
+                                                ? ''
+                                                : (parentFilter[parent.field] ??
+                                                  '')
+                                        }
+                                        emptyLabel={allLabel(parent.label)}
+                                        onValueChange={(id) =>
+                                            setParentFilter((current) => ({
+                                                ...current,
+                                                [parent.field]: id || 'semua',
+                                            }))
+                                        }
+                                    />
+                                </div>
+                            ))}
                             <div className="w-full sm:w-44">
                                 <Select
                                     items={[
@@ -560,7 +452,6 @@ export default function MasterPage({
                                                   ? 'false'
                                                   : 'semua',
                                         );
-                                        setPage(1);
                                     }}
                                 />
                             </div>
@@ -597,13 +488,15 @@ export default function MasterPage({
                                 <EmptyTitle>
                                     Data belum dapat ditampilkan
                                 </EmptyTitle>
-                                <EmptyDescription>{error}</EmptyDescription>
+                                <EmptyDescription>
+                                    {error || list.error}
+                                </EmptyDescription>
                             </EmptyHeader>
                             <Button variant="outline" onClick={load}>
                                 Coba lagi
                             </Button>
                         </Empty>
-                    ) : loading ? (
+                    ) : loading && !items.length ? (
                         <Empty>
                             <EmptyDescription>
                                 Memuat {config.singular}…
@@ -626,6 +519,9 @@ export default function MasterPage({
                             scrollMode="viewport"
                             className="min-h-0 flex-1"
                             columns={columns}
+                            incremental={list}
+                            sort={list.sort}
+                            onSortChange={list.onSortChange}
                             data={items}
                             getRowKey={(item) => item.id}
                             getRowLabel={(item) => item.nama}
@@ -646,38 +542,12 @@ export default function MasterPage({
                         />
                     )}
                 </CardContent>
-                {meta.last_page > 1 && (
-                    <CardFooter
-                        className="text-muted-foreground shrink-0 justify-end gap-3 border-t text-sm"
-                        aria-label={`Halaman daftar ${config.singular}`}
-                    >
-                        <Button
-                            variant="outline"
-                            disabled={meta.current_page <= 1}
-                            onClick={() => setPage((current) => current - 1)}
-                        >
-                            Sebelumnya
-                        </Button>
-                        <span>
-                            Halaman {meta.current_page} dari {meta.last_page}
-                        </span>
-                        <Button
-                            variant="outline"
-                            disabled={meta.current_page >= meta.last_page}
-                            onClick={() => setPage((current) => current + 1)}
-                        >
-                            Berikutnya
-                        </Button>
-                    </CardFooter>
-                )}
             </Card>
 
             {editing !== undefined && (
                 <MasterForm
                     config={config}
                     value={editing}
-                    parentOptions={parentOptions}
-                    parentOptionsError={parentOptionsError}
                     onClose={() => setEditing(undefined)}
                     key={editing?.id ?? 'baru'}
                     onSaved={(savedRecord, created) => {

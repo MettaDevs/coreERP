@@ -4,7 +4,7 @@
   get:
     tags: [Permintaan pemeliharaan]
     operationId: listMaintenanceRequestTypes
-    parameters: [$ref: '#/components/parameters/Search', $ref: '#/components/parameters/ActiveFilter', $ref: '#/components/parameters/Page', $ref: '#/components/parameters/PerPage']
+    parameters: [$ref: '#/components/parameters/Search', $ref: '#/components/parameters/ActiveFilter', $ref: '#/components/parameters/Cursor', $ref: '#/components/parameters/PerPage']
     responses: {'200': {description: Daftar jenis permintaan, content: {application/json: {schema: {$ref: '#/components/schemas/MaintenanceRequestTypeList'}}}}}
   post:
     tags: [Permintaan pemeliharaan]

@@ -24,16 +24,17 @@ import { Switch } from '@apperp/ui/switch';
 import { Head, router } from '@inertiajs/react';
 import { Search } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { loadLookupItems } from '@/lib/lookup-loader';
 import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 import Heading from '@/components/heading';
+import { RecordListScroll } from '@/components/record-list-scroll';
 import {
     apiJson,
     CoreApiError,
     errorText,
     toastSaveError,
 } from '@/lib/core-api';
+import { loadLookupItems } from '@/lib/lookup-loader';
 import type { BreadcrumbItem } from '@/types/navigation';
 import {
     OrganizationAddressesSection,
@@ -106,7 +107,12 @@ function Filters({
         router.get(
             '/settings/vendors',
             { ...filters, q, ...next },
-            { preserveState: true, preserveScroll: true, replace: true },
+            {
+                preserveState: true,
+                reset: ['vendors'],
+                preserveScroll: true,
+                replace: true,
+            },
         );
 
     return (
@@ -258,16 +264,20 @@ function VendorCard({
                 '/api/v1/vendors/party-options',
                 request,
             );
-            if (!request.signal.aborted)
-                setParties((current) => {
+
+            if (!request.signal.aborted) {
+setParties((current) => {
                     const unique = new Map(
                         current.map((party) => [party.id, party]),
                     );
                     result.items.forEach((party) =>
                         unique.set(party.id, party),
                     );
+
                     return [...unique.values()];
                 });
+}
+
             return result;
         },
         [],
@@ -331,8 +341,10 @@ function VendorCard({
             !form.legal_entity_id
         ) {
             setResolvingExisting(false);
+
             return;
         }
+
         const controller = new AbortController();
         setResolvingExisting(true);
         apiJson<{ data: Vendor[] }>(
@@ -340,18 +352,23 @@ function VendorCard({
             { signal: controller.signal },
         )
             .then((result) => {
-                if (!controller.signal.aborted && result.data[0])
-                    onOpenExisting(result.data[0]);
+                if (!controller.signal.aborted && result.data[0]) {
+onOpenExisting(result.data[0]);
+}
             })
             .catch((caught) => {
-                if (!controller.signal.aborted)
-                    setSaveError(
+                if (!controller.signal.aborted) {
+setSaveError(
                         errorText(caught, 'Akun vendor belum dapat diperiksa.'),
                     );
+}
             })
             .finally(() => {
-                if (!controller.signal.aborted) setResolvingExisting(false);
+                if (!controller.signal.aborted) {
+setResolvingExisting(false);
+}
             });
+
         return () => controller.abort();
     }, [
         vendor,
@@ -365,9 +382,11 @@ function VendorCard({
         if (saving || resolvingExisting) {
             return;
         }
+
         setSaving(true);
         setErrors({});
         setSaveError('');
+
         try {
             const result = await apiJson<{ data: Vendor }>(
                 vendor ? `/api/v1/vendors/${vendor.id}` : '/api/v1/vendors',
@@ -410,6 +429,7 @@ function VendorCard({
                     : `Vendor ${result.data.number} dibuat untuk ${legalEntityName}.`,
             );
             router.reload({ only: ['vendors'] });
+
             if (vendor) {
                 onClose();
             } else {
@@ -417,9 +437,11 @@ function VendorCard({
             }
         } catch (caught) {
             setSaveError(errorText(caught, 'Vendor belum dapat disimpan.'));
+
             if (caught instanceof CoreApiError) {
                 setErrors(caught.errors);
             }
+
             toastSaveError(caught, 'Vendor belum disimpan.');
         } finally {
             setSaving(false);
@@ -834,12 +856,15 @@ function VendorCard({
                     onClose={() => setCreatingParty(false)}
                     onCreated={(party) => {
                         setCreatingParty(false);
+
                         if (party.status !== 'active') {
                             toast.message(
                                 'Pihak tersimpan sebagai nonaktif. Aktifkan di buku alamat sebelum dipilih sebagai vendor.',
                             );
+
                             return;
                         }
+
                         const option: PartyOption = {
                             id: party.id,
                             name: party.name,
@@ -903,6 +928,7 @@ function VendorAddressTabs({
     if (!canRead) {
         return null;
     }
+
     return (
         <>
             <CollapsibleSection
@@ -1160,142 +1186,128 @@ export default function Vendors({
                         </div>
                     }
                     footer={
-                        <div className="flex items-center justify-between gap-3 border-t p-3 text-sm">
-                            <span>
-                                {vendors.from ?? 0}–{vendors.to ?? 0} dari{' '}
-                                {vendors.total} vendor
-                            </span>
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={!vendors.prev_page_url}
-                                    onClick={() =>
-                                        vendors.prev_page_url &&
-                                        router.visit(vendors.prev_page_url)
-                                    }
-                                >
-                                    Sebelumnya
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={!vendors.next_page_url}
-                                    onClick={() =>
-                                        vendors.next_page_url &&
-                                        router.visit(vendors.next_page_url)
-                                    }
-                                >
-                                    Berikutnya
-                                </Button>
-                            </div>
-                        </div>
+                        <p className="p-3 text-sm text-muted-foreground">
+                            {vendors.data.length} data dimuat
+                        </p>
                     }
                 >
-                    <DataTable
-                        data={vendors.data}
-                        getRowKey={(vendor) => vendor.id}
-                        getRowLabel={(vendor) => vendor.name}
-                        showRowNumbers
-                        actionsPlacement="inline"
-                        actions={[
-                            { id: 'view', label: 'Lihat vendor' },
-                            ...(canManage
-                                ? [{ id: 'edit', label: 'Ubah vendor' }]
-                                : []),
-                        ]}
-                        onRowAction={(action, vendor) =>
-                            action === 'edit'
-                                ? setEditing(vendor)
-                                : setViewing(vendor)
-                        }
-                        rowActivation="single-click"
-                        activeRowKey={selectedVendorId ?? undefined}
-                        onRowClick={(vendor) => setSelectedVendorId(vendor.id)}
-                        emptyMessage={
-                            legalEntities.length === 0
-                                ? 'Buat perusahaan di Organisasi lebih dulu sebelum menambahkan vendor.'
-                                : 'Belum ada vendor yang sesuai. Tambahkan vendor atau ubah saringan.'
-                        }
-                        columns={[
-                            {
-                                id: 'number',
-                                header: 'Nomor vendor',
-                                width: 180,
-                                cell: (vendor) => (
-                                    <Button
-                                        type="button"
-                                        variant="link"
-                                        className="h-auto p-0"
-                                        onClick={(event) => {
-                                            event.stopPropagation();
-                                            setViewing(vendor);
-                                        }}
-                                    >
-                                        {vendor.number}
-                                    </Button>
-                                ),
-                            },
-                            {
-                                id: 'name',
-                                header: 'Nama',
-                                width: 280,
-                                cell: (vendor) => (
-                                    <DataTableText>{vendor.name}</DataTableText>
-                                ),
-                            },
-                            {
-                                id: 'company',
-                                header: 'Perusahaan',
-                                width: 220,
-                                cell: (vendor) => (
-                                    <DataTableText>
-                                        {legalEntityName(
-                                            vendor.legal_entity_id,
-                                        )}
-                                    </DataTableText>
-                                ),
-                            },
-                            {
-                                id: 'tax',
-                                header: 'NPWP',
-                                width: 200,
-                                cell: (vendor) => (
-                                    <DataTableText>
-                                        {vendor.tax_number ?? '—'}
-                                    </DataTableText>
-                                ),
-                            },
-                            {
-                                id: 'type',
-                                header: 'Jenis pihak',
-                                width: 140,
-                                cell: (vendor) => (
-                                    <DataTableText>
-                                        {PARTY_TYPE_LABEL[vendor.party_type]}
-                                    </DataTableText>
-                                ),
-                            },
-                            {
-                                id: 'status',
-                                header: 'Status',
-                                width: 120,
-                                cell: (vendor) => (
-                                    <Badge
-                                        variant={
-                                            vendor.status === 'active'
-                                                ? 'secondary'
-                                                : 'outline'
-                                        }
-                                    >
-                                        {vendor.status === 'active'
-                                            ? 'Aktif'
-                                            : 'Nonaktif'}
-                                    </Badge>
-                                ),
-                            },
-                        ]}
-                    />
+                    <RecordListScroll
+                        data="vendors"
+                        className="flex h-full min-h-0 flex-1 flex-col"
+                    >
+                        <DataTable
+                            data={vendors.data}
+                            getRowKey={(vendor) => vendor.id}
+                            getRowLabel={(vendor) => vendor.name}
+                            showRowNumbers
+                            actionsPlacement="inline"
+                            actions={[
+                                { id: 'view', label: 'Lihat vendor' },
+                                ...(canManage
+                                    ? [{ id: 'edit', label: 'Ubah vendor' }]
+                                    : []),
+                            ]}
+                            onRowAction={(action, vendor) =>
+                                action === 'edit'
+                                    ? setEditing(vendor)
+                                    : setViewing(vendor)
+                            }
+                            rowActivation="single-click"
+                            activeRowKey={selectedVendorId ?? undefined}
+                            onRowClick={(vendor) =>
+                                setSelectedVendorId(vendor.id)
+                            }
+                            emptyMessage={
+                                legalEntities.length === 0
+                                    ? 'Buat perusahaan di Organisasi lebih dulu sebelum menambahkan vendor.'
+                                    : 'Belum ada vendor yang sesuai. Tambahkan vendor atau ubah saringan.'
+                            }
+                            columns={[
+                                {
+                                    id: 'number',
+                                    header: 'Nomor vendor',
+                                    width: 180,
+                                    cell: (vendor) => (
+                                        <Button
+                                            type="button"
+                                            variant="link"
+                                            className="h-auto p-0"
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                setViewing(vendor);
+                                            }}
+                                        >
+                                            {vendor.number}
+                                        </Button>
+                                    ),
+                                },
+                                {
+                                    id: 'name',
+                                    header: 'Nama',
+                                    width: 280,
+                                    cell: (vendor) => (
+                                        <DataTableText>
+                                            {vendor.name}
+                                        </DataTableText>
+                                    ),
+                                },
+                                {
+                                    id: 'company',
+                                    header: 'Perusahaan',
+                                    width: 220,
+                                    cell: (vendor) => (
+                                        <DataTableText>
+                                            {legalEntityName(
+                                                vendor.legal_entity_id,
+                                            )}
+                                        </DataTableText>
+                                    ),
+                                },
+                                {
+                                    id: 'tax',
+                                    header: 'NPWP',
+                                    width: 200,
+                                    cell: (vendor) => (
+                                        <DataTableText>
+                                            {vendor.tax_number ?? '—'}
+                                        </DataTableText>
+                                    ),
+                                },
+                                {
+                                    id: 'type',
+                                    header: 'Jenis pihak',
+                                    width: 140,
+                                    cell: (vendor) => (
+                                        <DataTableText>
+                                            {
+                                                PARTY_TYPE_LABEL[
+                                                    vendor.party_type
+                                                ]
+                                            }
+                                        </DataTableText>
+                                    ),
+                                },
+                                {
+                                    id: 'status',
+                                    header: 'Status',
+                                    width: 120,
+                                    cell: (vendor) => (
+                                        <Badge
+                                            variant={
+                                                vendor.status === 'active'
+                                                    ? 'secondary'
+                                                    : 'outline'
+                                            }
+                                        >
+                                            {vendor.status === 'active'
+                                                ? 'Aktif'
+                                                : 'Nonaktif'}
+                                        </Badge>
+                                    ),
+                                },
+                            ]}
+                        />
+                    </RecordListScroll>
                 </ListPageLayout>
             </VendorContextPanel>
             <Dialog open={importing} onOpenChange={setImporting}>

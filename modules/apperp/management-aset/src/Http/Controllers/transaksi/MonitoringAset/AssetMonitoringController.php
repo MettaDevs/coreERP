@@ -2,6 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\MonitoringAset;
 
+use App\Platform\Modules\Contracts\IncrementalList;
+use App\Platform\Modules\Contracts\OrganizationDirectory;
 use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -85,11 +87,10 @@ class AssetMonitoringController extends Controller
             $query->where(self::HEADER.'.lokasi_aset_id', $filter['lokasi_aset_id']);
         }
 
-        return response()->json(['data' => $this->withLookups($query)
-            ->orderByDesc(self::HEADER.'.tanggal')
-            ->orderByDesc(self::HEADER.'.created_at')
-            ->get()
-            ->map(fn (stdClass $row): stdClass => $this->withNames($tenant, $row))]);
+        $list = $this->withLookups($query);
+        app(OrganizationDirectory::class)->addNames($list, $tenant, ['responsible_org_unit_nama' => self::HEADER.'.responsible_org_unit_id'], ['penanggung_jawab_nama' => self::HEADER.'.penanggung_jawab_user_id']);
+
+        return response()->json(IncrementalList::query($request, $list, ['id' => 'id', 'kode' => 'kode', 'tanggal' => 'tanggal', 'lokasi' => 'lokasi_aset_nama', 'unit' => 'responsible_org_unit_nama', 'pic' => 'penanggung_jawab_nama', 'jumlah' => 'jumlah_baris', 'tidak_sesuai' => 'jumlah_tidak_sesuai', 'status' => 'status'], ['kode', 'keterangan', 'lokasi_aset_nama', 'responsible_org_unit_nama', 'penanggung_jawab_nama', 'status'], 'tanggal', ['jumlah_baris', 'jumlah_tidak_sesuai'], 'desc'));
     }
 
     public function show(Request $request, string $id): JsonResponse

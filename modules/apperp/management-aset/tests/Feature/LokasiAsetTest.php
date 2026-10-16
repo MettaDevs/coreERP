@@ -79,7 +79,7 @@ class LokasiAsetTest extends TestCase
 
         $this->request('lokasi-aset', 'get', '/api/modules/management-aset/v1/lokasi-aset?tipe_lokasi_id='.$ruangan)
             ->assertOk()
-            ->assertJsonPath('meta.total', 1)
+            ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.nama', 'Ruang server');
     }
 

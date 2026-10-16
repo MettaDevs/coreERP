@@ -16,6 +16,11 @@ namespace App\Platform\Modules\Contracts;
  */
 interface AccountDirectory
 {
+    /** @param array<string, mixed> $input
+     * @return array{data: mixed, next_cursor: ?string}
+     */
+    public function lookup(string $tenantId, ?string $legalEntityId, array $input): array;
+
     /**
      * Akun **aktif** untuk dropdown, dicocokkan dengan nomor, nama, atau `external_id`.
      *

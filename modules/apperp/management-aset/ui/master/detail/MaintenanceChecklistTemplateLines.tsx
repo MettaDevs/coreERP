@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { Button } from '@apperp/ui/button';
 import { Checkbox } from '@apperp/ui/checkbox';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
@@ -15,7 +14,9 @@ import {
     TableRow,
 } from '@apperp/ui/table';
 import { Textarea } from '@apperp/ui/textarea';
+import { useEffect, useState } from 'react';
 import { ApiError, api, errorMessage } from '../../api';
+import { useRecordOptions } from '../../use-record-list';
 
 type Line = {
     id?: string;
@@ -136,42 +137,51 @@ export default function MaintenanceChecklistTemplateLines({
     const [error, setError] = useState('');
     const [saved, setSaved] = useState(false);
     const [lineErrors, setLineErrors] = useState<LineErrors>({});
-    const [variables, setVariables] = useState<Option[]>([]);
-    const [templates, setTemplates] = useState<Option[]>([]);
-    const [units, setUnits] = useState<Option[]>([]);
-
+    const variableSource = useRecordOptions<Option>(
+        '/maintenance-checklist-variables?aktif=true',
+        label,
+        lines.map((line) => line.variable_id ?? '').filter(Boolean),
+    );
+    const templateSource = useRecordOptions<Option>(
+        '/maintenance-checklist-templates?aktif=true',
+        label,
+        lines.map((line) => line.nested_template_id ?? '').filter(Boolean),
+    );
+    const unitSource = useRecordOptions<Option>(
+        '/reference-data/units-of-measure',
+        label,
+        lines.map((line) => line.unit_id ?? '').filter(Boolean),
+    );
+    const variables = variableSource.options,
+        templates = templateSource.options.filter(
+            (item) => item.id !== templateId,
+        ),
+        units = unitSource.options;
     useEffect(() => {
-        Promise.all([
-            api<{ data: Line[] }>(
-                `/maintenance-checklist-templates/${templateId}/lines`,
-            ),
-            api<{ data: Option[] }>(
-                '/maintenance-checklist-variables?per_page=100&aktif=true',
-            ),
-            api<{ data: Option[] }>(
-                '/maintenance-checklist-templates?per_page=100&aktif=true',
-            ),
-            api<{ data: Option[] }>('/reference-data/units-of-measure'),
-        ])
-            .then(
-                ([lineResult, variableResult, templateResult, unitResult]) => {
-                    setLines(lineResult.data);
+        const request = new AbortController();
+        api<{ data: Line[] }>(
+            `/maintenance-checklist-templates/${templateId}/lines`,
+            { signal: request.signal },
+        )
+            .then((result) => {
+                if (!request.signal.aborted) {
+                    setLines(result.data);
                     setSelectedIndex(null);
                     setCheckedIndexes([]);
-                    setVariables(variableResult.data);
-                    setTemplates(
-                        templateResult.data.filter(
-                            (item) => item.id !== templateId,
-                        ),
-                    );
-                    setUnits(unitResult.data);
-                },
-            )
+                }
+            })
             .catch((caught) =>
                 setError(
-                    errorMessage(caught, 'Baris checklist belum dapat dimuat.'),
+                    request.signal.aborted
+                        ? ''
+                        : errorMessage(
+                              caught,
+                              'Baris checklist belum dapat dimuat.',
+                          ),
                 ),
             );
+
+        return () => request.abort();
     }, [templateId]);
 
     const update = (index: number, changes: Partial<Line>) => {
@@ -551,9 +561,10 @@ export default function MaintenanceChecklistTemplateLines({
                 <LineDetails
                     line={selected}
                     canEdit={canEdit}
-                    variables={variables}
-                    templates={templates}
-                    units={units}
+                    variableSource={variableSource}
+                    templateSource={templateSource}
+                    unitSource={unitSource}
+                    templateId={templateId}
                     onChange={(changes) => update(selectedIndex, changes)}
                 />
             )}
@@ -570,18 +581,25 @@ export default function MaintenanceChecklistTemplateLines({
 function LineDetails({
     line,
     canEdit,
-    variables,
-    templates,
-    units,
+    variableSource,
+    templateSource,
+    unitSource,
+    templateId,
     onChange,
 }: {
     line: Line;
     canEdit: boolean;
-    variables: Option[];
-    templates: Option[];
-    units: Option[];
+    variableSource: ReturnType<typeof useRecordOptions<Option>>;
+    templateSource: ReturnType<typeof useRecordOptions<Option>>;
+    unitSource: ReturnType<typeof useRecordOptions<Option>>;
+    templateId: string;
     onChange: (changes: Partial<Line>) => void;
 }) {
+    const variables = variableSource.options,
+        templates = templateSource.options.filter(
+            (item) => item.id !== templateId,
+        ),
+        units = unitSource.options;
     const pick = (items: Option[], id: string | null) =>
         items.find((item) => item.id === id);
     const picker = (
@@ -594,6 +612,12 @@ function LineDetails({
     ) =>
         canEdit ? (
             <Select
+                {...(items === variables
+                    ? variableSource
+                    : items === units
+                      ? unitSource
+                      : templateSource
+                ).selectProps}
                 label={fieldLabel}
                 required={required}
                 items={items.map(label)}

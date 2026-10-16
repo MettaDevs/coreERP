@@ -8,6 +8,7 @@ import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
 import { Head, router } from '@inertiajs/react';
 import { useState } from 'react';
 import Heading from '@/components/heading';
+import { RecordListScroll } from '@/components/record-list-scroll';
 import { apiJson, errorText } from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
 import { AddressBookHint } from './components/address-book-hint';
@@ -55,7 +56,7 @@ export default function GlobalAddressBook(props: Props) {
                 section: undefined,
                 [name]: value || undefined,
             },
-            { preserveState: true, replace: true },
+            { preserveState: true, reset: ['parties'], replace: true },
         );
     const openParty = (party: Party) => {
         if (party.deleted_at) {
@@ -337,146 +338,130 @@ export default function GlobalAddressBook(props: Props) {
                         </div>
                     }
                     footer={
-                        <div className="flex items-center justify-between gap-3 border-t p-3 text-sm">
-                            <span>
-                                {parties.from ?? 0}–{parties.to ?? 0} dari{' '}
-                                {parties.total} pihak
-                            </span>
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={!parties.prev_page_url}
-                                    onClick={() =>
-                                        parties.prev_page_url &&
-                                        router.visit(parties.prev_page_url)
-                                    }
-                                >
-                                    Sebelumnya
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={!parties.next_page_url}
-                                    onClick={() =>
-                                        parties.next_page_url &&
-                                        router.visit(parties.next_page_url)
-                                    }
-                                >
-                                    Berikutnya
-                                </Button>
-                            </div>
-                        </div>
+                        <p className="p-3 text-sm text-muted-foreground">
+                            {parties.data.length} data dimuat
+                        </p>
                     }
                 >
-                    <DataTable
-                        data={parties.data}
-                        getRowKey={(party) => party.id}
-                        getRowLabel={(party) => party.name}
-                        showRowNumbers
-                        actionsPlacement="inline"
-                        actions={
-                            filters.archived === 'only'
-                                ? canManage
-                                    ? [
-                                          {
-                                              id: 'restore',
-                                              label: 'Pulihkan pihak',
-                                          },
-                                      ]
-                                    : []
-                                : [{ id: 'open', label: 'Lihat pihak' }]
-                        }
-                        onRowAction={(action, party) =>
-                            action === 'restore'
-                                ? void restoreParty(party)
-                                : openParty(party)
-                        }
-                        onRowClick={openParty}
-                        emptyMessage="Belum ada pihak yang sesuai. Tambahkan pihak atau ubah saringan."
-                        columns={[
-                            {
-                                id: 'number',
-                                header: 'Nomor pihak',
-                                width: 180,
-                                cell: (party) => (
-                                    <DataTableText>
-                                        {party.number ?? 'Belum bernomor'}
-                                    </DataTableText>
-                                ),
-                            },
-                            {
-                                id: 'name',
-                                header: 'Nama',
-                                width: 280,
-                                cell: (party) => (
-                                    <DataTableText>{party.name}</DataTableText>
-                                ),
-                            },
-                            {
-                                id: 'type',
-                                header: 'Jenis',
-                                width: 150,
-                                cell: (party) => (
-                                    <DataTableText>
-                                        {partyTypeLabel(party.type, partyTypes)}
-                                    </DataTableText>
-                                ),
-                            },
-                            {
-                                id: 'city',
-                                header: 'Kota',
-                                width: 160,
-                                cell: (party) => (
-                                    <DataTableText>
-                                        {party.city ?? '—'}
-                                    </DataTableText>
-                                ),
-                            },
-                            {
-                                id: 'roles',
-                                header: 'Peran',
-                                width: 220,
-                                cell: (party) => (
-                                    <DataTableText>
-                                        {[
-                                            ...new Set(
-                                                party.roles.map(
-                                                    (role) =>
-                                                        props.referenceValues.role?.find(
-                                                            (value) =>
-                                                                value.code ===
-                                                                role.code,
-                                                        )?.name ?? role.code,
+                    <RecordListScroll
+                        data="parties"
+                        className="flex h-full min-h-0 flex-1 flex-col"
+                    >
+                        <DataTable
+                            data={parties.data}
+                            getRowKey={(party) => party.id}
+                            getRowLabel={(party) => party.name}
+                            showRowNumbers
+                            actionsPlacement="inline"
+                            actions={
+                                filters.archived === 'only'
+                                    ? canManage
+                                        ? [
+                                              {
+                                                  id: 'restore',
+                                                  label: 'Pulihkan pihak',
+                                              },
+                                          ]
+                                        : []
+                                    : [{ id: 'open', label: 'Lihat pihak' }]
+                            }
+                            onRowAction={(action, party) =>
+                                action === 'restore'
+                                    ? void restoreParty(party)
+                                    : openParty(party)
+                            }
+                            onRowClick={openParty}
+                            emptyMessage="Belum ada pihak yang sesuai. Tambahkan pihak atau ubah saringan."
+                            columns={[
+                                {
+                                    id: 'number',
+                                    header: 'Nomor pihak',
+                                    width: 180,
+                                    cell: (party) => (
+                                        <DataTableText>
+                                            {party.number ?? 'Belum bernomor'}
+                                        </DataTableText>
+                                    ),
+                                },
+                                {
+                                    id: 'name',
+                                    header: 'Nama',
+                                    width: 280,
+                                    cell: (party) => (
+                                        <DataTableText>
+                                            {party.name}
+                                        </DataTableText>
+                                    ),
+                                },
+                                {
+                                    id: 'type',
+                                    header: 'Jenis',
+                                    width: 150,
+                                    cell: (party) => (
+                                        <DataTableText>
+                                            {partyTypeLabel(
+                                                party.type,
+                                                partyTypes,
+                                            )}
+                                        </DataTableText>
+                                    ),
+                                },
+                                {
+                                    id: 'city',
+                                    header: 'Kota',
+                                    width: 160,
+                                    cell: (party) => (
+                                        <DataTableText>
+                                            {party.city ?? '—'}
+                                        </DataTableText>
+                                    ),
+                                },
+                                {
+                                    id: 'roles',
+                                    header: 'Peran',
+                                    width: 220,
+                                    cell: (party) => (
+                                        <DataTableText>
+                                            {[
+                                                ...new Set(
+                                                    party.roles.map(
+                                                        (role) =>
+                                                            props.referenceValues.role?.find(
+                                                                (value) =>
+                                                                    value.code ===
+                                                                    role.code,
+                                                            )?.name ??
+                                                            role.code,
+                                                    ),
                                                 ),
-                                            ),
-                                        ].join(', ') || '—'}
-                                    </DataTableText>
-                                ),
-                            },
-                            {
-                                id: 'status',
-                                header: 'Status',
-                                width: 120,
-                                cell: (party) => (
-                                    <Badge
-                                        variant={
-                                            !party.deleted_at &&
-                                            party.status === 'active'
-                                                ? 'secondary'
-                                                : 'outline'
-                                        }
-                                    >
-                                        {party.deleted_at
-                                            ? 'Terarsip'
-                                            : party.status === 'active'
-                                              ? 'Aktif'
-                                              : 'Nonaktif'}
-                                    </Badge>
-                                ),
-                            },
-                        ]}
-                    />
+                                            ].join(', ') || '—'}
+                                        </DataTableText>
+                                    ),
+                                },
+                                {
+                                    id: 'status',
+                                    header: 'Status',
+                                    width: 120,
+                                    cell: (party) => (
+                                        <Badge
+                                            variant={
+                                                !party.deleted_at &&
+                                                party.status === 'active'
+                                                    ? 'secondary'
+                                                    : 'outline'
+                                            }
+                                        >
+                                            {party.deleted_at
+                                                ? 'Terarsip'
+                                                : party.status === 'active'
+                                                  ? 'Aktif'
+                                                  : 'Nonaktif'}
+                                        </Badge>
+                                    ),
+                                },
+                            ]}
+                        />
+                    </RecordListScroll>
                 </ListPageLayout>
             )}
             {booksOpen && (

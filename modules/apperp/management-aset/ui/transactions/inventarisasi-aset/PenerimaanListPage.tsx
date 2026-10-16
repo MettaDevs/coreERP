@@ -1,7 +1,3 @@
-import { usePage } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
-import type { Workspace } from '@/types';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
 import { DataTable } from '@apperp/ui/data-table';
@@ -19,7 +15,11 @@ import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
-import { api, errorMessage } from '../../api';
+import { usePage } from '@inertiajs/react';
+import { useState } from 'react';
+import { toast } from 'sonner';
+import type { Workspace } from '@/types';
+import { useRecordList } from '../../use-record-list';
 import { bukaDaftar } from './aset';
 import { ImporSaldoAwal } from './ImporSaldoAwal';
 import type { Context, Penerimaan } from './penerimaan';
@@ -59,60 +59,19 @@ export default function PenerimaanListPage({
     const legalEntityNames = new Map(
         workspace.legal_entities.map((entity) => [entity.id, entity.name]),
     );
-    const [penerimaan, setPenerimaan] = useState<Penerimaan[]>([]);
     const [status, setStatus] = useState('');
     const [search, setSearch] = useState('');
-    const [memuat, setMemuat] = useState(true);
     const [impor, setImpor] = useState(false);
     // Dinaikkan sesudah impor supaya daftar dibaca ulang dengan draf yang baru lahir.
     const [putaran, setPutaran] = useState(0);
 
-    useEffect(() => {
-        let dibatalkan = false;
-        api<{ data: Penerimaan[] }>(
-            `/penerimaan-aset${status ? `?status=${status}` : ''}`,
-        )
-            .then((result) => {
-                if (!dibatalkan) {
-                    setPenerimaan(result.data);
-                }
-            })
-            .catch((caught) => {
-                if (!dibatalkan) {
-                    toast.error(
-                        errorMessage(caught, 'Penerimaan belum dapat dimuat.'),
-                    );
-                }
-            })
-            .finally(() => {
-                if (!dibatalkan) {
-                    setMemuat(false);
-                }
-            });
-
-        return () => {
-            dibatalkan = true;
-        };
-    }, [status, putaran]);
-
-    const query = search.trim().toLowerCase();
-    const terlihat =
-        query === ''
-            ? penerimaan
-            : penerimaan.filter((baris) =>
-                  [
-                      baris.kode,
-                      legalEntityNames.get(baris.legal_entity_id),
-                      baris.keterangan,
-                      baris.lokasi_aset_nama,
-                      baris.responsible_org_unit_nama,
-                      STATUS[baris.status]?.label,
-                  ].some((value) =>
-                      String(value ?? '')
-                          .toLowerCase()
-                          .includes(query),
-                  ),
-              );
+    const list = useRecordList<Penerimaan>('/penerimaan-aset', search, {
+        ...(status ? { status } : {}),
+        refresh: String(putaran),
+    });
+    const penerimaan = list.items;
+    const terlihat = penerimaan;
+    const memuat = list.loading;
 
     const columns: DataTableColumn<Penerimaan>[] = [
         {
@@ -284,6 +243,9 @@ export default function PenerimaanListPage({
                 ) : (
                     <DataTable
                         columns={columns}
+                        incremental={list}
+                        sort={list.sort}
+                        onSortChange={list.onSortChange}
                         data={terlihat}
                         getRowKey={(baris) => baris.id}
                         getRowLabel={(baris) => baris.kode}

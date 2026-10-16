@@ -18,6 +18,11 @@ namespace App\Platform\Modules\Contracts;
  */
 interface AddressDirectory
 {
+    /** @param array<string, mixed> $input
+     * @return array{data: mixed, next_cursor: ?string}
+     */
+    public function lookup(string $tenantId, array $input): array;
+
     /**
      * Tempat beralamat pos milik tenant, urut nama, untuk dipilih.
      *

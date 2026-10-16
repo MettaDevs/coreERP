@@ -1,6 +1,3 @@
-import { useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
-import { useWorkDate } from '@/hooks/use-work-date';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import { Checkbox } from '@apperp/ui/checkbox';
@@ -30,6 +27,9 @@ import { Field, FieldDescription } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
+import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { useWorkDate } from '@/hooks/use-work-date';
 import {
     ApiError,
     api,
@@ -37,8 +37,9 @@ import {
     newIdempotencyKey,
     toastSaveError,
 } from '../../api';
-import type { MasterOption } from '../../master/useMasterOptions';
+
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
+import { useRecordList } from '../../use-record-list';
 
 type Reading = {
     id: string;
@@ -117,13 +118,12 @@ export default function CounterReadingPage({
         'management-aset.pembacaan-counter.archive',
     );
     const { date: workDate } = useWorkDate();
-    const [rows, setRows] = useState<Reading[]>([]);
-    const [loading, setLoading] = useState(true);
     const [reload, setReload] = useState(0);
     const [filterAset, setFilterAset] = useState('');
     const [filterCounter, setFilterCounter] = useState('');
-    const [assets, setAssets] = useState<MasterOption[]>([]);
-    const [assetError, setAssetError] = useState('');
+    const assetSource = useMasterOptions('aset');
+    const assets = assetSource.options;
+    const assetError = assetSource.error;
     const counterTypes = useMasterOptions('jenis-counter');
     const [recording, setRecording] = useState(false);
     const [draft, setDraft] = useState<Draft | null>(null);
@@ -136,52 +136,13 @@ export default function CounterReadingPage({
     const [archiving, setArchiving] = useState<Reading | null>(null);
     const dialogRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        let cancelled = false;
-        api<{ data: MasterOption[] }>('/aset')
-            .then((result) => !cancelled && setAssets(result.data))
-            .catch(
-                () =>
-                    !cancelled &&
-                    setAssetError(
-                        'Daftar aset belum dapat dimuat. Anda memerlukan akses lihat register aset.',
-                    ),
-            );
-
-        return () => {
-            cancelled = true;
-        };
-    }, []);
-
-    useEffect(() => {
-        let cancelled = false;
-        const query = new URLSearchParams(
-            Object.entries({
-                aset_id: filterAset,
-                jenis_counter_id: filterCounter,
-            }).filter(([, value]) => Boolean(value)),
-        ).toString();
-
-        api<{ data: Reading[] }>(
-            `/pembacaan-counter${query ? `?${query}` : ''}`,
-        )
-            .then((result) => !cancelled && setRows(result.data))
-            .catch(
-                (caught) =>
-                    !cancelled &&
-                    toast.error(
-                        errorMessage(
-                            caught,
-                            'Pembacaan counter belum dapat dimuat.',
-                        ),
-                    ),
-            )
-            .finally(() => !cancelled && setLoading(false));
-
-        return () => {
-            cancelled = true;
-        };
-    }, [filterAset, filterCounter, reload]);
+    const list = useRecordList<Reading>('/pembacaan-counter', '', {
+        aset_id: filterAset,
+        jenis_counter_id: filterCounter,
+        refresh: String(reload),
+    });
+    const rows = list.items;
+    const loading = list.loading;
 
     // Counter yang berlaku untuk aset terpilih, beserta pembacaan terakhirnya.
     const draftAset = draft?.aset_id ?? '';
@@ -228,7 +189,6 @@ export default function CounterReadingPage({
     );
     const message = (field: string) => errors[field]?.[0];
     const refresh = () => {
-        setLoading(true);
         setReload((current) => current + 1);
     };
 
@@ -386,6 +346,7 @@ export default function CounterReadingPage({
             <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
                 <div className="w-full sm:w-80">
                     <Select
+                        {...assetSource.selectProps}
                         label="Aset"
                         items={[
                             { value: '', label: 'Semua aset' },
@@ -396,7 +357,6 @@ export default function CounterReadingPage({
                         searchPlaceholder="Cari kode atau nama aset"
                         ariaLabel="Saring berdasarkan aset"
                         onValueChange={(value) => {
-                            setLoading(true);
                             setFilterAset(value ?? '');
                         }}
                     />
@@ -412,7 +372,6 @@ export default function CounterReadingPage({
                         placeholder="Semua counter"
                         ariaLabel="Saring berdasarkan counter"
                         onValueChange={(value) => {
-                            setLoading(true);
                             setFilterCounter(value ?? '');
                         }}
                     />
@@ -424,7 +383,7 @@ export default function CounterReadingPage({
                 )}
             </div>
 
-            {!loading && rows.length === 0 ? (
+            {!loading && rows.length === 0 && !list.error ? (
                 <Empty>
                     <EmptyHeader>
                         <EmptyTitle>Belum ada pembacaan counter</EmptyTitle>
@@ -438,6 +397,9 @@ export default function CounterReadingPage({
             ) : (
                 <DataTable
                     columns={columns}
+                    incremental={list}
+                    sort={list.sort}
+                    onSortChange={list.onSortChange}
                     data={rows}
                     getRowKey={(row) => row.id}
                     getRowLabel={(row) =>
@@ -465,6 +427,7 @@ export default function CounterReadingPage({
                         <DialogBody className="space-y-4">
                             <Field>
                                 <Select
+                                    {...assetSource.selectProps}
                                     label="Aset"
                                     required
                                     items={assetChoices}

@@ -2,6 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\MutasiAset;
 
+use App\Platform\Modules\Contracts\IncrementalList;
+use App\Platform\Modules\Contracts\OrganizationDirectory;
 use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -87,11 +89,10 @@ class MutasiAsetController extends Controller
 
         $tenant = $this->tenant($request);
 
-        return response()->json(['data' => $this->withLookups($query)
-            ->orderByDesc(self::TABEL.'.tanggal')
-            ->orderByDesc(self::TABEL.'.created_at')
-            ->get()
-            ->map(fn (stdClass $baris): stdClass => $this->denganNama($tenant, $baris))]);
+        $list = $this->withLookups($query);
+        app(OrganizationDirectory::class)->addNames($list, $tenant, ['tujuan_org_unit_nama' => self::TABEL.'.tujuan_org_unit_id', 'responsible_org_unit_nama' => self::TABEL.'.responsible_org_unit_id'], ['diserahkan_oleh_nama' => self::TABEL.'.diserahkan_oleh_user_id', 'diterima_oleh_nama' => self::TABEL.'.diterima_oleh_user_id']);
+
+        return response()->json(IncrementalList::query($request, $list, ['id' => 'id', 'kode' => 'kode', 'tanggal' => 'tanggal', 'tujuan' => 'tujuan_lokasi_nama', 'unit' => 'tujuan_org_unit_nama', 'alasan' => 'alasan', 'jumlah' => 'jumlah_baris', 'status' => 'status'], ['kode', 'alasan', 'keterangan', 'tujuan_lokasi_nama', 'tujuan_org_unit_nama', 'status'], 'tanggal', ['jumlah_baris', 'jumlah_tidak_sesuai'], 'desc'));
     }
 
     public function show(Request $request, string $id): JsonResponse

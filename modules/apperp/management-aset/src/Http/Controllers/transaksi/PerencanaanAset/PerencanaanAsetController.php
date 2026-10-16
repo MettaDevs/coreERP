@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PerencanaanAset;
 
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\NumberSequenceIssuer;
 use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Database\QueryException;
@@ -43,10 +44,9 @@ class PerencanaanAsetController extends Controller
         $query = PerencanaanAset::query();
         app(OrganizationScope::class)->query($query, $request, 'legal_entity_id', 'planning_org_unit_id');
 
-        return response()->json(['data' => $query
-            ->toBase()
-            ->latest('planned_on')->latest('created_at')
-            ->get()]);
+        return response()->json(IncrementalList::query($request, $query->toBase(), [
+            'id' => 'id', 'kode' => 'kode', 'date' => 'planned_on', 'status' => 'status',
+        ], ['kode', 'description'], 'date', [], 'desc'));
     }
 
     public function numberPolicy(Request $request, NumberSequenceIssuer $numbers): JsonResponse

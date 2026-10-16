@@ -1,5 +1,5 @@
-import type { RefObject } from 'react';
 import { Select } from '@apperp/ui/select';
+import type { RefObject } from 'react';
 import { optionLabel, useMasterOptions } from './useMasterOptions';
 
 export default function AssetConditionSelect({
@@ -20,12 +20,17 @@ export default function AssetConditionSelect({
     const query = assetId
         ? `aset_id=${assetId}`
         : `jenis_aset_id=${assetTypeId ?? ''}`;
-    const { options, error } = useMasterOptions('kondisi-aset', query);
+    const { options, error, selectProps } = useMasterOptions(
+        'kondisi-aset',
+        query,
+        value,
+    );
     const selected = options.find((item) => item.id === value);
 
     return (
         <div>
             <Select
+                {...selectProps}
                 items={options.map(optionLabel)}
                 value={selected ? optionLabel(selected) : null}
                 placeholder="Tidak dicatat"

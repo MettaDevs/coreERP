@@ -69,7 +69,7 @@ final class GlobalAddressBookController extends Controller
         }
 
         return Inertia::render('platform/address-book/index', [
-            'parties' => $query->orderBy('name')->paginate(50)->withQueryString()->through(fn (Party $party): array => $this->present($party)),
+            'parties' => Inertia::scroll(fn () => $query->orderBy('name')->orderBy('id')->simplePaginate(40)->withQueryString()->through(fn (Party $party): array => $this->present($party)))->matchOn('data.id'),
             'filters' => $filters,
             ...$this->formMetadata($membership),
         ]);

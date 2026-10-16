@@ -1,5 +1,3 @@
-import type { FormEvent, ReactNode } from 'react';
-import { useMemo, useRef, useState } from 'react';
 import { Button } from '@apperp/ui/button';
 import {
     Field,
@@ -10,7 +8,6 @@ import {
     FieldTitle,
 } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
-import { Select } from '@apperp/ui/select';
 import {
     Sheet,
     SheetContent,
@@ -20,44 +17,31 @@ import {
 } from '@apperp/ui/sheet';
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
+import { useMemo, useRef, useState } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { api, errorMessage, newIdempotencyKey } from '../api';
 import DynamicField from './DynamicField';
 import type { FieldValue } from './fields';
 import { isVisible, payloadValue, valueFrom } from './fields';
 import LokasiAsetFields from './LokasiAsetFields';
-import type {
-    MasterConfig,
-    MasterParentConfig,
-    MasterRecord,
-    ParentSummary,
-} from './masters';
+import type { MasterConfig, MasterParentConfig, MasterRecord } from './masters';
 import { parentIdOf, parentSummaryOf } from './masters';
+import MasterSelect from './MasterSelect';
 import { changeProfileField } from './serviceLife';
 import ServiceLifeFields from './ServiceLifeFields';
 import { useNumberPolicy } from './useNumberPolicy';
 
 type FormValue = { nama: string; keterangan: string; aktif: boolean };
 
-/** Label pilihan induk; satu bentuk untuk seluruh master agar tidak ada varian pemisah. */
-function optionLabel(option: ParentSummary): string {
-    return `${option.kode} — ${option.nama}`;
-}
-
 export default function MasterForm({
     config,
     value,
-    parentOptions,
-    parentOptionsError,
     onClose,
     onSaved,
     extraSection,
 }: {
     config: MasterConfig;
     value: MasterRecord | null;
-    /** Pilihan induk per kolom foreign key. */
-    parentOptions: Record<string, ParentSummary[]>;
-    /** Pesan kegagalan pemuatan pilihan, per kolom foreign key. */
-    parentOptionsError: Record<string, string>;
     onClose: () => void;
     onSaved: (record: MasterRecord, created: boolean) => void;
     /** Bagian tambahan di bawah field, misalnya matriks yang disunting di dalam form ini. */
@@ -98,25 +82,6 @@ export default function MasterForm({
     const [saving, setSaving] = useState(false);
     const creationKey = useRef(newIdempotencyKey());
     const sheetContentRef = useRef<HTMLDivElement>(null);
-
-    /**
-     * Induk yang sedang dipakai record ini tetap dapat dipilih meski sudah diarsipkan,
-     * supaya menyunting field lain tidak diam-diam memutus tautan induknya.
-     */
-    const optionsOf = useMemo(() => {
-        const resolved: Record<string, ParentSummary[]> = {};
-
-        for (const parent of parents) {
-            const available = parentOptions[parent.field] ?? [];
-            const current = value ? parentSummaryOf(value, parent) : null;
-            resolved[parent.field] =
-                !current || available.some((option) => option.id === current.id)
-                    ? available
-                    : [current, ...available];
-        }
-
-        return resolved;
-    }, [parents, parentOptions, value]);
 
     async function submit(event: FormEvent) {
         event.preventDefault();
@@ -188,35 +153,25 @@ export default function MasterForm({
     }
 
     function parentField(parent: MasterParentConfig) {
-        const options = optionsOf[parent.field] ?? [];
-        const selected = options.find(
-            (option) => option.id === parentIds[parent.field],
-        );
-        const loadError = parentOptionsError[parent.field] ?? '';
-
         return (
-            <Field key={parent.field} data-invalid={Boolean(loadError)}>
-                <Select
+            <Field key={parent.field}>
+                <MasterSelect
+                    resource={parent.resource}
                     label={parent.label}
                     required={parent.required !== false}
-                    items={options.map(optionLabel)}
-                    value={selected ? optionLabel(selected) : undefined}
-                    placeholder={`Pilih ${parent.label.toLowerCase()}`}
-                    searchPlaceholder={`Cari ${parent.label.toLowerCase()}`}
-                    emptyMessage={`${parent.label} tidak ditemukan.`}
-                    ariaLabel={`Pilih ${parent.label.toLowerCase()}`}
+                    value={parentIds[parent.field] ?? ''}
+                    initialValue={value ? parentSummaryOf(value, parent) : null}
                     portalContainer={sheetContentRef}
-                    onValueChange={(item) =>
-                        setParentIds({
-                            ...parentIds,
-                            [parent.field]:
-                                options.find(
-                                    (option) => optionLabel(option) === item,
-                                )?.id ?? '',
-                        })
+                    emptyLabel={
+                        parent.required === false ? 'Tidak dipilih' : undefined
+                    }
+                    onValueChange={(id) =>
+                        setParentIds((current) => ({
+                            ...current,
+                            [parent.field]: id,
+                        }))
                     }
                 />
-                {loadError && <FieldDescription>{loadError}</FieldDescription>}
             </Field>
         );
     }

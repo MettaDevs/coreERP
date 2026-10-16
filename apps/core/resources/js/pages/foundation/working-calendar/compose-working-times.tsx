@@ -3,6 +3,7 @@ import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import { Field, FieldError } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
+import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
 import {
     Table,
@@ -235,8 +236,8 @@ export default function ComposeWorkingTimesPage({
         <>
             <Head title="Jadwal dari pola" />
 
-            <div className="flex min-h-[calc(100vh-4rem)] flex-col bg-background">
-                <div className="sticky top-0 z-20 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-card px-6 py-3 text-xs">
+            <ListPageLayout>
+                <div className="sticky top-0 z-20 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-card px-6 py-3">
                     <div className="flex items-center gap-3">
                         <Link
                             href="/settings/working-time-calendar-times"
@@ -254,22 +255,22 @@ export default function ComposeWorkingTimesPage({
                     <div className="flex items-center gap-2">
                         <Link
                             href="/settings/working-time-calendars"
-                            className="rounded border border-input px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                            className="rounded border border-input px-2.5 py-1 text-muted-foreground hover:bg-accent hover:text-foreground"
                         >
                             Daftar kalender
                         </Link>
                         <Link
                             href="/settings/working-time-templates"
-                            className="rounded border border-input px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                            className="rounded border border-input px-2.5 py-1 text-muted-foreground hover:bg-accent hover:text-foreground"
                         >
                             Daftar pola
                         </Link>
                     </div>
                 </div>
 
-                <div className="flex-1 p-6">
-                    <div className="mx-auto max-w-6xl space-y-6">
-                        <p className="text-xs text-muted-foreground">
+                <div className="min-h-0 flex-1 overflow-auto p-4 lg:p-6">
+                    <div className="w-full space-y-6">
+                        <p className="text-muted-foreground">
                             Terapkan pola jam kerja mingguan ke satu kalender
                             kerja untuk rentang tanggal tertentu. Hari kerja dan
                             jam kerjanya diambil dari pola yang dipilih.
@@ -294,7 +295,7 @@ export default function ComposeWorkingTimesPage({
                                 </h2>
 
                                 {calendars.length === 0 ? (
-                                    <div className="rounded border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
+                                    <div className="rounded border border-warning/30 bg-warning/10 p-3 text-warning">
                                         Belum ada kalender kerja yang dibuat.{' '}
                                         <Link
                                             href="/settings/working-time-calendars"
@@ -336,7 +337,7 @@ export default function ComposeWorkingTimesPage({
                                 )}
 
                                 {templates.length === 0 ? (
-                                    <div className="rounded border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
+                                    <div className="rounded border border-warning/30 bg-warning/10 p-3 text-warning">
                                         Belum ada pola jam kerja aktif.{' '}
                                         <Link
                                             href="/settings/working-time-templates"
@@ -376,7 +377,7 @@ export default function ComposeWorkingTimesPage({
                                 )}
 
                                 <div className="space-y-3">
-                                    <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                                    <div className="flex flex-wrap items-center gap-1.5">
                                         <span className="text-muted-foreground">
                                             Pilihan cepat:
                                         </span>
@@ -449,7 +450,7 @@ export default function ComposeWorkingTimesPage({
                                             )}
                                         </Field>
                                     </div>
-                                    <p className="text-[11px] text-muted-foreground">
+                                    <p className="text-muted-foreground">
                                         Setiap hari dalam rentang ini yang telah
                                         memiliki jadwal akan ditimpa dengan pola
                                         yang dipilih. Rentang paling panjang 3
@@ -481,7 +482,7 @@ export default function ComposeWorkingTimesPage({
 
                             <div className="space-y-6 lg:col-span-5">
                                 {selectedCalendar && (
-                                    <div className="rounded-lg border border-border bg-card p-4 text-xs">
+                                    <div className="rounded-lg border border-border bg-card p-4">
                                         <p className="border-b border-border pb-2 font-semibold text-foreground">
                                             Kalender sasaran:{' '}
                                             {selectedCalendar.code}
@@ -505,7 +506,7 @@ export default function ComposeWorkingTimesPage({
 
                                 <div className="rounded-lg border border-border bg-card p-4">
                                     <div className="flex items-center justify-between border-b border-border pb-2">
-                                        <p className="text-xs font-semibold text-foreground">
+                                        <p className="font-semibold text-foreground">
                                             Pratinjau pola:{' '}
                                             {selectedTemplate?.code ??
                                                 'Belum ada pola'}
@@ -526,16 +527,16 @@ export default function ComposeWorkingTimesPage({
                                             <Table>
                                                 <TableHeader>
                                                     <TableRow>
-                                                        <TableHead className="w-20 text-xs">
+                                                        <TableHead className="w-20">
                                                             Hari
                                                         </TableHead>
-                                                        <TableHead className="w-16 text-center text-xs">
+                                                        <TableHead className="w-16 text-center">
                                                             Status
                                                         </TableHead>
-                                                        <TableHead className="text-xs">
+                                                        <TableHead className="">
                                                             Jam kerja
                                                         </TableHead>
-                                                        <TableHead className="w-16 text-right text-xs">
+                                                        <TableHead className="w-16 text-right">
                                                             Total
                                                         </TableHead>
                                                     </TableRow>
@@ -548,12 +549,12 @@ export default function ComposeWorkingTimesPage({
                                                                     item.dayIndex
                                                                 }
                                                             >
-                                                                <TableCell className="text-xs font-medium text-foreground">
+                                                                <TableCell className="font-medium text-foreground">
                                                                     {
                                                                         item.dayName
                                                                     }
                                                                 </TableCell>
-                                                                <TableCell className="text-center text-xs">
+                                                                <TableCell className="text-center">
                                                                     {item.isOpen ? (
                                                                         <Badge className="bg-success/10 text-[10px] text-success">
                                                                             Kerja
@@ -567,7 +568,7 @@ export default function ComposeWorkingTimesPage({
                                                                         </Badge>
                                                                     )}
                                                                 </TableCell>
-                                                                <TableCell className="text-xs text-muted-foreground">
+                                                                <TableCell className="text-muted-foreground">
                                                                     {item.lines
                                                                         .length >
                                                                     0 ? (
@@ -580,7 +581,7 @@ export default function ComposeWorkingTimesPage({
                                                                                         key={
                                                                                             l.id
                                                                                         }
-                                                                                        className="flex items-center gap-1 font-mono text-[11px]"
+                                                                                        className="flex items-center gap-1 font-mono"
                                                                                     >
                                                                                         <span>
                                                                                             {
@@ -611,7 +612,7 @@ export default function ComposeWorkingTimesPage({
                                                                         </span>
                                                                     )}
                                                                 </TableCell>
-                                                                <TableCell className="text-right font-mono text-xs font-semibold text-foreground">
+                                                                <TableCell className="text-right font-mono font-semibold text-foreground">
                                                                     {item.totalHours.toFixed(
                                                                         1,
                                                                     )}{' '}
@@ -624,7 +625,7 @@ export default function ComposeWorkingTimesPage({
                                             </Table>
                                         </div>
                                     ) : (
-                                        <div className="py-8 text-center text-xs text-muted-foreground">
+                                        <div className="py-8 text-center text-muted-foreground">
                                             Pilih pola jam kerja untuk melihat
                                             rincian jam per hari.
                                         </div>
@@ -634,7 +635,7 @@ export default function ComposeWorkingTimesPage({
                         </div>
                     </div>
                 </div>
-            </div>
+            </ListPageLayout>
         </>
     );
 }

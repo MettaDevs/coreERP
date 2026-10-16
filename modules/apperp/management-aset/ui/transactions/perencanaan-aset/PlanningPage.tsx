@@ -1,8 +1,3 @@
-import { router } from '@inertiajs/react';
-import type { RefObject } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { toast } from 'sonner';
-import { useWorkDate } from '@/hooks/use-work-date';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import {
@@ -20,6 +15,7 @@ import {
     EmptyTitle,
 } from '@apperp/ui/empty';
 import { Field, FieldLabel } from '@apperp/ui/field';
+import { IncrementalListStatus } from '@apperp/ui/incremental-list-status';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
 import {
@@ -30,12 +26,20 @@ import {
     SheetTitle,
 } from '@apperp/ui/sheet';
 import { Textarea } from '@apperp/ui/textarea';
+import { router } from '@inertiajs/react';
+import { useRef, useState } from 'react';
+import type { RefObject } from 'react';
+import { toast } from 'sonner';
+import { useWorkDate } from '@/hooks/use-work-date';
 import {
     api,
     errorMessage,
     newIdempotencyKey,
     toastSaveError,
 } from '../../api';
+import { useMasterOptions } from '../../master/useMasterOptions';
+import { useRecordList } from '../../use-record-list';
+import { useRecordOptions } from '../../use-record-list';
 
 type Context = { legal_entity_id: string | null; org_unit_id: string | null };
 type Permission = string;
@@ -91,25 +95,23 @@ function AsetDetailRow({
     detail,
     index,
     canRemove,
-    types,
-    units,
     portalContainer,
-    onTypeSearch,
     onChange,
     onRemove,
 }: {
     detail: Detail;
     index: number;
     canRemove: boolean;
-    types: AsetType[];
-    units: AsetType[];
     portalContainer: RefObject<HTMLDivElement | null>;
-    onTypeSearch: (query: string) => void;
     onChange: (change: Partial<Detail>) => void;
     onRemove: () => void;
 }) {
-    const selectedType = types.find((type) => type.id === detail.jenis_aset_id);
-    const selectedUnit = units.find((unit) => unit.id === detail.satuan_id);
+    const typeSource = useMasterOptions('jenis-aset', '', detail.jenis_aset_id);
+    const unitSource = useRecordOptions<AsetType>(
+        '/reference-data/units-of-measure',
+        (item) => item.nama,
+        detail.satuan_id,
+    );
 
     return (
         <div className="space-y-3 rounded-lg border p-3">
@@ -131,18 +133,19 @@ function AsetDetailRow({
                     <Select
                         label="Jenis aset"
                         required
-                        items={types.map((type) => type.nama)}
-                        value={selectedType?.nama ?? null}
+                        {...typeSource.selectProps}
+                        items={typeSource.options.map((type) => ({
+                            value: type.id,
+                            label: type.nama,
+                        }))}
+                        value={detail.jenis_aset_id || null}
                         placeholder="Pilih jenis aset"
                         searchPlaceholder="Cari jenis aset"
                         ariaLabel={`Jenis aset baris ${index + 1}`}
                         portalContainer={portalContainer}
-                        onSearchChange={onTypeSearch}
                         onValueChange={(value) =>
                             onChange({
-                                jenis_aset_id:
-                                    types.find((type) => type.nama === value)
-                                        ?.id ?? '',
+                                jenis_aset_id: value ?? '',
                             })
                         }
                     />
@@ -151,17 +154,19 @@ function AsetDetailRow({
                     <Select
                         label="Satuan"
                         required
-                        items={units.map((unit) => unit.nama)}
-                        value={selectedUnit?.nama ?? null}
+                        {...unitSource.selectProps}
+                        items={unitSource.options.map((unit) => ({
+                            value: unit.id,
+                            label: unit.nama,
+                        }))}
+                        value={detail.satuan_id || null}
                         placeholder="Pilih satuan"
                         searchPlaceholder="Cari satuan"
                         ariaLabel={`Satuan baris ${index + 1}`}
                         portalContainer={portalContainer}
                         onValueChange={(value) =>
                             onChange({
-                                satuan_id:
-                                    units.find((unit) => unit.nama === value)
-                                        ?.id ?? '',
+                                satuan_id: value ?? '',
                             })
                         }
                     />
@@ -217,10 +222,6 @@ export default function PlanningPage({
     const can = (action: string) =>
         permissions.includes(`management-aset.perencanaan-aset.${action}`);
     const { date: workDate } = useWorkDate();
-    const [plans, setPlans] = useState<Plan[]>([]);
-    const [types, setTypes] = useState<AsetType[]>([]);
-    const [units, setUnits] = useState<AsetType[]>([]);
-    const [typeSearch, setTypeSearch] = useState('');
     const [editing, setEditing] = useState<
         (Plan & { details: Detail[] }) | null | undefined
     >();
@@ -239,75 +240,10 @@ export default function PlanningPage({
     const [versiMuat, setVersiMuat] = useState(0);
     const muatUlang = () => setVersiMuat((versi) => versi + 1);
 
-    /**
-     * Pilihan jenis aset dan satuan hanya diperlukan oleh form. Disimpan sebagai satu
-     * boolean supaya effect di bawah bergantung pada nilai yang stabil, bukan pada
-     * daftar izin yang dirangkai ulang setiap render.
-     */
-    const bolehSunting = useMemo(
-        () =>
-            permissions.includes('management-aset.perencanaan-aset.create') ||
-            permissions.includes('management-aset.perencanaan-aset.update'),
-        [permissions],
-    );
-
-    useEffect(() => {
-        let dilepas = false;
-
-        // Pengambilan data lahir di dalam effect: state baru disetel setelah jawaban
-        // server tiba, bukan pada commit render yang sama, dan jawaban yang telat
-        // datang setelah layar ditutup dibuang lewat `dilepas`.
-        const muat = async () => {
-            try {
-                const result = await api<{ data: Plan[] }>('/perencanaan-aset');
-
-                if (dilepas) {
-                    return;
-                }
-
-                setPlans(result.data);
-            } catch (caught) {
-                if (dilepas) {
-                    return;
-                }
-
-                toast.error(
-                    errorMessage(caught, 'Rencana aset belum dapat dimuat.'),
-                );
-            }
-        };
-
-        void muat();
-
-        return () => {
-            dilepas = true;
-        };
-    }, [versiMuat]);
-    useEffect(() => {
-        if (!bolehSunting) {
-            return;
-        }
-
-        api<{ data: AsetType[] }>('/reference-data/units-of-measure')
-            .then((result) => setUnits(result.data))
-            .catch(() => toast.error('Satuan belum dapat dimuat.'));
-    }, [bolehSunting]);
-    useEffect(() => {
-        if (!bolehSunting) {
-            return;
-        }
-
-        const timer = window.setTimeout(() => {
-            api<{ data: AsetType[] }>(
-                `/jenis-aset?per_page=20&aktif=true&q=${encodeURIComponent(typeSearch)}`,
-            )
-                .then((result) => setTypes(result.data))
-                .catch(() => toast.error('Jenis aset belum dapat dimuat.'));
-        }, 250);
-
-        return () => window.clearTimeout(timer);
-    }, [bolehSunting, typeSearch]);
-
+    const list = useRecordList<Plan>('/perencanaan-aset', '', {
+        refresh: String(versiMuat),
+    });
+    const plans = list.items;
     const openCreate = async () => {
         setNumberPolicy(null);
         setManualCode('');
@@ -477,7 +413,7 @@ export default function PlanningPage({
                 )}
             </CardHeader>
             <CardContent className="px-0">
-                {!plans.length ? (
+                {!plans.length && !list.loading && !list.error ? (
                     <Empty>
                         <EmptyHeader>
                             <EmptyTitle>Belum ada rencana aset</EmptyTitle>
@@ -553,6 +489,7 @@ export default function PlanningPage({
                         ))}
                     </div>
                 )}
+                <IncrementalListStatus state={list} />
             </CardContent>
 
             <Sheet
@@ -813,10 +750,7 @@ export default function PlanningPage({
                                         detail={detail}
                                         index={index}
                                         canRemove={editing.details.length > 1}
-                                        types={types}
-                                        units={units}
                                         portalContainer={sheetContentRef}
-                                        onTypeSearch={setTypeSearch}
                                         onChange={(change) =>
                                             updateDetail(index, change)
                                         }

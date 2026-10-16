@@ -1,6 +1,3 @@
-import { FileOutput } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
 import { DataTable } from '@apperp/ui/data-table';
@@ -18,8 +15,11 @@ import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
-import { api, errorMessage } from '../../api';
+import { FileOutput } from 'lucide-react';
+import { useState } from 'react';
+import { toast } from 'sonner';
 import { requestPrint } from '../../print';
+import { useRecordList } from '../../use-record-list';
 import type { Mutasi } from './mutasi';
 import {
     STATUS,
@@ -50,57 +50,19 @@ export default function MutasiListPage({
     permissions: string[];
 }) {
     const can = izin(permissions);
-    const [mutasi, setMutasi] = useState<Mutasi[]>([]);
     const [status, setStatus] = useState('');
     const [search, setSearch] = useState('');
-    const [memuat, setMemuat] = useState(true);
 
-    useEffect(() => {
-        let dibatalkan = false;
-        api<{ data: Mutasi[] }>(
-            `/mutasi-aset${status ? `?status=${status}` : ''}`,
-        )
-            .then((result) => {
-                if (!dibatalkan) {
-                    setMutasi(result.data);
-                }
-            })
-            .catch((caught) => {
-                if (!dibatalkan) {
-                    toast.error(
-                        errorMessage(caught, 'Mutasi belum dapat dimuat.'),
-                    );
-                }
-            })
-            .finally(() => {
-                if (!dibatalkan) {
-                    setMemuat(false);
-                }
-            });
-
-        return () => {
-            dibatalkan = true;
-        };
-    }, [status]);
-
-    const query = search.trim().toLowerCase();
-    const terlihat =
-        query === ''
-            ? mutasi
-            : mutasi.filter((baris) =>
-                  [
-                      baris.kode,
-                      baris.alasan,
-                      baris.keterangan,
-                      baris.tujuan_lokasi_nama,
-                      baris.tujuan_org_unit_nama,
-                      STATUS[baris.status]?.label,
-                  ].some((value) =>
-                      String(value ?? '')
-                          .toLowerCase()
-                          .includes(query),
-                  ),
-              );
+    const list = useRecordList<Mutasi>(
+        '/mutasi-aset',
+        search,
+        Object.fromEntries(
+            Object.entries({ status }).filter(([, value]) => value !== ''),
+        ),
+    );
+    const mutasi = list.items;
+    const terlihat = mutasi;
+    const memuat = list.loading;
 
     const columns: DataTableColumn<Mutasi>[] = [
         {
@@ -251,6 +213,9 @@ export default function MutasiListPage({
             ) : (
                 <DataTable
                     columns={columns}
+                    incremental={list}
+                    sort={list.sort}
+                    onSortChange={list.onSortChange}
                     data={terlihat}
                     getRowKey={(baris) => baris.id}
                     getRowLabel={(baris) => baris.kode}

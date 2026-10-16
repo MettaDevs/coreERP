@@ -7,7 +7,7 @@
     parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
     responses:
       '200':
@@ -16,7 +16,7 @@
           application/json:
             schema:
               type: object
-              required: [data, meta]
+              required: [data, next_cursor]
               properties:
                 data:
                   type: array
@@ -27,12 +27,8 @@
                         required: [version]
                         properties:
                           version: {type: integer, minimum: 1}
-                meta:
-                  type: object
-                  properties:
-                    current_page: {type: integer}
-                    last_page: {type: integer}
-                    total: {type: integer}
+                next_cursor:
+                  type: [string, 'null']
       '401':
         $ref: '#/components/responses/Unauthenticated'
       '403':

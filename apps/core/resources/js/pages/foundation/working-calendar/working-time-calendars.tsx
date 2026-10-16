@@ -1,21 +1,32 @@
 import { ActionButton } from '@apperp/ui/action-button';
 import { Alert, AlertDescription } from '@apperp/ui/alert';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@apperp/ui/alert-dialog';
 import { Button } from '@apperp/ui/button';
 import { Checkbox } from '@apperp/ui/checkbox';
-import {
-    Dialog,
-    DialogAction,
-    DialogBody,
-    DialogCancel,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@apperp/ui/dialog';
+import { DialogCancel } from '@apperp/ui/dialog';
 import { Field, FieldDescription, FieldError } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
+import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
+import {
+    PageDialog as Dialog,
+    PageDialogAction as DialogAction,
+    PageDialogBody as DialogBody,
+    PageDialogContent as DialogContent,
+    PageDialogDescription as DialogDescription,
+    PageDialogFooter as DialogFooter,
+    PageDialogHeader as DialogHeader,
+    PageDialogTitle as DialogTitle,
+} from '@apperp/ui/page-dialog';
 import {
     Table,
     TableBody,
@@ -69,6 +80,7 @@ export default function WorkingTimeCalendars({
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isCopyOpen, setIsCopyOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [isArchiveOpen, setIsArchiveOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Form states
@@ -183,14 +195,6 @@ export default function WorkingTimeCalendars({
             return;
         }
 
-        if (
-            !confirm(
-                `Apakah Anda yakin ingin mengarsipkan kalender kerja "${selectedCalendar.name}"?`,
-            )
-        ) {
-            return;
-        }
-
         setIsDeleting(true);
         router.delete(
             `/settings/working-time-calendars/${selectedCalendar.id}`,
@@ -199,7 +203,9 @@ export default function WorkingTimeCalendars({
                 preserveScroll: true,
                 onSuccess: () => {
                     setSelectedCalendarId(null);
+                    setIsArchiveOpen(false);
                 },
+                onError: (errors) => setFormErrors(errors),
                 onFinish: () => setIsDeleting(false),
             },
         );
@@ -245,9 +251,9 @@ export default function WorkingTimeCalendars({
         <>
             <Head title="Kalender kerja" />
 
-            <div className="flex min-h-[calc(100vh-4rem)] flex-col bg-background">
+            <ListPageLayout>
                 {/* Command Ribbon */}
-                <div className="sticky top-0 z-20 flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card px-4 py-2 text-xs">
+                <div className="sticky top-0 z-20 flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card px-4 py-2">
                     <span className="mr-2 text-sm font-semibold text-foreground">
                         Kalender kerja
                     </span>
@@ -281,7 +287,10 @@ export default function WorkingTimeCalendars({
                             size="sm"
                             type="button"
                             disabled={!selectedCalendar || isDeleting}
-                            onClick={handleDelete}
+                            onClick={() => {
+                                setFormErrors({});
+                                setIsArchiveOpen(true);
+                            }}
                         >
                             {isDeleting ? 'Mengarsipkan…' : 'Arsipkan'}
                         </ActionButton>
@@ -319,7 +328,7 @@ export default function WorkingTimeCalendars({
                                     ? `/settings/compose-working-times?calendar_id=${selectedCalendar.id}`
                                     : '/settings/compose-working-times'
                             }
-                            className="inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10"
+                            className="inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-3 py-1.5 font-medium text-primary hover:bg-primary/10"
                         >
                             <CalendarCheck className="size-4" />
                             <span>Jadwal dari pola</span>
@@ -329,7 +338,7 @@ export default function WorkingTimeCalendars({
 
                 {/* Notice if no legal entity selected */}
                 {!currentLegalEntity && (
-                    <div className="mx-4 mt-4 flex items-center justify-between rounded-md border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
+                    <div className="mx-4 mt-4 flex items-center justify-between rounded-md border border-warning/30 bg-warning/10 p-3 text-warning">
                         <span>
                             Belum ada perusahaan yang aktif pada sesi ini.
                             Kalender kerja selalu milik satu perusahaan.
@@ -344,7 +353,7 @@ export default function WorkingTimeCalendars({
                 )}
 
                 {/* Content Table */}
-                <div className="flex-1 p-4">
+                <div className="min-h-0 flex-1 overflow-auto p-4">
                     <div className="rounded-md border border-border bg-card">
                         <Table>
                             <TableHeader>
@@ -445,8 +454,52 @@ export default function WorkingTimeCalendars({
                         </Table>
                     </div>
                 </div>
-            </div>
+            </ListPageLayout>
 
+            <AlertDialog
+                open={isArchiveOpen}
+                onOpenChange={(open) => {
+                    if (!isDeleting) {
+                        setIsArchiveOpen(open);
+                    }
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Arsipkan kalender kerja?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {selectedCalendar?.code} - {selectedCalendar?.name}{' '}
+                            akan disembunyikan dari daftar kalender yang
+                            tersedia.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    {Object.values(formErrors).map((message, index) => (
+                        <p
+                            key={index}
+                            role="alert"
+                            className="text-destructive"
+                        >
+                            {message}
+                        </p>
+                    ))}
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting}>
+                            Batal
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            disabled={isDeleting}
+                            onClick={(event) => {
+                                event.preventDefault();
+                                handleDelete();
+                            }}
+                        >
+                            {isDeleting ? 'Mengarsipkan...' : 'Arsipkan'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                 <DialogContent>
                     <DialogHeader>

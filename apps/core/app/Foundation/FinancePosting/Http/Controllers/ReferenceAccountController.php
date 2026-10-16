@@ -52,8 +52,8 @@ final class ReferenceAccountController extends Controller
                 ->where('code', 'ilike', '%'.addcslashes($keyword, '\\%_').'%')
                 ->orWhere('name', 'ilike', '%'.addcslashes($keyword, '\\%_').'%')
                 ->orWhere('external_id', $keyword)))
-            ->orderBy('code')
-            ->paginate(self::PER_PAGE)
+            ->orderBy('code')->orderBy('id')
+            ->simplePaginate(self::PER_PAGE)
             ->withQueryString()
             ->through(fn (FinanceReferenceAccount $account): array => $this->present($account));
 
@@ -70,7 +70,7 @@ final class ReferenceAccountController extends Controller
             'canManage' => $membership->hasCorePermission(CoreSecurityCatalog::FINANCE_SETUP_UPDATE),
             'filters' => ['q' => $keyword, 'scope' => $scope, 'status' => $filter['status'] ?? null],
             'legalEntities' => $this->legalEntities($tenant),
-            'accounts' => $accounts,
+            'accounts' => Inertia::scroll($accounts)->matchOn('data.id'),
             'imports' => $imports->map(fn (FinanceReferenceAccountImport $import): array => [
                 'id' => $import->id,
                 'file_name' => $import->file_name,
