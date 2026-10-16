@@ -1,5 +1,5 @@
-import { Badge } from '@apperp/ui/badge';
 import { router } from '@inertiajs/react';
+import { Badge } from '@apperp/ui/badge';
 import { useRecordOptions } from '../../use-record-list';
 
 /**

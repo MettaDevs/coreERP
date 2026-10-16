@@ -1,7 +1,7 @@
-import { InlineLookup } from '@apperp/ui/inline-lookup';
-import type { LookupLoader } from '@apperp/ui/inline-lookup';
 import { useCallback, useEffect, useState } from 'react';
 import type { RefObject } from 'react';
+import { InlineLookup } from '@apperp/ui/inline-lookup';
+import type { LookupLoader } from '@apperp/ui/inline-lookup';
 import { api } from '../api';
 import { optionLabel } from './useMasterOptions';
 import type { MasterOption } from './useMasterOptions';

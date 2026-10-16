@@ -1,3 +1,6 @@
+import type { FormEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { ActionButton } from '@apperp/ui/action-button';
 import {
     AlertDialog,
@@ -22,9 +25,6 @@ import { MasterDetailLayout } from '@apperp/ui/master-detail-layout';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { RecordEditBoundary } from '@apperp/ui/record-edit-boundary';
 import { Switch } from '@apperp/ui/switch';
-import type { FormEvent } from 'react';
-import { useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
 import EditShield from '../../_shared/EditShield';
 import { api, ApiError, errorMessage, newIdempotencyKey } from '../../api';
 import { useRecordList } from '../../use-record-list';

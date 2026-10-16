@@ -1,3 +1,5 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { FormEvent } from 'react';
 import { Badge } from '@apperp/ui/badge';
 import {
     CollapsibleSection,
@@ -7,8 +9,6 @@ import { Empty, EmptyDescription } from '@apperp/ui/empty';
 import { Field, FieldDescription, FieldError } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { RecordEditBoundary } from '@apperp/ui/record-edit-boundary';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { FormEvent } from 'react';
 import { api, errorMessage, newIdempotencyKey } from '../../api';
 import DynamicField from '../DynamicField';
 import type { FieldValue } from '../fields';

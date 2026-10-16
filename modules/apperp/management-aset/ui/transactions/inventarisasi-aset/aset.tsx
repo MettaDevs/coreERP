@@ -1,7 +1,7 @@
-import { FieldDescription } from '@apperp/ui/field';
 import { router } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import type { RefObject } from 'react';
+import { FieldDescription } from '@apperp/ui/field';
 import { api } from '../../api';
 import DynamicField from '../../master/DynamicField';
 import type { FieldConfig, FieldValue } from '../../master/fields';

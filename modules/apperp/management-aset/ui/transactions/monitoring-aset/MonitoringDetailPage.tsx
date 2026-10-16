@@ -1,3 +1,9 @@
+import { router } from '@inertiajs/react';
+import { CheckCheck, ListPlus, Plus, Trash2 } from 'lucide-react';
+import type { RefObject } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { useWorkDate } from '@/hooks/use-work-date';
 import { ActionButton } from '@apperp/ui/action-button';
 import {
     AlertDialog,
@@ -27,12 +33,6 @@ import {
     TableRow,
 } from '@apperp/ui/table';
 import { Textarea } from '@apperp/ui/textarea';
-import { router } from '@inertiajs/react';
-import { CheckCheck, ListPlus, Plus, Trash2 } from 'lucide-react';
-import type { RefObject } from 'react';
-import { useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
-import { useWorkDate } from '@/hooks/use-work-date';
 import EditShield from '../../_shared/EditShield';
 import {
     ApiError,

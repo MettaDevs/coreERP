@@ -1,3 +1,6 @@
+import { useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { useToday } from '@/hooks/use-work-date';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import { DataTable } from '@apperp/ui/data-table';
@@ -25,9 +28,6 @@ import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@apperp/ui/tabs';
 import { Textarea } from '@apperp/ui/textarea';
-import { useRef, useState } from 'react';
-import { toast } from 'sonner';
-import { useToday } from '@/hooks/use-work-date';
 import { day, money } from '../../_shared/format';
 import { useVendors } from '../../_shared/useVendors';
 import {
@@ -37,7 +37,6 @@ import {
     newIdempotencyKey,
     toastSaveError,
 } from '../../api';
-
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import { useRecordList } from '../../use-record-list';
 import type { Contract, Expiring, Warranty } from './warranty';

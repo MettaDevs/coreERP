@@ -1,3 +1,8 @@
+import { router } from '@inertiajs/react';
+import { useRef, useState } from 'react';
+import type { RefObject } from 'react';
+import { toast } from 'sonner';
+import { useWorkDate } from '@/hooks/use-work-date';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import {
@@ -26,11 +31,6 @@ import {
     SheetTitle,
 } from '@apperp/ui/sheet';
 import { Textarea } from '@apperp/ui/textarea';
-import { router } from '@inertiajs/react';
-import { useRef, useState } from 'react';
-import type { RefObject } from 'react';
-import { toast } from 'sonner';
-import { useWorkDate } from '@/hooks/use-work-date';
 import {
     api,
     errorMessage,

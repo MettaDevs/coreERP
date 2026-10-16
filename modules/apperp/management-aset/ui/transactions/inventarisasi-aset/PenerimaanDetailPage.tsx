@@ -1,3 +1,10 @@
+import { usePage } from '@inertiajs/react';
+import { Plus, Trash2, TriangleAlert } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { RecordAttachments } from '@/components/record-attachments';
+import { useWorkDate } from '@/hooks/use-work-date';
+import type { Workspace } from '@/types';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Alert, AlertDescription, AlertTitle } from '@apperp/ui/alert';
 import {
@@ -28,13 +35,6 @@ import {
     TableRow,
 } from '@apperp/ui/table';
 import { Textarea } from '@apperp/ui/textarea';
-import { usePage } from '@inertiajs/react';
-import { Plus, Trash2, TriangleAlert } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
-import { RecordAttachments } from '@/components/record-attachments';
-import { useWorkDate } from '@/hooks/use-work-date';
-import type { Workspace } from '@/types';
 import EditShield from '../../_shared/EditShield';
 import {
     ApiError,

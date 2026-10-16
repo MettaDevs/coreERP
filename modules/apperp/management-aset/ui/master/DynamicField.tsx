@@ -1,10 +1,10 @@
+import { CircleAlert } from 'lucide-react';
+import type { ReactNode, RefObject } from 'react';
 import { Field, FieldHint, FieldLabel } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
-import { CircleAlert } from 'lucide-react';
-import type { ReactNode, RefObject } from 'react';
 import EditShield from '../_shared/EditShield';
 import type { FieldConfig, FieldValue } from './fields';
 import MasterSelect from './MasterSelect';

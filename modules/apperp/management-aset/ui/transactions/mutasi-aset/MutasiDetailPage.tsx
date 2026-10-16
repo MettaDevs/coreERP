@@ -1,3 +1,7 @@
+import { FileText, Plus, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { useWorkDate } from '@/hooks/use-work-date';
 import { ActionButton } from '@apperp/ui/action-button';
 import {
     AlertDialog,
@@ -27,10 +31,6 @@ import {
     TableRow,
 } from '@apperp/ui/table';
 import { Textarea } from '@apperp/ui/textarea';
-import { FileText, Plus, Trash2 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { toast } from 'sonner';
-import { useWorkDate } from '@/hooks/use-work-date';
 import EditShield from '../../_shared/EditShield';
 import {
     ApiError,

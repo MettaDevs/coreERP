@@ -1,7 +1,7 @@
-import { DataTable } from '@apperp/ui/data-table';
-import { Input } from '@apperp/ui/input';
 import { InfiniteScroll, router } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
+import { DataTable } from '@apperp/ui/data-table';
+import { Input } from '@apperp/ui/input';
 
 /**
  * Halaman module: sebuah halaman Inertia biasa yang ikut build shell Core.
@@ -40,8 +40,8 @@ export default function RecordList({
     const [search, setSearch] = useState(filters.q ?? '');
     useEffect(() => {
         if (search === (filters.q ?? '')) {
-return;
-}
+            return;
+        }
 
         const timer = setTimeout(
             () =>

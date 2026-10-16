@@ -1,3 +1,7 @@
+import { usePage } from '@inertiajs/react';
+import { useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { useDateTimeFormat } from '@/hooks/use-date-time';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import { Checkbox } from '@apperp/ui/checkbox';
@@ -23,13 +27,8 @@ import { Field, FieldDescription } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
-import { usePage } from '@inertiajs/react';
-import { useRef, useState } from 'react';
-import { toast } from 'sonner';
-import { useDateTimeFormat } from '@/hooks/use-date-time';
 import { zonedInput } from '../../_shared/format';
 import { ApiError, api, newIdempotencyKey, toastSaveError } from '../../api';
-
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import { useRecordList } from '../../use-record-list';
 import type { Downtime } from './downtime';

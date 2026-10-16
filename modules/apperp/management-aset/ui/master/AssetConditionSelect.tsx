@@ -1,5 +1,5 @@
-import { Select } from '@apperp/ui/select';
 import type { RefObject } from 'react';
+import { Select } from '@apperp/ui/select';
 import { optionLabel, useMasterOptions } from './useMasterOptions';
 
 export default function AssetConditionSelect({
