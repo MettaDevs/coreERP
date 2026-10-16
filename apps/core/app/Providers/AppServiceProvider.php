@@ -12,6 +12,7 @@ use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Platform\Environment\Support\OutboundGuard;
 use App\Platform\Identity\Models\Passkey;
 use App\Platform\Identity\Models\User;
+use App\Platform\Identity\Support\SessionRevocation;
 use App\Platform\License\Support\SiteLicense;
 use App\Platform\Observability\Support\ErrorReporter;
 use Carbon\CarbonImmutable;
@@ -24,6 +25,7 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Events\MigrationsEnded;
 use Illuminate\Database\Events\MigrationsStarted;
+use Illuminate\Foundation\Events\DiagnosingHealth;
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
 use Illuminate\Log\Events\MessageLogged;
@@ -33,6 +35,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Passkeys\Passkeys;
@@ -159,6 +162,16 @@ class AppServiceProvider extends ServiceProvider
 
         Event::listen(Login::class, function (Login $event): void {
             $event->user->forceFill(['last_login_at' => now()])->saveQuietly();
+            app(SessionRevocation::class)->stamp(request(), $event->user->getAuthIdentifier());
+        });
+
+        Event::listen(DiagnosingHealth::class, function (): void {
+            if (config('cache.default') === 'redis') {
+                Redis::connection('cache')->ping();
+            }
+            if (config('session.driver') === 'redis') {
+                Redis::connection('sessions')->ping();
+            }
         });
 
         // Pelaku untuk kolom jejak: dipasang setiap kali guard memegang pengguna, termasuk saat

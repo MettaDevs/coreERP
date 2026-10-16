@@ -56,15 +56,25 @@ x-app-environment: &app-environment
   DB_USERNAME: ${DB_USERNAME:-core_erp}
   DB_PASSWORD: ${CORE_DB_PASSWORD:?CORE_DB_PASSWORD wajib}
 
-  # Ketiganya di database, dan itulah yang membuat banyak node mungkin sama sekali.
+  # Sesi/cache memakai penyimpan bersama (database atau Valkey); antrean tetap database.
   #
   # Sesi di berkas berarti orang yang dilempar ke node lain kehilangan loginnya, dan penawarnya
   # sticky session — yang lalu membuat satu node mati menjatuhkan semua orang yang menempel padanya.
-  # Dengan sesi di database, permintaan boleh mendarat di node mana pun, tiap kali.
-  SESSION_DRIVER: database
+  # Dengan penyimpan bersama, permintaan boleh mendarat di node mana pun, tiap kali.
+  SESSION_DRIVER: ${SESSION_DRIVER:-database}
   SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-true}
-  CACHE_STORE: database
+  CACHE_STORE: ${CACHE_STORE:-database}
   QUEUE_CONNECTION: database
+  REDIS_CLIENT: phpredis
+  REDIS_HOST: ${VALKEY_HOST:-core-valkey}
+  REDIS_PORT: ${VALKEY_PORT:-6379}
+  REDIS_USERNAME: cache
+  REDIS_PASSWORD: ${VALKEY_CACHE_PASSWORD:?VALKEY_CACHE_PASSWORD wajib}
+  REDIS_CACHE_DB: '1'
+  REDIS_DB: '1'
+  VALKEY_SESSION_USERNAME: sessions
+  VALKEY_SESSION_PASSWORD: ${VALKEY_SESSION_PASSWORD:?VALKEY_SESSION_PASSWORD wajib}
+  VALKEY_SESSION_DB: '2'
 
   # Berkas unggahan ke object storage, bukan ke volume lokal.
   #
@@ -143,6 +153,28 @@ x-app-environment: &app-environment
 
 services:
   # ------------------------------------------------------------------ data
+
+  # Cache dan sesi dibatasi ACL database serta kredensial yang berbeda.
+  core-valkey:
+    profiles: [data]
+    image: ${VALKEY_IMAGE:-valkey/valkey:9.1.2-alpine}
+    pull_policy: never
+    restart: unless-stopped
+    entrypoint: ['sh', '/etc/valkey/start.sh']
+    environment:
+      VALKEY_CACHE_PASSWORD: ${VALKEY_CACHE_PASSWORD:?VALKEY_CACHE_PASSWORD wajib}
+      VALKEY_SESSION_PASSWORD: ${VALKEY_SESSION_PASSWORD:?VALKEY_SESSION_PASSWORD wajib}
+      VALKEY_MAXMEMORY: ${VALKEY_MAXMEMORY:-512mb}
+    volumes:
+      - core-valkey-data:/data
+      - ./valkey/valkey.conf:/etc/valkey/valkey.conf:ro
+      - ./valkey/start.sh:/etc/valkey/start.sh:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'VALKEYCLI_AUTH="$$VALKEY_CACHE_PASSWORD" valkey-cli --user cache ping | grep -q PONG']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    # Tidak ada published port; hanya jaringan privat Compose.
 
   core-db:
     profiles: [data]
@@ -432,6 +464,7 @@ networks:
     internal: true
 
 volumes:
+  core-valkey-data:
   core-console-storage:
   core-db-data:
   core-rustfs-data:

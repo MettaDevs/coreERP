@@ -6,16 +6,21 @@ namespace Tests\Feature\Platform\Identity;
 
 use App\Platform\ControlPlane\Models\Client;
 use App\Platform\Environment\Models\Environment;
+use App\Platform\Identity\Http\Controllers\SsoBackchannelLogoutController;
 use App\Platform\Identity\Http\Controllers\SsoLoginController;
 use App\Platform\Identity\Models\ExternalIdentity;
 use App\Platform\Identity\Models\SsoLoginAttempt;
 use App\Platform\Identity\Models\TenantIdentityProvider;
 use App\Platform\Identity\Models\User;
+use App\Platform\Identity\Support\SessionRevocation;
 use App\Platform\Tenant\Models\Tenant;
 use App\Platform\Tenant\Models\TenantMembership;
 use Firebase\JWT\JWT;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpRequest;
+use Illuminate\Http\Request;
+use Illuminate\Session\ArraySessionHandler;
+use Illuminate\Session\Store;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -573,6 +578,28 @@ class SsoLoginTest extends TestCase
 
         $this->assertSame(0, DB::table('sessions')->where('user_id', $user->id)->count());
         $this->assertSame(1, DB::table('sessions')->where('user_id', $bystander->id)->count(), 'Sesi orang lain tidak ikut berakhir.');
+    }
+
+    public function test_a_backchannel_logout_revokes_valkey_sessions_and_remember_me(): void
+    {
+        $user = $this->linkedMember('valkey-subject');
+        $user->forceFill(['remember_token' => 'previous-remember-token'])->save();
+        config(['session.driver' => 'redis', 'cache.stores.sessions' => ['driver' => 'array']]);
+        $sessions = app(SessionRevocation::class);
+        $request = Request::create('http://tenanta.contoh.co.id/dashboard');
+        $store = new Store('test', new ArraySessionHandler(120));
+        $store->start();
+        $request->setLaravelSession($store);
+        $sessions->stamp($request, $user->id);
+
+        $logout = Request::create('http://contoh.co.id/sso/backchannel-logout', 'POST', [
+            'logout_token' => $this->logoutToken('valkey-subject'),
+        ]);
+        $response = app(SsoBackchannelLogoutController::class)($logout);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertTrue($sessions->revoked($request, $user->id));
+        $this->assertNull($user->fresh()->remember_token);
     }
 
     /** Logout token dilarang memuat nonce — yang memuatnya bisa berupa ID token curian yang dikirim ulang. */

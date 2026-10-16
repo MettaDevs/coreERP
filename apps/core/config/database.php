@@ -228,7 +228,7 @@ return [
 
         'options' => [
             'cluster' => env('REDIS_CLUSTER', 'redis'),
-            'prefix' => env('REDIS_PREFIX', Str::slug((string) env('APP_NAME', 'laravel')).'-database-'),
+            'prefix' => env('REDIS_PREFIX', Str::slug((string) env('APP_NAME', 'laravel')).':'.substr(hash('sha256', (string) env('APP_KEY', '')), 0, 16).':'),
             'persistent' => env('REDIS_PERSISTENT', false),
         ],
 
@@ -239,10 +239,23 @@ return [
             'password' => env('REDIS_PASSWORD'),
             'port' => env('REDIS_PORT', '6379'),
             'database' => env('REDIS_DB', '0'),
+            'timeout' => 2.0,
+            'read_timeout' => 2.0,
             'max_retries' => env('REDIS_MAX_RETRIES', 3),
             'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter'),
             'backoff_base' => env('REDIS_BACKOFF_BASE', 100),
             'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
+        ],
+
+        'sessions' => [
+            'host' => env('REDIS_HOST', '127.0.0.1'),
+            'username' => env('VALKEY_SESSION_USERNAME', 'sessions'),
+            'password' => env('VALKEY_SESSION_PASSWORD'),
+            'port' => env('REDIS_PORT', '6379'),
+            'database' => env('VALKEY_SESSION_DB', '2'),
+            'timeout' => 2.0,
+            'read_timeout' => 2.0,
+            'max_retries' => 1,
         ],
 
         'cache' => [
@@ -252,6 +265,8 @@ return [
             'password' => env('REDIS_PASSWORD'),
             'port' => env('REDIS_PORT', '6379'),
             'database' => env('REDIS_CACHE_DB', '1'),
+            'timeout' => 2.0,
+            'read_timeout' => 2.0,
             'max_retries' => env('REDIS_MAX_RETRIES', 3),
             'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter'),
             'backoff_base' => env('REDIS_BACKOFF_BASE', 100),

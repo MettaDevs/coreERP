@@ -240,6 +240,7 @@ export default withMermaid({
             { text: 'Registry Harbor', link: '/dev/30-registry-harbor' },
             { text: 'admin.erp: konsol operator', link: '/dev/31-admin-erp-control-plane' },
             { text: 'SSO', link: '/dev/32-sso' },
+            { text: 'Cache dan sesi Valkey', link: '/dev/36-cache-and-sessions' },
             { text: 'Release dan on-prem', link: '/dev/03-release-and-on-prem' },
             { text: 'Mendaftarkan katalog produk', link: '/dev/13-publishing-an-app-release' },
             { text: 'CI/CD polyrepo', link: '/dev/22-ci-cd' },

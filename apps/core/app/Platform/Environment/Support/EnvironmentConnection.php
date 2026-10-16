@@ -274,7 +274,8 @@ class EnvironmentConnection
 
             // Tanpa ini, setiap permintaan ke alamat lingkungan memulai sesi baru di database
             // lingkungan — dan login tidak pernah bertahan satu klik pun.
-            'session.connection' => $controlPlane,
+            'session.connection' => config('session.driver') === 'database'
+                ? $controlPlane : config('session.connection'),
 
             // Pembatas laju login hidup di cache. Tanpa ini ia menghitung per lingkungan, sehingga
             // percobaan sandi dapat dikalikan sebanyak lingkungan yang dimiliki tenant.

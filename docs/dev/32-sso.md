@@ -101,11 +101,15 @@ Akibatnya berbeda di dua aplikasi, dan bedanya nyata di produksi:
 
 | | Core | Konsol |
 | --- | --- | --- |
-| Penyimpan sesi | Database | Berkas |
-| Yang terjadi | Seluruh baris sesi milik pengguna itu dihapus seketika | Waktu logout ditandai di cache; sesi berakhir pada permintaan berikutnya |
+| Penyimpan sesi | Database atau Valkey sesuai konfigurasi | Berkas |
+| Yang terjadi | Driver database menghapus baris sesi; Valkey mencabut generasi seluruh sesi pengguna dan menolaknya pada request berikutnya | Waktu logout ditandai di cache; sesi berakhir pada permintaan berikutnya |
 
 Sesi berkas tidak dapat dicari per pengguna — itu sebabnya konsol menunda satu permintaan, bukan karena
 kelalaian.
+
+Pada Core dengan Valkey, penanda pencabutan berada pada database session yang terpisah dari cache framework,
+bertahan lewat AOF, dan tidak dapat dihapus lewat flush cache. Remember token ikut dicabut. Mekanisme dan cutover
+ada di [cache dan sesi bersama](36-cache-and-sessions.md).
 
 ## Setelan
 

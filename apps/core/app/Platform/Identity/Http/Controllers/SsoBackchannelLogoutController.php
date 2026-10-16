@@ -6,6 +6,8 @@ namespace App\Platform\Identity\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Platform\Identity\Models\ExternalIdentity;
+use App\Platform\Identity\Models\User;
+use App\Platform\Identity\Support\SessionRevocation;
 use App\Platform\Identity\Support\Sso\SharedIdentityProvider;
 use App\Platform\Identity\Support\Sso\SsoFailure;
 use Illuminate\Http\JsonResponse;
@@ -57,10 +59,15 @@ class SsoBackchannelLogoutController extends Controller
         $ended = 0;
 
         if ($userId !== null) {
-            $ended = DB::connection(config('session.connection'))
-                ->table((string) config('session.table', 'sessions'))
-                ->where('user_id', $userId)
-                ->delete();
+            if (app(SessionRevocation::class)->enabled()) {
+                app(SessionRevocation::class)->revoke($userId);
+            } else {
+                $ended = DB::connection(config('session.connection'))
+                    ->table((string) config('session.table', 'sessions'))
+                    ->where('user_id', $userId)
+                    ->delete();
+            }
+            User::query()->whereKey($userId)->update(['remember_token' => null]);
         }
 
         Log::info('SSO: logout back-channel diterima.', ['user_id' => $userId, 'sesi_diakhiri' => $ended]);
