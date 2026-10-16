@@ -923,6 +923,25 @@ hari menurut pengguna, bukan `now()` atau `today()` yang berjalan dalam UTC. Lap
 laporan (`timezone`), dan waktu di dataset dikirim dalam UTC bertipe `datetime`; lihat
 [perenderan dokumen](23-document-rendering.md#cara-layout-membaca-dataset).
 
+## Layout master–detail
+
+Halaman record dengan daftar di kiri dan detail di kanan memakai `MasterDetailLayout` dari
+`@apperp/ui/master-detail-layout`. Berikan daftar lewat `list`, isi detail lewat `children`, dan
+kendalikan `detailOpen` beserta `onDetailOpenChange`. Setelah memilih, membuat, atau meminta Ubah pada
+record, halaman membuka detail. SDK menangani divider polos yang bisa diseret dan batas lebar kedua
+panel. Di bawah 1280 px hanya satu panel terlihat; tombol Daftar mengembalikan daftar tanpa melepas
+detail dari React, sehingga draft dan posisi scroll tidak dibuang.
+
+Form baca-saja yang boleh disunting memakai `RecordEditBoundary` dari
+`@apperp/ui/record-edit-boundary`, dengan `editing`, `canEdit`, `onEdit`, dan `disabled` ketika menyimpan.
+Klik label/field baca-saja atau judul fasttab meminta edit, tanpa menyimpan. `RecordEditControl`
+membungkus kontrol yang tidak punya `readOnly`, termasuk labelnya, agar klik pertama tidak sekaligus
+mengubah nilai. Pemanggil tetap memegang izin, validasi, konfirmasi perpindahan draft, Simpan, dan Batal.
+Data acuan baca-saja dan versi yang sudah terbit tidak menjadi editable karena memakai layout ini.
+
+Navigasi kategori, editor workflow, tabel dengan detail di bawah, dan drill-down banyak kolom memakai
+layout sesuai kebutuhannya; semuanya bukan master–detail dua panel.
+
 ## Bantuan kontekstual pada halaman dan field
 
 UI app mengikuti pola **field description** Dynamics 365: setiap field dapat memiliki help text opsional, tetapi bantuan hanya ditulis untuk field yang rumit atau pemakaiannya tidak langsung jelas. Dynamics 365 juga menampilkan deskripsi saat pengguna mengarahkan pointer ke field dan tidak mengisi deskripsi pada semua halaman. Lihat [View and export field descriptions](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/get-started/view-export-field-descriptions).
@@ -1005,12 +1024,27 @@ Shell menetapkan tinggi viewport dan mempertahankan header serta spanduk di luar
 Daftar operasional memakai `ListPageLayout` dari `@apperp/ui/list-page-layout`. Komponen ini memiliki slot header, filter, dan footer yang tidak ikut digulir, serta memberikan sisa tinggi kepada tabel. DataTable di dalamnya otomatis memakai mode `viewport`: satu container native menangani scroll vertikal dan horizontal, header kolom memakai `sticky`, dan scrollbar horizontal berada di bawah area yang terlihat. Pengguna tidak perlu menuju baris terakhir untuk menggeser kolom.
 
 ```tsx
-<ListPageLayout header={actionBar} filters={filters} footer={pagination}>
-    <DataTable columns={columns} data={rows} getRowKey={(row) => row.id} />
+const list = useIncrementalList({ loadItems, query: search, getKey: (row) => row.id });
+
+<ListPageLayout header={actionBar} filters={filters}>
+    <DataTable columns={columns} data={list.items} getRowKey={(row) => row.id}
+        incremental={list} sort={list.sort} onSortChange={list.onSortChange} />
 </ListPageLayout>
 ```
 
 Kembalikan layout tersebut sebagai root halaman. Bila module masih memiliki pembungkus `main`, pembungkus itu meneruskan `h-full min-h-0` dan tidak membuat area scroll tambahan. Form/detail memakai scroll isi Shell; tabel kecil di dalam form atau dialog tetap `inline`. Dialog/Sheet ditempatkan sebagai saudara layout daftar, atau tabel di dalam overlay diberi `scrollMode="inline"` secara eksplisit. Card daftar yang sudah membatasi tinggi dapat memilih `scrollMode="viewport"` tanpa memakai layout baru.
+
+### Data daftar dimuat bertahap
+
+Daftar record, tabel operasional, dan dropdown referensi memuat batch berikutnya saat pengguna mendekati akhir scroll, seperti [list Business Central](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/performance/performance-users#making-pages-load-faster). Tidak ada navigasi nomor halaman atau tombol sebelumnya/berikutnya. Paging pada protokol server tetap diperlukan untuk membatasi pekerjaan setiap request; pengguna menelusurinya melalui scroll.
+
+Mesin fetch bersama berada pada `packages/ui/src/components/use-incremental-list.ts`; `DataTable` menerima hasilnya melalui prop `incremental`. Adapter module `useRecordList` menerjemahkan `data` dan `next_cursor` API menjadi batch SDK. `InlineLookup` memakai mesin yang sama untuk popup dan pemilih lengkap; `MasterSelect` mengikatnya ke master module. Halaman Inertia memakai `Inertia::scroll()` dan `RecordListScroll`, bukan menyalin observer atau menggabungkan batch sendiri.
+
+Search, filter, dan sort diterapkan server pada seluruh hasil yang diizinkan **sebelum** batas batch. Setiap batch mempertahankan tenant, perusahaan aktif, policy organisasi, permission, dan dependency field. Kolom sort berasal dari allowlist pemilik resource. Query memakai pembeda ID untuk nilai urutan yang sama dan menangani NULL serta urutan angka. `App\Support\IncrementalList` menyediakan bentuk batch tersebut untuk query yang sudah diberi scope; presenter dan cast tetap milik resource. Nama direktori Core diproyeksikan melalui kontrak `OrganizationDirectory`, bukan dengan membaca tabel pusat langsung dari module atau mengunduh seluruh direktori ke browser.
+
+Mengganti query/filter/sort membatalkan request sebelumnya dan mengosongkan hasil lama; mengganti workspace membongkar state isi halaman. Nilai field yang tersimpan dapat dimuat sendiri melalui `record_id` pada endpoint yang sama, dengan scope dan izin yang sama. Label nilai terpilih tidak bergantung pada keberadaannya di batch pertama. Kegagalan batch lanjutan mempertahankan hasil yang sudah dimuat, menyediakan retry, dan tidak menganggap daftar selesai. Pemuatan otomatis juga menyediakan aksi yang dapat dijangkau keyboard.
+
+Jumlah yang dihitung dari batch diberi arti **sudah dimuat**, bukan total database. Export, agregat, dan pilih-semua lintas hasil tetap operasi server sendiri. Enum pendek dan baris draft yang sedang disunting boleh memakai data lokal yang sudah dimiliki form. Virtualisasi baris merupakan optimasi render terpisah; merender sedikit baris tidak membenarkan query yang mengambil seluruh tabel.
 
 Container native memakai atribut `scroll-region` agar Inertia mengelola posisi scroll ketika berpindah halaman. Keadaan header dibaca dari container pemilik scroll, bukan dari `window.scrollY`. Jangan memakai tinggi piksel tetap yang menghitung sendiri tinggi header/filter, scrollbar duplikat yang disinkronkan lewat JavaScript, atau Shift+wheel sebagai satu-satunya jalan untuk menggeser kolom.
 

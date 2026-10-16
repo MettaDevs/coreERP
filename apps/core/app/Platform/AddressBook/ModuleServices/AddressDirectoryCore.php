@@ -6,15 +6,27 @@ namespace App\Platform\AddressBook\ModuleServices;
 
 use App\Platform\AddressBook\Models\Location;
 use App\Platform\AddressBook\Models\PartyLocation;
+use App\Platform\AddressBook\Models\PostalAddress;
 use App\Platform\Modules\Contracts\AddressDirectory;
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Organization\Models\OrganizationParty;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 
 /**
  * Pelaksana {@see AddressDirectory}: membaca tempat beralamat pos dari buku alamat, tanpa menulis.
  */
 final class AddressDirectoryCore implements AddressDirectory
 {
+    public function lookup(string $tenantId, array $input): array
+    {
+        $query = $this->postal($tenantId)->select(['locations.id', 'locations.name as nama'])
+            ->selectSub(PostalAddress::query()->whereColumn('location_id', 'locations.id')->select('formatted')->limit(1), 'alamat');
+
+        return IncrementalList::query(Request::create('/lookup', 'GET', $input), $query->toBase(),
+            ['id' => 'id', 'kode' => 'nama', 'nama' => 'nama'], ['nama', 'alamat'], 'nama');
+    }
+
     /**
      * Batas pilihan. Tempat beralamat pos satu tenant adalah alamat organisasinya sendiri — puluhan, bukan
      * ribuan — jadi batas ini hanya pagar terhadap data yang tidak wajar.

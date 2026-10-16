@@ -56,7 +56,7 @@
     parameters:
     - $ref: '#/components/parameters/Search'
     - $ref: '#/components/parameters/ActiveFilter'
-    - $ref: '#/components/parameters/Page'
+    - $ref: '#/components/parameters/Cursor'
     - $ref: '#/components/parameters/PerPage'
     responses:
       '200':

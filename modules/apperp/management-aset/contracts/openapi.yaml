@@ -154,7 +154,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -236,7 +236,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -386,7 +386,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -986,7 +986,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -1136,7 +1136,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -1288,7 +1288,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       - name: jenis_aset_id
         in: query
@@ -1477,7 +1477,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       - $ref: '#/components/parameters/ParentLokasiAsetFilter'
       - $ref: '#/components/parameters/TipeLokasiAsetFilter'
@@ -1632,7 +1632,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       - $ref: '#/components/parameters/PabrikanAsetFilter'
       - $ref: '#/components/parameters/JenisAsetFilter'
@@ -1784,7 +1784,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -1934,7 +1934,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -2084,7 +2084,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -2234,7 +2234,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -2384,7 +2384,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -2738,7 +2738,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -2749,7 +2749,7 @@ paths:
                 type: object
                 required:
                 - data
-                - meta
+                - next_cursor
                 properties:
                   data:
                     type: array
@@ -2763,15 +2763,10 @@ paths:
                           version:
                             type: integer
                             minimum: 1
-                  meta:
-                    type: object
-                    properties:
-                      current_page:
-                        type: integer
-                      last_page:
-                        type: integer
-                      total:
-                        type: integer
+                  next_cursor:
+                    type:
+                    - string
+                    - 'null'
         '401':
           $ref: '#/components/responses/Unauthenticated'
         '403':
@@ -3029,7 +3024,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -3124,7 +3119,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -3219,7 +3214,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -3341,7 +3336,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -3436,7 +3431,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -3531,7 +3526,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -3626,7 +3621,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -3721,7 +3716,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -3816,7 +3811,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -3911,7 +3906,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -6777,7 +6772,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -7041,7 +7036,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -7456,7 +7451,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -7840,7 +7835,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -8566,7 +8561,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Search'
       - $ref: '#/components/parameters/ActiveFilter'
-      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Cursor'
       - $ref: '#/components/parameters/PerPage'
       responses:
         '200':
@@ -9469,12 +9464,13 @@ components:
       in: query
       schema:
         type: boolean
-    Page:
-      name: page
+    Cursor:
+      name: cursor
       in: query
+      description: Cursor opaque dari next_cursor pada batch sebelumnya. Kosong untuk batch pertama.
       schema:
-        type: integer
-        minimum: 1
+        type: string
+        maxLength: 2000
     PerPage:
       name: per_page
       in: query
@@ -9482,7 +9478,7 @@ components:
         type: integer
         minimum: 1
         maximum: 100
-        default: 20
+        default: 40
     PabrikanAsetFilter:
       name: pabrikan_aset_id
       in: query
@@ -10525,14 +10521,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/FiscalClassification'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     ErrorResponse:
       type: object
       required:
@@ -10772,14 +10770,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/ModelAset'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     GroupAsetFields:
       description: |
         Perlakuan finansial yang melekat pada group; padanan field pada "Fixed asset group"
@@ -10848,14 +10848,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/GroupAset'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     JenisAset:
       description: |
         Sumbu klasifikasi teknis aset; padanan "Asset type" pada modul Asset management
@@ -10880,14 +10882,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/JenisAset'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     KondisiAset:
       allOf:
       - $ref: '#/components/schemas/MasterRecord'
@@ -10908,14 +10912,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/KondisiAset'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     PabrikanAset:
       allOf:
       - $ref: '#/components/schemas/MasterRecord'
@@ -10936,14 +10942,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/PabrikanAset'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     PabrikanAsetDetail:
       description: |
         Jumlah model dan aset pada satu pabrikan untuk panel detail. `null` berarti pemanggil
@@ -10989,14 +10997,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/ItemChecklistMaintenance'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     AnalisaMaintenance:
       allOf:
       - $ref: '#/components/schemas/MasterRecord'
@@ -11017,14 +11027,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/AnalisaMaintenance'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     MaintenanceJobType:
       allOf:
       - $ref: '#/components/schemas/MasterRecord'
@@ -11081,14 +11093,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/MaintenanceJobType'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     MaintenanceJobTypeVariant:
       allOf:
       - $ref: '#/components/schemas/MasterRecord'
@@ -11120,14 +11134,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/MaintenanceJobTypeVariant'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     MaintenanceJobTypeDefault:
       allOf:
       - $ref: '#/components/schemas/MasterRecord'
@@ -11188,14 +11204,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/MaintenanceJobTypeDefault'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     MaintenanceChecklistVariable:
       allOf:
       - $ref: '#/components/schemas/MasterRecord'
@@ -11215,14 +11233,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/MaintenanceChecklistVariable'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     MaintenanceChecklistVariableValue:
       type: object
       required:
@@ -11307,14 +11327,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/MaintenanceChecklistTemplate'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     MaintenanceChecklistTemplateLine:
       type: object
       required:
@@ -11462,14 +11484,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/TipeWorkOrder'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     TingkatLayanan:
       allOf:
       - $ref: '#/components/schemas/MasterRecord'
@@ -11490,14 +11514,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/TingkatLayanan'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     TradeResponse:
       type: object
       required:
@@ -11509,14 +11535,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/MasterRecord'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     FaultChoice:
       allOf:
       - $ref: '#/components/schemas/MasterRecord'
@@ -11553,14 +11581,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/FaultChoice'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     TindakanPerbaikanResponse:
       type: object
       required:
@@ -11572,14 +11602,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/FaultChoice'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     MaintenanceTransferResponse:
       type: object
       required:
@@ -11628,14 +11660,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/TipeLokasiAset'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     LokasiAsetFields:
       type: object
       properties:
@@ -11786,14 +11820,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/LokasiAset'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     ProfilPenyusutanFields:
       description: |
         Aturan penyusutan yang dapat dipakai ulang lintas aset; padanan "Depreciation profile"
@@ -11901,14 +11937,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/ProfilPenyusutan'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     BukuPenyusutanFields:
       type: object
       properties:
@@ -11969,14 +12007,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/BukuPenyusutan'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     GroupBukuPenyusutanRow:
       description: |
         Satu baris matriks group x buku; padanan "Fixed asset group/book" di F&O. Nilainya
@@ -12409,14 +12449,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/TipeAtribut'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     TipeAtributNilaiReplace:
       description: Daftar penuh pilihan nilai; pilihan yang tidak disertakan diarsipkan.
       type: object
@@ -12799,14 +12841,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/CounterType'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     AssetTypeCounterTransfer:
       type: object
       required:
@@ -12828,9 +12872,8 @@ components:
                   nama:
                     type: string
                   satuan:
-                    type:
-                    - string
-                    - 'null'
+                    type: string
+                    nullable: true
             selected:
               type: array
               items:
@@ -12843,9 +12886,8 @@ components:
                   nama:
                     type: string
                   satuan:
-                    type:
-                    - string
-                    - 'null'
+                    type: string
+                    nullable: true
         version:
           $ref: '#/components/schemas/RecordVersion'
     CounterReadingWrite:
@@ -12903,9 +12945,8 @@ components:
         jenis_counter_nama:
           type: string
         satuan:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         dibaca_pada:
           type: string
         nilai:
@@ -12918,13 +12959,11 @@ components:
         reset:
           type: boolean
         keterangan:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         dicatat_oleh_nama:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         version:
           $ref: '#/components/schemas/RecordVersion'
     AssetCounter:
@@ -12937,9 +12976,8 @@ components:
         nama:
           type: string
         satuan:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         terakhir:
           oneOf:
           - type: 'null'
@@ -12993,14 +13031,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/MaintenancePlan'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     MaintenancePlanLineWrite:
       type: object
       required:
@@ -13097,13 +13137,11 @@ components:
           job_type_nama:
             type: string
           jenis_counter_nama:
-            type:
-            - string
-            - 'null'
+            type: string
+            nullable: true
           jenis_counter_satuan:
-            type:
-            - string
-            - 'null'
+            type: string
+            nullable: true
           tipe_work_order_nama:
             type: string
           version:
@@ -13139,21 +13177,17 @@ components:
       - type: object
         properties:
           aset_kode:
-            type:
-            - string
-            - 'null'
+            type: string
+            nullable: true
           aset_nama:
-            type:
-            - string
-            - 'null'
+            type: string
+            nullable: true
           jenis_aset_kode:
-            type:
-            - string
-            - 'null'
+            type: string
+            nullable: true
           jenis_aset_nama:
-            type:
-            - string
-            - 'null'
+            type: string
+            nullable: true
           version:
             $ref: '#/components/schemas/RecordVersion'
     MaintenanceScheduleLine:
@@ -13208,9 +13242,8 @@ components:
           - $ref: '#/components/schemas/Ulid'
           - type: 'null'
         work_order_kode:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         rencana_kode:
           type: string
         rencana_nama:
@@ -13266,14 +13299,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/MaintenanceRequestType'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     MaintenanceRequestWrite:
       type: object
       required:
@@ -13341,35 +13376,29 @@ components:
             - 'null'
             format: date-time
           diputuskan_oleh_user_id:
-            type:
-            - string
-            - 'null'
+            type: string
+            nullable: true
           alasan_penolakan:
-            type:
-            - string
-            - 'null'
+            type: string
+            nullable: true
           pemeliharaan_aset_id:
             oneOf:
             - $ref: '#/components/schemas/Ulid'
             - type: 'null'
           work_order_kode:
-            type:
-            - string
-            - 'null'
+            type: string
+            nullable: true
           jenis_permintaan_nama:
             type: string
           aset_kode:
-            type:
-            - string
-            - 'null'
+            type: string
+            nullable: true
           aset_nama:
-            type:
-            - string
-            - 'null'
+            type: string
+            nullable: true
           lokasi_nama:
-            type:
-            - string
-            - 'null'
+            type: string
+            nullable: true
           unit_nama:
             type:
             - string
@@ -13411,9 +13440,8 @@ components:
         name:
           type: string
         tax_number:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         status:
           type: string
         legal_entity_id:
@@ -13445,14 +13473,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/MasterRecord'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     InsurancePolicyWrite:
       type: object
       required:
@@ -13540,9 +13570,8 @@ components:
           format: date
           description: Kosong berarti mengikuti masa berlaku polis.
         keterangan:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         berjalan:
           type: boolean
           description: Berlaku hari ini (zona pengguna).
@@ -13604,21 +13633,17 @@ components:
         nomor_polis:
           type: string
         jenis_asuransi_id:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         jenis_asuransi_kode:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         jenis_asuransi_nama:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         vendor_id:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         vendor:
           oneOf:
           - $ref: '#/components/schemas/VendorSummary'
@@ -13638,9 +13663,8 @@ components:
         diblokir:
           type: boolean
         keterangan:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         total_nilai_tertanggung:
           type: string
           description: Jumlah pertanggungan yang berlaku hari ini (*Total Value Insured* BC).
@@ -13681,9 +13705,8 @@ components:
           type: string
           description: Nilai perolehan buku komersial; nilai perolehan aset bila belum punya buku.
         nilai_buku:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         status:
           type: string
           enum:
@@ -13725,27 +13748,22 @@ components:
         jenis_aset_id:
           type: string
         jenis_aset_nama:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         lokasi_aset_id:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         lokasi_aset_nama:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         nilai_perolehan:
           type: string
         akumulasi_penyusutan:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         nilai_buku:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         total_nilai_tertanggung:
           type: string
         kekurangan:
@@ -13813,9 +13831,8 @@ components:
         aset_nama:
           type: string
         vendor_id:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         vendor:
           oneOf:
           - $ref: '#/components/schemas/VendorSummary'
@@ -13828,9 +13845,8 @@ components:
         jenis_garansi_label:
           type: string
         nomor_referensi:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         berlaku_mulai:
           type: string
           format: date
@@ -13838,9 +13854,8 @@ components:
           type: string
           format: date
         catatan:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         berlaku:
           type: boolean
         sisa_hari:
@@ -13865,27 +13880,22 @@ components:
         id:
           $ref: '#/components/schemas/Ulid'
         referensi:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         aset_id:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         aset_kode:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         aset_nama:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         jumlah_aset:
           type: integer
         vendor_nama:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         berlaku_sampai:
           type: string
           format: date
@@ -13906,13 +13916,11 @@ components:
           - garansi
           - kontrak_servis
         referensi:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         vendor_nama:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         jenis_garansi:
           type:
           - string
@@ -13922,9 +13930,8 @@ components:
           - sebagian
           - null
         cakupan:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         berlaku_sampai:
           type: string
           format: date
@@ -14007,17 +14014,14 @@ components:
           type: string
           format: date
         cakupan:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         nilai_kontrak:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         keterangan:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         lines_count:
           type:
           - integer
@@ -14068,14 +14072,16 @@ components:
       type: object
       required:
       - data
-      - meta
+      - next_cursor
       properties:
         data:
           type: array
           items:
             $ref: '#/components/schemas/DowntimeReason'
-        meta:
-          $ref: '#/components/schemas/PaginationMeta'
+        next_cursor:
+          type:
+          - string
+          - 'null'
     AssetDowntimeWrite:
       type: object
       required:
@@ -14088,9 +14094,8 @@ components:
           type: string
           description: Waktu; tanpa offset dibaca menurut zona pengguna.
         selesai:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         alasan_downtime_id:
           oneOf:
           - $ref: '#/components/schemas/Ulid'
@@ -14140,35 +14145,28 @@ components:
           - 'null'
           description: Waktu UTC; kosong selama aset masih berhenti.
         alasan_downtime_id:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         alasan_downtime_kode:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         alasan_downtime_nama:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         masuk_kpi:
           type: boolean
         pemeliharaan_aset_id:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         pemeliharaan_aset_kode:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         permintaan_pemeliharaan_id:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         permintaan_pemeliharaan_kode:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         sumber:
           type: string
           enum:
@@ -14176,9 +14174,8 @@ components:
           - work_order
           description: '`work_order` dibuka dan ditutup perpindahan status work order.'
         keterangan:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         durasi_jam:
           type: number
           description: Catatan terbuka dihitung sampai saat ini.
@@ -14226,13 +14223,11 @@ components:
             jenis aset: null
             atau lokasi; kosong untuk aset tanpa lokasi.: null
           kode:
-            type:
-            - string
-            - 'null'
+            type: string
+            nullable: true
           nama:
-            type:
-            - string
-            - 'null'
+            type: string
+            nullable: true
       - $ref: '#/components/schemas/MaintenanceKpiFigures'
     PengaturanAsetTetap:
       type: object
@@ -14330,15 +14325,13 @@ components:
           - rejected
           - blocked
         workflow_instance_id:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         requested_by_user_id:
           type: string
         acted_by_user_id:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
         posting_ids:
           type:
           - array
@@ -14346,9 +14339,8 @@ components:
           items:
             type: string
         failure_message:
-          type:
-          - string
-          - 'null'
+          type: string
+          nullable: true
     AssetPurchaseRequestInput:
       type: object
       required:

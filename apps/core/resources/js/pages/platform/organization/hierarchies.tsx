@@ -4,6 +4,8 @@ import type { Props } from './components/organization-types';
 export default function Hierarchies(
     props: Pick<
         Props,
+        | 'scopeKey'
+        | 'savedHierarchy'
         | 'canManage'
         | 'organizations'
         | 'hierarchies'
@@ -11,7 +13,7 @@ export default function Hierarchies(
         | 'operatingUnitTypes'
     >,
 ) {
-    return <OrganizationHierarchies {...props} />;
+    return <OrganizationHierarchies key={props.scopeKey} {...props} />;
 }
 Hierarchies.layout = {
     breadcrumbs: [

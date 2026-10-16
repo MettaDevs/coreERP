@@ -5,7 +5,6 @@ import {
     CardAction,
     CardContent,
     CardDescription,
-    CardFooter,
     CardHeader,
     CardTitle,
 } from '@apperp/ui/card';
@@ -45,6 +44,7 @@ import { Download, FileUp, Search } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import Heading from '@/components/heading';
+import { RecordListScroll } from '@/components/record-list-scroll';
 import { useDateTimeFormat } from '@/hooks/use-date-time';
 import {
     apiJson,
@@ -158,7 +158,12 @@ function Filters({
         router.get(
             '/settings/finance-accounts',
             { ...filters, q, ...next },
-            { preserveState: true, preserveScroll: true, replace: true },
+            {
+                preserveState: true,
+                reset: ['accounts'],
+                preserveScroll: true,
+                replace: true,
+            },
         );
 
     return (
@@ -562,114 +567,88 @@ export default function FinanceAccounts({
                             </Empty>
                         ) : (
                             <div className="overflow-x-auto rounded-lg border">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Nomor</TableHead>
-                                            <TableHead>Nama</TableHead>
-                                            <TableHead>Jenis</TableHead>
-                                            <TableHead>Cakupan</TableHead>
-                                            <TableHead>external_id</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            {canManage && (
-                                                <TableHead className="w-32 text-right">
-                                                    Aksi
+                                <RecordListScroll data="accounts">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Nomor</TableHead>
+                                                <TableHead>Nama</TableHead>
+                                                <TableHead>Jenis</TableHead>
+                                                <TableHead>Cakupan</TableHead>
+                                                <TableHead>
+                                                    external_id
                                                 </TableHead>
-                                            )}
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {accounts.data.map((account) => (
-                                            <TableRow key={account.id}>
-                                                <TableCell className="font-mono">
-                                                    {account.code}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {account.name}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {TYPE_LABEL[account.type]}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {scopeName(
-                                                        account.legal_entity_id,
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="font-mono text-muted-foreground">
-                                                    {account.external_id}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge
-                                                        variant={
-                                                            account.active
-                                                                ? 'secondary'
-                                                                : 'outline'
-                                                        }
-                                                    >
-                                                        {account.active
-                                                            ? 'Aktif'
-                                                            : 'Nonaktif'}
-                                                    </Badge>
-                                                </TableCell>
+                                                <TableHead>Status</TableHead>
                                                 {canManage && (
-                                                    <TableCell className="text-right">
-                                                        <Button
-                                                            type="button"
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                toggle(account)
+                                                    <TableHead className="w-32 text-right">
+                                                        Aksi
+                                                    </TableHead>
+                                                )}
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {accounts.data.map((account) => (
+                                                <TableRow key={account.id}>
+                                                    <TableCell className="font-mono">
+                                                        {account.code}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {account.name}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {
+                                                            TYPE_LABEL[
+                                                                account.type
+                                                            ]
+                                                        }
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {scopeName(
+                                                            account.legal_entity_id,
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className="font-mono text-muted-foreground">
+                                                        {account.external_id}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge
+                                                            variant={
+                                                                account.active
+                                                                    ? 'secondary'
+                                                                    : 'outline'
                                                             }
                                                         >
                                                             {account.active
-                                                                ? 'Nonaktifkan'
-                                                                : 'Aktifkan'}
-                                                        </Button>
+                                                                ? 'Aktif'
+                                                                : 'Nonaktif'}
+                                                        </Badge>
                                                     </TableCell>
-                                                )}
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
+                                                    {canManage && (
+                                                        <TableCell className="text-right">
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    toggle(
+                                                                        account,
+                                                                    )
+                                                                }
+                                                            >
+                                                                {account.active
+                                                                    ? 'Nonaktifkan'
+                                                                    : 'Aktifkan'}
+                                                            </Button>
+                                                        </TableCell>
+                                                    )}
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </RecordListScroll>
                             </div>
                         )}
                     </CardContent>
-                    {accounts.last_page > 1 && (
-                        <CardFooter className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
-                            <span>
-                                {accounts.from}–{accounts.to} dari{' '}
-                                {accounts.total} akun
-                            </span>
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={!accounts.prev_page_url}
-                                    onClick={() =>
-                                        accounts.prev_page_url &&
-                                        router.visit(accounts.prev_page_url, {
-                                            preserveScroll: true,
-                                        })
-                                    }
-                                >
-                                    Sebelumnya
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={!accounts.next_page_url}
-                                    onClick={() =>
-                                        accounts.next_page_url &&
-                                        router.visit(accounts.next_page_url, {
-                                            preserveScroll: true,
-                                        })
-                                    }
-                                >
-                                    Berikutnya
-                                </Button>
-                            </div>
-                        </CardFooter>
-                    )}
                 </Card>
 
                 <Card>

@@ -45,6 +45,9 @@ export type Hierarchy = {
     versions: Version[];
 };
 export type Props = {
+    scopeKey: string;
+    savedOrganization?: Organization | null;
+    savedHierarchy?: Hierarchy | null;
     canManage: boolean;
     organizations: Organization[];
     hierarchies: Hierarchy[];

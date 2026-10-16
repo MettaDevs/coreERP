@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\MaintenanceSchedule;
 
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\RequestContext;
 use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Database\Eloquent\Builder;
@@ -68,15 +69,16 @@ final class MaintenanceScheduleController extends Controller
         }
 
         $today = $this->today()->toDateString();
-        $rows = $query->orderBy(self::TABLE.'.jatuh_tempo')->orderBy('aset.kode')->limit(1000)->toBase()->get()
-            ->map(static function ($row) use ($today) {
-                // Terlambat dihitung menurut hari ini pengguna, bukan disimpan: besok jawabannya berubah.
-                $row->terlambat = $row->status === MaintenanceScheduleStatus::PROPOSED && $row->jatuh_tempo < $today;
+        $batch = IncrementalList::query($request, $query->toBase(), [
+            'id' => 'id', 'jatuh_tempo' => 'jatuh_tempo', 'aset' => 'aset_kode', 'pekerjaan' => 'job_type_nama', 'rencana' => 'rencana_nama', 'status' => 'status',
+        ], ['aset_kode', 'aset_nama', 'job_type_nama', 'rencana_nama'], 'jatuh_tempo');
+        $batch['data'] = $batch['data']->map(static function ($row) use ($today) {
+            $row->terlambat = $row->status === MaintenanceScheduleStatus::PROPOSED && $row->jatuh_tempo < $today;
 
-                return $row;
-            });
+            return $row;
+        });
 
-        return response()->json(['data' => $rows, 'meta' => ['hari_ini' => $today]]);
+        return response()->json([...$batch, 'meta' => ['hari_ini' => $today]]);
     }
 
     public function run(Request $request, MaintenanceScheduleCalculator $calculator): JsonResponse

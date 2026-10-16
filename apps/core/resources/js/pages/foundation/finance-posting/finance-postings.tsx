@@ -6,7 +6,6 @@ import {
     CardAction,
     CardContent,
     CardDescription,
-    CardFooter,
     CardHeader,
     CardTitle,
 } from '@apperp/ui/card';
@@ -65,6 +64,7 @@ import type {
     PostingCheckProblem,
 } from '@/components/finance/posting-check';
 import Heading from '@/components/heading';
+import { RecordListScroll } from '@/components/record-list-scroll';
 import { useDateTimeFormat } from '@/hooks/use-date-time';
 import { apiJson, CoreApiError, errorText } from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
@@ -1463,6 +1463,7 @@ export default function FinancePostings({
         setSelectedId(null);
         router.get(PAGE_URL, toQuery(next), {
             preserveState: true,
+            reset: ['postings'],
             preserveScroll: true,
             replace: true,
             onError: (errors) =>
@@ -1470,15 +1471,6 @@ export default function FinancePostings({
                     Object.values(errors)[0] ?? 'Saringan belum dapat dipakai.',
                 ),
         });
-    };
-
-    const visitPage = (url: string | null) => {
-        if (url === null) {
-            return;
-        }
-
-        setSelectedId(null);
-        router.visit(url, { preserveScroll: true });
     };
 
     const refresh = (updated?: Posting) => {
@@ -1568,80 +1560,59 @@ export default function FinancePostings({
                             />
                         ) : (
                             <div className="overflow-x-auto rounded-lg border">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Nomor posting</TableHead>
-                                            <TableHead>Jenis</TableHead>
-                                            <TableHead>Perusahaan</TableHead>
-                                            <TableHead>
-                                                Tanggal posting
-                                            </TableHead>
-                                            <TableHead className="text-right">
-                                                Nilai
-                                            </TableHead>
-                                            <TableHead>Umur</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            {canManage && (
-                                                <TableHead className="w-12">
-                                                    <span className="sr-only">
-                                                        Aksi
-                                                    </span>
+                                <RecordListScroll data="postings">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>
+                                                    Nomor posting
                                                 </TableHead>
-                                            )}
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {postings.data.map((posting) => (
-                                            <PostingRow
-                                                key={posting.id}
-                                                posting={posting}
-                                                selected={
-                                                    posting.id === selectedId
-                                                }
-                                                canManage={canManage}
-                                                busy={busyId === posting.id}
-                                                now={now}
-                                                onSelect={setSelectedId}
-                                                onRevalidate={revalidate}
-                                                onMarkManual={openMarkManual}
-                                            />
-                                        ))}
-                                    </TableBody>
-                                </Table>
+                                                <TableHead>Jenis</TableHead>
+                                                <TableHead>
+                                                    Perusahaan
+                                                </TableHead>
+                                                <TableHead>
+                                                    Tanggal posting
+                                                </TableHead>
+                                                <TableHead className="text-right">
+                                                    Nilai
+                                                </TableHead>
+                                                <TableHead>Umur</TableHead>
+                                                <TableHead>Status</TableHead>
+                                                {canManage && (
+                                                    <TableHead className="w-12">
+                                                        <span className="sr-only">
+                                                            Aksi
+                                                        </span>
+                                                    </TableHead>
+                                                )}
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {postings.data.map((posting) => (
+                                                <PostingRow
+                                                    key={posting.id}
+                                                    posting={posting}
+                                                    selected={
+                                                        posting.id ===
+                                                        selectedId
+                                                    }
+                                                    canManage={canManage}
+                                                    busy={busyId === posting.id}
+                                                    now={now}
+                                                    onSelect={setSelectedId}
+                                                    onRevalidate={revalidate}
+                                                    onMarkManual={
+                                                        openMarkManual
+                                                    }
+                                                />
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </RecordListScroll>
                             </div>
                         )}
                     </CardContent>
-                    {postings.last_page > 1 && (
-                        <CardFooter className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
-                            <span>
-                                {postings.from}–{postings.to} dari{' '}
-                                {postings.total} posting
-                            </span>
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={!postings.prev_page_url}
-                                    onClick={() =>
-                                        visitPage(postings.prev_page_url)
-                                    }
-                                >
-                                    Sebelumnya
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={!postings.next_page_url}
-                                    onClick={() =>
-                                        visitPage(postings.next_page_url)
-                                    }
-                                >
-                                    Berikutnya
-                                </Button>
-                            </div>
-                        </CardFooter>
-                    )}
                 </Card>
                 {selectedId !== null && (
                     <PostingDetailCard

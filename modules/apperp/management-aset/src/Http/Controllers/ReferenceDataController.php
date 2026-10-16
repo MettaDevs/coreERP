@@ -3,13 +3,14 @@
 namespace Modules\Apperp\ManagementAset\Http\Controllers;
 
 use App\Platform\Modules\Contracts\AddressDirectory;
+use App\Platform\Modules\Contracts\IncrementalList;
+use App\Platform\Modules\Contracts\OrganizationDirectory;
+use App\Platform\Modules\Contracts\UnitOfMeasureDirectory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Modules\Apperp\ManagementAset\Models\master\KelompokHartaFiskal;
-use Modules\Apperp\ManagementAset\Services\AssetOrganizationDirectory;
-use Modules\Apperp\ManagementAset\Services\AssetUnitOfMeasureDirectory;
 use RuntimeException;
 
 final class ReferenceDataController extends Controller
@@ -27,13 +28,15 @@ final class ReferenceDataController extends Controller
         'management-aset.maintenance-checklist-templates.read',
     ];
 
-    public function unitsOfMeasure(Request $request, AssetUnitOfMeasureDirectory $units): JsonResponse
+    public function unitsOfMeasure(Request $request): JsonResponse
     {
         $held = $request->attributes->get('coreerp.permissions', []);
         abort_if(array_intersect(self::UNIT_READERS, $held) === [], 403);
         try {
-            return response()->json(['data' => collect($units->active((string) $request->attributes->get('coreerp.tenant_id')))
-                ->map(fn (array $unit): array => ['id' => $unit['id'], 'kode' => $unit['code'], 'nama' => $unit['name']])->values()]);
+            $batch = app(UnitOfMeasureDirectory::class)->lookup((string) $request->attributes->get('coreerp.tenant_id'), $request->query());
+            $batch['data'] = collect($batch['data'])->map(fn ($unit): array => ['id' => $unit->id, 'kode' => $unit->code, 'nama' => $unit->name]);
+
+            return response()->json($batch);
         } catch (RuntimeException $exception) {
             return response()->json(['error' => ['code' => 'units_of_measure_unavailable', 'message' => $exception->getMessage()]], 503);
         }
@@ -59,35 +62,22 @@ final class ReferenceDataController extends Controller
         'management-aset.lokasi-aset.read',
     ];
 
-    public function operatingUnits(Request $request, AssetOrganizationDirectory $direktori): JsonResponse
+    public function operatingUnits(Request $request): JsonResponse
     {
         $this->guardDirektori($request);
 
-        return response()->json(['data' => array_map(
-            static fn (array $unit): array => [
-                'id' => $unit['id'],
-                'kode' => $unit['nomor'] ?? '',
-                'nama' => $unit['nama'],
-                'display_label' => $unit['nomor'] === null ? $unit['nama'] : $unit['nomor'].' — '.$unit['nama'],
-            ],
-            $direktori->operatingUnits((string) $request->attributes->get('coreerp.tenant_id')),
-        )]);
+        return response()->json(app(OrganizationDirectory::class)->lookup(
+            (string) $request->attributes->get('coreerp.tenant_id'), 'operating_units', $request->query(),
+        ));
     }
 
-    public function members(Request $request, AssetOrganizationDirectory $direktori): JsonResponse
+    public function members(Request $request): JsonResponse
     {
         $this->guardDirektori($request);
 
-        return response()->json(['data' => array_map(
-            static fn (array $anggota): array => [
-                'id' => $anggota['id'],
-                'kode' => $anggota['nama'],
-                'nama' => $anggota['nama'],
-                'display_label' => $anggota['nama'],
-                'email' => $anggota['email'],
-            ],
-            $direktori->members((string) $request->attributes->get('coreerp.tenant_id')),
-        )]);
+        return response()->json(app(OrganizationDirectory::class)->lookup(
+            (string) $request->attributes->get('coreerp.tenant_id'), 'members', $request->query(),
+        ));
     }
 
     /**
@@ -104,10 +94,13 @@ final class ReferenceDataController extends Controller
         $tenantId = (string) $request->attributes->get('coreerp.tenant_id');
 
         if (($validated['unit_kerja_id'] ?? null) === null) {
-            $rows = $addresses->postalAddresses($tenantId);
+            $batch = $addresses->lookup($tenantId, $request->query());
+            $rows = collect($batch['data'])->map(fn ($row) => (array) $row)->all();
+            $nextCursor = $batch['next_cursor'];
         } else {
             $primary = $addresses->primaryOfOrganization($tenantId, $validated['unit_kerja_id']);
             $rows = $primary === null ? [] : [$primary];
+            $nextCursor = null;
         }
 
         return response()->json(['data' => array_map(
@@ -121,7 +114,7 @@ final class ReferenceDataController extends Controller
                 'display_label' => $row['alamat'] === '' ? $row['nama'] : $row['nama'].' — '.str_replace("\n", ', ', $row['alamat']),
             ],
             $rows,
-        )]);
+        ), 'next_cursor' => $nextCursor]);
     }
 
     private function guardDirektori(Request $request): void
@@ -151,10 +144,12 @@ final class ReferenceDataController extends Controller
             $query->where('aktif', filter_var($validated['aktif'], FILTER_VALIDATE_BOOL));
         }
 
-        $page = $query->orderBy('effective_from')->orderBy('label')->paginate((int) ($validated['per_page'] ?? 20));
+        $batch = IncrementalList::query($request, $query->toBase(), ['id' => 'id', 'kode' => 'template_key', 'nama' => 'label'], [], 'nama');
+        $records = KelompokHartaFiskal::hydrate($batch['data']->map(fn ($row) => (array) $row)->all());
 
         return response()->json([
-            'data' => collect($page->items())->map(fn (KelompokHartaFiskal $record): array => [
+            ...$batch,
+            'data' => $records->map(fn (KelompokHartaFiskal $record): array => [
                 'id' => $record->id,
                 'kode' => $record->template_key,
                 'nama' => $record->label,
@@ -173,12 +168,7 @@ final class ReferenceDataController extends Controller
                 'depreciable' => $record->depreciable,
                 'aktif' => $record->aktif,
             ])->values(),
-            'meta' => [
-                'current_page' => $page->currentPage(),
-                'last_page' => $page->lastPage(),
-                'per_page' => $page->perPage(),
-                'total' => $page->total(),
-            ],
+
         ]);
     }
 }

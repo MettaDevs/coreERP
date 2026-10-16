@@ -1,7 +1,7 @@
 import { router } from '@inertiajs/react';
 import { CheckCheck, ListPlus, Plus, Trash2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useWorkDate } from '@/hooks/use-work-date';
 import { ActionButton } from '@apperp/ui/action-button';
@@ -43,6 +43,7 @@ import {
 } from '../../api';
 import AssetConditionSelect from '../../master/AssetConditionSelect';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
+import { useRecordOptions } from '../../use-record-list';
 import type {
     Context,
     EditableMonitoring,
@@ -116,8 +117,7 @@ export default function MonitoringDetailPage({
     const [galat, setGalat] = useState<Record<string, string[]>>({});
     const [konfirmasiSelesai, setKonfirmasiSelesai] = useState(false);
     const [konfirmasiArsip, setKonfirmasiArsip] = useState(false);
-    const [aset, setAset] = useState<Aset[]>([]);
-    const [asetGalat, setAsetGalat] = useState('');
+    const asetGalat = '';
     const lokasi = useMasterOptions('lokasi-aset');
     const unitKerja = useMasterOptions('reference-data/unit-kerja');
     const anggota = useMasterOptions('reference-data/anggota');
@@ -127,19 +127,6 @@ export default function MonitoringDetailPage({
     const selesai = tersimpan?.status === 'selesai';
 
     // Daftar aset hanya dibutuhkan untuk menambah baris dengan tangan.
-    useEffect(() => {
-        if (readOnly) {
-            return;
-        }
-
-        api<{ data: Aset[] }>('/aset')
-            .then((result) => setAset(result.data))
-            .catch(() =>
-                setAsetGalat(
-                    'Daftar aset tidak dapat dimuat, jadi aset belum bisa ditambahkan satu per satu. Pakai Isi otomatis, atau minta akses lihat register aset.',
-                ),
-            );
-    }, [readOnly]);
 
     useEffect(() => {
         if (!monitoringId) {
@@ -460,6 +447,7 @@ export default function MonitoringDetailPage({
                                             onActivate={ubah}
                                         >
                                             <Select
+                                                {...lokasi.selectProps}
                                                 label="Lokasi aset"
                                                 required
                                                 items={lokasi.options.map(
@@ -505,6 +493,7 @@ export default function MonitoringDetailPage({
                                             onActivate={ubah}
                                         >
                                             <Select
+                                                {...unitKerja.selectProps}
                                                 label="Unit organisasi"
                                                 items={unitKerja.options.map(
                                                     optionLabel,
@@ -546,6 +535,7 @@ export default function MonitoringDetailPage({
                                             onActivate={ubah}
                                         >
                                             <Select
+                                                {...anggota.selectProps}
                                                 label="Penanggung jawab"
                                                 items={anggota.options.map(
                                                     optionLabel,
@@ -714,7 +704,6 @@ export default function MonitoringDetailPage({
                                                                 record.lokasi_aset_id ??
                                                                 ''
                                                             }
-                                                            aset={aset}
                                                             permissions={
                                                                 permissions
                                                             }
@@ -841,7 +830,6 @@ function MonitoringRow({
     index,
     readOnly,
     lokasiDokumen,
-    aset,
     permissions,
     panelRef,
     onChange,
@@ -851,12 +839,17 @@ function MonitoringRow({
     index: number;
     readOnly: boolean;
     lokasiDokumen: string;
-    aset: Aset[];
     permissions: string[];
     panelRef: RefObject<HTMLDivElement | null>;
     onChange: (patch: Partial<MonitoringLine>) => void;
     onRemove: () => void;
 }) {
+    const assetSource = useRecordOptions<Aset>(
+        '/aset',
+        (item) => (item.nama ? `${item.kode} \u00b7 ${item.nama}` : item.kode),
+        baris.aset_id,
+    );
+    const aset = assetSource.options;
     const baru = !baris.id;
     const dipilih = aset.find((item) => item.id === baris.aset_id);
     const lokasiLain =
@@ -874,6 +867,7 @@ function MonitoringRow({
             <TableCell>
                 {baru && !readOnly ? (
                     <Select
+                        {...assetSource.selectProps}
                         items={aset.map((item) =>
                             item.nama
                                 ? `${item.kode} · ${item.nama}`

@@ -9,14 +9,12 @@ export default function ServiceLifeFields({
     onChange,
     required = false,
     readOnly = false,
-    onRequestEdit,
 }: {
     value: unknown;
     frequency: unknown;
     onChange: (value: string | number) => void;
     required?: boolean;
     readOnly?: boolean;
-    onRequestEdit?: () => void;
 }) {
     const months = serviceLifeMonths(value, frequency);
     const periodMonths = monthsPerPeriod(frequency);
@@ -42,7 +40,6 @@ export default function ServiceLifeFields({
                     required={required}
                     readOnly={readOnly}
                     disabled={!periodMonths}
-                    onFocus={readOnly ? onRequestEdit : undefined}
                     value={
                         months === null ? '' : Number((months / 12).toFixed(8))
                     }
@@ -56,7 +53,6 @@ export default function ServiceLifeFields({
                     required={required}
                     readOnly={readOnly}
                     disabled={!periodMonths}
-                    onFocus={readOnly ? onRequestEdit : undefined}
                     value={months ?? ''}
                     onChange={(event) => change(event.target.value, 1)}
                 />

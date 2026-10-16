@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\DokumenSiklusAset;
 
+use App\Platform\Modules\Contracts\IncrementalList;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -48,17 +49,17 @@ class DokumenSiklusAsetController extends Controller
     {
         $this->guard($request, $type, 'read');
         $query = DokumenSiklusAset::query()->where('jenis_dokumen', $type);
-        app(OrganizationScope::class)->query($query, $request, 'legal_entity_id', 'responsible_org_unit_id');
+        $table = $query->getModel()->getTable();
+        app(OrganizationScope::class)->query($query, $request, $table.'.legal_entity_id', $table.'.responsible_org_unit_id');
 
-        $rows = $query->toBase()->latest('created_at')->get();
-        // Kode dan nama aset di samping id-nya, dibaca sekaligus untuk seluruh daftar.
-        $aset = Aset::withTrashed()->whereIn('id', $rows->pluck('aset_id')->filter()->unique()->values()->all())->toBase()->get(['id', 'kode', 'nama'])->keyBy('id');
-        foreach ($rows as $row) {
-            $row->aset_kode = $aset[$row->aset_id]->kode ?? null;
-            $row->aset_nama = $aset[$row->aset_id]->nama ?? null;
-        }
+        $list = $query->toBase();
+        $list->leftJoin('aset_tr_aset as list_asset', function ($join) use ($table): void {
+            $join->on('list_asset.id', '=', $table.'.aset_id')->on('list_asset.tenant_id', '=', $table.'.tenant_id');
+        })->select([$table.'.*', 'list_asset.kode as aset_kode', 'list_asset.nama as aset_nama']);
 
-        return response()->json(['data' => $rows]);
+        return response()->json(IncrementalList::query($request, $list, [
+            'id' => 'id', 'created_at' => 'created_at', 'kode' => 'kode', 'tanggal' => 'tanggal', 'aset' => 'aset_kode', 'nilai' => 'nilai', 'status' => 'status',
+        ], ['kode', 'aset_kode', 'aset_nama', 'keterangan', 'status'], 'created_at', ['nilai'], 'desc'));
     }
 
     public function store(Request $request, string $type, AssetNumberSequenceIssuer $numbers, AssetApprovalWorkflow $workflow): JsonResponse

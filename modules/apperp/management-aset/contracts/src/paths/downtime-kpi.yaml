@@ -3,7 +3,7 @@
   get:
     tags: [Downtime dan KPI]
     operationId: listDowntimeReasons
-    parameters: [$ref: '#/components/parameters/Search', $ref: '#/components/parameters/ActiveFilter', $ref: '#/components/parameters/Page', $ref: '#/components/parameters/PerPage']
+    parameters: [$ref: '#/components/parameters/Search', $ref: '#/components/parameters/ActiveFilter', $ref: '#/components/parameters/Cursor', $ref: '#/components/parameters/PerPage']
     responses: {'200': {description: Daftar alasan downtime, content: {application/json: {schema: {$ref: '#/components/schemas/DowntimeReasonList'}}}}}
   post:
     tags: [Downtime dan KPI]

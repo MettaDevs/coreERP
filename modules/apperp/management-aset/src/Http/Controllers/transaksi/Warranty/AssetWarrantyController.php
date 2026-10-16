@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\Warranty;
 
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\RequestContext;
 use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Modules\Contracts\VendorDirectory;
@@ -64,10 +65,13 @@ class AssetWarrantyController extends Controller
         };
 
         $tenant = $this->tenant($request);
-        $rows = $query->orderByDesc(self::TABLE.'.berlaku_sampai')->limit(500)->toBase()->get()
-            ->map(fn (stdClass $row): stdClass => $this->present($tenant, $row, $today));
+        $batch = IncrementalList::query($request, $query->toBase(), [
+            'id' => 'id', 'aset' => 'aset_kode', 'periode' => 'berlaku_sampai',
+        ], ['aset_kode', 'aset_nama', 'nomor_referensi', 'catatan'], 'periode', [], 'desc');
+        $vendors = app(VendorDirectory::class)->findMany($tenant, array_values($batch['data']->pluck('vendor_id')->filter()->map(strval(...))->unique()->all()));
+        $batch['data'] = $batch['data']->map(fn (stdClass $row): stdClass => $this->present($tenant, $row, $today, $vendors));
 
-        return response()->json(['data' => $rows]);
+        return response()->json($batch);
     }
 
     public function store(Request $request): JsonResponse
@@ -149,7 +153,7 @@ class AssetWarrantyController extends Controller
 
         app(OrganizationScope::class)->require($request, $query['legal_entity_id'], null);
 
-        return response()->json(['data' => app(VendorDirectory::class)->active($this->tenant($request), $query['legal_entity_id'], (string) ($query['q'] ?? ''))]);
+        return response()->json(app(VendorDirectory::class)->lookup($this->tenant($request), $query['legal_entity_id'], $request->query()));
     }
 
     /**
@@ -167,52 +171,35 @@ class AssetWarrantyController extends Controller
         $today = $this->today();
         $until = Carbon::parse($today)->addDays($days)->toDateString();
         $tenant = $this->tenant($request);
-        $items = [];
-
+        $parts = [];
         if ($warranties) {
-            $rows = $this->joined(AssetWarranty::query(), $request)
-                ->whereBetween(self::TABLE.'.berlaku_sampai', [$today, $until])
-                ->toBase()->get();
-            foreach ($rows as $row) {
-                $row = $this->present($tenant, $row, $today);
-                $items[] = [
-                    'jenis' => 'garansi',
-                    'id' => $row->id,
-                    'referensi' => $row->nomor_referensi,
-                    'aset_id' => $row->aset_id,
-                    'aset_kode' => $row->aset_kode,
-                    'aset_nama' => $row->aset_nama,
-                    'jumlah_aset' => 1,
-                    'vendor_nama' => $row->vendor['name'] ?? null,
-                    'berlaku_sampai' => $row->berlaku_sampai,
-                    'sisa_hari' => $row->sisa_hari,
-                ];
-            }
+            $parts[] = $this->joined(AssetWarranty::query(), $request)
+                ->whereBetween(self::TABLE.'.berlaku_sampai', [$today, $until])->toBase()
+                ->select([self::TABLE.'.id', self::TABLE.'.nomor_referensi as referensi', self::TABLE.'.aset_id', 'aset_tr_aset.kode as aset_kode', 'aset_tr_aset.nama as aset_nama', self::TABLE.'.vendor_id', self::TABLE.'.berlaku_sampai'])
+                ->selectRaw("'garansi' AS jenis, 1::bigint AS jumlah_aset");
         }
-
         if ($contracts) {
             $query = ServiceContract::query()->whereBetween('berlaku_sampai', [$today, $until]);
             app(OrganizationScope::class)->legalEntityQuery($query, $request, 'aset_tr_kontrak_servis.legal_entity_id');
-            foreach ($query->get() as $contract) {
-                $vendor = app(VendorDirectory::class)->find($tenant, $contract->vendor_id);
-                $items[] = [
-                    'jenis' => 'kontrak_servis',
-                    'id' => $contract->id,
-                    'referensi' => $contract->kode.' · '.$contract->nomor_kontrak,
-                    'aset_id' => null,
-                    'aset_kode' => null,
-                    'aset_nama' => null,
-                    'jumlah_aset' => ServiceContractLine::query()->where('kontrak_servis_id', $contract->id)->count(),
-                    'vendor_nama' => $vendor['name'] ?? null,
-                    'berlaku_sampai' => $contract->berlaku_sampai->toDateString(),
-                    'sisa_hari' => (int) Carbon::parse($today)->diffInDays($contract->berlaku_sampai),
-                ];
-            }
+            $parts[] = $query->select(['aset_tr_kontrak_servis.id', 'aset_tr_kontrak_servis.vendor_id', 'aset_tr_kontrak_servis.berlaku_sampai'])
+                ->selectRaw("kode || ' · ' || COALESCE(nomor_kontrak, '') AS referensi, NULL::text AS aset_id, NULL::text AS aset_kode, NULL::text AS aset_nama, 'kontrak_servis' AS jenis")
+                ->selectSub(ServiceContractLine::query()->whereColumn((new ServiceContractLine)->qualifyColumn('kontrak_servis_id'), 'aset_tr_kontrak_servis.id')->selectRaw('count(*)')->toBase(), 'jumlah_aset')->toBase();
         }
+        // Susunan kolom union harus sama meski kedua model memiliki payload berbeda.
+        $parts = array_map(fn ($part) => $part->newQuery()->fromSub($part, 'expiry_part')->select(['id', 'referensi', 'aset_id', 'aset_kode', 'aset_nama', 'vendor_id', 'berlaku_sampai', 'jenis', 'jumlah_aset']), $parts);
+        $union = array_shift($parts);
+        foreach ($parts as $part) {
+            $union->unionAll($part);
+        }
+        $list = DB::query()->fromSub($union, 'expiry')->select('expiry.*')
+            ->selectRaw("COALESCE(referensi, '') || ':' || jenis || ':' || id AS record_key")
+            ->selectRaw('GREATEST(0, berlaku_sampai::date - ?::date) AS sisa_hari', [$today]);
+        app(VendorDirectory::class)->addNames($list, $tenant, ['vendor_nama' => 'expiry.vendor_id']);
+        $batch = IncrementalList::query($request, $list, [
+            'id' => 'id', 'sampai' => 'berlaku_sampai', 'sisa' => 'sisa_hari',
+        ], ['referensi', 'aset_kode', 'aset_nama', 'vendor_nama'], 'sampai', ['sisa_hari'], identity: 'record_key');
 
-        usort($items, static fn (array $a, array $b): int => [$a['berlaku_sampai'], $a['referensi']] <=> [$b['berlaku_sampai'], $b['referensi']]);
-
-        return response()->json(['data' => $items, 'meta' => ['hari' => $days, 'sampai' => $until]]);
+        return response()->json([...$batch, 'meta' => ['hari' => $days, 'sampai' => $until]]);
     }
 
     /**
@@ -339,9 +326,10 @@ class AssetWarrantyController extends Controller
         return $query;
     }
 
-    private function present(string $tenant, stdClass $row, string $today): stdClass
+    /** @param array<string, array{id: string, number: string, name: string, tax_number: ?string, status: string, legal_entity_id: string}>|null $vendors */
+    private function present(string $tenant, stdClass $row, string $today, ?array $vendors = null): stdClass
     {
-        $vendor = $row->vendor_id === null ? null : app(VendorDirectory::class)->find($tenant, (string) $row->vendor_id);
+        $vendor = $vendors !== null ? ($vendors[$row->vendor_id] ?? null) : ($row->vendor_id === null ? null : app(VendorDirectory::class)->find($tenant, (string) $row->vendor_id));
         $row->vendor = $vendor === null ? null : ['id' => $vendor['id'], 'number' => $vendor['number'], 'name' => $vendor['name'], 'status' => $vendor['status']];
         $row->jenis_garansi_label = AssetWarranty::TYPES[$row->jenis_garansi] ?? $row->jenis_garansi;
         $row->berlaku = $row->berlaku_mulai <= $today && $row->berlaku_sampai >= $today;

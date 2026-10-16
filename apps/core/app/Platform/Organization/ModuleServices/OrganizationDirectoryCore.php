@@ -4,8 +4,13 @@ declare(strict_types=1);
 
 namespace App\Platform\Organization\ModuleServices;
 
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\OrganizationDirectory;
 use App\Platform\Organization\Support\BusinessUnitResolver;
+use Illuminate\Contracts\Database\Query\Expression;
+use Illuminate\Database\Grammar;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -20,7 +25,52 @@ use Illuminate\Support\Facades\DB;
  */
 final class OrganizationDirectoryCore implements OrganizationDirectory
 {
+    public function lookup(string $tenantId, string $kind, array $input): array
+    {
+        if ($kind === 'members') {
+            $query = DB::table('tenant_memberships as memberships')
+                ->join('users', 'users.id', '=', 'memberships.user_id')
+                ->where('memberships.tenant_id', $tenantId)->where('memberships.status', 'active')
+                ->select(['users.id', 'users.name as kode', 'users.name as nama', 'users.name as display_label', 'users.email']);
+        } else {
+            abort_unless($kind === 'operating_units', 422);
+            $query = DB::table('organizations')->leftJoin('operating_units as unit', 'unit.organization_id', '=', 'organizations.id')
+                ->where('organizations.tenant_id', $tenantId)->where('organizations.classification', 'operating_unit')
+                ->select(['organizations.id', 'organizations.name as nama', 'unit.number as kode'])
+                ->selectRaw("CASE WHEN unit.number IS NULL THEN organizations.name ELSE unit.number || ' — ' || organizations.name END AS display_label");
+        }
+
+        return IncrementalList::query(Request::create('/lookup', 'GET', $input), $query, ['id' => 'id', 'kode' => 'kode', 'nama' => 'nama'], ['kode', 'nama'], 'nama');
+    }
+
     public function __construct(private readonly BusinessUnitResolver $businessUnits) {}
+
+    public function addNames(Builder $query, string $tenantId, array $units = [], array $members = []): void
+    {
+        foreach ($units as $alias => $column) {
+            $query->selectSub(DB::table('organizations as directory_org')->where('directory_org.tenant_id', $tenantId)
+                ->whereColumn('directory_org.id', $column)->select('directory_org.name')->limit(1), $alias);
+        }
+        foreach ($members as $alias => $column) {
+            $query->selectSub(DB::table('tenant_memberships as directory_member')->join('users as directory_user', 'directory_user.id', '=', 'directory_member.user_id')
+                ->where('directory_member.tenant_id', $tenantId)->where('directory_member.status', 'active')
+                ->where(self::textColumn($column), '=', DB::raw('CAST(directory_user.id AS TEXT)'))->select('directory_user.name')->limit(1), $alias);
+        }
+    }
+
+    /** ID pengguna pada dokumen lama berupa teks, sedangkan dokumen lain memakai angka. */
+    private static function textColumn(string $column): Expression
+    {
+        return new class($column) implements Expression
+        {
+            public function __construct(private readonly string $column) {}
+
+            public function getValue(Grammar $grammar): string
+            {
+                return 'CAST('.$grammar->wrap($this->column).' AS TEXT)';
+            }
+        };
+    }
 
     public function members(string $tenantId): array
     {

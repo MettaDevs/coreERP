@@ -10,6 +10,7 @@ use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class OrganizationHierarchyTest extends TestCase
@@ -29,6 +30,47 @@ class OrganizationHierarchyTest extends TestCase
             'email' => 'owner@metta.test',
             'password' => 'password',
         ]);
+    }
+
+    public function test_directory_batches_searches_all_records_and_keeps_classification_scope(): void
+    {
+        $membership = $this->owner->memberships()->firstOrFail();
+        $units = collect(range(1, 45))->map(function (int $number) use ($membership): Organization {
+            $organization = Organization::create([
+                'tenant_id' => $membership->tenant_id, 'classification' => 'operating_unit',
+                'name' => sprintf('Unit %03d', $number), 'status' => 'active',
+            ]);
+            $organization->operatingUnit()->create([
+                'tenant_id' => $membership->tenant_id, 'type' => 'department', 'number' => sprintf('UNIT-%03d', $number),
+            ]);
+
+            return $organization;
+        });
+        $this->actingAs($this->owner);
+        $first = $this->getJson('/settings/operating-units?incremental=1')->assertOk()->assertJsonCount(40, 'data');
+        $second = $this->getJson('/settings/operating-units?'.http_build_query(['incremental' => 1, 'cursor' => $first->json('next_cursor')]))
+            ->assertOk()->assertJsonCount(5, 'data')->assertJsonPath('next_cursor', null);
+        $this->assertCount(45, array_unique([...array_column($first->json('data'), 'id'), ...array_column($second->json('data'), 'id')]));
+        $this->getJson('/settings/operating-units?incremental=1&q=UNIT-045')->assertOk()
+            ->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $units->last()->id);
+        $this->getJson('/settings/legal-entities?incremental=1')->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson('/settings/operating-units?incremental=1&sort=tenant_id')->assertUnprocessable();
+        $this->get('/settings/operating-units')->assertInertia(fn ($page) => $page->has('organizations', 0));
+    }
+
+    public function test_hierarchy_lookup_excludes_placed_organizations_and_keeps_tenant_scope(): void
+    {
+        $company = $this->createOrganization(['classification' => 'legal_entity', 'name' => 'Perusahaan', 'company_code' => 'CO', 'country_code' => 'ID']);
+        $unit = $this->createOrganization(['classification' => 'operating_unit', 'name' => 'Unit', 'operating_unit_type' => 'department']);
+        $this->post('/settings/organization/hierarchies', [
+            'name' => 'Struktur', 'purpose_codes' => ['management'], 'root_organization_id' => $company->id, 'effective_from' => now()->toDateString(),
+        ])->assertRedirect();
+        $version = OrganizationHierarchyVersion::query()->firstOrFail();
+        $this->getJson('/settings/organization-hierarchies?'.http_build_query(['incremental' => 1, 'resource' => 'organizations', 'exclude_version_id' => $version->id]))
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $unit->id);
+        $this->getJson('/settings/organization-hierarchies?incremental=1&record_id='.$version->hierarchy_id)
+            ->assertOk()->assertJsonCount(1, 'data.0.versions')->assertJsonCount(1, 'data.0.versions.0.nodes');
+        $this->getJson('/settings/organization-hierarchies?incremental=1&record_id='.(string) Str::ulid())->assertNotFound();
     }
 
     public function test_owner_builds_directory_then_purpose_scoped_versioned_hierarchy(): void

@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PemeliharaanAset;
 
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -81,17 +82,20 @@ class PelaksanaanController extends Controller
             ->whereIn('wo.status', [WorkOrderStatus::DIJADWALKAN, WorkOrderStatus::DIKERJAKAN]);
         app(OrganizationScope::class)->query($query, $request, 'wo.legal_entity_id', 'wo.responsible_org_unit_id');
 
-        return response()->json(['data' => $query
-            ->orderByRaw('coalesce('.self::TABEL_BARIS.'.dijadwalkan_mulai, wo.dijadwalkan_mulai) asc')
-            ->toBase()
-            ->get([
-                self::TABEL_BARIS.'.id', self::TABEL_BARIS.'.pemeliharaan_aset_id', self::TABEL_BARIS.'.line_number', self::TABEL_BARIS.'.hasil',
-                self::TABEL_BARIS.'.dijadwalkan_mulai', self::TABEL_BARIS.'.dijadwalkan_selesai', self::TABEL_BARIS.'.aktual_jam',
-                'wo.kode as work_order_kode', 'wo.status', 'wo.keterangan',
-                'aset.kode as aset_kode',
-                'pekerjaan.nama as job_type_nama',
-                'lokasi.nama as lokasi_nama',
-            ])]);
+        $list = $query->toBase()->select([
+            self::TABEL_BARIS.'.id', self::TABEL_BARIS.'.pemeliharaan_aset_id', self::TABEL_BARIS.'.line_number', self::TABEL_BARIS.'.hasil',
+            self::TABEL_BARIS.'.dijadwalkan_mulai', self::TABEL_BARIS.'.dijadwalkan_selesai', self::TABEL_BARIS.'.aktual_jam',
+            'wo.kode as work_order_kode', 'wo.status', 'wo.keterangan',
+            'aset.kode as aset_kode',
+            'pekerjaan.nama as job_type_nama',
+            'lokasi.nama as lokasi_nama',
+        ]);
+
+        return response()->json(IncrementalList::query($request, $list, [
+            'id' => 'id', 'work-order' => 'work_order_kode', 'aset' => 'aset_kode',
+            'pekerjaan' => 'job_type_nama', 'lokasi' => 'lokasi_nama',
+            'jadwal' => 'dijadwalkan_mulai', 'status' => 'status',
+        ], ['work_order_kode', 'aset_kode', 'job_type_nama', 'lokasi_nama', 'keterangan'], 'jadwal'));
     }
 
     /** Memindahkan status work order dan mencatat perpindahannya. */

@@ -4,7 +4,7 @@
   get:
     tags: [Asuransi aset]
     operationId: listInsuranceTypes
-    parameters: [$ref: '#/components/parameters/Search', $ref: '#/components/parameters/ActiveFilter', $ref: '#/components/parameters/Page', $ref: '#/components/parameters/PerPage']
+    parameters: [$ref: '#/components/parameters/Search', $ref: '#/components/parameters/ActiveFilter', $ref: '#/components/parameters/Cursor', $ref: '#/components/parameters/PerPage']
     responses: {'200': {description: Daftar jenis asuransi, content: {application/json: {schema: {$ref: '#/components/schemas/InsuranceTypeList'}}}}}
   post:
     tags: [Asuransi aset]

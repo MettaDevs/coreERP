@@ -1,6 +1,6 @@
 import { CircleAlert } from 'lucide-react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
     AlertDialog,
@@ -30,6 +30,7 @@ import {
     FieldGroup,
     FieldHint,
 } from '@apperp/ui/field';
+import { IncrementalListStatus } from '@apperp/ui/incremental-list-status';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
 import {
@@ -39,7 +40,10 @@ import {
     SheetHeader,
     SheetTitle,
 } from '@apperp/ui/sheet';
-import { api, ApiError, errorMessage, toastSaveError } from '../api';
+import type { ListLoader } from '@apperp/ui/use-incremental-list';
+import { useIncrementalList } from '@apperp/ui/use-incremental-list';
+import { api, ApiError, toastSaveError } from '../api';
+import { recordListParams, useRecordOptions } from '../use-record-list';
 
 type AccountColumn = { column: string; label: string; required: boolean };
 
@@ -123,53 +127,60 @@ export default function AssetPostingGroupPage({
         permissions.includes(
             `management-aset.fixed-asset-posting-profiles.${action}`,
         );
-    const [matrix, setMatrix] = useState<Matrix | null>(null);
-    const [loadError, setLoadError] = useState<string | null>(null);
+    const [metadata, setMetadata] = useState<Matrix | null>(null);
+    const [search, setSearch] = useState('');
     const [editing, setEditing] = useState<Group | null>(null);
-    // Effect satu-satunya pemilik pengambilan data; pemuatan ulang sesudah simpan dinyatakan
-    // dengan menaikkan penanda ini.
-    const [versiMuat, setVersiMuat] = useState(0);
+    const loadItems = useCallback<ListLoader<Group>>(async (request) => {
+        const response = await api<{
+            data: Matrix;
+            next_cursor: string | null;
+        }>(`/posting-group-aset?${recordListParams(request)}`, {
+            signal: request.signal,
+        });
 
-    useEffect(() => {
-        let dilepas = false;
+        if (!request.signal.aborted) {
+            setMetadata((current) => ({
+                ...response.data,
+                account_details: request.cursor
+                    ? {
+                          ...current?.account_details,
+                          ...response.data.account_details,
+                      }
+                    : response.data.account_details,
+            }));
+        }
 
-        const muat = async () => {
-            try {
-                const response = await api<{ data: Matrix }>(
-                    '/posting-group-aset',
-                );
-
-                if (dilepas) {
-                    return;
-                }
-
-                setMatrix(response.data);
-                setLoadError(null);
-            } catch (caught) {
-                if (dilepas) {
-                    return;
-                }
-
-                setLoadError(
-                    errorMessage(
-                        caught,
-                        'Setup akun/COA aset belum dapat dimuat.',
-                    ),
-                );
-            }
+        return {
+            items: response.data.groups,
+            nextCursor: response.next_cursor,
         };
-
-        void muat();
-
-        return () => {
-            dilepas = true;
-        };
-    }, [versiMuat]);
+    }, []);
+    const list = useIncrementalList({
+        loadItems,
+        query: search,
+        getKey: (group: Group) => group.id,
+    });
+    const matrix = metadata
+        ? {
+              ...metadata,
+              groups: list.items,
+              groups_needing_attention: list.items.filter(
+                  (group) =>
+                      group.missing.length || group.unusable_accounts.length,
+              ).length,
+          }
+        : null;
 
     return (
         <Card className="flex h-full min-h-0 flex-col overflow-hidden rounded-none border-0 shadow-none">
             <CardHeader className="shrink-0 border-b px-5 py-4">
                 <CardTitle>Setup Akun/COA Aset</CardTitle>
+                <Input
+                    aria-label="Cari group aset"
+                    placeholder="Cari kode atau nama group"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                />
                 <p className="text-muted-foreground mt-1 text-sm">
                     Akun jurnal untuk setiap group aset. Posting memakai baris
                     yang tanggal berlakunya paling akhir, tetapi tidak melewati
@@ -177,30 +188,44 @@ export default function AssetPostingGroupPage({
                 </p>
             </CardHeader>
             <CardContent className="flex min-h-0 flex-1 flex-col gap-4 px-5 py-4">
-                {loadError && <FieldError>{loadError}</FieldError>}
-                {matrix && matrix.groups.length === 0 && (
-                    <Empty>
-                        <EmptyHeader>
-                            <EmptyTitle>Belum ada group aset</EmptyTitle>
-                            <EmptyDescription>
-                                Buat group aset lebih dulu di Master data ›
-                                Group aset, lalu petakan akunnya di sini.
-                            </EmptyDescription>
-                        </EmptyHeader>
-                    </Empty>
-                )}
-                {matrix && matrix.groups.length > 0 && (
-                    <>
-                        <div className="shrink-0">
-                            <Summary matrix={matrix} />
-                        </div>
-                        <PostingMatrix
-                            matrix={matrix}
-                            canEdit={can('create') || can('update')}
-                            onOpen={setEditing}
-                        />
-                    </>
-                )}
+                {!matrix && <IncrementalListStatus state={list} />}
+                {matrix &&
+                    matrix.groups.length === 0 &&
+                    !list.loading &&
+                    !list.error && (
+                        <Empty>
+                            <EmptyHeader>
+                                <EmptyTitle>
+                                    {search
+                                        ? 'Group aset tidak ditemukan'
+                                        : 'Belum ada group aset'}
+                                </EmptyTitle>
+                                <EmptyDescription>
+                                    Buat group aset lebih dulu di Master data ›
+                                    Group aset, lalu petakan akunnya di sini.
+                                </EmptyDescription>
+                            </EmptyHeader>
+                        </Empty>
+                    )}
+                {matrix &&
+                    (matrix.groups.length > 0 ||
+                        list.loading ||
+                        list.error) && (
+                        <>
+                            <div className="shrink-0">
+                                <Summary
+                                    matrix={matrix}
+                                    hasMore={list.hasMore}
+                                />
+                            </div>
+                            <PostingMatrix
+                                matrix={matrix}
+                                list={list}
+                                canEdit={can('create') || can('update')}
+                                onOpen={setEditing}
+                            />
+                        </>
+                    )}
             </CardContent>
             {editing && matrix && (
                 <PostingGroupSheet
@@ -210,14 +235,14 @@ export default function AssetPostingGroupPage({
                     canUpdate={can('update')}
                     canArchive={can('archive')}
                     onClose={() => setEditing(null)}
-                    onSaved={() => setVersiMuat((versi) => versi + 1)}
+                    onSaved={list.reload}
                 />
             )}
         </Card>
     );
 }
 
-function Summary({ matrix }: { matrix: Matrix }) {
+function Summary({ matrix, hasMore }: { matrix: Matrix; hasMore: boolean }) {
     const required = matrix.accounts
         .filter((account) => account.required)
         .map((account) => account.label.toLowerCase());
@@ -225,7 +250,9 @@ function Summary({ matrix }: { matrix: Matrix }) {
     if (matrix.groups_needing_attention === 0) {
         return (
             <p className="text-muted-foreground text-sm">
-                Semua group sudah punya akun wajib yang berlaku hari ini.
+                {hasMore
+                    ? 'Group yang sudah tampil memiliki akun wajib yang berlaku hari ini. Geser daftar untuk memeriksa group lainnya.'
+                    : 'Semua group sudah punya akun wajib yang berlaku hari ini.'}
             </p>
         );
     }
@@ -237,7 +264,7 @@ function Summary({ matrix }: { matrix: Matrix }) {
         >
             <p className="font-medium">
                 {matrix.groups_needing_attention} dari {matrix.groups.length}{' '}
-                group perlu dibenahi.
+                group yang sudah tampil perlu dibenahi.
             </p>
             <p className="mt-1">
                 Sel merah menandai akun wajib ({required.join(', ')}) yang masih
@@ -250,10 +277,12 @@ function Summary({ matrix }: { matrix: Matrix }) {
 
 function PostingMatrix({
     matrix,
+    list,
     canEdit,
     onOpen,
 }: {
     matrix: Matrix;
+    list: ReturnType<typeof useIncrementalList<Group>>;
     canEdit: boolean;
     onOpen: (group: Group) => void;
 }) {
@@ -325,6 +354,9 @@ function PostingMatrix({
             className="min-h-0 flex-1"
             columns={columns}
             data={matrix.groups}
+            incremental={list}
+            sort={list.sort}
+            onSortChange={list.onSortChange}
             getRowKey={(group) => group.id}
             getRowLabel={(group) => `${group.kode} — ${group.nama}`}
             actions={[
@@ -481,78 +513,19 @@ function RowEditor({
             ]),
         ),
     );
-    const [known, setKnown] = useState<Record<string, Account>>(
-        matrix.account_details,
+    const accountSource = useRecordOptions<Account>(
+        editable ? '/posting-group-aset/akun' : null,
+        accountLabel,
+        Object.values(values).filter((id): id is string => id !== null),
     );
-    const [results, setResults] = useState<Account[]>([]);
+    const results = accountSource.options;
+    const known = {
+        ...matrix.account_details,
+        ...Object.fromEntries(results.map((account) => [account.id, account])),
+    };
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
     const [archiving, setArchiving] = useState(false);
-    const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    const terima = (accounts: Account[]) => {
-        setResults(accounts);
-        setKnown((current) => ({
-            ...current,
-            ...Object.fromEntries(
-                accounts.map((account) => [account.id, account]),
-            ),
-        }));
-    };
-
-    // Pilihan awal pemilih akun, sebelum pengguna mengetik apa pun.
-    useEffect(() => {
-        if (!editable) {
-            return;
-        }
-
-        let dilepas = false;
-
-        const muat = async () => {
-            try {
-                const response = await api<{ data: Account[] }>(
-                    '/posting-group-aset/akun',
-                );
-
-                if (!dilepas) {
-                    setResults(response.data);
-                    setKnown((current) => ({
-                        ...current,
-                        ...Object.fromEntries(
-                            response.data.map((account) => [
-                                account.id,
-                                account,
-                            ]),
-                        ),
-                    }));
-                }
-            } catch {
-                // Pemilih tetap dapat dipakai lewat pencarian.
-            }
-        };
-
-        void muat();
-
-        return () => {
-            dilepas = true;
-        };
-    }, [editable]);
-
-    // Satu permintaan setelah pengguna berhenti mengetik, bukan satu per huruf.
-    const cariNanti = (query: string) => {
-        if (searchTimer.current) {
-            clearTimeout(searchTimer.current);
-        }
-
-        searchTimer.current = setTimeout(() => {
-            api<{ data: Account[] }>(
-                `/posting-group-aset/akun?q=${encodeURIComponent(query)}`,
-            )
-                .then((response) => terima(response.data))
-                .catch(() => setResults([]));
-        }, 250);
-    };
-
     async function save() {
         const date = row ? row.effective_from : effectiveFrom;
 
@@ -656,7 +629,7 @@ function RowEditor({
                             disabled={!editable}
                             error={errors[column.column]}
                             portal={portal}
-                            onSearch={cariNanti}
+                            source={accountSource}
                             onChange={(next) =>
                                 setValues((current) => ({
                                     ...current,
@@ -847,7 +820,7 @@ function AccountField({
     disabled,
     error,
     portal,
-    onSearch,
+    source,
     onChange,
 }: {
     column: AccountColumn;
@@ -857,7 +830,7 @@ function AccountField({
     disabled: boolean;
     error?: string;
     portal: RefObject<HTMLDivElement | null>;
-    onSearch: (query: string) => void;
+    source: ReturnType<typeof useRecordOptions<Account>>;
     onChange: (next: string | null) => void;
 }) {
     const items = useMemo(() => {
@@ -891,7 +864,7 @@ function AccountField({
                             current
                                 ? accountLabel(current)
                                 : value
-                                  ? value
+                                  ? 'Akun tidak tersedia'
                                   : 'Tidak dipetakan'
                         }
                         disabled
@@ -906,6 +879,7 @@ function AccountField({
             {withAccountHint(
                 column,
                 <Select
+                    {...source.selectProps}
                     label={column.label}
                     required={column.required}
                     items={items}
@@ -914,7 +888,6 @@ function AccountField({
                     searchPlaceholder="Cari nomor atau nama akun"
                     emptyMessage="Akun tidak ditemukan."
                     portalContainer={portal}
-                    onSearchChange={onSearch}
                     onValueChange={(next) =>
                         onChange(next === null || next === NONE ? null : next)
                     }

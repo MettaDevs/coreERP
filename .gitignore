@@ -35,3 +35,4 @@ docs/.vitepress/cache/
 # meninggalkan berkas yang ikut ter-commit.
 apps/core/resources/penanda-kendali.txt
 docs/references/Screenshot
+/artifacts

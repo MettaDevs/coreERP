@@ -136,7 +136,7 @@ class MasterDataAsetTest extends TestCase
 
         $this->request($resource, 'delete', '/api/modules/management-aset/v1/'.$resource.'/'.$id, ['version' => $this->versi($resource, $id)])->assertNoContent();
         $this->assertSoftDeleted($table, ['id' => $id, 'tenant_id' => $this->tenantId]);
-        $this->request($resource, 'get', '/api/modules/management-aset/v1/'.$resource)->assertOk()->assertJsonPath('meta.total', 0);
+        $this->request($resource, 'get', '/api/modules/management-aset/v1/'.$resource)->assertOk()->assertJsonCount(0, 'data');
     }
 
     public function test_master_sebab_dapat_meminta_keterangan_saat_dipilih(): void
@@ -199,20 +199,20 @@ class MasterDataAsetTest extends TestCase
             'jenis_aset_id' => $classification['jenis-aset'],
         ])->assertCreated();
 
-        $this->request('model-aset', 'get', '/api/modules/management-aset/v1/model-aset')->assertOk()->assertJsonPath('meta.total', 3);
+        $this->request('model-aset', 'get', '/api/modules/management-aset/v1/model-aset')->assertOk()->assertJsonCount(3, 'data');
 
         $this->request('model-aset', 'get', '/api/modules/management-aset/v1/model-aset?pabrikan_aset_id='.$classification['pabrikan-aset'])
             ->assertOk()
-            ->assertJsonPath('meta.total', 2);
+            ->assertJsonCount(2, 'data');
 
         $this->request('model-aset', 'get', '/api/modules/management-aset/v1/model-aset?jenis_aset_id='.$classification['jenis-aset'])
             ->assertOk()
-            ->assertJsonPath('meta.total', 2);
+            ->assertJsonCount(2, 'data');
 
         // Kedua filter dikirim bersamaan; server menerapkan keduanya, bukan salah satu.
         $this->request('model-aset', 'get', '/api/modules/management-aset/v1/model-aset?pabrikan_aset_id='.$classification['pabrikan-aset'].'&jenis_aset_id='.$jenisLain)
             ->assertOk()
-            ->assertJsonPath('meta.total', 1)
+            ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', $modelJenisLain);
     }
 
@@ -381,7 +381,7 @@ class MasterDataAsetTest extends TestCase
             ->assertJsonPath('data.0.id', $reference)
             ->assertJsonPath('data.0.display_label', 'Kelompok uji')
             ->assertJsonPath('data.0.effective_from', '2023-07-17')
-            ->assertJsonPath('meta.total', 1);
+            ->assertJsonCount(1, 'data');
     }
 
     public function test_group_aset_menyimpan_dan_menyajikan_field_finansialnya(): void
@@ -489,7 +489,7 @@ class MasterDataAsetTest extends TestCase
 
         $this->request('kondisi-aset', 'get', '/api/modules/management-aset/v1/kondisi-aset')
             ->assertOk()
-            ->assertJsonPath('meta.total', 1)
+            ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.nama', 'Baik');
         $this->request('kondisi-aset', 'get', '/api/modules/management-aset/v1/kondisi-aset/'.$foreign)->assertNotFound();
     }
@@ -530,8 +530,8 @@ class MasterDataAsetTest extends TestCase
         $this->createRecord('kondisi-aset', ['nama' => 'Rusak', 'aktif' => false])->assertCreated();
 
         // `?aktif=` kosong berarti tanpa filter, bukan "hanya yang tidak aktif".
-        $this->request('kondisi-aset', 'get', '/api/modules/management-aset/v1/kondisi-aset?aktif=')->assertOk()->assertJsonPath('meta.total', 2);
-        $this->request('kondisi-aset', 'get', '/api/modules/management-aset/v1/kondisi-aset?aktif=false')->assertOk()->assertJsonPath('meta.total', 1);
+        $this->request('kondisi-aset', 'get', '/api/modules/management-aset/v1/kondisi-aset?aktif=')->assertOk()->assertJsonCount(2, 'data');
+        $this->request('kondisi-aset', 'get', '/api/modules/management-aset/v1/kondisi-aset?aktif=false')->assertOk()->assertJsonCount(1, 'data');
     }
 
     public function test_pencarian_angka_nol_tetap_dipakai_sebagai_kata_kunci(): void
@@ -548,7 +548,7 @@ class MasterDataAsetTest extends TestCase
 
         $this->request('pabrikan-aset', 'get', '/api/modules/management-aset/v1/pabrikan-aset?q=zzz')
             ->assertOk()
-            ->assertJsonPath('meta.total', 0);
+            ->assertJsonCount(0, 'data');
 
         $ditemukan = $this->request('pabrikan-aset', 'get', '/api/modules/management-aset/v1/pabrikan-aset?q=Merek 0')
             ->assertOk()

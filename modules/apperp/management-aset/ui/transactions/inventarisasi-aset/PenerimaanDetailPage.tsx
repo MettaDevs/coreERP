@@ -140,16 +140,52 @@ export default function PenerimaanDetailPage({
         data: PratinjauPosting | null;
     } | null>(null);
 
-    const lokasi = useMasterOptions('lokasi-aset');
-    const grup = useMasterOptions('group-aset');
-    const jenis = useMasterOptions('jenis-aset');
-    const kondisi = useMasterOptions('kondisi-aset');
-    const pabrikan = useMasterOptions('pabrikan-aset');
-    const model = useMasterOptions('model-aset');
+    const lokasi = useMasterOptions(
+        'lokasi-aset',
+        '',
+        record.lokasi_aset_id ?? '',
+    );
+    const grup = useMasterOptions(
+        'group-aset',
+        '',
+        record.details.map((row) => row.group_aset_id).filter(Boolean),
+    );
+    const jenis = useMasterOptions(
+        'jenis-aset',
+        '',
+        record.details.map((row) => row.jenis_aset_id).filter(Boolean),
+    );
+    const kondisi = useMasterOptions(
+        'kondisi-aset',
+        '',
+        record.details.map((row) => row.kondisi_aset_id).filter(Boolean),
+    );
+    const pabrikan = useMasterOptions(
+        'pabrikan-aset',
+        '',
+        record.details.map((row) => row.pabrikan_aset_id).filter(Boolean),
+    );
+    const model = useMasterOptions(
+        'model-aset',
+        '',
+        record.details.map((row) => row.model_aset_id).filter(Boolean),
+    );
     // Unit kerja dan orang milik Core, dibaca lewat endpoint referensi module: tidak ada
     // pengguna yang mengenali unitnya atau rekannya dari ULID.
-    const unitKerja = useMasterOptions('reference-data/unit-kerja');
-    const anggota = useMasterOptions('reference-data/anggota');
+    const unitKerja = useMasterOptions(
+        'reference-data/unit-kerja',
+        '',
+        [record.responsible_org_unit_id, record.receiving_org_unit_id].filter(
+            (id): id is string => Boolean(id),
+        ),
+    );
+    const anggota = useMasterOptions(
+        'reference-data/anggota',
+        '',
+        [record.diterima_oleh_user_id, record.penanggung_jawab_user_id].filter(
+            (id): id is string => Boolean(id),
+        ),
+    );
     const panelRef = useRef<HTMLDivElement>(null);
     // Saldo awal aset lama (area 10): tanpa vendor dan PPN, dengan akumulasi per buku.
     const saldoAwal = record.cara_perolehan === 'saldo_awal';
@@ -572,6 +608,7 @@ export default function PenerimaanDetailPage({
         label: string,
         sumber: {
             options: MasterOption[];
+            selectProps?: ReturnType<typeof useMasterOptions>['selectProps'];
             error?: string | null;
             loading?: boolean;
             reload?: () => void;
@@ -589,6 +626,7 @@ export default function PenerimaanDetailPage({
         >
             <div>
                 <Select
+                    {...sumber.selectProps}
                     label={label}
                     required={opsi.required}
                     items={sumber.options.map(optionLabel)}

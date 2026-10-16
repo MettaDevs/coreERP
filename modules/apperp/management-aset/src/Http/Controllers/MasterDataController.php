@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers;
 
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\NumberSequenceIssuer;
 use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Database\Eloquent\Builder;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Exists;
 use Illuminate\Validation\ValidationException;
+use LogicException;
 use Modules\Apperp\ManagementAset\Models\master\BukuPenyusutan;
 use Modules\Apperp\ManagementAset\Models\master\GroupAset;
 use Modules\Apperp\ManagementAset\Models\master\GroupBukuPenyusutan;
@@ -144,17 +146,22 @@ abstract class MasterDataController extends Controller
             }
         }
 
-        $page = $query->orderBy('kode')->paginate((int) ($validated['per_page'] ?? 20));
+        $batch = IncrementalList::query($request, (clone $query)->toBase(), [
+            'id' => 'id', 'kode' => 'kode', 'nama' => 'nama',
+        ], [], 'kode');
+        // Pertahankan cast, eager-load, dan presenter tiap master hanya untuk batch ini.
+        $model = $this->model();
+        $records = $model::hydrate($batch['data']->map(fn ($row) => (array) $row)->all());
+        $records->load($query->getEagerLoads());
+        $batch['data'] = $records->map(function (MasterData $record) use ($model): array {
+            if (! $record instanceof $model) {
+                throw new LogicException('Model master tidak sesuai dengan resource yang diminta.');
+            }
 
-        return response()->json([
-            'data' => collect($page->items())->map($this->present(...))->values(),
-            'meta' => [
-                'current_page' => $page->currentPage(),
-                'last_page' => $page->lastPage(),
-                'per_page' => $page->perPage(),
-                'total' => $page->total(),
-            ],
-        ]);
+            return $this->present($record);
+        });
+
+        return response()->json($batch);
     }
 
     public function numberPolicy(Request $request, NumberSequenceIssuer $numbers): JsonResponse

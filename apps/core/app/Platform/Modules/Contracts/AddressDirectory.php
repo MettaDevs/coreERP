@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Platform\Modules\Contracts;
 
+use Illuminate\Support\Collection;
+
 /**
  * Membaca alamat dari buku alamat Core: tempat (`locations`, padanan `LogisticsLocation` Dynamics 365)
  * yang punya alamat pos.
@@ -18,6 +20,11 @@ namespace App\Platform\Modules\Contracts;
  */
 interface AddressDirectory
 {
+    /** @param array<string, mixed> $input
+     * @return array{data: Collection<int, \stdClass>, next_cursor: ?string}
+     */
+    public function lookup(string $tenantId, array $input): array;
+
     /**
      * Tempat beralamat pos milik tenant, urut nama, untuk dipilih.
      *

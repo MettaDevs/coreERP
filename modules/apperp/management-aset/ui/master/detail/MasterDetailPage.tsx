@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useState } from 'react';
 import { ActionButton } from '@apperp/ui/action-button';
 import {
     AlertDialog,
@@ -11,7 +11,9 @@ import {
     AlertDialogTitle,
 } from '@apperp/ui/alert-dialog';
 import { Button } from '@apperp/ui/button';
+import { MasterDetailLayout } from '@apperp/ui/master-detail-layout';
 import { api, errorMessage } from '../../api';
+import { useRecordList } from '../../use-record-list';
 import type {
     MasterAction,
     MasterConfig,
@@ -24,7 +26,6 @@ import RecordDetailPane from './RecordDetailPane';
 import RecordListPane from './RecordListPane';
 
 const FORM_ID = 'master-detail-form';
-const PER_PAGE = 20;
 
 export default function MasterDetailPage({
     config,
@@ -36,17 +37,13 @@ export default function MasterDetailPage({
     const can = (action: MasterAction) =>
         permissions.includes(permission(config.resource, action));
 
-    const [items, setItems] = useState<MasterRecord[]>([]);
-    const [total, setTotal] = useState(0);
-    const [lastPage, setLastPage] = useState(1);
-    const [page, setPage] = useState(1);
     const [search, setSearch] = useState('');
+    const [showDetail, setShowDetail] = useState(false);
     const [activeFilter, setActiveFilter] = useState('semua');
-    const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const loadingMoreRef = useRef(false);
+    const [snapshot, setSnapshot] = useState<MasterRecord | null>(null);
 
-    const [selectedIdDipilih, setSelectedId] = useState<string | null>(null);
+    const [selectedId, setSelectedId] = useState<string | null>(null);
     const [mode, setMode] = useState<DetailMode>('view');
     const [dirty, setDirty] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -58,73 +55,24 @@ export default function MasterDetailPage({
     /** Dinaikkan untuk membuang suntingan: panel detail dipasang ulang dari data server. */
     const [formNonce, setFormNonce] = useState(0);
 
-    const query = useMemo(() => {
-        const params = new URLSearchParams({
-            per_page: String(PER_PAGE),
-            page: String(page),
-        });
+    const list = useRecordList<MasterRecord>(
+        `/${config.resource}`,
+        search,
+        activeFilter === 'semua' ? {} : { aktif: activeFilter },
+    );
+    const { items, setItems, loading } = list;
+    const load = () => {
+        setError('');
+        list.reload();
+    };
 
-        if (search.trim()) {
-            params.set('q', search.trim());
-        }
-
-        if (activeFilter !== 'semua') {
-            params.set('aktif', activeFilter);
-        }
-
-        return params.toString();
-    }, [page, search, activeFilter]);
-
-    const load = useCallback(async () => {
-        setLoading(true);
-
-        try {
-            const list = await api<{
-                data: MasterRecord[];
-                meta: {
-                    current_page: number;
-                    last_page: number;
-                    total: number;
-                };
-            }>(`/${config.resource}?${query}`);
-            // Halaman pertama mengganti; halaman berikutnya menambah. Daftar yang hanya
-            // tumbuh membuat record yang sedang dipilih tidak mungkin hilang dari bawah
-            // kaki pengguna saat ia menggulir.
-            setItems((current) =>
-                list.meta.current_page === 1
-                    ? list.data
-                    : [...current, ...list.data],
-            );
-            setTotal(list.meta.total);
-            setLastPage(list.meta.last_page);
-            setError('');
-        } catch (caught) {
-            setError(errorMessage(caught, 'Data belum dapat dimuat.'));
-        } finally {
-            setLoading(false);
-            loadingMoreRef.current = false;
-        }
-    }, [config.resource, query]);
-
-    useEffect(() => {
-        const timer = window.setTimeout(() => {
-            void load();
-        }, 250);
-
-        return () => window.clearTimeout(timer);
-    }, [load]);
-
-    // Pilihan awal jatuh ke record pertama supaya panel detail tidak menyambut dengan
-    // layar kosong. Dihitung saat render, jadi tidak ada satu frame pun yang sempat
-    // memperlihatkan panel kosong sebelum pilihan otomatisnya jadi. Pilihan yang sudah
-    // ada tidak pernah ditimpa, dan saat sedang membuat record baru tidak ada pilihan.
-    const selectedId =
-        selectedIdDipilih ??
-        (mode === 'create' ? null : (items[0]?.id ?? null));
-
-    const selected = items.find((item) => item.id === selectedId) ?? null;
+    const selected =
+        items.find((item) => item.id === selectedId) ??
+        (snapshot?.id === selectedId ? snapshot : null);
 
     function commitSelect(id: string | null) {
+        setShowDetail(id !== null);
+        setSnapshot(items.find((item) => item.id === id) ?? null);
         setSelectedId(id);
         setMode('view');
         setDirty(false);
@@ -132,6 +80,12 @@ export default function MasterDetailPage({
     }
 
     function requestSelect(id: string) {
+        if (id === selectedId) {
+            setShowDetail(true);
+
+            return;
+        }
+
         if (mode !== 'view' && dirty) {
             setPendingSelect(id);
 
@@ -158,15 +112,19 @@ export default function MasterDetailPage({
         }
 
         try {
-            await api(`/${config.resource}/${selected.id}`, {
-                method: 'PATCH',
-                body: JSON.stringify({
-                    aktif: !selected.aktif,
-                    version: selected.version,
-                }),
-            });
-            setPage(1);
-            await load();
+            const response = await api<{ data: MasterRecord }>(
+                `/${config.resource}/${selected.id}`,
+                {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                        aktif: !selected.aktif,
+                        version: selected.version,
+                    }),
+                },
+            );
+            setSnapshot(response.data);
+            setSelectedId(response.data.id);
+            load();
             setFormNonce((current) => current + 1);
         } catch (caught) {
             setError(errorMessage(caught, 'Status belum dapat diubah.'));
@@ -183,9 +141,9 @@ export default function MasterDetailPage({
                 method: 'DELETE',
                 body: JSON.stringify({ version: selected.version }),
             });
+            setSnapshot(null);
             setSelectedId(null);
-            setPage(1);
-            await load();
+            load();
         } catch (caught) {
             setError(errorMessage(caught, 'Data belum dapat diarsipkan.'));
         } finally {
@@ -210,13 +168,14 @@ export default function MasterDetailPage({
                 index === existingIndex ? savedRecord : item,
             );
         });
+        setSnapshot(savedRecord);
         setSelectedId(savedRecord.id);
+        setShowDetail(true);
         // Record baru langsung tetap disunting karena master maintenance biasanya
         // memiliki rincian lanjutan (misalnya nilai variable atau baris template).
         // Setelah PATCH biasa, kembali ke mode baca seperti sebelumnya.
         setMode(created ? 'edit' : 'view');
-        setPage(1);
-        await load();
+        load();
     }
 
     /**
@@ -225,21 +184,15 @@ export default function MasterDetailPage({
      * berikutnya — rincian lain atau form-nya sendiri — berangkat dari versi terbaru.
      */
     function changeVersion(id: string, version: number) {
+        setSnapshot((current) =>
+            current?.id === id ? { ...current, version } : current,
+        );
         setItems((current) =>
             current.map((item) =>
                 item.id === id ? { ...item, version } : item,
             ),
         );
     }
-
-    const loadMore = useCallback(() => {
-        if (loading || loadingMoreRef.current || page >= lastPage) {
-            return;
-        }
-
-        loadingMoreRef.current = true;
-        setPage((current) => current + 1);
-    }, [lastPage, loading, page]);
 
     const editing = mode !== 'view';
 
@@ -277,8 +230,10 @@ export default function MasterDetailPage({
                                 action="create"
                                 type="button"
                                 onClick={() => {
+                                    setSnapshot(null);
                                     setSelectedId(null);
                                     setMode('create');
+                                    setShowDetail(true);
                                 }}
                             >
                                 Tambah {config.singular}
@@ -310,35 +265,44 @@ export default function MasterDetailPage({
                 )}
             </div>
 
-            <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[20rem_minmax(0,1fr)]">
-                <RecordListPane
-                    config={config}
-                    items={items}
-                    total={total}
-                    hasMore={page < lastPage}
-                    loading={loading}
-                    error={error}
-                    search={search}
-                    onSearchChange={(next) => {
-                        setSearch(next);
-                        // Nomor halaman disetel ulang di tempat filternya diubah,
-                        // bukan lewat effect susulan.
-                        setPage(1);
-                    }}
-                    activeFilter={activeFilter}
-                    onActiveFilterChange={(next) => {
-                        setActiveFilter(next);
-                        setPage(1);
-                    }}
-                    selectedId={selectedId}
-                    creating={mode === 'create'}
-                    onSelect={requestSelect}
-                    onLoadMore={loadMore}
-                    onRetry={() => {
-                        void load();
-                    }}
-                />
+            <MasterDetailLayout
+                detailOpen={showDetail}
+                onDetailOpenChange={setShowDetail}
+                list={
+                    <RecordListPane
+                        config={config}
+                        items={items}
+                        hasMore={list.hasMore}
+                        loading={loading}
+                        error={error || list.error}
+                        search={search}
+                        onSearchChange={(next) => {
+                            if (mode === 'view') {
+                                setSnapshot(null);
+                                setSelectedId(null);
+                            }
 
+                            setSearch(next);
+                            // Nomor halaman disetel ulang di tempat filternya diubah,
+                            // bukan lewat effect susulan.
+                        }}
+                        activeFilter={activeFilter}
+                        onActiveFilterChange={(next) => {
+                            if (mode === 'view') {
+                                setSnapshot(null);
+                                setSelectedId(null);
+                            }
+
+                            setActiveFilter(next);
+                        }}
+                        selectedId={selectedId}
+                        creating={mode === 'create'}
+                        onSelect={requestSelect}
+                        onLoadMore={list.loadMore}
+                        onRetry={list.retry}
+                    />
+                }
+            >
                 <RecordDetailPane
                     key={`${selectedId ?? 'baru'}:${formNonce}`}
                     formId={FORM_ID}
@@ -347,7 +311,12 @@ export default function MasterDetailPage({
                     mode={mode}
                     permissions={permissions}
                     canEdit={can('update')}
-                    onRequestEdit={() => setMode('edit')}
+                    onRequestEdit={() => {
+                        setSnapshot(selected);
+                        setSelectedId(selected?.id ?? null);
+                        setMode('edit');
+                        setShowDetail(true);
+                    }}
                     onDirtyChange={setDirty}
                     onSavingChange={setSaving}
                     onVersionChange={(version) => {
@@ -359,7 +328,7 @@ export default function MasterDetailPage({
                         void handleSaved(savedRecord, created);
                     }}
                 />
-            </div>
+            </MasterDetailLayout>
 
             <AlertDialog
                 open={pendingSelect !== undefined}

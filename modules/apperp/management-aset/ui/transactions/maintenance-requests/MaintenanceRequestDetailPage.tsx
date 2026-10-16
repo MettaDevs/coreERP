@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDateTimeFormat } from '@/hooks/use-date-time';
 import { ActionButton } from '@apperp/ui/action-button';
@@ -139,12 +139,16 @@ export default function MaintenanceRequestDetailPage({
         ordering ? 'tipe-work-order' : null,
     );
     const trades = useMasterOptions(ordering ? 'trade' : null);
-    const assets = useAssets(!readOnly || ordering);
+    const assets = useAssets(
+        !readOnly || ordering,
+        [form.aset_id, order.aset_id, saved?.aset_id ?? ''].filter(Boolean),
+    );
     const orderAsset = saved?.aset_id ?? order.aset_id;
     const jobTypes = useDependentOptions(
         ordering ? orderAsset : '',
         (asetId) => `/pemeliharaan-aset/referensi/job-types?aset_id=${asetId}`,
         'Jenis pekerjaan untuk aset ini belum dapat dimuat.',
+        order.maintenance_job_type_id,
     );
 
     useEffect(() => {
@@ -507,6 +511,7 @@ export default function MaintenanceRequestDetailPage({
                                     <div className="grid gap-4 sm:grid-cols-2">
                                         <Field>
                                             <Select
+                                                {...types.selectProps}
                                                 label="Jenis permintaan"
                                                 required
                                                 items={choices(types.options)}
@@ -535,6 +540,7 @@ export default function MaintenanceRequestDetailPage({
                                         </Field>
                                         <Field>
                                             <Select
+                                                {...units.selectProps}
                                                 label="Unit pelapor"
                                                 required
                                                 items={choices(units.options)}
@@ -565,6 +571,7 @@ export default function MaintenanceRequestDetailPage({
                                         </Field>
                                         <Field>
                                             <Select
+                                                {...assets.selectProps}
                                                 label="Aset"
                                                 items={[
                                                     {
@@ -594,6 +601,7 @@ export default function MaintenanceRequestDetailPage({
                                         </Field>
                                         <Field>
                                             <Select
+                                                {...locations.selectProps}
                                                 label="Lokasi"
                                                 items={[
                                                     {
@@ -624,6 +632,7 @@ export default function MaintenanceRequestDetailPage({
                                         </Field>
                                         <Field>
                                             <Select
+                                                {...levels.selectProps}
                                                 label="Tingkat layanan"
                                                 items={[
                                                     {
@@ -649,6 +658,7 @@ export default function MaintenanceRequestDetailPage({
                                         </Field>
                                         <Field>
                                             <Select
+                                                {...causes.selectProps}
                                                 label="Sebab kerusakan"
                                                 items={[
                                                     {
@@ -811,6 +821,7 @@ export default function MaintenanceRequestDetailPage({
                         {!saved?.aset_id && (
                             <Field>
                                 <Select
+                                    {...assets.selectProps}
                                     label="Aset"
                                     required
                                     items={choices(assets.options)}
@@ -836,6 +847,7 @@ export default function MaintenanceRequestDetailPage({
                         )}
                         <Field>
                             <Select
+                                {...jobTypes.selectProps}
                                 label="Jenis pekerjaan"
                                 required
                                 items={choices(jobTypes.options)}
@@ -864,6 +876,7 @@ export default function MaintenanceRequestDetailPage({
                         </Field>
                         <Field>
                             <Select
+                                {...workOrderTypes.selectProps}
                                 label="Tipe work order"
                                 required
                                 items={choices(workOrderTypes.options)}
@@ -886,6 +899,7 @@ export default function MaintenanceRequestDetailPage({
                         </Field>
                         <Field>
                             <Select
+                                {...trades.selectProps}
                                 label="Bidang keahlian"
                                 items={[
                                     { value: '', label: 'Tidak ditentukan' },

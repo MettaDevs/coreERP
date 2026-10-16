@@ -6,7 +6,9 @@ namespace App\Foundation\UnitOfMeasure\ModuleServices;
 
 use App\Foundation\UnitOfMeasure\Models\UnitOfMeasure;
 use App\Foundation\UnitOfMeasure\Support\UnitOfMeasureService;
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\UnitOfMeasureDirectory;
+use Illuminate\Http\Request;
 
 /**
  * Meneruskan pertanyaan satuan ke layanan Core.
@@ -14,6 +16,15 @@ use App\Platform\Modules\Contracts\UnitOfMeasureDirectory;
 final class UnitOfMeasureDirectoryCore implements UnitOfMeasureDirectory
 {
     public function __construct(private readonly UnitOfMeasureService $service) {}
+
+    public function lookup(string $tenantId, array $input): array
+    {
+        $query = UnitOfMeasure::query()->where('tenant_id', $tenantId)->where('active', true)
+            ->select(['id', 'code', 'name', 'symbol', 'decimal_places']);
+
+        return IncrementalList::query(Request::create('/lookup', 'GET', $input), $query->toBase(),
+            ['id' => 'id', 'code' => 'code', 'name' => 'name'], ['code', 'name'], 'name');
+    }
 
     public function active(string $tenantId): array
     {

@@ -73,7 +73,7 @@ final class FinancePostingMonitorController extends Controller
             ->orderByDesc('posting_date')
             ->orderByDesc('published_at')
             ->orderByDesc('id')
-            ->paginate(self::PER_PAGE)
+            ->simplePaginate(self::PER_PAGE)
             ->withQueryString()
             ->through(fn (FinancePosting $posting): array => $this->present($posting, $legalEntity));
 
@@ -98,7 +98,7 @@ final class FinancePostingMonitorController extends Controller
                 ->all(),
             'legalEntities' => array_values($legalEntity),
             'counts' => $this->countsByStatus($tenant),
-            'postings' => $postings,
+            'postings' => Inertia::scroll($postings)->matchOn('data.id'),
         ]);
     }
 

@@ -197,7 +197,7 @@ class ReferenceAccountTest extends TestCase
             ->patchJson("/api/v1/finance-reference-accounts/{$akunLain}", ['active' => false])
             ->assertNotFound();
         $this->actingAs($this->owner)->get('/settings/finance-accounts')
-            ->assertInertia(fn (AssertableInertia $page) => $page->where('accounts.total', 3));
+            ->assertInertia(fn (AssertableInertia $page) => $page->has('accounts.data', 3));
     }
 
     public function test_mengubah_status_akun_membutuhkan_versi_yang_dibuka(): void
@@ -250,7 +250,7 @@ class ReferenceAccountTest extends TestCase
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->component('foundation/finance-posting/finance-accounts')
                 ->where('canManage', true)
-                ->where('accounts.total', 2)
+                ->has('accounts.data', 2)
                 ->where('imports.0.status', 'rejected')
                 ->where('imports.1.status', 'applied')
                 ->where('imports.1.imported_by', 'Owner PT Metta')

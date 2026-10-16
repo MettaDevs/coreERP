@@ -955,14 +955,14 @@ FiscalClassificationList:
   type: object
   required:
   - data
-  - meta
+  - next_cursor
   properties:
     data:
       type: array
       items:
         $ref: '#/components/schemas/FiscalClassification'
-    meta:
-      $ref: '#/components/schemas/PaginationMeta'
+    next_cursor:
+      type: [string, 'null']
 ErrorResponse:
   type: object
   required:
@@ -1193,14 +1193,14 @@ ModelAsetList:
   type: object
   required:
   - data
-  - meta
+  - next_cursor
   properties:
     data:
       type: array
       items:
         $ref: '#/components/schemas/ModelAset'
-    meta:
-      $ref: '#/components/schemas/PaginationMeta'
+    next_cursor:
+      type: [string, 'null']
 GroupAsetFields:
   description: |
     Perlakuan finansial yang melekat pada group; padanan field pada "Fixed asset group"
@@ -1269,14 +1269,14 @@ GroupAsetList:
   type: object
   required:
   - data
-  - meta
+  - next_cursor
   properties:
     data:
       type: array
       items:
         $ref: '#/components/schemas/GroupAset'
-    meta:
-      $ref: '#/components/schemas/PaginationMeta'
+    next_cursor:
+      type: [string, 'null']
 JenisAset:
   description: |
     Sumbu klasifikasi teknis aset; padanan "Asset type" pada modul Asset management
@@ -1301,14 +1301,14 @@ JenisAsetList:
   type: object
   required:
   - data
-  - meta
+  - next_cursor
   properties:
     data:
       type: array
       items:
         $ref: '#/components/schemas/JenisAset'
-    meta:
-      $ref: '#/components/schemas/PaginationMeta'
+    next_cursor:
+      type: [string, 'null']
 KondisiAset:
   allOf:
   - $ref: '#/components/schemas/MasterRecord'
@@ -1329,14 +1329,14 @@ KondisiAsetList:
   type: object
   required:
   - data
-  - meta
+  - next_cursor
   properties:
     data:
       type: array
       items:
         $ref: '#/components/schemas/KondisiAset'
-    meta:
-      $ref: '#/components/schemas/PaginationMeta'
+    next_cursor:
+      type: [string, 'null']
 PabrikanAset:
   allOf:
   - $ref: '#/components/schemas/MasterRecord'
@@ -1357,14 +1357,14 @@ PabrikanAsetList:
   type: object
   required:
   - data
-  - meta
+  - next_cursor
   properties:
     data:
       type: array
       items:
         $ref: '#/components/schemas/PabrikanAset'
-    meta:
-      $ref: '#/components/schemas/PaginationMeta'
+    next_cursor:
+      type: [string, 'null']
 PabrikanAsetDetail:
   description: |
     Jumlah model dan aset pada satu pabrikan untuk panel detail. `null` berarti pemanggil
@@ -1407,14 +1407,14 @@ ItemChecklistMaintenanceList:
   type: object
   required:
   - data
-  - meta
+  - next_cursor
   properties:
     data:
       type: array
       items:
         $ref: '#/components/schemas/ItemChecklistMaintenance'
-    meta:
-      $ref: '#/components/schemas/PaginationMeta'
+    next_cursor:
+      type: [string, 'null']
 AnalisaMaintenance:
   allOf:
   - $ref: '#/components/schemas/MasterRecord'
@@ -1435,14 +1435,14 @@ AnalisaMaintenanceList:
   type: object
   required:
   - data
-  - meta
+  - next_cursor
   properties:
     data:
       type: array
       items:
         $ref: '#/components/schemas/AnalisaMaintenance'
-    meta:
-      $ref: '#/components/schemas/PaginationMeta'
+    next_cursor:
+      type: [string, 'null']
 MaintenanceJobType:
   allOf:
   - $ref: '#/components/schemas/MasterRecord'
@@ -1471,8 +1471,8 @@ MaintenanceJobTypeResponse:
   properties: {data: {$ref: '#/components/schemas/MaintenanceJobType'}}
 MaintenanceJobTypeList:
   type: object
-  required: [data, meta]
-  properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenanceJobType'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+  required: [data, next_cursor]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenanceJobType'}}, next_cursor: {type: [string, 'null']}}
 MaintenanceJobTypeVariant:
   allOf:
   - $ref: '#/components/schemas/MasterRecord'
@@ -1493,8 +1493,8 @@ MaintenanceJobTypeVariantResponse:
   properties: {data: {$ref: '#/components/schemas/MaintenanceJobTypeVariant'}}
 MaintenanceJobTypeVariantList:
   type: object
-  required: [data, meta]
-  properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenanceJobTypeVariant'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+  required: [data, next_cursor]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenanceJobTypeVariant'}}, next_cursor: {type: [string, 'null']}}
 MaintenanceJobTypeDefault:
   allOf:
   - $ref: '#/components/schemas/MasterRecord'
@@ -1525,8 +1525,8 @@ MaintenanceJobTypeDefaultResponse:
   properties: {data: {$ref: '#/components/schemas/MaintenanceJobTypeDefault'}}
 MaintenanceJobTypeDefaultList:
   type: object
-  required: [data, meta]
-  properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenanceJobTypeDefault'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+  required: [data, next_cursor]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenanceJobTypeDefault'}}, next_cursor: {type: [string, 'null']}}
 MaintenanceChecklistVariable:
   allOf:
   - $ref: '#/components/schemas/MasterRecord'
@@ -1538,8 +1538,8 @@ MaintenanceChecklistVariableResponse:
   properties: {data: {$ref: '#/components/schemas/MaintenanceChecklistVariable'}}
 MaintenanceChecklistVariableList:
   type: object
-  required: [data, meta]
-  properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenanceChecklistVariable'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+  required: [data, next_cursor]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenanceChecklistVariable'}}, next_cursor: {type: [string, 'null']}}
 MaintenanceChecklistVariableValue:
   type: object
   required: [id, line_number, value, result_code]
@@ -1588,8 +1588,8 @@ MaintenanceChecklistTemplateResponse:
   properties: {data: {$ref: '#/components/schemas/MaintenanceChecklistTemplate'}}
 MaintenanceChecklistTemplateList:
   type: object
-  required: [data, meta]
-  properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenanceChecklistTemplate'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+  required: [data, next_cursor]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenanceChecklistTemplate'}}, next_cursor: {type: [string, 'null']}}
 MaintenanceChecklistTemplateLine:
   type: object
   required: [id, line_number, type, nama, wajib]
@@ -1647,8 +1647,8 @@ TipeWorkOrderResponse:
   properties: {data: {$ref: '#/components/schemas/TipeWorkOrder'}}
 TipeWorkOrderList:
   type: object
-  required: [data, meta]
-  properties: {data: {type: array, items: {$ref: '#/components/schemas/TipeWorkOrder'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+  required: [data, next_cursor]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/TipeWorkOrder'}}, next_cursor: {type: [string, 'null']}}
 TingkatLayanan:
   allOf:
   - $ref: '#/components/schemas/MasterRecord'
@@ -1660,16 +1660,16 @@ TingkatLayananResponse:
   properties: {data: {$ref: '#/components/schemas/TingkatLayanan'}}
 TingkatLayananList:
   type: object
-  required: [data, meta]
-  properties: {data: {type: array, items: {$ref: '#/components/schemas/TingkatLayanan'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+  required: [data, next_cursor]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/TingkatLayanan'}}, next_cursor: {type: [string, 'null']}}
 TradeResponse:
   type: object
   required: [data]
   properties: {data: {$ref: '#/components/schemas/MasterRecord'}}
 TradeList:
   type: object
-  required: [data, meta]
-  properties: {data: {type: array, items: {$ref: '#/components/schemas/MasterRecord'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+  required: [data, next_cursor]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/MasterRecord'}}, next_cursor: {type: [string, 'null']}}
 FaultChoice:
   allOf:
   - $ref: '#/components/schemas/MasterRecord'
@@ -1695,16 +1695,16 @@ SebabKerusakanResponse:
   properties: {data: {$ref: '#/components/schemas/FaultChoice'}}
 SebabKerusakanList:
   type: object
-  required: [data, meta]
-  properties: {data: {type: array, items: {$ref: '#/components/schemas/FaultChoice'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+  required: [data, next_cursor]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/FaultChoice'}}, next_cursor: {type: [string, 'null']}}
 TindakanPerbaikanResponse:
   type: object
   required: [data]
   properties: {data: {$ref: '#/components/schemas/FaultChoice'}}
 TindakanPerbaikanList:
   type: object
-  required: [data, meta]
-  properties: {data: {type: array, items: {$ref: '#/components/schemas/FaultChoice'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+  required: [data, next_cursor]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/FaultChoice'}}, next_cursor: {type: [string, 'null']}}
 MaintenanceTransferResponse:
   type: object
   required: [data, version]
@@ -1743,14 +1743,14 @@ TipeLokasiAsetList:
   type: object
   required:
   - data
-  - meta
+  - next_cursor
   properties:
     data:
       type: array
       items:
         $ref: '#/components/schemas/TipeLokasiAset'
-    meta:
-      $ref: '#/components/schemas/PaginationMeta'
+    next_cursor:
+      type: [string, 'null']
 LokasiAsetFields:
   type: object
   properties:
@@ -1889,14 +1889,14 @@ LokasiAsetList:
   type: object
   required:
   - data
-  - meta
+  - next_cursor
   properties:
     data:
       type: array
       items:
         $ref: '#/components/schemas/LokasiAset'
-    meta:
-      $ref: '#/components/schemas/PaginationMeta'
+    next_cursor:
+      type: [string, 'null']
 ProfilPenyusutanFields:
   description: |
     Aturan penyusutan yang dapat dipakai ulang lintas aset; padanan "Depreciation profile"
@@ -2004,14 +2004,14 @@ ProfilPenyusutanList:
   type: object
   required:
   - data
-  - meta
+  - next_cursor
   properties:
     data:
       type: array
       items:
         $ref: '#/components/schemas/ProfilPenyusutan'
-    meta:
-      $ref: '#/components/schemas/PaginationMeta'
+    next_cursor:
+      type: [string, 'null']
 BukuPenyusutanFields:
   type: object
   properties:
@@ -2065,14 +2065,14 @@ BukuPenyusutanResponse:
       $ref: '#/components/schemas/BukuPenyusutan'
 BukuPenyusutanList:
   type: object
-  required: [data, meta]
+  required: [data, next_cursor]
   properties:
     data:
       type: array
       items:
         $ref: '#/components/schemas/BukuPenyusutan'
-    meta:
-      $ref: '#/components/schemas/PaginationMeta'
+    next_cursor:
+      type: [string, 'null']
 GroupBukuPenyusutanRow:
   description: |
     Satu baris matriks group x buku; padanan "Fixed asset group/book" di F&O. Nilainya
@@ -2442,14 +2442,14 @@ TipeAtributResponse:
       $ref: '#/components/schemas/TipeAtribut'
 TipeAtributList:
   type: object
-  required: [data, meta]
+  required: [data, next_cursor]
   properties:
     data:
       type: array
       items:
         $ref: '#/components/schemas/TipeAtribut'
-    meta:
-      $ref: '#/components/schemas/PaginationMeta'
+    next_cursor:
+      type: [string, 'null']
 TipeAtributNilaiReplace:
   description: Daftar penuh pilihan nilai; pilihan yang tidak disertakan diarsipkan.
   type: object
@@ -2760,8 +2760,8 @@ CounterTypeResponse:
   properties: {data: {$ref: '#/components/schemas/CounterType'}}
 CounterTypeList:
   type: object
-  required: [data, meta]
-  properties: {data: {type: array, items: {$ref: '#/components/schemas/CounterType'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+  required: [data, next_cursor]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/CounterType'}}, next_cursor: {type: [string, 'null']}}
 AssetTypeCounterTransfer:
   type: object
   required: [data, version]
@@ -2769,8 +2769,8 @@ AssetTypeCounterTransfer:
     data:
       type: object
       properties:
-        remaining: {type: array, items: {type: object, properties: {id: {$ref: '#/components/schemas/Ulid'}, kode: {type: string}, nama: {type: string}, satuan: {type: [string, 'null']}}}}
-        selected: {type: array, items: {type: object, properties: {id: {$ref: '#/components/schemas/Ulid'}, kode: {type: string}, nama: {type: string}, satuan: {type: [string, 'null']}}}}
+        remaining: {type: array, items: {type: object, properties: {id: {$ref: '#/components/schemas/Ulid'}, kode: {type: string}, nama: {type: string}, satuan: {type: string, nullable: true}}}}
+        selected: {type: array, items: {type: object, properties: {id: {$ref: '#/components/schemas/Ulid'}, kode: {type: string}, nama: {type: string}, satuan: {type: string, nullable: true}}}}
     version: {$ref: '#/components/schemas/RecordVersion'}
 CounterReadingWrite:
   type: object
@@ -2793,13 +2793,13 @@ CounterReading:
     jenis_counter_id: {$ref: '#/components/schemas/Ulid'}
     jenis_counter_kode: {type: string}
     jenis_counter_nama: {type: string}
-    satuan: {type: [string, 'null']}
+    satuan: {type: string, nullable: true}
     dibaca_pada: {type: string}
     nilai: {type: string, description: Desimal dua angka di belakang koma, sebagai teks.}
     nilai_total: {type: string, description: Pemakaian kumulatif melewati penggantian meter; dihitung server.}
     reset: {type: boolean}
-    keterangan: {type: [string, 'null']}
-    dicatat_oleh_nama: {type: [string, 'null']}
+    keterangan: {type: string, nullable: true}
+    dicatat_oleh_nama: {type: string, nullable: true}
     version: {$ref: '#/components/schemas/RecordVersion'}
 AssetCounter:
   type: object
@@ -2807,7 +2807,7 @@ AssetCounter:
     jenis_counter_id: {$ref: '#/components/schemas/Ulid'}
     kode: {type: string}
     nama: {type: string}
-    satuan: {type: [string, 'null']}
+    satuan: {type: string, nullable: true}
     terakhir:
       oneOf:
       - type: 'null'
@@ -2831,8 +2831,8 @@ MaintenancePlanResponse:
   properties: {data: {$ref: '#/components/schemas/MaintenancePlan'}}
 MaintenancePlanList:
   type: object
-  required: [data, meta]
-  properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenancePlan'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+  required: [data, next_cursor]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenancePlan'}}, next_cursor: {type: [string, 'null']}}
 MaintenancePlanLineWrite:
   type: object
   required: [dasar, maintenance_job_type_id, tipe_work_order_id]
@@ -2864,8 +2864,8 @@ MaintenancePlanLine:
       line_number: {type: integer}
       job_type_kode: {type: string}
       job_type_nama: {type: string}
-      jenis_counter_nama: {type: [string, 'null']}
-      jenis_counter_satuan: {type: [string, 'null']}
+      jenis_counter_nama: {type: string, nullable: true}
+      jenis_counter_satuan: {type: string, nullable: true}
       tipe_work_order_nama: {type: string}
       version: {$ref: '#/components/schemas/RecordVersion'}
 MaintenancePlanTargetWrite:
@@ -2882,10 +2882,10 @@ MaintenancePlanTarget:
   - $ref: '#/components/schemas/MaintenancePlanTargetWrite'
   - type: object
     properties:
-      aset_kode: {type: [string, 'null']}
-      aset_nama: {type: [string, 'null']}
-      jenis_aset_kode: {type: [string, 'null']}
-      jenis_aset_nama: {type: [string, 'null']}
+      aset_kode: {type: string, nullable: true}
+      aset_nama: {type: string, nullable: true}
+      jenis_aset_kode: {type: string, nullable: true}
+      jenis_aset_nama: {type: string, nullable: true}
       version: {$ref: '#/components/schemas/RecordVersion'}
 MaintenanceScheduleLine:
   type: object
@@ -2903,7 +2903,7 @@ MaintenanceScheduleLine:
     status: {type: string, enum: [usulan, work_order_dibuat, diabaikan]}
     terlambat: {type: boolean, description: Usulan yang jatuh temponya sebelum hari ini menurut zona waktu pengguna.}
     pemeliharaan_aset_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}
-    work_order_kode: {type: [string, 'null']}
+    work_order_kode: {type: string, nullable: true}
     rencana_kode: {type: string}
     rencana_nama: {type: string}
     job_type_nama: {type: string}
@@ -2933,8 +2933,8 @@ MaintenanceRequestTypeResponse:
   properties: {data: {$ref: '#/components/schemas/MaintenanceRequestType'}}
 MaintenanceRequestTypeList:
   type: object
-  required: [data, meta]
-  properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenanceRequestType'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+  required: [data, next_cursor]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/MaintenanceRequestType'}}, next_cursor: {type: [string, 'null']}}
 MaintenanceRequestWrite:
   type: object
   required: [legal_entity_id, responsible_org_unit_id, jenis_permintaan_id, deskripsi]
@@ -2959,14 +2959,14 @@ MaintenanceRequest:
       status: {type: string, enum: [draft, diajukan, diterima, ditolak, work_order_dibuat]}
       diajukan_pada: {type: [string, 'null'], format: date-time}
       diputuskan_pada: {type: [string, 'null'], format: date-time}
-      diputuskan_oleh_user_id: {type: [string, 'null']}
-      alasan_penolakan: {type: [string, 'null']}
+      diputuskan_oleh_user_id: {type: string, nullable: true}
+      alasan_penolakan: {type: string, nullable: true}
       pemeliharaan_aset_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}
-      work_order_kode: {type: [string, 'null']}
+      work_order_kode: {type: string, nullable: true}
       jenis_permintaan_nama: {type: string}
-      aset_kode: {type: [string, 'null']}
-      aset_nama: {type: [string, 'null']}
-      lokasi_nama: {type: [string, 'null']}
+      aset_kode: {type: string, nullable: true}
+      aset_nama: {type: string, nullable: true}
+      lokasi_nama: {type: string, nullable: true}
       unit_nama: {type: [string, 'null'], description: Hanya pada GET detail.}
       dilaporkan_oleh_nama: {type: [string, 'null'], description: Hanya pada GET detail.}
       diputuskan_oleh_nama: {type: [string, 'null'], description: Hanya pada GET detail.}
@@ -2979,7 +2979,7 @@ VendorOption:
   description: Vendor milik Core (K-06), dibaca lewat kontrak `VendorDirectory`.
   type: object
   required: [id, number, name, status, legal_entity_id]
-  properties: {id: {type: string}, number: {type: string}, name: {type: string}, tax_number: {type: [string, 'null']}, status: {type: string}, legal_entity_id: {type: string}}
+  properties: {id: {type: string}, number: {type: string}, name: {type: string}, tax_number: {type: string, nullable: true}, status: {type: string}, legal_entity_id: {type: string}}
 VendorSummary:
   type: object
   required: [id, number, name, status]
@@ -2990,8 +2990,8 @@ InsuranceTypeResponse:
   properties: {data: {$ref: '#/components/schemas/MasterRecord'}}
 InsuranceTypeList:
   type: object
-  required: [data, meta]
-  properties: {data: {type: array, items: {$ref: '#/components/schemas/MasterRecord'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+  required: [data, next_cursor]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/MasterRecord'}}, next_cursor: {type: [string, 'null']}}
 InsurancePolicyWrite:
   type: object
   required: [legal_entity_id, nama, nomor_polis, berlaku_mulai]
@@ -3019,7 +3019,7 @@ InsuranceCoverage:
     nilai_pertanggungan: {type: string, description: Desimal dua angka sebagai teks.}
     berlaku_mulai: {type: string, format: date}
     berlaku_sampai: {type: [string, 'null'], format: date, description: Kosong berarti mengikuti masa berlaku polis.}
-    keterangan: {type: [string, 'null']}
+    keterangan: {type: string, nullable: true}
     berjalan: {type: boolean, description: Berlaku hari ini (zona pengguna).}
     version: {$ref: '#/components/schemas/RecordVersion'}
 InsuranceCoverageWrite:
@@ -3041,17 +3041,17 @@ InsurancePolicy:
     legal_entity_id: {$ref: '#/components/schemas/Ulid'}
     nama: {type: string}
     nomor_polis: {type: string}
-    jenis_asuransi_id: {type: [string, 'null']}
-    jenis_asuransi_kode: {type: [string, 'null']}
-    jenis_asuransi_nama: {type: [string, 'null']}
-    vendor_id: {type: [string, 'null']}
+    jenis_asuransi_id: {type: string, nullable: true}
+    jenis_asuransi_kode: {type: string, nullable: true}
+    jenis_asuransi_nama: {type: string, nullable: true}
+    vendor_id: {type: string, nullable: true}
     vendor: {oneOf: [{$ref: '#/components/schemas/VendorSummary'}, {type: 'null'}]}
     berlaku_mulai: {type: string, format: date}
     berlaku_sampai: {type: [string, 'null'], format: date}
     premi_tahunan: {type: string}
     nilai_pertanggungan: {type: string}
     diblokir: {type: boolean}
-    keterangan: {type: [string, 'null']}
+    keterangan: {type: string, nullable: true}
     total_nilai_tertanggung: {type: string, description: Jumlah pertanggungan yang berlaku hari ini (*Total Value Insured* BC).}
     selisih_plafon: {type: string, description: Plafon polis dikurangi total yang ditanggung (*Over/Under Insured* BC); negatif berarti melebihi plafon.}
     berlaku: {type: boolean}
@@ -3068,7 +3068,7 @@ AssetInsurance:
     tanggal: {type: string, format: date}
     total_nilai_tertanggung: {type: string}
     nilai_perolehan: {type: string, description: Nilai perolehan buku komersial; nilai perolehan aset bila belum punya buku.}
-    nilai_buku: {type: [string, 'null']}
+    nilai_buku: {type: string, nullable: true}
     status: {type: string, enum: [tidak_diasuransikan, kurang_diasuransikan, cukup]}
     pertanggungan: {type: array, items: {allOf: [{$ref: '#/components/schemas/InsuranceCoverage'}, {type: object, properties: {polis_kode: {type: string}, polis_nama: {type: string}, nomor_polis: {type: string}}}]}}
 AssetInsuranceSummaryRow:
@@ -3080,12 +3080,12 @@ AssetInsuranceSummaryRow:
     nama: {type: string}
     legal_entity_id: {type: string}
     jenis_aset_id: {type: string}
-    jenis_aset_nama: {type: [string, 'null']}
-    lokasi_aset_id: {type: [string, 'null']}
-    lokasi_aset_nama: {type: [string, 'null']}
+    jenis_aset_nama: {type: string, nullable: true}
+    lokasi_aset_id: {type: string, nullable: true}
+    lokasi_aset_nama: {type: string, nullable: true}
     nilai_perolehan: {type: string}
-    akumulasi_penyusutan: {type: [string, 'null']}
-    nilai_buku: {type: [string, 'null']}
+    akumulasi_penyusutan: {type: string, nullable: true}
+    nilai_buku: {type: string, nullable: true}
     total_nilai_tertanggung: {type: string}
     kekurangan: {type: string, description: Nilai perolehan dikurangi total yang ditanggung, paling kecil nol.}
     status: {type: string, enum: [tidak_diasuransikan, kurang_diasuransikan, cukup]}
@@ -3107,14 +3107,14 @@ AssetWarranty:
     aset_id: {$ref: '#/components/schemas/Ulid'}
     aset_kode: {type: string}
     aset_nama: {type: string}
-    vendor_id: {type: [string, 'null']}
+    vendor_id: {type: string, nullable: true}
     vendor: {oneOf: [{$ref: '#/components/schemas/VendorSummary'}, {type: 'null'}]}
     jenis_garansi: {type: string, enum: [penuh, sebagian]}
     jenis_garansi_label: {type: string}
-    nomor_referensi: {type: [string, 'null']}
+    nomor_referensi: {type: string, nullable: true}
     berlaku_mulai: {type: string, format: date}
     berlaku_sampai: {type: string, format: date}
-    catatan: {type: [string, 'null']}
+    catatan: {type: string, nullable: true}
     berlaku: {type: boolean}
     sisa_hari: {type: integer, minimum: 0}
     version: {$ref: '#/components/schemas/RecordVersion'}
@@ -3124,12 +3124,12 @@ ExpiringCoverage:
   properties:
     jenis: {type: string, enum: [garansi, kontrak_servis]}
     id: {$ref: '#/components/schemas/Ulid'}
-    referensi: {type: [string, 'null']}
-    aset_id: {type: [string, 'null']}
-    aset_kode: {type: [string, 'null']}
-    aset_nama: {type: [string, 'null']}
+    referensi: {type: string, nullable: true}
+    aset_id: {type: string, nullable: true}
+    aset_kode: {type: string, nullable: true}
+    aset_nama: {type: string, nullable: true}
     jumlah_aset: {type: integer}
-    vendor_nama: {type: [string, 'null']}
+    vendor_nama: {type: string, nullable: true}
     berlaku_sampai: {type: string, format: date}
     sisa_hari: {type: integer}
 ActiveWarranty:
@@ -3138,10 +3138,10 @@ ActiveWarranty:
   properties:
     aset_id: {type: string}
     jenis: {type: string, enum: [garansi, kontrak_servis]}
-    referensi: {type: [string, 'null']}
-    vendor_nama: {type: [string, 'null']}
+    referensi: {type: string, nullable: true}
+    vendor_nama: {type: string, nullable: true}
     jenis_garansi: {type: [string, 'null'], enum: [penuh, sebagian, null]}
-    cakupan: {type: [string, 'null']}
+    cakupan: {type: string, nullable: true}
     berlaku_sampai: {type: string, format: date}
 ServiceContractWrite:
   type: object
@@ -3168,9 +3168,9 @@ ServiceContract:
     vendor: {oneOf: [{$ref: '#/components/schemas/VendorSummary'}, {type: 'null'}]}
     berlaku_mulai: {type: string, format: date}
     berlaku_sampai: {type: string, format: date}
-    cakupan: {type: [string, 'null']}
-    nilai_kontrak: {type: [string, 'null']}
-    keterangan: {type: [string, 'null']}
+    cakupan: {type: string, nullable: true}
+    nilai_kontrak: {type: string, nullable: true}
+    keterangan: {type: string, nullable: true}
     lines_count: {type: [integer, 'null']}
     berlaku: {type: boolean}
     sisa_hari: {type: integer}
@@ -3191,15 +3191,15 @@ DowntimeReasonResponse:
   properties: {data: {$ref: '#/components/schemas/DowntimeReason'}}
 DowntimeReasonList:
   type: object
-  required: [data, meta]
-  properties: {data: {type: array, items: {$ref: '#/components/schemas/DowntimeReason'}}, meta: {$ref: '#/components/schemas/PaginationMeta'}}
+  required: [data, next_cursor]
+  properties: {data: {type: array, items: {$ref: '#/components/schemas/DowntimeReason'}}, next_cursor: {type: [string, 'null']}}
 AssetDowntimeWrite:
   type: object
   required: [aset_id, mulai]
   properties:
     aset_id: {$ref: '#/components/schemas/Ulid'}
     mulai: {type: string, description: Waktu; tanpa offset dibaca menurut zona pengguna.}
-    selesai: {type: [string, 'null']}
+    selesai: {type: string, nullable: true}
     alasan_downtime_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}]}
     pemeliharaan_aset_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}], description: Work order yang memuat aset ini.}
     permintaan_pemeliharaan_id: {oneOf: [{$ref: '#/components/schemas/Ulid'}, {type: 'null'}], description: Permintaan pemeliharaan atas aset ini.}
@@ -3214,16 +3214,16 @@ AssetDowntime:
     aset_nama: {type: string}
     mulai: {type: string, description: Waktu UTC.}
     selesai: {type: [string, 'null'], description: Waktu UTC; kosong selama aset masih berhenti.}
-    alasan_downtime_id: {type: [string, 'null']}
-    alasan_downtime_kode: {type: [string, 'null']}
-    alasan_downtime_nama: {type: [string, 'null']}
+    alasan_downtime_id: {type: string, nullable: true}
+    alasan_downtime_kode: {type: string, nullable: true}
+    alasan_downtime_nama: {type: string, nullable: true}
     masuk_kpi: {type: boolean}
-    pemeliharaan_aset_id: {type: [string, 'null']}
-    pemeliharaan_aset_kode: {type: [string, 'null']}
-    permintaan_pemeliharaan_id: {type: [string, 'null']}
-    permintaan_pemeliharaan_kode: {type: [string, 'null']}
+    pemeliharaan_aset_id: {type: string, nullable: true}
+    pemeliharaan_aset_kode: {type: string, nullable: true}
+    permintaan_pemeliharaan_id: {type: string, nullable: true}
+    permintaan_pemeliharaan_kode: {type: string, nullable: true}
     sumber: {type: string, enum: [manual, work_order], description: '`work_order` dibuka dan ditutup perpindahan status work order.'}
-    keterangan: {type: [string, 'null']}
+    keterangan: {type: string, nullable: true}
     durasi_jam: {type: number, description: Catatan terbuka dihitung sampai saat ini.}
     terbuka: {type: boolean}
     version: {$ref: '#/components/schemas/RecordVersion'}
@@ -3246,8 +3246,8 @@ MaintenanceKpiRow:
   - type: object
     properties:
       kunci: {type: [string, 'null'], description: Id aset, jenis aset, atau lokasi; kosong untuk aset tanpa lokasi.}
-      kode: {type: [string, 'null']}
-      nama: {type: [string, 'null']}
+      kode: {type: string, nullable: true}
+      nama: {type: string, nullable: true}
   - $ref: '#/components/schemas/MaintenanceKpiFigures'
 PengaturanAsetTetap:
   type: object
@@ -3305,11 +3305,11 @@ AssetCancellation:
     reason: {type: string}
     posting_date: {type: string}
     status: {type: string, enum: [pending, applied, rejected, blocked]}
-    workflow_instance_id: {type: [string, 'null']}
+    workflow_instance_id: {type: string, nullable: true}
     requested_by_user_id: {type: string}
-    acted_by_user_id: {type: [string, 'null']}
+    acted_by_user_id: {type: string, nullable: true}
     posting_ids: {type: [array, 'null'], items: {type: string}}
-    failure_message: {type: [string, 'null']}
+    failure_message: {type: string, nullable: true}
 AssetPurchaseRequestInput:
   type: object
   required: [legal_entity_id, requesting_org_unit_id, requested_on, details]

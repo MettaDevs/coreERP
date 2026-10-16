@@ -29,6 +29,7 @@ import {
     newIdempotencyKey,
     toastSaveError,
 } from '../../api';
+import { useRecordOptions } from '../../use-record-list';
 import { PostingPreviewPanel } from '../_shared/PostingPreviewPanel';
 import type { PostingPreview } from '../_shared/PostingPreviewPanel';
 import type { Disposal, DisposalAmounts, DisposalResource } from './disposal';
@@ -94,7 +95,6 @@ export default function DisposalDetailPage({
         nilai: '',
         keterangan: '',
     });
-    const [aset, setAset] = useState<AsetPilihan[]>([]);
     const [memuat, setMemuat] = useState(Boolean(disposalId));
     const [menyimpan, setMenyimpan] = useState(false);
     const [galat, setGalat] = useState<Record<string, string[]>>({});
@@ -115,25 +115,13 @@ export default function DisposalDetailPage({
     const bolehUbah = draf && can('create');
 
     // Aset yang boleh dilepas: yang dekomisioningnya sudah disetujui.
-    useEffect(() => {
-        if (!baru) {
-            return;
-        }
 
-        api<{ data: AsetPilihan[] }>('/aset')
-            .then((result) =>
-                setAset(
-                    result.data.filter(
-                        (item) => item.lifecycle_state === 'decommissioned',
-                    ),
-                ),
-            )
-            .catch((caught) =>
-                toast.error(
-                    errorMessage(caught, 'Daftar aset belum dapat dimuat.'),
-                ),
-            );
-    }, [baru]);
+    const assetSource = useRecordOptions<AsetPilihan>(
+        '/aset?lifecycle_state=decommissioned',
+        (item) => (item.nama ? `${item.kode} \u00b7 ${item.nama}` : item.kode),
+        isian.aset_id,
+    );
+    const aset = assetSource.options;
 
     useEffect(() => {
         if (!disposalId) {
@@ -367,6 +355,7 @@ export default function DisposalDetailPage({
                                             <Select
                                                 label="Aset"
                                                 required
+                                                {...assetSource.selectProps}
                                                 items={aset.map(labelAset)}
                                                 value={
                                                     dipilih

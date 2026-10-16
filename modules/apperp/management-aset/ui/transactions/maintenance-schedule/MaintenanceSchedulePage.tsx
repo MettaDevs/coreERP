@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Key } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useToday } from '@/hooks/use-work-date';
 import { Badge } from '@apperp/ui/badge';
@@ -30,8 +30,9 @@ import { Input } from '@apperp/ui/input';
 import { RadioGroup, RadioGroupItem } from '@apperp/ui/radio-group';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
-import { api, errorMessage, toastSaveError } from '../../api';
+import { api, toastSaveError } from '../../api';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
+import { useRecordList } from '../../use-record-list';
 
 type ScheduleLine = {
     id: string;
@@ -133,9 +134,7 @@ export default function MaintenanceSchedulePage({
     const canCreateWorkOrder = permissions.includes(
         'management-aset.pemeliharaan-aset.create',
     );
-    const [rows, setRows] = useState<ScheduleLine[]>([]);
     const [status, setStatus] = useState('usulan');
-    const [loading, setLoading] = useState(true);
     const [reload, setReload] = useState(0);
     const [selected, setSelected] = useState<Key[]>([]);
     const [running, setRunning] = useState(false);
@@ -148,36 +147,14 @@ export default function MaintenanceSchedulePage({
     const runRef = useRef<HTMLDivElement>(null);
     const plans = useMasterOptions(running ? 'rencana-pemeliharaan' : null);
 
-    useEffect(() => {
-        let cancelled = false;
-
-        api<{ data: ScheduleLine[] }>(`/jadwal-pemeliharaan?status=${status}`)
-            .then((result) => {
-                if (!cancelled) {
-                    setRows(result.data);
-                    setSelected([]);
-                }
-            })
-            .catch((caught) => {
-                if (!cancelled) {
-                    toast.error(
-                        errorMessage(caught, 'Jadwal belum dapat dimuat.'),
-                    );
-                }
-            })
-            .finally(() => {
-                if (!cancelled) {
-                    setLoading(false);
-                }
-            });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [status, reload]);
+    const list = useRecordList<ScheduleLine>('/jadwal-pemeliharaan', '', {
+        status,
+        refresh: String(reload),
+    });
+    const rows = list.items;
+    const loading = list.loading;
 
     const refresh = useCallback(() => {
-        setLoading(true);
         setReload((current) => current + 1);
     }, []);
 
@@ -367,14 +344,13 @@ export default function MaintenanceSchedulePage({
                         value={status}
                         ariaLabel="Saring berdasarkan status"
                         onValueChange={(value) => {
-                            setLoading(true);
                             setStatus(value ?? 'usulan');
                         }}
                     />
                 </div>
             </div>
 
-            {!loading && rows.length === 0 ? (
+            {!loading && rows.length === 0 && !list.error ? (
                 <Empty>
                     <EmptyHeader>
                         <EmptyTitle>Tidak ada usulan jadwal</EmptyTitle>
@@ -387,6 +363,9 @@ export default function MaintenanceSchedulePage({
             ) : (
                 <DataTable
                     columns={columns}
+                    incremental={list}
+                    sort={list.sort}
+                    onSortChange={list.onSortChange}
                     data={rows}
                     getRowKey={(row) => row.id}
                     getRowLabel={(row) =>
@@ -438,6 +417,7 @@ export default function MaintenanceSchedulePage({
                             onChange={(event) => setUntil(event.target.value)}
                         />
                         <Select
+                            {...plans.selectProps}
                             label="Rencana"
                             items={[
                                 { value: '', label: 'Semua rencana aktif' },

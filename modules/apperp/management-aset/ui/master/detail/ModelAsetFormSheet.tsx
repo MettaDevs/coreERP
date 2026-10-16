@@ -1,5 +1,5 @@
+import { useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@apperp/ui/button';
 import {
     Field,
@@ -21,6 +21,7 @@ import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
 import { api, errorMessage, newIdempotencyKey } from '../../api';
 import type { MasterRecord, ParentSummary } from '../masters';
+import { useMasterOptions } from '../useMasterOptions';
 import type { PabrikanModelRecord } from './pabrikanAsetDetail';
 
 function optionLabel(option: ParentSummary): string {
@@ -44,66 +45,17 @@ export default function ModelAsetFormSheet({
     const [keterangan, setKeterangan] = useState(value?.keterangan ?? '');
     const [aktif, setAktif] = useState(value?.aktif ?? true);
     const [jenisAsetId, setJenisAsetId] = useState(value?.jenis_aset_id ?? '');
-    const [jenisOptionsTermuat, setJenisOptionsTermuat] = useState<
-        ParentSummary[]
-    >([]);
-    // Tanpa akses lihat jenis aset, pilihannya kosong — dihitung saat render, bukan
-    // dikosongkan lewat effect. Isi form sendiri tidak perlu disalin ulang dari props:
-    // pemanggilnya memasang `key` berisi id record, jadi ganti record memasang ulang
-    // sheet ini dan penginisialisasi `useState` di atas yang mengerjakannya.
-    const jenisOptions = useMemo(
-        () => (canReadJenis ? jenisOptionsTermuat : []),
-        [canReadJenis, jenisOptionsTermuat],
+    const jenisSource = useMasterOptions(
+        canReadJenis ? 'jenis-aset' : null,
+        '',
+        jenisAsetId,
     );
-    const [jenisError, setJenisError] = useState('');
+    const jenisOptions = jenisSource.options;
+    const jenisError = jenisSource.error;
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
     const sheetContentRef = useRef<HTMLDivElement>(null);
     const creationKey = useRef(newIdempotencyKey());
-
-    useEffect(() => {
-        if (!canReadJenis) {
-            return;
-        }
-
-        let cancelled = false;
-        api<{ data: MasterRecord[] }>('/jenis-aset?per_page=100&aktif=true')
-            .then((result) => {
-                if (cancelled) {
-                    return;
-                }
-
-                const options = result.data.map(({ id, kode, nama }) => ({
-                    id,
-                    kode,
-                    nama,
-                }));
-
-                if (
-                    value?.jenis_aset &&
-                    !options.some((option) => option.id === value.jenis_aset_id)
-                ) {
-                    options.unshift(value.jenis_aset);
-                }
-
-                setJenisOptionsTermuat(options);
-                setJenisError('');
-            })
-            .catch((caught) => {
-                if (!cancelled) {
-                    setJenisError(
-                        errorMessage(
-                            caught,
-                            'Pilihan jenis aset belum dapat dimuat.',
-                        ),
-                    );
-                }
-            });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [canReadJenis, value?.jenis_aset, value?.jenis_aset_id]);
 
     const jenisLabel = useMemo(() => {
         const selected = jenisOptions.find(
@@ -181,6 +133,7 @@ export default function ModelAsetFormSheet({
                             {canReadJenis ? (
                                 <Field data-invalid={Boolean(jenisError)}>
                                     <Select
+                                        {...jenisSource.selectProps}
                                         label="Jenis aset"
                                         items={[
                                             'Tidak ditentukan',

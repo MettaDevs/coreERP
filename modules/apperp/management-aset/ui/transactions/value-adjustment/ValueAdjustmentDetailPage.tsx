@@ -39,6 +39,7 @@ import {
     toastSaveError,
 } from '../../api';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
+import { useRecordOptions } from '../../use-record-list';
 import { CancellationAction } from '../_shared/CancellationAction';
 import { CancellationStatus } from '../_shared/CancellationStatus';
 import { PostingPreviewPanel } from '../_shared/PostingPreviewPanel';
@@ -120,38 +121,29 @@ export default function ValueAdjustmentDetailPage({
     const [memuat, setMemuat] = useState(mode !== 'create');
     const [menyimpan, setMenyimpan] = useState(false);
     const [galat, setGalat] = useState<Record<string, string[]>>({});
-    const [aset, setAset] = useState<AsetPilihan[]>([]);
     const [pratinjau, setPratinjau] = useState<PostingPreview | null>(null);
     const [konfirmasi, setKonfirmasi] = useState<'posting' | 'arsip' | null>(
         null,
     );
-    const buku = useMasterOptions('buku-penyusutan');
-    const unitKerja = useMasterOptions('reference-data/unit-kerja');
+    const buku = useMasterOptions('buku-penyusutan', '', record.buku_id);
+    const unitKerja = useMasterOptions(
+        'reference-data/unit-kerja',
+        '',
+        record.responsible_org_unit_id,
+    );
     const panelRef = useRef<HTMLDivElement>(null);
 
     const readOnly = mode === 'view';
     const draf = mode === 'create' || tersimpan?.status === 'draft';
 
     // Daftar aset hanya dibutuhkan untuk menambah baris; aset yang sudah dilepas tidak ditawarkan.
-    useEffect(() => {
-        if (readOnly) {
-            return;
-        }
 
-        api<{ data: AsetPilihan[] }>('/aset')
-            .then((result) =>
-                setAset(
-                    result.data.filter(
-                        (item) => item.lifecycle_state !== 'disposed',
-                    ),
-                ),
-            )
-            .catch(() =>
-                toast.error(
-                    'Daftar aset tidak dapat dimuat, jadi aset belum bisa ditambahkan.',
-                ),
-            );
-    }, [readOnly]);
+    const assetSource = useRecordOptions<AsetPilihan>(
+        '/aset?exclude_state=disposed',
+        (item) => (item.nama ? `${item.kode} \u00b7 ${item.nama}` : item.kode),
+        record.details.map((row) => row.aset_id),
+    );
+    const aset = assetSource.options;
 
     useEffect(() => {
         if (!adjustmentId) {
@@ -495,6 +487,7 @@ export default function ValueAdjustmentDetailPage({
                                             />
                                         ) : (
                                             <Select
+                                                {...buku.selectProps}
                                                 label="Buku penyusutan"
                                                 required
                                                 items={buku.options.map(
@@ -560,6 +553,7 @@ export default function ValueAdjustmentDetailPage({
                                             />
                                         ) : (
                                             <Select
+                                                {...unitKerja.selectProps}
                                                 label="Unit penanggung jawab"
                                                 required
                                                 items={unitKerja.options.map(
@@ -702,6 +696,7 @@ export default function ValueAdjustmentDetailPage({
                                                                 {!baris.id &&
                                                                 !readOnly ? (
                                                                     <Select
+                                                                        {...assetSource.selectProps}
                                                                         items={aset.map(
                                                                             labelAset,
                                                                         )}

@@ -48,7 +48,7 @@ export function MasterFilter({
     value,
     onChange,
 }: MasterFilterProps) {
-    const master = useMasterOptions(resource);
+    const master = useMasterOptions(resource, '', value);
     const items = useMemo(
         () =>
             master.options.map((option) => ({
@@ -61,6 +61,7 @@ export function MasterFilter({
     return (
         <Field className="w-full sm:w-56">
             <MultiSelect
+                {...master.selectProps}
                 label={label}
                 items={items}
                 value={value}
@@ -133,7 +134,7 @@ export function ConditionFilter(props: MultiFilterProps) {
  * menyusutkan aset yang sama, jadi menjumlahkan semua buku membuat totalnya dobel.
  */
 export function DepreciationBookFilter({ value, onChange }: FilterProps) {
-    const master = useMasterOptions('buku-penyusutan');
+    const master = useMasterOptions('buku-penyusutan', '', value ?? '');
     const items = useMemo(
         () => [
             { value: ALL, label: 'Semua buku komersial' },
@@ -148,6 +149,7 @@ export function DepreciationBookFilter({ value, onChange }: FilterProps) {
     return (
         <Field className="w-full sm:w-52">
             <Select
+                {...master.selectProps}
                 label="Buku penyusutan"
                 items={items}
                 value={value || ALL}

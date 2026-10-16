@@ -7,21 +7,22 @@ import {
     Menu,
     Filter,
     Plus,
-} from "lucide-react";
-import * as React from "react";
+} from 'lucide-react';
+import * as React from 'react';
 
-import { TableScrollContext } from "../table-scroll-context";
-import { cn } from "../utils";
-import { Button } from "./button";
-import { Checkbox } from "./checkbox";
+import { TableScrollContext } from '../table-scroll-context';
+import { cn } from '../utils';
+import { Button } from './button';
+import { Checkbox } from './checkbox';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-} from "./dropdown-menu";
-import { Popover, PopoverTrigger, PopoverContent } from "./popover";
+} from './dropdown-menu';
+import { IncrementalListStatus } from './incremental-list-status';
+import { Popover, PopoverTrigger, PopoverContent } from './popover';
 import {
     Table,
     TableBody,
@@ -29,10 +30,10 @@ import {
     TableHead,
     TableHeader,
     TableRow,
-} from "./table";
+} from './table';
 
 type SortValue = string | number;
-type SortDirection = "asc" | "desc";
+type SortDirection = 'asc' | 'desc';
 type DataTableSort = { columnId: string; direction: SortDirection };
 
 type DataTableColumn<T> = {
@@ -46,7 +47,7 @@ type DataTableColumn<T> = {
     sortValue?: (row: T) => SortValue;
     width?: number;
     minWidth?: number;
-    align?: "left" | "center" | "right";
+    align?: 'left' | 'center' | 'right';
 };
 
 type DataTableRowAction = {
@@ -64,6 +65,15 @@ type DataTableSelection = {
 type UtilityWidths = { selection: number; rowNumbers: number; actions: number };
 
 type DataTableProps<T> = {
+    serverSort?: boolean;
+    /** Urutan server tidak boleh diurutkan ulang hanya pada batch yang sudah dimuat. */
+    incremental?: {
+        hasMore: boolean;
+        loading: boolean;
+        error: string;
+        loadMore: () => void;
+        retry: () => void;
+    };
     columns: DataTableColumn<T>[];
     /** Baris hierarkis memakai header, ukuran kolom, dan scroll tabel yang sama. */
     renderRows?: () => React.ReactNode;
@@ -82,17 +92,17 @@ type DataTableProps<T> = {
     showRowNumbers?: boolean;
     className?: string;
     /** `viewport` mengisi ruang yang dibatasi halaman; `inline` mengikuti isi form/dialog. */
-    scrollMode?: "inline" | "viewport";
+    scrollMode?: 'inline' | 'viewport';
     /**
      * Letak menu tiga titik. `inline` menaruhnya tepat setelah kolom pertama
      * seperti Business Central, sehingga tetap terjangkau pada tabel lebar tanpa
      * perlu menggulir ke kanan. `trailing` menaruhnya di kolom terakhir.
      */
-    actionsPlacement?: "inline" | "trailing";
+    actionsPlacement?: 'inline' | 'trailing';
     /** Baris aktif ditandai panah pada kolom nomor, seperti penunjuk baris BC. */
     activeRowKey?: React.Key;
     /** Membuka baris memakai klik dua kali; pemilihan baris boleh memakai klik sekali. */
-    rowActivation?: "double-click" | "single-click";
+    rowActivation?: 'double-click' | 'single-click';
     onRowClick?: (row: T) => void;
     /** Baris kosong di bawah untuk menambah data, seperti Edit List BC. */
     onAddRow?: () => void;
@@ -104,6 +114,9 @@ type DataTableProps<T> = {
     sort?: DataTableSort | null;
     /** Dipanggil setiap kali pengguna mengganti urutan kolom. */
     onSortChange?: (sort: DataTableSort | null) => void;
+    pagination?: never;
+    page?: never;
+    onPageChange?: never;
 };
 
 /** Nilai satu baris; header dapat membungkus kata dengan `multiline`. */
@@ -114,7 +127,7 @@ function DataTableText({
     children: React.ReactNode;
     multiline?: boolean;
 }) {
-    if (typeof children !== "string" && typeof children !== "number") {
+    if (typeof children !== 'string' && typeof children !== 'number') {
         return <>{children}</>;
     }
 
@@ -162,18 +175,20 @@ function DataTable<T>({
     getRowLabel,
     onRowAction,
     selection,
-    emptyMessage = "No results.",
+    emptyMessage = 'No results.',
     showRowNumbers = true,
     className,
     scrollMode: requestedScrollMode,
-    actionsPlacement = "inline",
+    actionsPlacement = 'inline',
     activeRowKey,
-    rowActivation = "double-click",
+    rowActivation = 'double-click',
     onRowClick,
     onAddRow,
-    addRowLabel = "Tambah baris",
+    addRowLabel = 'Tambah baris',
     sort: controlledSort,
     onSortChange,
+    incremental,
+    serverSort = false,
 }: DataTableProps<T>) {
     const [wrapHeaders, setWrapHeaders] = React.useState(true);
     const [frozenCount, setFrozenCount] = React.useState(0);
@@ -227,7 +242,7 @@ function DataTable<T>({
         const headerCells = new Map(
             Array.from(
                 tableRef.current?.querySelectorAll<HTMLTableCellElement>(
-                    "thead th[data-column-id]",
+                    'thead th[data-column-id]',
                 ) ?? [],
             ).map((cell) => [
                 cell.dataset.columnId,
@@ -276,11 +291,11 @@ function DataTable<T>({
             tableRef.current
                 ?.querySelector('thead th[data-column-kind="actions"]')
                 ?.getBoundingClientRect().width ??
-            (actionsPlacement === "inline" ? 36 : 44),
+            (actionsPlacement === 'inline' ? 36 : 44),
     });
 
     const sortedData = React.useMemo(() => {
-        if (!sort) {
+        if (!sort || incremental || serverSort) {
             return data;
         }
 
@@ -294,24 +309,24 @@ function DataTable<T>({
             const a = column.sortValue!(left);
             const b = column.sortValue!(right);
             const result =
-                typeof a === "number" && typeof b === "number"
+                typeof a === 'number' && typeof b === 'number'
                     ? a - b
                     : String(a).localeCompare(String(b), undefined, {
                           numeric: true,
-                          sensitivity: "base",
+                          sensitivity: 'base',
                       });
 
-            return sort.direction === "asc" ? result : -result;
+            return sort.direction === 'asc' ? result : -result;
         });
-    }, [columns, data, sort]);
+    }, [columns, data, sort, incremental, serverSort]);
 
     const toggleSort = (columnId: string) => {
         const next: DataTableSort = {
             columnId,
             direction:
-                sort?.columnId === columnId && sort.direction === "asc"
-                    ? "desc"
-                    : "asc",
+                sort?.columnId === columnId && sort.direction === 'asc'
+                    ? 'desc'
+                    : 'asc',
         };
 
         setSort(next);
@@ -344,9 +359,9 @@ function DataTable<T>({
     };
 
     const hasInlineActions =
-        actions.length > 0 && actionsPlacement === "inline";
+        actions.length > 0 && actionsPlacement === 'inline';
     const hasTrailingActions =
-        actions.length > 0 && actionsPlacement === "trailing";
+        actions.length > 0 && actionsPlacement === 'trailing';
     const selectionWidth = utilityWidths?.selection ?? 44;
     const rowNumberWidth = utilityWidths?.rowNumbers ?? 44;
     const actionWidth = utilityWidths?.actions ?? (hasInlineActions ? 36 : 44);
@@ -362,7 +377,7 @@ function DataTable<T>({
                     variant="ghost"
                     size="icon"
                     className="size-6"
-                    aria-label={`Tindakan untuk ${getRowLabel?.(row) ?? "baris"}`}
+                    aria-label={`Tindakan untuk ${getRowLabel?.(row) ?? 'baris'}`}
                     /* Membuka menu bukan mengklik baris. Tanpa ini, tabel yang memakai
              `onRowClick` ikut berpindah halaman begitu menunya dibuka, dan tindakan
              yang baru saja dipilih pengguna langsung ditimpa tujuan baris. */
@@ -384,7 +399,7 @@ function DataTable<T>({
                         {action.separatorBefore && <DropdownMenuSeparator />}
                         <DropdownMenuItem
                             variant={
-                                action.destructive ? "destructive" : "default"
+                                action.destructive ? 'destructive' : 'default'
                             }
                             onSelect={() => onRowAction?.(action.id, row)}
                         >
@@ -401,7 +416,7 @@ function DataTable<T>({
         row: T,
     ) => {
         if (
-            rowActivation === "double-click" &&
+            rowActivation === 'double-click' &&
             event.target instanceof Element &&
             event.target.closest(
                 'a, button, input, textarea, select, [role="button"], [role="checkbox"], [role="combobox"], [contenteditable]',
@@ -416,15 +431,15 @@ function DataTable<T>({
     const renderRow = (row: T, index: number) => (
         <TableRow
             key={getRowKey(row)}
-            data-active={activeRowKey === getRowKey(row) ? "" : undefined}
+            data-active={activeRowKey === getRowKey(row) ? '' : undefined}
             tabIndex={onRowClick ? 0 : undefined}
             onClick={
-                onRowClick && rowActivation === "single-click"
+                onRowClick && rowActivation === 'single-click'
                     ? (event) => activateRow(event, row)
                     : undefined
             }
             onDoubleClick={
-                onRowClick && rowActivation === "double-click"
+                onRowClick && rowActivation === 'double-click'
                     ? (event) => activateRow(event, row)
                     : undefined
             }
@@ -432,17 +447,17 @@ function DataTable<T>({
                 if (
                     onRowClick &&
                     event.target === event.currentTarget &&
-                    (event.key === "Enter" || event.key === " ")
+                    (event.key === 'Enter' || event.key === ' ')
                 ) {
                     event.preventDefault();
                     onRowClick(row);
                 }
             }}
             className={cn(
-                "hover:bg-accent/40 data-active:bg-accent/60 border-0",
+                'hover:bg-accent/40 data-active:bg-accent/60 border-0',
                 onRowClick &&
-                    "focus-visible:ring-ring cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset",
-                selection && selectedKeys.has(getRowKey(row)) && "bg-accent/40",
+                    'focus-visible:ring-ring cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset',
+                selection && selectedKeys.has(getRowKey(row)) && 'bg-accent/40',
             )}
         >
             {selection && (
@@ -466,7 +481,7 @@ function DataTable<T>({
 
                             selection.onSelectedKeysChange([...next]);
                         }}
-                        aria-label={`Pilih ${getRowLabel?.(row) ?? "baris"}`}
+                        aria-label={`Pilih ${getRowLabel?.(row) ?? 'baris'}`}
                     />
                 </TableCell>
             )}
@@ -484,13 +499,13 @@ function DataTable<T>({
                     <TableCell
                         ref={(cell) => {
                             if (cell) {
-                                cell.title = cell.textContent ?? "";
+                                cell.title = cell.textContent ?? '';
                             }
                         }}
                         style={
                             allowColumnFreeze && columnIndex < frozenCount
                                 ? {
-                                      position: "sticky",
+                                      position: 'sticky',
                                       left: frozenLeft(columnIndex),
                                       zIndex: 10,
                                   }
@@ -499,10 +514,10 @@ function DataTable<T>({
                         className={cn(
                             allowColumnFreeze &&
                                 columnIndex < frozenCount &&
-                                "bg-background",
-                            "h-9 overflow-hidden whitespace-nowrap border-b px-3 py-2",
-                            column.align === "center" && "text-center",
-                            column.align === "right" && "text-right",
+                                'bg-background',
+                            'h-9 overflow-hidden whitespace-nowrap border-b px-3 py-2',
+                            column.align === 'center' && 'text-center',
+                            column.align === 'right' && 'text-right',
                         )}
                     >
                         <div className="min-w-0 truncate">
@@ -528,17 +543,17 @@ function DataTable<T>({
         <div
             ref={containerRef}
             className={cn(
-                "bg-background relative overflow-hidden rounded-md border",
-                scrollMode === "viewport" &&
-                    "flex h-full min-h-0 flex-1 flex-col",
+                'bg-background relative overflow-hidden rounded-md border',
+                scrollMode === 'viewport' &&
+                    'flex h-full min-h-0 flex-1 flex-col',
                 className,
             )}
         >
             <Table
                 ref={tableRef}
                 containerClassName={
-                    scrollMode === "viewport"
-                        ? "min-h-0 flex-1 overflow-auto"
+                    scrollMode === 'viewport'
+                        ? 'min-h-0 flex-1 overflow-auto'
                         : undefined
                 }
                 className="table-fixed border-separate border-spacing-0 leading-5"
@@ -555,7 +570,7 @@ function DataTable<T>({
                                       (showRowNumbers ? rowNumberWidth : 0) +
                                       (actions.length ? actionWidth : 0),
                               )
-                            : "100%",
+                            : '100%',
                     // Tabel tetap mengisi viewport setelah kolom diperkecil.
                     minWidth: `max(100%, ${columns.reduce(
                         (total, column) =>
@@ -592,9 +607,9 @@ function DataTable<T>({
                 </colgroup>
                 <TableHeader
                     className={cn(
-                        "[&_tr]:border-0",
-                        scrollMode === "viewport" &&
-                            "bg-background sticky top-0 z-10",
+                        '[&_tr]:border-0',
+                        scrollMode === 'viewport' &&
+                            'bg-background sticky top-0 z-10',
                     )}
                 >
                     <TableRow className="border-0 hover:bg-transparent">
@@ -608,7 +623,7 @@ function DataTable<T>({
                                         allRowsSelected
                                             ? true
                                             : someRowsSelected
-                                              ? "indeterminate"
+                                              ? 'indeterminate'
                                               : false
                                     }
                                     onCheckedChange={toggleAllRows}
@@ -629,7 +644,7 @@ function DataTable<T>({
                             const isSorted = sort?.columnId === column.id;
                             const SortIcon = !isSorted
                                 ? ArrowUpDown
-                                : sort.direction === "asc"
+                                : sort.direction === 'asc'
                                   ? ArrowUp
                                   : ArrowDown;
 
@@ -642,7 +657,7 @@ function DataTable<T>({
                                             columns.indexOf(column) <
                                                 frozenCount
                                                 ? {
-                                                      position: "sticky",
+                                                      position: 'sticky',
                                                       left: frozenLeft(
                                                           columns.indexOf(
                                                               column,
@@ -657,36 +672,36 @@ function DataTable<T>({
                                         }
                                         aria-sort={
                                             isSorted
-                                                ? sort.direction === "asc"
-                                                    ? "ascending"
-                                                    : "descending"
+                                                ? sort.direction === 'asc'
+                                                    ? 'ascending'
+                                                    : 'descending'
                                                 : undefined
                                         }
                                         className={cn(
-                                            "bg-muted/70 group relative h-9 select-none overflow-visible whitespace-normal border-b px-3 py-2 align-bottom text-[13px] font-medium last:border-r-0",
+                                            'bg-muted/70 group relative h-9 select-none overflow-visible whitespace-normal border-b px-3 py-2 align-bottom text-[13px] font-medium last:border-r-0',
                                             allowColumnFreeze &&
                                                 columns.indexOf(column) <
                                                     frozenCount &&
-                                                "bg-muted",
+                                                'bg-muted',
                                             (showColumnMenu ||
                                                 allowColumnFreeze ||
                                                 column.headerFilter) &&
-                                                "pr-12",
-                                            column.align === "center" &&
-                                                "text-center",
-                                            column.align === "right" &&
-                                                "text-right",
+                                                'pr-12',
+                                            column.align === 'center' &&
+                                                'text-center',
+                                            column.align === 'right' &&
+                                                'text-right',
                                         )}
                                     >
                                         {column.sortValue ? (
                                             <button
                                                 type="button"
                                                 className={cn(
-                                                    "focus-visible:ring-ring inline-flex w-full min-w-0 items-center gap-2 rounded-sm text-left outline-none focus-visible:ring-2",
-                                                    column.align === "center" &&
-                                                        "justify-center text-center",
-                                                    column.align === "right" &&
-                                                        "justify-end text-right",
+                                                    'focus-visible:ring-ring inline-flex w-full min-w-0 items-center gap-2 rounded-sm text-left outline-none focus-visible:ring-2',
+                                                    column.align === 'center' &&
+                                                        'justify-center text-center',
+                                                    column.align === 'right' &&
+                                                        'justify-end text-right',
                                                 )}
                                                 onClick={() =>
                                                     toggleSort(column.id)
@@ -702,9 +717,9 @@ function DataTable<T>({
                                                 </span>
                                                 <SortIcon
                                                     className={cn(
-                                                        "text-muted-foreground size-3.5 shrink-0 transition-opacity",
+                                                        'text-muted-foreground size-3.5 shrink-0 transition-opacity',
                                                         !isSorted &&
-                                                            "opacity-0 group-focus-within:opacity-60 group-hover:opacity-60",
+                                                            'opacity-0 group-focus-within:opacity-60 group-hover:opacity-60',
                                                     )}
                                                 />
                                             </button>
@@ -731,7 +746,7 @@ function DataTable<T>({
                                                 <DropdownMenuContent>
                                                     {allowColumnFreeze && (
                                                         <>
-                                                            {" "}
+                                                            {' '}
                                                             <DropdownMenuItem
                                                                 onClick={() =>
                                                                     setFrozenCount(
@@ -745,7 +760,7 @@ function DataTable<T>({
                                                                 kolom ini
                                                             </DropdownMenuItem>
                                                         </>
-                                                    )}{" "}
+                                                    )}{' '}
                                                     {allowColumnFreeze &&
                                                         frozenCount > 0 && (
                                                             <DropdownMenuItem
@@ -860,8 +875,8 @@ function DataTable<T>({
                                                         }
                                                     >
                                                         {wrapHeaders
-                                                            ? "Unwrap column headers"
-                                                            : "Wrap column headers"}
+                                                            ? 'Unwrap column headers'
+                                                            : 'Wrap column headers'}
                                                     </DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
@@ -873,9 +888,9 @@ function DataTable<T>({
                                                         type="button"
                                                         aria-label={`Filter kolom ${column.header}`}
                                                         className={cn(
-                                                            "bg-muted absolute right-2 top-1 z-10 rounded p-1 opacity-0 focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100",
+                                                            'bg-muted absolute right-2 top-1 z-10 rounded p-1 opacity-0 focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100',
                                                             column.filterActive &&
-                                                                "text-primary opacity-100",
+                                                                'text-primary opacity-100',
                                                         )}
                                                     >
                                                         <Filter className="size-3.5" />
@@ -895,12 +910,12 @@ function DataTable<T>({
                                                         : `Resize column ${column.header}`
                                                 }
                                                 className={cn(
-                                                    "after:bg-primary absolute inset-y-0 z-10 w-2 cursor-col-resize touch-none opacity-0 outline-none after:absolute after:inset-y-0 after:left-1/2 after:w-0.5 focus-visible:opacity-100 group-hover:opacity-100",
+                                                    'after:bg-primary absolute inset-y-0 z-10 w-2 cursor-col-resize touch-none opacity-0 outline-none after:absolute after:inset-y-0 after:left-1/2 after:w-0.5 focus-visible:opacity-100 group-hover:opacity-100',
                                                     // Handle ujung tetap di dalam tabel agar tidak menambah scrollWidth.
                                                     nextColumn ||
                                                         hasTrailingActions
-                                                        ? "-right-1"
-                                                        : "right-0 after:left-auto after:right-0",
+                                                        ? '-right-1'
+                                                        : 'right-0 after:left-auto after:right-0',
                                                 )}
                                                 onPointerDown={(event) => {
                                                     if (event.button !== 0) {
@@ -1006,9 +1021,9 @@ function DataTable<T>({
                                                 onKeyDown={(event) => {
                                                     if (
                                                         event.key !==
-                                                            "ArrowLeft" &&
+                                                            'ArrowLeft' &&
                                                         event.key !==
-                                                            "ArrowRight"
+                                                            'ArrowRight'
                                                     ) {
                                                         return;
                                                     }
@@ -1053,7 +1068,7 @@ function DataTable<T>({
                                                                     measuredUtilityWidths,
                                                             },
                                                             (event.key ===
-                                                            "ArrowRight"
+                                                            'ArrowRight'
                                                                 ? 1
                                                                 : -1) *
                                                                 (event.shiftKey
@@ -1099,7 +1114,26 @@ function DataTable<T>({
                                 colSpan={totalColumns}
                                 className="text-muted-foreground h-24 text-center"
                             >
-                                {emptyMessage}
+                                {incremental?.loading
+                                    ? 'Memuat data…'
+                                    : incremental?.error || emptyMessage}
+                            </TableCell>
+                        </TableRow>
+                    )}
+                    {incremental && (
+                        <TableRow>
+                            <TableCell
+                                colSpan={totalColumns}
+                                className="text-muted-foreground text-center"
+                            >
+                                <IncrementalListStatus
+                                    state={incremental}
+                                    endMessage={
+                                        data.length
+                                            ? 'Semua hasil sudah dimuat.'
+                                            : undefined
+                                    }
+                                />
                             </TableCell>
                         </TableRow>
                     )}

@@ -79,8 +79,8 @@ final class VendorController extends Controller
                 ->where('number', 'ilike', $pattern)
                 ->orWhere('tax_number', 'ilike', $pattern)
                 ->orWhereHas('party', fn ($party) => $party->where('name', 'ilike', $pattern))))
-            ->orderBy('number')
-            ->paginate(self::PER_PAGE)
+            ->orderBy('number')->orderBy('id')
+            ->simplePaginate(self::PER_PAGE)
             ->withQueryString()
             ->through(fn (Vendor $vendor): array => $this->present($vendor));
 
@@ -90,7 +90,7 @@ final class VendorController extends Controller
             'canManage' => $membership->hasCorePermission(CoreSecurityCatalog::VENDOR_UPDATE),
             'filters' => ['q' => $keyword, 'legal_entity' => $filter['legal_entity'] ?? null, 'status' => $filter['status'] ?? null],
             'legalEntities' => $this->legalEntities($tenant),
-            'vendors' => $vendors,
+            'vendors' => Inertia::scroll($vendors)->matchOn('data.id'),
             'automaticNumbers' => $this->automaticNumberAllowed($tenant),
             'initialParty' => $initialParty === null ? null : ['id' => $initialParty->id, 'name' => $initialParty->name, 'type' => $initialParty->identityType()],
             'canReadAddressBook' => $membership->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_READ),

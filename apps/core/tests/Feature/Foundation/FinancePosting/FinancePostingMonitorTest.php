@@ -87,7 +87,7 @@ class FinancePostingMonitorTest extends TestCase
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->component('foundation/finance-posting/finance-postings')
                 ->where('canManage', true)
-                ->where('postings.total', 1)
+                ->has('postings.data', 1)
                 ->where('postings.data.0.id', $id)
                 ->where('postings.data.0.status', 'pending')
                 ->where('postings.data.0.legal_entity.name', 'PT Metta Sehat')
@@ -121,7 +121,7 @@ class FinancePostingMonitorTest extends TestCase
             $total = null;
             $this->actingAs($this->owner)->get('/settings/finance-postings?'.http_build_query($saringan))->assertOk()
                 ->assertInertia(function (AssertableInertia $page) use (&$total): void {
-                    $total = $page->toArray()['props']['postings']['total'];
+                    $total = count($page->toArray()['props']['postings']['data']);
                 });
 
             return (int) $total;
@@ -285,7 +285,7 @@ class FinancePostingMonitorTest extends TestCase
         $lain = $this->pemilik('owner@lain.test', 'PT Lain');
 
         $this->actingAs($lain)->get('/settings/finance-postings')->assertOk()
-            ->assertInertia(fn (AssertableInertia $page) => $page->where('postings.total', 0)->where('counts.pending', 0));
+            ->assertInertia(fn (AssertableInertia $page) => $page->has('postings.data', 0)->where('counts.pending', 0));
         $this->actingAs($lain)->getJson("/api/v1/finance-postings/{$id}")->assertNotFound();
         $this->actingAs($lain)->postJson("/api/v1/finance-postings/{$id}/mark-manual", ['reason' => 'x'])->assertNotFound();
         $this->actingAs($lain)->postJson("/api/v1/finance-postings/{$id}/revalidate")->assertNotFound();

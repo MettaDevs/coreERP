@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { RefObject } from 'react';
 import { Select } from '@apperp/ui/select';
 import { api, errorMessage } from '../../api';
+import { useRecordOptions } from '../../use-record-list';
 import type {
     PurchaseRequest,
     RequestLine,
@@ -25,7 +26,6 @@ export default function PurchaseRequestPicker({
     portalContainer: RefObject<HTMLDivElement | null>;
     onChange: (line: RequestLine | null) => void;
 }) {
-    const [requests, setRequests] = useState<PurchaseRequest[]>([]);
     const [requestId, setRequestId] = useState<string | null>(
         initialRequestId ?? null,
     );
@@ -33,32 +33,12 @@ export default function PurchaseRequestPicker({
     const [error, setError] = useState('');
     const [busy, setBusy] = useState(false);
 
-    useEffect(() => {
-        let cancelled = false;
-        api<{ data: PurchaseRequest[] }>('/permintaan-pembelian-aset')
-            .then((result) => {
-                if (!cancelled) {
-                    setRequests(
-                        result.data.filter(
-                            (item) =>
-                                item.legal_entity_id === companyId &&
-                                item.status !== 'cancelled',
-                        ),
-                    );
-                }
-            })
-            .catch((caught) => {
-                if (!cancelled) {
-                    setError(
-                        errorMessage(caught, 'Permintaan belum dapat dimuat.'),
-                    );
-                }
-            });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [companyId]);
+    const source = useRecordOptions<PurchaseRequest>(
+        `/permintaan-pembelian-aset?exclude_cancelled=1&legal_entity_id=${encodeURIComponent(companyId ?? '')}`,
+        (item) => item.kode,
+        requestId ?? '',
+    );
+    const requests = source.options;
 
     useEffect(() => {
         if (!requestId) {
@@ -99,6 +79,7 @@ export default function PurchaseRequestPicker({
     return (
         <fieldset className="space-y-2" disabled={readOnly || busy}>
             <Select
+                {...source.selectProps}
                 label="No. permintaan pembelian"
                 items={[
                     { value: DIRECT_RECEIPT, label: 'Tanpa permintaan asal' },

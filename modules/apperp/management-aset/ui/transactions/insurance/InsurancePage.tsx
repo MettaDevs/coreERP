@@ -38,8 +38,8 @@ import {
     newIdempotencyKey,
     toastSaveError,
 } from '../../api';
-import type { MasterOption } from '../../master/useMasterOptions';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
+import { useRecordList } from '../../use-record-list';
 import type { Coverage, Policy } from './insurance';
 import InsuranceSummary from './InsuranceSummary';
 
@@ -104,8 +104,6 @@ export default function InsurancePage({
         'management-aset.polis-asuransi.archive',
     );
     const today = useToday();
-    const [policies, setPolicies] = useState<Policy[]>([]);
-    const [loading, setLoading] = useState(true);
     const [reload, setReload] = useState(0);
     const [openId, setOpenId] = useState<string | null>(null);
     const [opened, setOpened] = useState<Policy | null>(null);
@@ -116,33 +114,24 @@ export default function InsurancePage({
     const [action, setAction] = useState<CoverageAction | null>(null);
     const [errors, setErrors] = useState<Record<string, string[]>>({});
     const [busy, setBusy] = useState(false);
-    const [assets, setAssets] = useState<MasterOption[]>([]);
+    const assetSource = useMasterOptions('aset');
+    const assets = assetSource.options;
     const types = useMasterOptions('jenis-asuransi');
-    const vendors = useVendors(
+    const vendorsSource = useVendors(
         '/polis-asuransi/vendor',
         editing ? context.legal_entity_id : null,
     );
     const editRef = useRef<HTMLDivElement>(null);
     const actionRef = useRef<HTMLDivElement>(null);
+    const vendors = vendorsSource.options;
     const message = (field: string) => errors[field]?.[0];
 
-    useEffect(() => {
-        let cancelled = false;
-        api<{ data: Policy[] }>('/polis-asuransi')
-            .then((result) => !cancelled && setPolicies(result.data))
-            .catch(
-                (caught) =>
-                    !cancelled &&
-                    toast.error(
-                        errorMessage(caught, 'Polis belum dapat dimuat.'),
-                    ),
-            )
-            .finally(() => !cancelled && setLoading(false));
-
-        return () => {
-            cancelled = true;
-        };
-    }, [reload]);
+    const list = useRecordList<Policy>('/polis-asuransi', '', {
+        refresh: String(reload),
+    });
+    const refresh = () => setReload((current) => current + 1);
+    const policies = list.items;
+    const loading = list.loading;
 
     useEffect(() => {
         if (!openId) {
@@ -165,30 +154,6 @@ export default function InsurancePage({
         };
     }, [openId]);
 
-    // Pemilih aset hanya dibutuhkan saat menambah pertanggungan.
-    const needAssets = action?.kind === 'tambah';
-    useEffect(() => {
-        if (!needAssets) {
-            return;
-        }
-
-        let cancelled = false;
-        api<{ data: MasterOption[] }>('/aset')
-            .then((result) => !cancelled && setAssets(result.data))
-            .catch(
-                () =>
-                    !cancelled &&
-                    toast.error(
-                        'Daftar aset belum dapat dimuat. Anda memerlukan akses lihat register aset.',
-                    ),
-            );
-
-        return () => {
-            cancelled = true;
-        };
-    }, [needAssets]);
-
-    const refresh = () => setReload((current) => current + 1);
     const shown = opened && opened.id === openId ? opened : null;
 
     function startEdit(policy: Policy | null) {
@@ -507,7 +472,7 @@ export default function InsurancePage({
             </RecordActionBar>
 
             <TabsContent value="polis">
-                {!loading && policies.length === 0 ? (
+                {!loading && policies.length === 0 && !list.error ? (
                     <Empty>
                         <EmptyHeader>
                             <EmptyTitle>Belum ada polis asuransi</EmptyTitle>
@@ -521,6 +486,9 @@ export default function InsurancePage({
                 ) : (
                     <DataTable
                         columns={policyColumns}
+                        incremental={list}
+                        sort={list.sort}
+                        onSortChange={list.onSortChange}
                         data={policies}
                         getRowKey={(row) => row.id}
                         getRowLabel={(row) => `${row.kode} ${row.nama}`}
@@ -738,6 +706,7 @@ export default function InsurancePage({
                             </Field>
                             <Field>
                                 <Select
+                                    {...vendorsSource.selectProps}
                                     label="Penanggung"
                                     items={vendorChoices}
                                     value={editing.draft.vendor_id || null}
@@ -756,6 +725,7 @@ export default function InsurancePage({
                                 )}
                             </Field>
                             <Select
+                                {...types.selectProps}
                                 label="Jenis asuransi"
                                 items={types.options.map((option) => ({
                                     value: option.id,
@@ -899,6 +869,7 @@ export default function InsurancePage({
                             {action.kind === 'tambah' ? (
                                 <Field>
                                     <Select
+                                        {...assetSource.selectProps}
                                         label="Aset"
                                         required
                                         items={assets.map((asset) => ({

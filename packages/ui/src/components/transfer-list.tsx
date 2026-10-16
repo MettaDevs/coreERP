@@ -1,38 +1,62 @@
-"use client"
+'use client';
 
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react"
-import * as React from "react"
+import {
+    ChevronLeft,
+    ChevronRight,
+    ChevronsLeft,
+    ChevronsRight,
+} from 'lucide-react';
+import * as React from 'react';
 
-import { cn } from "../utils"
-import { Button } from "./button"
+import { cn } from '../utils';
+import { Button } from './button';
+import { IncrementalListStatus } from './incremental-list-status';
+import type { IncrementalListState } from './incremental-list-status';
+import { Input } from './input';
 
 export type TransferListItem = {
-  id: string
-  label: string
-  description?: string
-}
+    id: string;
+    label: string;
+    description?: string;
+};
 
 function TransferListPane({
-  title,
-  items,
-  highlighted,
-  onHighlight,
-  onActivate,
-  disabled,
-  emptyLabel,
+    title,
+    items,
+    highlighted,
+    onHighlight,
+    onActivate,
+    disabled,
+    emptyLabel,
+    incremental,
+    searchValue,
+    onSearchChange,
 }: {
-  title: string
-  items: TransferListItem[]
-  highlighted: string | null
-  onHighlight: (id: string) => void
-  onActivate: (id: string) => void
-  disabled?: boolean
-  emptyLabel: string
+    title: string;
+    items: TransferListItem[];
+    highlighted: string | null;
+    onHighlight: (id: string) => void;
+    onActivate: (id: string) => void;
+    disabled?: boolean;
+    emptyLabel: string;
+    incremental?: IncrementalListState;
+    searchValue?: string;
+    onSearchChange?: (value: string) => void;
 }) {
-  return (
-    <div className="flex min-w-0 flex-1 flex-col gap-2">
-      <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{title}</p>
-      {/*
+    return (
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">
+                {title}
+            </p>
+            {onSearchChange && (
+                <Input
+                    aria-label={`Cari ${title}`}
+                    placeholder="Cari"
+                    value={searchValue ?? ''}
+                    onChange={(event) => onSearchChange(event.target.value)}
+                />
+            )}
+            {/*
         Tinggi mengikuti isi sampai batas atas, bukan tinggi tetap.
 
         Panel ini hampir selalu dipasang di dalam permukaan yang sudah bergulir sendiri.
@@ -43,36 +67,45 @@ function TransferListPane({
         melampaui batas, dan `overscroll-contain` menahan gulirnya agar tidak merembet ke
         permukaan induk begitu mentok.
       */}
-      <div className="max-h-56 min-h-24 overflow-y-auto overscroll-contain rounded-md border">
-        {items.length === 0 ? (
-          <p className="p-3 text-sm text-muted-foreground">{emptyLabel}</p>
-        ) : (
-          <ul className="divide-y">
-            {items.map((item) => (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  disabled={disabled}
-                  aria-pressed={highlighted === item.id}
-                  onClick={() => onHighlight(item.id)}
-                  onDoubleClick={() => onActivate(item.id)}
-                  className={cn(
-                    "flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-                    highlighted === item.id ? "bg-accent text-accent-foreground" : "hover:bg-muted/50"
-                  )}
-                >
-                  <span className="font-medium">{item.label}</span>
-                  {item.description && (
-                    <span className="text-xs text-muted-foreground">{item.description}</span>
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
-  )
+            <div className="max-h-56 min-h-24 overflow-y-auto overscroll-contain rounded-md border">
+                {items.length === 0 ? (
+                    <p className="text-muted-foreground p-3 text-sm">
+                        {emptyLabel}
+                    </p>
+                ) : (
+                    <ul className="divide-y">
+                        {items.map((item) => (
+                            <li key={item.id}>
+                                <button
+                                    type="button"
+                                    disabled={disabled}
+                                    aria-pressed={highlighted === item.id}
+                                    onClick={() => onHighlight(item.id)}
+                                    onDoubleClick={() => onActivate(item.id)}
+                                    className={cn(
+                                        'flex w-full flex-col items-start gap-0.5 px-3 py-2 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+                                        highlighted === item.id
+                                            ? 'bg-accent text-accent-foreground'
+                                            : 'hover:bg-muted/50',
+                                    )}
+                                >
+                                    <span className="font-medium">
+                                        {item.label}
+                                    </span>
+                                    {item.description && (
+                                        <span className="text-muted-foreground text-xs">
+                                            {item.description}
+                                        </span>
+                                    )}
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+                {incremental && <IncrementalListStatus state={incremental} />}
+            </div>
+        </div>
+    );
 }
 
 /**
@@ -88,133 +121,168 @@ function TransferListPane({
  * item, so a single click can never be mistaken for a commit.
  */
 function TransferList({
-  remaining,
-  selected,
-  onChange,
-  remainingTitle,
-  selectedTitle,
-  disabled,
-  remainingEmptyLabel = "Tidak ada data.",
-  selectedEmptyLabel = "Belum ada yang dipilih.",
-  className,
+    remaining,
+    selected,
+    onChange,
+    remainingTitle,
+    selectedTitle,
+    disabled,
+    remainingEmptyLabel = 'Tidak ada data.',
+    selectedEmptyLabel = 'Belum ada yang dipilih.',
+    className,
+    incremental,
+    searchValue,
+    onSearchChange,
 }: {
-  remaining: TransferListItem[]
-  selected: TransferListItem[]
-  onChange: (next: { remaining: TransferListItem[]; selected: TransferListItem[] }) => void
-  remainingTitle: string
-  selectedTitle: string
-  disabled?: boolean
-  remainingEmptyLabel?: string
-  selectedEmptyLabel?: string
-  className?: string
+    remaining: TransferListItem[];
+    selected: TransferListItem[];
+    onChange: (next: {
+        remaining: TransferListItem[];
+        selected: TransferListItem[];
+    }) => void;
+    remainingTitle: string;
+    selectedTitle: string;
+    disabled?: boolean;
+    remainingEmptyLabel?: string;
+    selectedEmptyLabel?: string;
+    className?: string;
+    incremental?: IncrementalListState;
+    searchValue?: string;
+    onSearchChange?: (value: string) => void;
 }) {
-  const [highlightedRemaining, setHighlightedRemaining] = React.useState<string | null>(null)
-  const [highlightedSelected, setHighlightedSelected] = React.useState<string | null>(null)
+    const [highlightedRemaining, setHighlightedRemaining] = React.useState<
+        string | null
+    >(null);
+    const [highlightedSelected, setHighlightedSelected] = React.useState<
+        string | null
+    >(null);
 
-  function moveToSelected(id: string) {
-    const item = remaining.find((candidate) => candidate.id === id)
+    function moveToSelected(id: string) {
+        const item = remaining.find((candidate) => candidate.id === id);
 
-    if (!item) {
-return
-}
+        if (!item) {
+            return;
+        }
 
-    setHighlightedRemaining(null)
-    onChange({ remaining: remaining.filter((candidate) => candidate.id !== id), selected: [...selected, item] })
-  }
+        setHighlightedRemaining(null);
+        onChange({
+            remaining: remaining.filter((candidate) => candidate.id !== id),
+            selected: [...selected, item],
+        });
+    }
 
-  function moveToRemaining(id: string) {
-    const item = selected.find((candidate) => candidate.id === id)
+    function moveToRemaining(id: string) {
+        const item = selected.find((candidate) => candidate.id === id);
 
-    if (!item) {
-return
-}
+        if (!item) {
+            return;
+        }
 
-    setHighlightedSelected(null)
-    onChange({ remaining: [...remaining, item], selected: selected.filter((candidate) => candidate.id !== id) })
-  }
+        setHighlightedSelected(null);
+        onChange({
+            remaining: [...remaining, item],
+            selected: selected.filter((candidate) => candidate.id !== id),
+        });
+    }
 
-  function moveAllToSelected() {
-    if (remaining.length === 0) {
-return
-}
+    function moveAllToSelected() {
+        if (remaining.length === 0) {
+            return;
+        }
 
-    setHighlightedRemaining(null)
-    onChange({ remaining: [], selected: [...selected, ...remaining] })
-  }
+        setHighlightedRemaining(null);
+        onChange({ remaining: [], selected: [...selected, ...remaining] });
+    }
 
-  function moveAllToRemaining() {
-    if (selected.length === 0) {
-return
-}
+    function moveAllToRemaining() {
+        if (selected.length === 0) {
+            return;
+        }
 
-    setHighlightedSelected(null)
-    onChange({ remaining: [...remaining, ...selected], selected: [] })
-  }
+        setHighlightedSelected(null);
+        onChange({ remaining: [...remaining, ...selected], selected: [] });
+    }
 
-  return (
-    <div data-slot="transfer-list" className={cn("flex items-stretch gap-3", className)}>
-      <TransferListPane
-        title={remainingTitle}
-        items={remaining}
-        highlighted={highlightedRemaining}
-        onHighlight={setHighlightedRemaining}
-        onActivate={moveToSelected}
-        disabled={disabled}
-        emptyLabel={remainingEmptyLabel}
-      />
-      <div className="flex flex-col justify-center gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          disabled={disabled || !highlightedRemaining}
-          onClick={() => highlightedRemaining && moveToSelected(highlightedRemaining)}
-          aria-label="Pindahkan yang dipilih ke sisi kanan"
+    return (
+        <div
+            data-slot="transfer-list"
+            className={cn('flex items-stretch gap-3', className)}
         >
-          <ChevronRight />
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          disabled={disabled || !highlightedSelected}
-          onClick={() => highlightedSelected && moveToRemaining(highlightedSelected)}
-          aria-label="Pindahkan yang dipilih ke sisi kiri"
-        >
-          <ChevronLeft />
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          disabled={disabled || remaining.length === 0}
-          onClick={moveAllToSelected}
-          aria-label="Pindahkan semua ke sisi kanan"
-        >
-          <ChevronsRight />
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          disabled={disabled || selected.length === 0}
-          onClick={moveAllToRemaining}
-          aria-label="Pindahkan semua ke sisi kiri"
-        >
-          <ChevronsLeft />
-        </Button>
-      </div>
-      <TransferListPane
-        title={selectedTitle}
-        items={selected}
-        highlighted={highlightedSelected}
-        onHighlight={setHighlightedSelected}
-        onActivate={moveToRemaining}
-        disabled={disabled}
-        emptyLabel={selectedEmptyLabel}
-      />
-    </div>
-  )
+            <TransferListPane
+                incremental={incremental}
+                searchValue={searchValue}
+                onSearchChange={onSearchChange}
+                title={remainingTitle}
+                items={remaining}
+                highlighted={highlightedRemaining}
+                onHighlight={setHighlightedRemaining}
+                onActivate={moveToSelected}
+                disabled={disabled}
+                emptyLabel={remainingEmptyLabel}
+            />
+            <div className="flex flex-col justify-center gap-2">
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    disabled={disabled || !highlightedRemaining}
+                    onClick={() =>
+                        highlightedRemaining &&
+                        moveToSelected(highlightedRemaining)
+                    }
+                    aria-label="Pindahkan yang dipilih ke sisi kanan"
+                >
+                    <ChevronRight />
+                </Button>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    disabled={disabled || !highlightedSelected}
+                    onClick={() =>
+                        highlightedSelected &&
+                        moveToRemaining(highlightedSelected)
+                    }
+                    aria-label="Pindahkan yang dipilih ke sisi kiri"
+                >
+                    <ChevronLeft />
+                </Button>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    disabled={disabled || remaining.length === 0}
+                    onClick={moveAllToSelected}
+                    aria-label={
+                        incremental
+                            ? 'Pindahkan data yang sudah tampil ke sisi kanan'
+                            : 'Pindahkan semua ke sisi kanan'
+                    }
+                >
+                    <ChevronsRight />
+                </Button>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    disabled={disabled || selected.length === 0}
+                    onClick={moveAllToRemaining}
+                    aria-label="Pindahkan semua ke sisi kiri"
+                >
+                    <ChevronsLeft />
+                </Button>
+            </div>
+            <TransferListPane
+                title={selectedTitle}
+                items={selected}
+                highlighted={highlightedSelected}
+                onHighlight={setHighlightedSelected}
+                onActivate={moveToRemaining}
+                disabled={disabled}
+                emptyLabel={selectedEmptyLabel}
+            />
+        </div>
+    );
 }
 
-export { TransferList }
+export { TransferList };

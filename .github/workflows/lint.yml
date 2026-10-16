@@ -104,6 +104,12 @@ jobs:
       - name: Check Page Dialog Stack
         run: node --test ../../packages/ui/scripts/page-dialog-stack.test.mjs
 
+      - name: Check Master Detail Layout
+        run: node ../../packages/ui/scripts/check-master-detail-layout.mjs
+
+      - name: Check Incremental Lists
+        run: node ../../packages/ui/scripts/check-incremental-list.mjs
+
       - name: Check Upload Client
         run: node scripts/test-core-api.mjs
 

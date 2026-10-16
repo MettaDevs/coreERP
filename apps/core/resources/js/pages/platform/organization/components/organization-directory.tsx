@@ -1,25 +1,15 @@
-import {
-    Accordion,
-    AccordionContent,
-    AccordionItem,
-    AccordionTrigger,
-} from '@apperp/ui/accordion';
-
 import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import {
-    Card,
-    CardAction,
-    CardContent,
-    CardHeader,
-    CardTitle,
-} from '@apperp/ui/card';
+    CollapsibleSection,
+    CollapsibleSectionGroup,
+} from '@apperp/ui/collapsible-section';
+import { DataTable, DataTableText } from '@apperp/ui/data-table';
 import {
     Empty,
     EmptyDescription,
     EmptyHeader,
-    EmptyMedia,
     EmptyTitle,
 } from '@apperp/ui/empty';
 import {
@@ -29,34 +19,28 @@ import {
     FieldGroup,
 } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
-import { RecordActionBar } from '@apperp/ui/record-action-bar';
-import { Select } from '@apperp/ui/select';
+import { ListPageLayout } from '@apperp/ui/list-page-layout';
+import { MasterDetailLayout } from '@apperp/ui/master-detail-layout';
 import {
-    Sheet,
-    SheetTrigger,
-    SheetContent,
-    SheetHeader,
-    SheetTitle,
-    SheetFooter,
-} from '@apperp/ui/sheet';
+    PageDialog,
+    PageDialogTrigger,
+    PageDialogContent,
+    PageDialogHeader,
+    PageDialogTitle,
+    PageDialogFooter,
+} from '@apperp/ui/page-dialog';
+import { RecordActionBar } from '@apperp/ui/record-action-bar';
+import { RecordEditBoundary } from '@apperp/ui/record-edit-boundary';
+import { Select } from '@apperp/ui/select';
+import { useIncrementalList } from '@apperp/ui/use-incremental-list';
+import type { ListLoader } from '@apperp/ui/use-incremental-list';
 
 import { Head, useForm, usePage } from '@inertiajs/react';
 
-import {
-    Building2,
-    Check,
-    ChevronRight,
-    Image,
-    Layers,
-    Mail,
-    MapPin,
-    Pencil,
-    Receipt,
-    Search,
-} from 'lucide-react';
-import { useRef, useState } from 'react';
+import { Image, Mail, MapPin, Receipt } from 'lucide-react';
+import { useCallback, useRef, useState } from 'react';
 import type { RefObject } from 'react';
-import Heading from '@/components/heading';
+import { apiJson } from '@/lib/core-api';
 
 import {
     OrganizationAddressesSection,
@@ -140,13 +124,11 @@ function CreateOrganizationDialog({
     classification,
     operatingUnitTypes,
     triggerLabel,
-    organizationIds,
     onCreated,
 }: {
     classification: Organization['classification'];
     operatingUnitTypes: Props['operatingUnitTypes'];
     triggerLabel: string;
-    organizationIds: string[];
     onCreated: (organization: Organization) => void;
 }) {
     const [open, setOpen] = useState(false);
@@ -166,20 +148,27 @@ function CreateOrganizationDialog({
     const legalEntity = classification === 'legal_entity';
 
     return (
-        <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger asChild>
+        <PageDialog
+            open={open}
+            onOpenChange={(next) => {
+                if (!form.processing) {
+                    setOpen(next);
+                }
+            }}
+        >
+            <PageDialogTrigger asChild>
                 <ActionButton action="create" size="sm">
                     Tambah {triggerLabel.toLocaleLowerCase()}
                 </ActionButton>
-            </SheetTrigger>
-            <SheetContent ref={contentRef} side="right">
-                <SheetHeader>
-                    <SheetTitle>
+            </PageDialogTrigger>
+            <PageDialogContent ref={contentRef}>
+                <PageDialogHeader>
+                    <PageDialogTitle>
                         {legalEntity
                             ? 'Buat perusahaan'
                             : 'Buat operating unit'}
-                    </SheetTitle>
-                </SheetHeader>
+                    </PageDialogTitle>
+                </PageDialogHeader>
                 <form
                     className="flex min-h-0 flex-1 flex-col"
                     onSubmit={(event) => {
@@ -191,14 +180,8 @@ function CreateOrganizationDialog({
                         }));
                         form.post('/settings/organization/organizations', {
                             onSuccess: (page) => {
-                                const created = (
-                                    page.props.organizations as Organization[]
-                                ).find(
-                                    (organization) =>
-                                        !organizationIds.includes(
-                                            organization.id,
-                                        ),
-                                );
+                                const created = page.props
+                                    .savedOrganization as Organization | null;
 
                                 if (created) {
                                     onCreated(created);
@@ -230,7 +213,7 @@ function CreateOrganizationDialog({
                                 <FieldError>{form.errors.name}</FieldError>
                             </Field>
                             {legalEntity ? (
-                                <div className="grid gap-4 md:grid-cols-2">
+                                <div className="grid gap-4 py-2 md:grid-cols-2">
                                     <Field
                                         data-invalid={Boolean(
                                             form.errors.company_code,
@@ -293,7 +276,7 @@ function CreateOrganizationDialog({
                                     />
                                 </div>
                             ) : (
-                                <div className="grid gap-4 md:grid-cols-2">
+                                <div className="grid gap-4 py-2 md:grid-cols-2">
                                     <Field
                                         data-invalid={Boolean(
                                             form.errors.operating_unit_type,
@@ -370,7 +353,7 @@ function CreateOrganizationDialog({
                             )}
                         </FieldGroup>
                     </div>
-                    <SheetFooter>
+                    <PageDialogFooter>
                         <Button type="submit" disabled={form.processing}>
                             Simpan Organisasi
                         </Button>
@@ -382,10 +365,10 @@ function CreateOrganizationDialog({
                         >
                             Batal
                         </Button>
-                    </SheetFooter>
+                    </PageDialogFooter>
                 </form>
-            </SheetContent>
-        </Sheet>
+            </PageDialogContent>
+        </PageDialog>
     );
 }
 
@@ -452,10 +435,12 @@ function OrganizationDetailPage({
     canManage,
     operatingUnitTypes,
     initialEditing = false,
+    onUpdated,
 }: {
     organization: Organization;
     canManage: boolean;
     initialEditing?: boolean;
+    onUpdated: (organization: Organization) => void;
     operatingUnitTypes: Props['operatingUnitTypes'];
 }) {
     const legalEntity = organization.classification === 'legal_entity';
@@ -485,28 +470,28 @@ function OrganizationDetailPage({
         ? [
               {
                   value: 'addresses',
-                  title: 'Alamat Utama & Cabang',
+                  title: 'Alamat',
                   description:
                       'Alamat utama dan lokasi kantor perusahaan; alamat utama tampil pada kop dokumen.',
                   icon: MapPin,
               },
               {
                   value: 'contact-information',
-                  title: 'Informasi Kontak & Komunikasi',
+                  title: 'Informasi kontak',
                   description:
                       'Email resmi, telepon, WhatsApp, faks, dan laman; kontak utama tampil pada kop dokumen.',
                   icon: Mail,
               },
               {
                   value: 'print-identity',
-                  title: 'Identitas Cetak: Kop, Footer & Logo',
+                  title: 'Identitas cetak',
                   description:
                       'Nama pada kop, baris induk, NPWP/NIB, footer, dan logo pada semua dokumen yang dicetak.',
                   icon: Image,
               },
               {
                   value: 'finance-posting',
-                  title: 'Posting ke Aplikasi Finance',
+                  title: 'Posting finance',
                   description:
                       'Aktif atau tidaknya pengiriman jurnal, tanggal cutover, dan kebijakan jurnal perolehan.',
                   icon: Receipt,
@@ -515,20 +500,20 @@ function OrganizationDetailPage({
         : [
               {
                   value: 'addresses',
-                  title: 'Alamat Lokasi Kerja',
+                  title: 'Alamat',
                   description: 'Alamat fisik unit operasional ini.',
                   icon: MapPin,
               },
               {
                   value: 'contact-information',
-                  title: 'Informasi Kontak Unit',
+                  title: 'Informasi kontak',
                   description:
                       'Email dan kontak penanggung jawab unit operasional.',
                   icon: Mail,
               },
               {
                   value: 'print-identity',
-                  title: 'Identitas Cetak Unit (Kop Sendiri)',
+                  title: 'Identitas cetak',
                   description:
                       'Isi hanya bila unit ini mencetak dengan kop sendiri, misalnya puskesmas di bawah dinas. Kosong berarti memakai kop perusahaan.',
                   icon: Image,
@@ -541,86 +526,59 @@ function OrganizationDetailPage({
     );
 
     return (
-        <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-card text-foreground">
-            {/* Header Sticky Detail dengan Banner Khas */}
-            <div className="sticky top-0 z-10 flex min-w-0 shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-card/90 px-6 py-4 backdrop-blur-md">
-                <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary shadow-2xs">
-                        {legalEntity ? (
-                            <Building2 className="size-5" />
-                        ) : (
-                            <Layers className="size-5" />
+        <RecordEditBoundary
+            editing={editing}
+            canEdit={canManage}
+            disabled={form.processing}
+            onEdit={() => setEditing(true)}
+            className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-card text-foreground"
+        >
+            <RecordActionBar
+                title={organization.name}
+                trailing={
+                    <>
+                        <Badge variant="outline">
+                            {organization.status === 'active'
+                                ? 'Aktif'
+                                : 'Nonaktif'}
+                        </Badge>
+                        {needsNumber(organization.operating_unit) && (
+                            <MissingNumberBadge />
                         )}
-                    </div>
-                    <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                            <CardTitle className="truncate text-base font-bold text-foreground">
-                                {organization.name}
-                            </CardTitle>
-                        </div>
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                            <Badge variant="outline">
-                                {legalEntity ? 'Perusahaan' : 'Operating unit'}
-                            </Badge>
-                            <span>
-                                {legalEntity
-                                    ? `${organization.legal_entity?.company_code ?? 'Belum ada kode'} · ${organization.legal_entity?.country_code ?? 'Belum ada negara'}`
-                                    : [
-                                          unitType,
-                                          organization.operating_unit?.number,
-                                      ]
-                                          .filter(Boolean)
-                                          .join(' · ')}
-                            </span>
-                            {needsNumber(organization.operating_unit) && (
-                                <MissingNumberBadge />
-                            )}
-                        </div>
-                    </div>
-                </div>
-                {canManage && (
-                    <RecordActionBar>
-                        {!editing ? (
+                    </>
+                }
+            >
+                {canManage &&
+                    (!editing ? (
+                        <ActionButton
+                            action="edit"
+                            onClick={() => setEditing(true)}
+                        >
+                            Ubah
+                        </ActionButton>
+                    ) : (
+                        <>
                             <Button
-                                type="button"
-                                size="sm"
-                                onClick={() => setEditing(true)}
-                                className="text-xs font-medium shadow-xs"
+                                type="submit"
+                                form={`organization-form-${organization.id}`}
+                                disabled={form.processing}
                             >
-                                <Pencil className="mr-1.5 size-3.5" /> Ubah
-                                Organisasi
+                                Simpan
                             </Button>
-                        ) : (
-                            <div className="flex gap-2">
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-xs"
-                                    onClick={() => {
-                                        form.reset();
-                                        form.clearErrors();
-                                        setEditing(false);
-                                    }}
-                                    disabled={form.processing}
-                                >
-                                    Batal
-                                </Button>
-                                <Button
-                                    type="submit"
-                                    size="sm"
-                                    className="text-xs shadow-xs"
-                                    form={`organization-form-${organization.id}`}
-                                    disabled={form.processing}
-                                >
-                                    <Check className="mr-1.5 size-3.5" /> Simpan
-                                </Button>
-                            </div>
-                        )}
-                    </RecordActionBar>
-                )}
-            </div>
-
+                            <Button
+                                variant="outline"
+                                onClick={() => {
+                                    form.reset();
+                                    form.clearErrors();
+                                    setEditing(false);
+                                }}
+                                disabled={form.processing}
+                            >
+                                Batal
+                            </Button>
+                        </>
+                    ))}
+            </RecordActionBar>
             {/* Content Accordion */}
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-6">
                 <form
@@ -634,513 +592,421 @@ function OrganizationDetailPage({
                         }));
                         form.patch(
                             `/settings/organization/organizations/${organization.id}`,
-                            { onSuccess: () => setEditing(false) },
+                            {
+                                onSuccess: (page) => {
+                                    setEditing(false);
+                                    const saved = page.props
+                                        .savedOrganization as Organization | null;
+
+                                    if (saved) {
+                                        onUpdated(saved);
+                                    }
+                                },
+                            },
                         );
                     }}
                 >
-                    <Accordion
-                        type="multiple"
+                    <CollapsibleSectionGroup
                         defaultValue={['general']}
                         className="space-y-3"
                     >
-                        <AccordionItem
+                        <CollapsibleSection
                             value="general"
-                            className="rounded-xl border border-border/80 bg-card px-5 shadow-2xs"
+                            title="Umum"
+                            summary={
+                                legalEntity
+                                    ? `${organization.legal_entity?.company_code ?? '-'} - ${organization.name}`
+                                    : `${organization.operating_unit?.number ?? '-'} - ${organization.name}`
+                            }
                         >
-                            <AccordionTrigger className="py-3.5 text-xs font-bold tracking-wider text-foreground uppercase hover:no-underline">
-                                <span className="flex items-center gap-2">
-                                    <Building2 className="size-4 shrink-0 text-primary" />
-                                    Identitas Umum Organisasi
-                                </span>
-                            </AccordionTrigger>
-                            <AccordionContent className="pt-1 pb-5">
-                                <FieldGroup className="grid gap-4 md:grid-cols-2">
-                                    <Field
-                                        data-invalid={Boolean(form.errors.name)}
-                                    >
-                                        <Input
-                                            label="Nama Organisasi"
-                                            required
-                                            value={form.data.name}
-                                            readOnly={!editing}
-                                            onChange={(event) =>
-                                                form.setData(
-                                                    'name',
-                                                    event.target.value,
-                                                )
-                                            }
-                                            aria-invalid={Boolean(
-                                                form.errors.name,
+                            <FieldGroup className="grid gap-4 py-2 md:grid-cols-2">
+                                <Field data-invalid={Boolean(form.errors.name)}>
+                                    <Input
+                                        label="Nama Organisasi"
+                                        required
+                                        value={form.data.name}
+                                        readOnly={!editing}
+                                        onChange={(event) =>
+                                            form.setData(
+                                                'name',
+                                                event.target.value,
+                                            )
+                                        }
+                                        aria-invalid={Boolean(form.errors.name)}
+                                    />
+                                    <FieldError>{form.errors.name}</FieldError>
+                                </Field>
+                                {legalEntity ? (
+                                    <>
+                                        <Field
+                                            data-invalid={Boolean(
+                                                form.errors.company_code,
                                             )}
-                                        />
-                                        <FieldError>
-                                            {form.errors.name}
-                                        </FieldError>
-                                    </Field>
-                                    {legalEntity ? (
-                                        <>
-                                            <Field
-                                                data-invalid={Boolean(
-                                                    form.errors.company_code,
-                                                )}
-                                            >
-                                                <Input
-                                                    label="Kode Perusahaan"
-                                                    required
-                                                    value={
-                                                        form.data.company_code
-                                                    }
-                                                    readOnly={!editing}
-                                                    onChange={(event) =>
-                                                        form.setData(
-                                                            'company_code',
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                    aria-invalid={Boolean(
-                                                        form.errors
-                                                            .company_code,
-                                                    )}
-                                                />
-                                                <FieldError>
-                                                    {form.errors.company_code}
-                                                </FieldError>
-                                            </Field>
-                                            <Field
-                                                data-invalid={Boolean(
-                                                    form.errors.country_code,
-                                                )}
-                                            >
-                                                <Input
-                                                    label="Kode Negara (ISO)"
-                                                    required
-                                                    value={
-                                                        form.data.country_code
-                                                    }
-                                                    readOnly={!editing}
-                                                    onChange={(event) =>
-                                                        form.setData(
-                                                            'country_code',
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                    aria-invalid={Boolean(
-                                                        form.errors
-                                                            .country_code,
-                                                    )}
-                                                    maxLength={2}
-                                                />
-                                                <FieldError>
-                                                    {form.errors.country_code}
-                                                </FieldError>
-                                            </Field>
-                                            <LegalEntityTimezoneField
-                                                value={form.data.timezone}
-                                                onChange={(value) =>
+                                        >
+                                            <Input
+                                                label="Kode Perusahaan"
+                                                required
+                                                value={form.data.company_code}
+                                                readOnly={!editing}
+                                                onChange={(event) =>
                                                     form.setData(
-                                                        'timezone',
-                                                        value,
+                                                        'company_code',
+                                                        event.target.value,
                                                     )
                                                 }
-                                                error={form.errors.timezone}
-                                                editing={editing}
+                                                aria-invalid={Boolean(
+                                                    form.errors.company_code,
+                                                )}
                                             />
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Field
-                                                data-invalid={Boolean(
-                                                    form.errors
-                                                        .operating_unit_type,
+                                            <FieldError>
+                                                {form.errors.company_code}
+                                            </FieldError>
+                                        </Field>
+                                        <Field
+                                            data-invalid={Boolean(
+                                                form.errors.country_code,
+                                            )}
+                                        >
+                                            <Input
+                                                label="Kode Negara (ISO)"
+                                                required
+                                                value={form.data.country_code}
+                                                readOnly={!editing}
+                                                onChange={(event) =>
+                                                    form.setData(
+                                                        'country_code',
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                aria-invalid={Boolean(
+                                                    form.errors.country_code,
                                                 )}
-                                            >
-                                                {editing ? (
-                                                    <Select
-                                                        label="Tipe operating unit"
-                                                        required
-                                                        items={Object.entries(
-                                                            operatingUnitTypes,
-                                                        ).map(
-                                                            ([
-                                                                value,
-                                                                label,
-                                                            ]) => ({
-                                                                value,
-                                                                label,
-                                                            }),
-                                                        )}
-                                                        value={
-                                                            form.data
-                                                                .operating_unit_type ||
-                                                            null
-                                                        }
-                                                        onValueChange={(
-                                                            value,
-                                                        ) =>
-                                                            form.setData(
-                                                                'operating_unit_type',
-                                                                value ?? '',
-                                                            )
-                                                        }
-                                                        aria-invalid={Boolean(
-                                                            form.errors
-                                                                .operating_unit_type,
-                                                        )}
-                                                    />
-                                                ) : (
-                                                    <Input
-                                                        label="Tipe operating unit"
-                                                        value={unitType ?? ''}
-                                                        readOnly
-                                                    />
-                                                )}
-                                                <FieldError>
-                                                    {
-                                                        form.errors
-                                                            .operating_unit_type
+                                                maxLength={2}
+                                            />
+                                            <FieldError>
+                                                {form.errors.country_code}
+                                            </FieldError>
+                                        </Field>
+                                        <LegalEntityTimezoneField
+                                            value={form.data.timezone}
+                                            onChange={(value) =>
+                                                form.setData('timezone', value)
+                                            }
+                                            error={form.errors.timezone}
+                                            editing={editing}
+                                        />
+                                    </>
+                                ) : (
+                                    <>
+                                        <Field
+                                            data-invalid={Boolean(
+                                                form.errors.operating_unit_type,
+                                            )}
+                                        >
+                                            {editing ? (
+                                                <Select
+                                                    label="Tipe operating unit"
+                                                    required
+                                                    items={Object.entries(
+                                                        operatingUnitTypes,
+                                                    ).map(([value, label]) => ({
+                                                        value,
+                                                        label,
+                                                    }))}
+                                                    value={
+                                                        form.data
+                                                            .operating_unit_type ||
+                                                        null
                                                     }
-                                                </FieldError>
-                                            </Field>
-                                            <Field
-                                                data-invalid={Boolean(
+                                                    onValueChange={(value) =>
+                                                        form.setData(
+                                                            'operating_unit_type',
+                                                            value ?? '',
+                                                        )
+                                                    }
+                                                    aria-invalid={Boolean(
+                                                        form.errors
+                                                            .operating_unit_type,
+                                                    )}
+                                                />
+                                            ) : (
+                                                <Input
+                                                    label="Tipe operating unit"
+                                                    value={unitType ?? ''}
+                                                    readOnly
+                                                />
+                                            )}
+                                            <FieldError>
+                                                {
+                                                    form.errors
+                                                        .operating_unit_type
+                                                }
+                                            </FieldError>
+                                        </Field>
+                                        <Field
+                                            data-invalid={Boolean(
+                                                form.errors
+                                                    .operating_unit_number,
+                                            )}
+                                        >
+                                            <Input
+                                                label="Kode unit"
+                                                required={
+                                                    editing &&
+                                                    [
+                                                        'business_unit',
+                                                        'department',
+                                                    ].includes(
+                                                        form.data
+                                                            .operating_unit_type,
+                                                    )
+                                                }
+                                                value={
+                                                    form.data
+                                                        .operating_unit_number
+                                                }
+                                                readOnly={!editing}
+                                                onChange={(event) =>
+                                                    form.setData(
+                                                        'operating_unit_number',
+                                                        event.target.value.toUpperCase(),
+                                                    )
+                                                }
+                                                maxLength={30}
+                                                placeholder={
+                                                    editing
+                                                        ? 'Contoh: KLN-A'
+                                                        : 'Belum diisi'
+                                                }
+                                                aria-invalid={Boolean(
                                                     form.errors
                                                         .operating_unit_number,
                                                 )}
-                                            >
-                                                <Input
-                                                    label="Kode unit"
-                                                    required={
-                                                        editing &&
-                                                        [
-                                                            'business_unit',
-                                                            'department',
-                                                        ].includes(
-                                                            form.data
-                                                                .operating_unit_type,
-                                                        )
-                                                    }
-                                                    value={
-                                                        form.data
-                                                            .operating_unit_number
-                                                    }
-                                                    readOnly={!editing}
-                                                    onChange={(event) =>
-                                                        form.setData(
-                                                            'operating_unit_number',
-                                                            event.target.value.toUpperCase(),
-                                                        )
-                                                    }
-                                                    maxLength={30}
-                                                    placeholder={
-                                                        editing
-                                                            ? 'Contoh: KLN-A'
-                                                            : 'Belum diisi'
-                                                    }
-                                                    aria-invalid={Boolean(
-                                                        form.errors
-                                                            .operating_unit_number,
-                                                    )}
-                                                />
-                                                <FieldDescription>
-                                                    Kode unik untuk membedakan
-                                                    unit yang namanya sama.
-                                                    Gunakan huruf besar, angka,
-                                                    atau tanda hubung. Kode ini
-                                                    juga dikirim ke Finance;
-                                                    perubahan tidak mengubah
-                                                    jurnal yang sudah terkirim.
-                                                </FieldDescription>
-                                                <FieldError>
-                                                    {
-                                                        form.errors
-                                                            .operating_unit_number
-                                                    }
-                                                </FieldError>
-                                            </Field>
-                                        </>
-                                    )}
-                                </FieldGroup>
-                            </AccordionContent>
-                        </AccordionItem>
+                                            />
+                                            <FieldDescription>
+                                                Kode unik untuk membedakan unit
+                                                yang namanya sama. Gunakan huruf
+                                                besar, angka, atau tanda hubung.
+                                                Kode ini juga dikirim ke
+                                                Finance; perubahan tidak
+                                                mengubah jurnal yang sudah
+                                                terkirim.
+                                            </FieldDescription>
+                                            <FieldError>
+                                                {
+                                                    form.errors
+                                                        .operating_unit_number
+                                                }
+                                            </FieldError>
+                                        </Field>
+                                    </>
+                                )}
+                            </FieldGroup>
+                        </CollapsibleSection>
                         {extraSections.map((section) => {
                             return (
-                                <AccordionItem
+                                <CollapsibleSection
                                     key={section.value}
                                     value={section.value}
-                                    className="rounded-xl border border-border/80 bg-card px-5 shadow-2xs"
+                                    title={section.title}
+                                    summary={section.description}
                                 >
-                                    <AccordionTrigger className="py-3.5 text-xs font-bold text-foreground hover:no-underline">
-                                        <span className="flex items-center gap-2">
-                                            {section.title}
-                                        </span>
-                                    </AccordionTrigger>
-                                    <AccordionContent className="pt-1 pb-5">
-                                        <OrganizationExtraSectionContent
-                                            section={section}
-                                            organization={organization}
-                                            canManage={canManage}
-                                            canManageFinancePosting={
-                                                canManageFinancePosting
-                                            }
-                                        />
-                                    </AccordionContent>
-                                </AccordionItem>
+                                    <OrganizationExtraSectionContent
+                                        section={section}
+                                        organization={organization}
+                                        canManage={canManage}
+                                        canManageFinancePosting={
+                                            canManageFinancePosting
+                                        }
+                                    />
+                                </CollapsibleSection>
                             );
                         })}
-                    </Accordion>
+                    </CollapsibleSectionGroup>
                 </form>
             </div>
-        </div>
+        </RecordEditBoundary>
     );
 }
 
 export default function OrganizationDirectory({
     canManage,
-    organizations,
     operatingUnitTypes,
     classification,
     title,
-}: Pick<Props, 'canManage' | 'organizations' | 'operatingUnitTypes'> & {
+}: Pick<
+    Props,
+    'canManage' | 'organizations' | 'operatingUnitTypes' | 'savedOrganization'
+> & {
     classification: Organization['classification'];
     title: string;
 }) {
-    const [selectedOrganizationId, setSelectedOrganizationId] = useState<
-        string | null
-    >(null);
+    const [selectedOrganization, setSelectedOrganization] =
+        useState<Organization | null>(null);
+    const [showDetail, setShowDetail] = useState(false);
     const [organizationSearch, setOrganizationSearch] = useState('');
     const [createdOrganizationId, setCreatedOrganizationId] = useState<
         string | null
     >(null);
+    const path =
+        classification === 'legal_entity'
+            ? '/settings/legal-entities'
+            : '/settings/operating-units';
+    const loader = useCallback<ListLoader<Organization>>(
+        async ({ query, cursor, sort, signal }) => {
+            const params = new URLSearchParams({ incremental: '1', q: query });
 
-    const visibleOrganizations = organizations.filter(
-        (organization) => organization.classification === classification,
-    );
-
-    const organizationSearchTerm = organizationSearch
-        .trim()
-        .toLocaleLowerCase();
-    const filteredOrganizations = visibleOrganizations.filter(
-        (organization) => {
-            if (!organizationSearchTerm) {
-                return true;
+            if (cursor) {
+                params.set('cursor', cursor);
             }
 
-            return [
-                organization.name,
-                organization.legal_entity?.company_code,
-                organization.legal_entity?.country_code,
-                organization.operating_unit?.number ?? undefined,
-                organization.operating_unit?.type,
-                organization.operating_unit?.type
-                    ? operatingUnitTypes[organization.operating_unit.type]
-                    : undefined,
-            ].some((value) =>
-                value?.toLocaleLowerCase().includes(organizationSearchTerm),
-            );
+            if (sort) {
+                params.set('sort', sort.columnId);
+                params.set('direction', sort.direction);
+            }
+
+            const result = await apiJson<{
+                data: Organization[];
+                next_cursor: string | null;
+            }>(`${path}?${params}`, { signal });
+
+            return { items: result.data, nextCursor: result.next_cursor };
         },
+        [path],
     );
-    const selectedOrganization =
-        visibleOrganizations.find(
-            (organization) => organization.id === selectedOrganizationId,
-        ) ?? null;
+    const list = useIncrementalList({
+        loadItems: loader,
+        query: organizationSearch,
+        getKey: (item) => item.id,
+    });
+    const code = (item: Organization) =>
+        item.legal_entity?.company_code ?? item.operating_unit?.number ?? '';
+    const saved = (organization: Organization) => {
+        setSelectedOrganization(organization);
+        setShowDetail(true);
+        list.reload();
+    };
 
     return (
         <>
             <Head title={title} />
-            <main className="flex min-w-0 flex-col gap-6 p-4 sm:p-6">
-                <Heading title={title} />
-                <Card>
-                    <CardHeader>
-                        <CardTitle>
-                            Daftar {title.toLocaleLowerCase()}
-                        </CardTitle>
+            <ListPageLayout
+                header={
+                    <RecordActionBar title={title}>
                         {canManage && (
-                            <CardAction className="col-span-2 col-start-1 row-span-1 row-start-2 justify-self-start sm:col-span-1 sm:col-start-2 sm:row-start-1 sm:justify-self-end">
-                                <CreateOrganizationDialog
-                                    classification={classification}
-                                    operatingUnitTypes={operatingUnitTypes}
-                                    triggerLabel={title}
-                                    organizationIds={organizations.map(
-                                        (organization) => organization.id,
-                                    )}
-                                    onCreated={(organization) => {
-                                        setSelectedOrganizationId(
-                                            organization.id,
-                                        );
-                                        setCreatedOrganizationId(
-                                            organization.id,
-                                        );
-                                        setOrganizationSearch('');
-                                    }}
-                                />
-                            </CardAction>
+                            <CreateOrganizationDialog
+                                classification={classification}
+                                operatingUnitTypes={operatingUnitTypes}
+                                triggerLabel={title}
+                                onCreated={(organization) => {
+                                    saved(organization);
+                                    setCreatedOrganizationId(organization.id);
+                                    setOrganizationSearch('');
+                                }}
+                            />
                         )}
-                    </CardHeader>
-                    <CardContent>
-                        {visibleOrganizations.length ? (
-                            <div className="grid min-w-0 gap-0 lg:min-h-[32rem] lg:grid-cols-[20rem_minmax(0,1fr)]">
-                                {/* Sidebar Daftar Organisasi Kiri */}
-                                <aside className="flex min-w-0 flex-col overflow-hidden border-r border-border bg-card/40">
-                                    <div className="shrink-0 space-y-2 border-b border-border p-4">
-                                        <div className="flex items-center justify-between">
-                                            <p className="text-sm font-medium text-muted-foreground">
-                                                Pilih Organisasi
-                                            </p>
-                                            <Badge
-                                                variant="outline"
-                                                className="text-[10px]"
-                                            >
-                                                {filteredOrganizations.length}{' '}
-                                                Total
-                                            </Badge>
-                                        </div>
-                                        <div className="relative">
-                                            <Search className="absolute top-2.5 left-2.5 size-3.5 text-muted-foreground" />
-                                            <Input
-                                                aria-label="Cari organisasi"
-                                                placeholder="Cari nama atau kode..."
-                                                value={organizationSearch}
-                                                className="h-8 bg-background pl-8 text-xs"
-                                                onChange={(event) =>
-                                                    setOrganizationSearch(
-                                                        event.target.value,
-                                                    )
-                                                }
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
-                                        {filteredOrganizations.length ? (
-                                            filteredOrganizations.map(
-                                                (organization) => {
-                                                    const selected =
-                                                        organization.id ===
-                                                        selectedOrganization?.id;
-                                                    const subtitle =
-                                                        organization.legal_entity
-                                                            ? `${organization.legal_entity.company_code} · ${organization.legal_entity.country_code}`
-                                                            : [
-                                                                  operatingUnitTypes[
-                                                                      organization
-                                                                          .operating_unit
-                                                                          ?.type ??
-                                                                          ''
-                                                                  ] ??
-                                                                      organization
-                                                                          .operating_unit
-                                                                          ?.type,
-                                                                  organization
-                                                                      .operating_unit
-                                                                      ?.number,
-                                                              ]
-                                                                  .filter(
-                                                                      Boolean,
-                                                                  )
-                                                                  .join(' · ');
-
-                                                    return (
-                                                        <button
-                                                            key={
-                                                                organization.id
-                                                            }
-                                                            type="button"
-                                                            aria-pressed={
-                                                                selected
-                                                            }
-                                                            onClick={() => {
-                                                                setSelectedOrganizationId(
-                                                                    organization.id,
-                                                                );
-                                                                setCreatedOrganizationId(
-                                                                    null,
-                                                                );
-                                                            }}
-                                                            className={`group flex w-full items-center justify-between rounded-lg border-l-4 p-3 text-left transition-all ${
-                                                                selected
-                                                                    ? 'border-l-primary bg-primary/10 font-semibold text-primary shadow-2xs'
-                                                                    : 'border-l-transparent text-foreground hover:bg-muted/50'
-                                                            }`}
-                                                        >
-                                                            <div className="flex min-w-0 flex-1 items-start gap-2.5 pr-2">
-                                                                {organization.legal_entity ? (
-                                                                    <Building2 className="mt-0.5 size-4 shrink-0 text-primary" />
-                                                                ) : (
-                                                                    <Layers className="mt-0.5 size-4 shrink-0 text-primary" />
-                                                                )}
-                                                                <div className="min-w-0 flex-1">
-                                                                    <span className="block truncate text-xs leading-tight font-semibold">
-                                                                        {
-                                                                            organization.name
-                                                                        }
-                                                                    </span>
-                                                                    <span className="mt-0.5 block truncate text-[11px] font-normal text-muted-foreground">
-                                                                        {
-                                                                            subtitle
-                                                                        }
-                                                                    </span>
-                                                                    {needsNumber(
-                                                                        organization.operating_unit,
-                                                                    ) && (
-                                                                        <span className="mt-1 block">
-                                                                            <MissingNumberBadge />
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                            <ChevronRight className="size-4 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
-                                                        </button>
-                                                    );
-                                                },
-                                            )
-                                        ) : (
-                                            <p className="p-4 text-center text-xs text-muted-foreground italic">
-                                                Tidak ada organisasi yang cocok.
-                                            </p>
-                                        )}
-                                    </div>
-                                </aside>
-
-                                {/* Section Detail Organisasi Terpilih */}
-                                {selectedOrganization && (
-                                    <div className="flex min-w-0 overflow-hidden bg-card">
-                                        <OrganizationDetailPage
-                                            key={selectedOrganization.id}
-                                            initialEditing={
-                                                createdOrganizationId ===
-                                                selectedOrganization.id
-                                            }
-                                            organization={selectedOrganization}
-                                            canManage={canManage}
-                                            operatingUnitTypes={
-                                                operatingUnitTypes
-                                            }
-                                        />
-                                    </div>
-                                )}
+                    </RecordActionBar>
+                }
+            >
+                <MasterDetailLayout
+                    detailOpen={showDetail}
+                    onDetailOpenChange={setShowDetail}
+                    list={
+                        <aside className="flex h-full min-h-0 min-w-0 flex-col">
+                            <div className="shrink-0 border-b p-3">
+                                <Input
+                                    type="search"
+                                    aria-label={`Cari ${title.toLocaleLowerCase()}`}
+                                    placeholder="Cari nama atau kode..."
+                                    value={organizationSearch}
+                                    onChange={(event) =>
+                                        setOrganizationSearch(
+                                            event.target.value,
+                                        )
+                                    }
+                                />
                             </div>
+                            <DataTable
+                                data={list.items}
+                                getRowKey={(item) => item.id}
+                                columns={[
+                                    {
+                                        id: 'code',
+                                        header: 'Kode',
+                                        cell: (item) => (
+                                            <DataTableText>
+                                                {code(item) ||
+                                                    'Belum ada nomor'}
+                                            </DataTableText>
+                                        ),
+                                        sortValue: code,
+                                        width: 110,
+                                    },
+                                    {
+                                        id: 'name',
+                                        header: 'Nama',
+                                        cell: (item) => (
+                                            <DataTableText>
+                                                {item.name}
+                                            </DataTableText>
+                                        ),
+                                        sortValue: (item) => item.name,
+                                    },
+                                ]}
+                                activeRowKey={selectedOrganization?.id}
+                                rowActivation="single-click"
+                                onRowClick={(organization) => {
+                                    setShowDetail(true);
+
+                                    if (
+                                        organization.id !==
+                                        selectedOrganization?.id
+                                    ) {
+                                        setCreatedOrganizationId(null);
+                                        setSelectedOrganization(organization);
+                                    }
+                                }}
+                                sort={list.sort}
+                                onSortChange={list.onSortChange}
+                                serverSort
+                                incremental={list}
+                                emptyMessage="Belum ada organisasi yang cocok."
+                            />
+                        </aside>
+                    }
+                >
+                    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+                        {selectedOrganization ? (
+                            <OrganizationDetailPage
+                                key={`${selectedOrganization.id}:${selectedOrganization.version}`}
+                                organization={selectedOrganization}
+                                initialEditing={
+                                    createdOrganizationId ===
+                                    selectedOrganization.id
+                                }
+                                canManage={canManage}
+                                operatingUnitTypes={operatingUnitTypes}
+                                onUpdated={(organization) => {
+                                    setCreatedOrganizationId(null);
+                                    saved(organization);
+                                }}
+                            />
                         ) : (
-                            <Empty className="py-16">
+                            <Empty>
                                 <EmptyHeader>
-                                    <EmptyMedia variant="icon">
-                                        <Building2 className="size-8 text-muted-foreground" />
-                                    </EmptyMedia>
                                     <EmptyTitle>
-                                        Belum Ada{' '}
-                                        {classification === 'legal_entity'
-                                            ? 'Perusahaan'
-                                            : 'Operating Unit'}
+                                        Pilih {title.toLocaleLowerCase()}
                                     </EmptyTitle>
-                                    <EmptyDescription className="max-w-sm text-xs text-muted-foreground">
-                                        {classification === 'legal_entity'
-                                            ? 'Buat perusahaan pertama agar transaksi resmi dan perpajakan memiliki identitas badan hukum.'
-                                            : 'Buat operating unit bila proses bisnis membutuhkan struktur departemen atau divisi.'}
+                                    <EmptyDescription>
+                                        Pilih organisasi dari daftar untuk
+                                        melihat atau mengubah rinciannya.
                                     </EmptyDescription>
                                 </EmptyHeader>
                             </Empty>
                         )}
-                    </CardContent>
-                </Card>
-            </main>
+                    </div>
+                </MasterDetailLayout>
+            </ListPageLayout>
         </>
     );
 }
