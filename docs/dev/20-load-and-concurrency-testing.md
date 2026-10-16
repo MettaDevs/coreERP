@@ -4,14 +4,14 @@ Dokumen ini menetapkan kapan sebuah modul boleh dinyatakan selesai. Test feature
 
 ## Syarat minimum
 
-| Dimensi | Minimum |
-| --- | --- |
-| Virtual user serentak | 1000+, ditahan, bukan lonjakan sesaat |
-| Tenant yang digerakkan bersamaan | 100+ |
-| Instance API di belakang load balancer | 2+, disarankan 4 |
-| Database | engine asli yang dipakai modul (PostgreSQL). Tidak pernah SQLite |
-| Durasi pada beban penuh | 90 detik+ setelah pemanasan |
-| Number Sequence | penerbit sungguhan di dalam runtime; oracle-nya tabel terbitan Core, bukan stub |
+| Dimensi                                | Minimum                                                                         |
+| -------------------------------------- | ------------------------------------------------------------------------------- |
+| Virtual user serentak                  | 1000+, ditahan, bukan lonjakan sesaat                                           |
+| Tenant yang digerakkan bersamaan       | 100+                                                                            |
+| Instance API di belakang load balancer | 2+, disarankan 4                                                                |
+| Database                               | engine asli yang dipakai modul (PostgreSQL). Tidak pernah SQLite                |
+| Durasi pada beban penuh                | 90 detik+ setelah pemanasan                                                     |
+| Number Sequence                        | penerbit sungguhan di dalam runtime; oracle-nya tabel terbitan Core, bukan stub |
 
 Beberapa instance bukan hiasan. Itu satu-satunya cara membuktikan modul tidak menyimpan counter, identitas tenant, atau cache permission pada memori satu proses API. Satu instance akan lulus test yang seharusnya gagal.
 
@@ -70,17 +70,17 @@ satu 2xx dan satu 409 — 409 di sana jawaban yang benar, bukan error aplikasi.
 
 Diukur pada concurrency tertinggi yang masih memenuhi SLO, bukan pada titik jenuh. Latensi pada beban jenuh mengukur kedalaman antrean, bukan biaya kode.
 
-| Operasi | p95 | p99 |
-| --- | --- | --- |
-| Baca (show, list) | < 200 ms | < 500 ms |
+| Operasi                                                          | p95      | p99      |
+| ---------------------------------------------------------------- | -------- | -------- |
+| Baca (show, list)                                                | < 200 ms | < 500 ms |
 | Tulis (create, update, archive), termasuk satu panggilan ke Core | < 400 ms | < 900 ms |
 
 Catat juga biaya request tunggal tanpa beban. Angka ini lebih dapat dipindahkan antar perangkat keras daripada persentil di bawah beban:
 
-| Jalur | Anggaran |
-| --- | --- |
-| Tanpa auth, tanpa database | < 25 ms |
-| Terautentikasi, baca satu tabel | < 50 ms |
+| Jalur                                          | Anggaran |
+| ---------------------------------------------- | -------- |
+| Tanpa auth, tanpa database                     | < 25 ms  |
+| Terautentikasi, baca satu tabel                | < 50 ms  |
 | Tulis terautentikasi termasuk penerbitan nomor | < 120 ms |
 
 ## Menyebut bottleneck adalah bagian dari gate
@@ -94,6 +94,50 @@ Periksa ini pertama, setiap kali:
 - Laravel membuka dan menutup koneksi database per request kecuali diperintahkan lain. PostgreSQL fork satu proses per koneksi, jadi koneksi per request menjadi badai fork jauh sebelum ada query yang lambat.
 - Perbaiki di lapis deployment: koneksi persisten (`DB_PERSISTENT`, dengan `MaxRequestWorkers × jumlah instance` tetap di bawah `max_connections`) atau connection pooler. PgBouncer single-threaded dan menghitung ulang autentikasi tiap koneksi klien, sehingga ia menjadi bottleneck berikutnya bila app tetap membuka koneksi per request.
 - Cache config dan route seperti produksi. Satu closure pada file route diam-diam mematikan `php artisan route:cache`; pakai controller.
+
+## Setting runtime dan penambahan node
+
+Konfigurasi SaaS berada di `deploy/saas/compose.yaml` dan `deploy/saas/Caddyfile`.
+`OCTANE_WORKERS` diteruskan dari env operator ke proses Octane; bila tidak diisi, nilainya
+tetap `auto`. Jumlah worker dipilih lewat pengukuran pada node yang akan dipakai, bukan
+disalin dari hasil server lain. Periksa CPU yang benar-benar tersedia, CPU steal, worker,
+koneksi, dan beban database bersama-sama. Worker tambahan dapat memindahkan antrean ke
+database tanpa menambah pekerjaan yang selesai.
+
+Health check `/up` tetap menjalankan Laravel lewat `public/index.php`, pada thread PHP
+biasa yang terpisah dari worker transaksi `frankenphp-worker.php`. Tujuannya supaya
+antrean transaksi tidak membuat proxy mengeluarkan node yang masih hidup. Pemeriksaan ini
+tidak membuktikan database dan transaksi memenuhi SLO; error bisnis, timeout, dan latensi
+tetap diukur sendiri. Konfigurasi harus diverifikasi lagi setelah recreate memakai digest
+image yang sama, bukan hanya setelah perubahan sementara lewat admin API.
+
+Prosedur pemasangan, tuning, dan pengukuran yang dapat dipakai ulang ada di skill
+`.agents/skills/coreerp-runtime-operations/SKILL.md`. Skill itu mengatur cara memilih dan
+memverifikasi setting; ia tidak menetapkan satu jumlah worker untuk semua node.
+
+## Memisahkan antrean dari biaya request
+
+Bandingkan waktu HTTP klien dengan waktu sejak request diterima worker hingga response
+siap, waktu sampai termination selesai, dan waktu query dari PHP. Selisih HTTP dan waktu
+worker mencakup antrean serta jaringan. Waktu PHP di luar query bukan otomatis waktu CPU,
+dan waktu query dari PHP sudah mencakup round trip serta wait database.
+
+Periksa juga waktu waiting/receiving, ukuran respons, jumlah baris, dan encoding klien.
+Parameter `per_page` yang dikirim test belum membuktikan endpoint memakainya. Respons yang
+mengirim seluruh dataset dapat lambat diterima walaupun eksekusi query cepat. Uji compression
+sebagai faktor terpisah dan catat apakah profil klien memang menyerupai browser atau consumer
+integrasi yang dimaksud.
+
+Pada FrankenPHP ZTS, CPU seluruh proses mencakup worker lain. Gunakan pengukuran per thread
+bila tersedia. Catat jumlah serta bentuk query dari request yang sama; penghitung transaksi
+PostgreSQL tidak boleh langsung dianggap jumlah query aplikasi. Jalankan SELECT representatif
+melalui `EXPLAIN ANALYZE` dengan `BUFFERS`, batas waktu, dan transaksi read-only. Jangan
+menjalankannya pada write karena perintah tersebut benar-benar dieksekusi.
+
+Instrumentasi sementara perlu pembanding tanpa profiler, batas durasi/ukuran, log privat,
+dan pemulihan berkas serta setting. Cookie, token, password, dan bindings autentikasi tidak
+masuk laporan. Latensi saat jenuh tetap dipisahkan dari biaya request tanpa beban; profiler
+tidak boleh mengubah penolakan cepat menjadi kesimpulan bahwa aplikasi lebih cepat.
 
 ## Bila load test tidak dapat dijalankan
 
