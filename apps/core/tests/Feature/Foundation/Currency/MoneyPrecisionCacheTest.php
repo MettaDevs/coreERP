@@ -48,6 +48,22 @@ class MoneyPrecisionCacheTest extends TestCase
         $this->assertSame(2, $precision->amountDecimals((string) Str::ulid(), 'IDR'));
     }
 
+    public function test_nested_savepoints_do_not_repeat_unchanged_reference_reads(): void
+    {
+        $tenant = (string) Str::ulid();
+        DB::enableQueryLog();
+        try {
+            $this->assertSame(2, app(CurrencyRounding::class)->amountDecimals($tenant, 'IDR'));
+            for ($index = 0; $index < 3; $index++) {
+                DB::transaction(fn () => $this->assertSame(2, app(CurrencyRounding::class)->amountDecimals($tenant, 'IDR')));
+            }
+            $reads = array_filter(DB::getQueryLog(), fn (array $query): bool => str_contains($query['query'], 'currency_precisions'));
+            $this->assertCount(1, $reads);
+        } finally {
+            DB::disableQueryLog();
+        }
+    }
+
     public function test_new_scope_observes_updates_from_another_writer(): void
     {
         $tenant = (string) Str::ulid();
@@ -80,6 +96,17 @@ class MoneyPrecisionCacheTest extends TestCase
             ]);
             DB::setDefaultConnection($copy);
             $this->assertSame(0, $precision->amountDecimals($tenant, 'IDR'));
+            $connection->table('currency_precisions')->update(['amount_decimals' => 1]);
+            $connection->beginTransaction();
+            try {
+                $this->assertSame(1, $precision->amountDecimals($tenant, 'IDR'));
+                $connection->table('currency_precisions')->update(['amount_decimals' => 2]);
+                $connection->commit();
+            } catch (\Throwable $exception) {
+                $connection->rollBack();
+                throw $exception;
+            }
+            $this->assertSame(2, $precision->amountDecimals($tenant, 'IDR'));
         } finally {
             DB::setDefaultConnection($original);
             DB::purge($copy);

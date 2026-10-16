@@ -40,7 +40,17 @@ final class CurrencyServiceProvider extends ServiceProvider
         };
         CurrencyPrecision::saved($forget);
         CurrencyPrecision::deleted($forget);
-        Event::listen([TransactionBeginning::class, TransactionCommitted::class, TransactionRolledBack::class], $forget);
+        Event::listen(TransactionBeginning::class, static function (TransactionBeginning $event) use ($forget): void {
+            if ($event->connection->transactionLevel() === 1) {
+                $forget();
+            }
+        });
+        Event::listen(TransactionCommitted::class, static function (TransactionCommitted $event) use ($forget): void {
+            if ($event->connection->transactionLevel() === 0) {
+                $forget();
+            }
+        });
+        Event::listen(TransactionRolledBack::class, $forget);
 
         // Engine analitik: mata uang adalah dimensi bersama yang ditunjuk dataset module; labelnya dari sini,
         // karena Platform tidak boleh menyebut fitur Foundation.

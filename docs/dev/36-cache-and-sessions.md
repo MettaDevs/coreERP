@@ -11,8 +11,9 @@ TTL pada respons transaksi bukan cara mengurangi biaya query tulis. Cari pengula
 eksekusinya dahulu; pembacaan referensi hanya boleh dipakai ulang bila batas hidup dan invalidasinya jelas.
 
 `MoneyPrecision` berbagi hasil baca dalam satu scope request/job. Kuncinya membedakan koneksi/database,
-tenant, dan mata uang. Penyimpanan atau penghapusan `CurrencyPrecision`, serta awal, commit, dan rollback
-transaksi membuang hasil itu. Request berikutnya pada worker Octane membaca ulang; tidak ada TTL lintas
+tenant, dan mata uang. Penyimpanan atau penghapusan `CurrencyPrecision`, awal/commit transaksi terluar,
+serta rollback termasuk savepoint membuang hasil itu. Savepoint yang berhasil tidak mengulang bacaan
+referensi yang sama. Request berikutnya pada worker Octane membaca ulang; tidak ada TTL lintas
 API yang membuat perubahan presisi terlambat terlihat. Counter dan nomor tidak ikut cache ini.
 
 Daftar work order memakai `IncrementalList` dengan tipe urut native yang dinyatakan server melalui
