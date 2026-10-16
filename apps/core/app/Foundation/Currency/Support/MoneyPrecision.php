@@ -51,7 +51,11 @@ final class MoneyPrecision
     public function forCurrency(string $tenantId, string $currencyCode): array
     {
         $code = strtoupper($currencyCode);
-        $key = $tenantId.'|'.$code;
+        $connection = (new CurrencyPrecision)->getConnection();
+        $key = json_encode([
+            $connection->getName(), $connection->getConfig('host'), $connection->getConfig('port'),
+            $connection->getDatabaseName(), $connection->getConfig('search_path'), $tenantId, $code,
+        ], JSON_THROW_ON_ERROR);
         if (isset($this->cache[$key])) {
             return $this->cache[$key];
         }

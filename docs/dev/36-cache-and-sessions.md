@@ -4,6 +4,27 @@ Core dapat menyimpan session dan cache framework pada Valkey di mesin yang sama 
 menyimpan data bisnis, nomor, audit, antrean pekerjaan, dan hasil cache analitik yang memang milik database tenant.
 Pemindahan ini tidak membuat respons API otomatis di-cache dan tidak menambah CPU yang tersedia untuk transaksi.
 
+## Cache pada jalur transaksi
+
+Posting, stok, status dokumen, hak akses, dan hasil sesudah simpan tetap membaca keadaan terbaru.
+TTL pada respons transaksi bukan cara mengurangi biaya query tulis. Cari pengulangan query dan rencana
+eksekusinya dahulu; pembacaan referensi hanya boleh dipakai ulang bila batas hidup dan invalidasinya jelas.
+
+`MoneyPrecision` berbagi hasil baca dalam satu scope request/job. Kuncinya membedakan koneksi/database,
+tenant, dan mata uang. Penyimpanan atau penghapusan `CurrencyPrecision`, awal/commit transaksi terluar,
+serta rollback termasuk savepoint membuang hasil itu. Savepoint yang berhasil tidak mengulang bacaan
+referensi yang sama. Penulisan tabel presisi melalui query builder atau SQL Laravel juga membuang cache,
+karena jalur itu tidak menerbitkan event model; SELECT biasa tidak membuangnya. Request berikutnya pada worker Octane membaca ulang; tidak ada TTL lintas
+API yang membuat perubahan presisi terlambat terlihat. Counter dan nomor tidak ikut cache ini.
+
+Daftar work order memakai `IncrementalList` dengan tipe urut native yang dinyatakan server melalui
+`nativeSortColumns`. Pengurutan tanggal asli dapat memakai indeks, tanpa cast teks untuk mengurutkan
+seluruh data. Format cursor lama, pemecah seri ID, posisi NULL di belakang, search/filter server, dan
+pembacaan langsung dari PostgreSQL dipertahankan. Kolom yang tidak menyatakan tipe native tetap memakai
+perilaku urut sebelumnya; jangan mengubah arti urutan kolom hanya untuk mendapatkan indeks.
+Cursor lanjutan memakai perbandingan pasangan nilai/ID. Kelompok NULL digabung dengan `UNION ALL` dalam
+satu statement, supaya index seek tetap bekerja dan edit bersamaan tidak menggandakan baris dalam satu batch.
+
 ## Batas host, tenant, dan lingkungan
 
 `ResolveEnvironment` menentukan lingkungan dari alamat yang terdaftar sebelum Laravel membuka sesi. Alamat asing

@@ -34,6 +34,7 @@ fallback per-instance untuk menutupi kegagalan penyimpan bersama. Verifikasi kon
 - Ikuti `docs/dev/20-load-and-concurrency-testing.md` dan gate proyek. Nyatakan gap topology, tenant, durasi, dan permukaan; satu instance tidak membuktikan multi-instance.
 - Uji business flow lewat sesi nyata. GET login hanya uji halaman login. Provision fixture lewat jalur tepercaya yang berlaku; setup dan smoke harus selesai sebelum pengukuran. Jangan mematikan limiter atau memalsukan konteks tenant agar setup lolos.
 - Pisahkan generator bila memungkinkan, tetapi periksa bebannya juga. Pakai fixture sama dan RUN_ID baru: idempotency key lama dapat mengembalikan dokumen selesai. Catat pertumbuhan data, warm-up, beban penuh, think time, dan drain terpisah.
+- Periksa CPU/affinity/cgroup, memori, jaringan, dan batas file descriptor generator pada proses k6 yang aktif. Jika batas proses dinaikkan, catat nilai sebelum/sesudah serta pemakaian aktual; jangan mengaitkan seluruh perubahan throughput ke kode ketika setting generator juga berubah.
 - Tunggu proses k6 selesai beserta drain sebelum mengganti konfigurasi; hasil yang tercampur dua konfigurasi tidak menjadi kontrol. Setelah reload, beri kontrol dan kandidat warm-up yang sama. Catat tenant yang benar-benar disentuh: fixture 128 tenant dengan pemilihan tetap per VU hanya menyentuh delapan tenant pada delapan VU, sehingga perbandingan antar-concurrency juga dapat mengubah campuran data.
 - Catat ukuran/cardinality respons dan header encoding klien. Pastikan parameter seperti `per_page` benar-benar membatasi hasil. Sesuaikan encoding dengan consumer yang diuji; jangan diam-diam mengganti compression antara baseline dan sesudah. Pisahkan waktu waiting/receiving dari proses di worker sebelum menyebut selisihnya antrean.
 - Untuk daftar bertahap, ukur batch pertama dan penelusuran cursor secara terpisah; search/filter/sort harus menemukan record di luar batch pertama. UI mengikuti scroll bertahap tanpa navigasi halaman sesuai `coreerp-ui`. Ulangi workload bisnis yang sama dengan encoding, fixture, worker, dan beban yang dicatat; jangan menyebut pengurangan payload batch pertama sebagai perbaikan throughput seluruh transaksi sebelum diukur.
@@ -45,6 +46,12 @@ fallback per-instance untuk menutupi kegagalan penyimpan bersama. Verifikasi kon
 - Jalankan race yang sengaja berebut dan oracle SQL pada fixture. Buktikan oracle bisa merah bila belum pernah diverifikasi; gunakan rollback untuk suntikan sementara. Jangan menghapus baris tersimpan secara fisik.
 
 ## Profiling bila kapasitas tetap rendah
+
+Untuk workload banyak tulis, jangan menutupi query mahal dengan TTL respons transaksi. Ukur pengulangan
+query, urutan yang menghalangi indeks, dan biaya commit. Pakai ulang bacaan referensi hanya dengan scope
+database/tenant yang benar serta invalidasi pada perubahan dan rollback; request berikutnya wajib melihat
+hasil simpan terbaru. Periksa kompatibilitas cursor, NULL, search/filter/sort ketika mempercepat daftar.
+Ukur batch pertama dan posisi scroll yang jauh; pemisahan kelompok NULL tetap harus membaca satu snapshot per batch.
 
 Baca [profiling.md](references/profiling.md) untuk membedakan antrean runtime, eksekusi PHP, query, dan scheduler. Mulai tanpa beban dan pada concurrency tertahan; latensi saat jenuh terutama mengukur antrean.
 

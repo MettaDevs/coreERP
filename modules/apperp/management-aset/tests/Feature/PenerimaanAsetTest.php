@@ -57,6 +57,20 @@ class PenerimaanAsetTest extends TestCase
         $this->assertSame(0, DB::table('aset_tr_aset')->where('penerimaan_aset_id', $dokumen)->count());
     }
 
+    public function test_standalone_receipt_does_not_read_purchase_request_records(): void
+    {
+        $group = $this->groupSiapSusut();
+        $reads = [];
+        DB::listen(static function ($query) use (&$reads): void {
+            if (str_contains($query->sql, 'from "aset_tr_permintaan_pengadaan_aset')) {
+                $reads[] = $query->sql;
+            }
+        });
+        $receipt = $this->draf([$this->baris(jumlah: 1, group: $group)]);
+        $this->selesaikan($receipt)->assertOk();
+        $this->assertSame([], $reads);
+    }
+
     public function test_nomor_po_manual_dapat_disimpan_dikosongkan_dan_dibatasi_panjangnya(): void
     {
         $payload = $this->payload([$this->baris(1)]);

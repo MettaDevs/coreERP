@@ -18,9 +18,10 @@ final class IncrementalList
      * @param  array<string, string>  $columns
      * @param  list<string>  $searchColumns
      * @param  list<string>  $numericColumns
+     * @param  array<string, 'string'|'date'|'numeric'>  $nativeSortColumns  Kolom yang urutan native-nya sama dengan kontrak cursor.
      * @return array{data: Collection<int, \stdClass>, next_cursor: ?string}
      */
-    public static function query(Request $request, Builder $query, array $columns, array $searchColumns, string $defaultSort = 'id', array $numericColumns = [], string $defaultDirection = 'asc', string $identity = 'id'): array
+    public static function query(Request $request, Builder $query, array $columns, array $searchColumns, string $defaultSort = 'id', array $numericColumns = [], string $defaultDirection = 'asc', string $identity = 'id', array $nativeSortColumns = []): array
     {
         $input = $request->validate([
             'q' => ['nullable', 'string', 'max:200'],
@@ -57,10 +58,6 @@ final class IncrementalList
             self::columnExpression($sort, in_array($sort, $numericColumns, true) ? 'COALESCE(%s, 0) AS list_sort_value' : "COALESCE(CAST(%s AS TEXT), '') AS list_sort_value"),
         );
         $list = $list->newQuery()->fromSub($list, 'sorted_records');
-        $list->orderBy('list_sort_null')->orderBy('list_sort_value', $direction);
-        if ($sort !== $identity) {
-            $list->orderBy($identity, $direction);
-        }
         $hasCursor = ($input['cursor'] ?? '') !== '' && ($input['cursor'] ?? null) !== null;
         try {
             $cursor = $hasCursor ? Cursor::fromEncoded($input['cursor']) : null;
@@ -75,15 +72,90 @@ final class IncrementalList
             || (in_array($sort, $numericColumns, true) && ! is_numeric($parameters['list_sort_value'] ?? null)))) {
             throw ValidationException::withMessages(['cursor' => 'Posisi daftar tidak valid. Muat ulang daftar.']);
         }
-        $batch = $list->cursorPaginate((int) ($input['per_page'] ?? 40), ['*'], 'cursor', $cursor);
-        $nextCursor = $batch->nextCursor()?->encode();
-        $rows = collect($batch->items())->map(function ($row) {
+        if (array_key_exists($sort, $nativeSortColumns)) {
+            if ($cursor !== null) {
+                $values = [];
+                $rules = [];
+                if (($parameters['list_sort_null'] ?? null) === 0) {
+                    $values['value'] = $parameters['list_sort_value'];
+                    $rules['value'] = [$nativeSortColumns[$sort] === 'string' ? 'present' : 'required', $nativeSortColumns[$sort]];
+                }
+                if ($sort !== $identity && isset($nativeSortColumns[$identity])) {
+                    $values['identity'] = $parameters[$identity];
+                    $rules['identity'] = [$nativeSortColumns[$identity] === 'string' ? 'present' : 'required', $nativeSortColumns[$identity]];
+                }
+                if (validator($values, $rules)->fails()) {
+                    throw ValidationException::withMessages(['cursor' => 'Posisi daftar tidak valid. Muat ulang daftar.']);
+                }
+            }
+            [$items, $nextCursor] = self::nativeBatch($list, $cursor, $sort, $direction, $identity, (int) ($input['per_page'] ?? 40));
+        } else {
+            $list->orderBy('list_sort_null')->orderBy('list_sort_value', $direction);
+            if ($sort !== $identity) {
+                $list->orderBy($identity, $direction);
+            }
+            $batch = $list->cursorPaginate((int) ($input['per_page'] ?? 40), ['*'], 'cursor', $cursor);
+            $items = collect($batch->items());
+            $nextCursor = $batch->nextCursor()?->encode();
+        }
+        $rows = $items->map(function ($row) {
             unset($row->list_sort_null, $row->list_sort_value);
 
             return $row;
         });
 
         return ['data' => $rows, 'next_cursor' => $nextCursor];
+    }
+
+    /** @return array{Collection<int, \stdClass>, ?string} */
+    private static function nativeBatch(Builder $query, ?Cursor $cursor, string $sort, string $direction, string $identity, int $size): array
+    {
+        $forward = $cursor?->pointsToNextItems() ?? true;
+        $comparison = ($direction === 'desc') === $forward ? '<' : '>';
+        $order = $direction === 'desc' ? ($forward ? 'desc' : 'asc') : ($forward ? 'asc' : 'desc');
+        $orderQuery = static function (Builder $ordered) use ($forward, $sort, $identity, $order): Builder {
+            $ordered->orderBy('list_sort_null', $forward ? 'asc' : 'desc')->orderBy($sort, $order);
+            if ($sort !== $identity) {
+                $ordered->orderBy($identity, $order);
+            }
+
+            return $ordered;
+        };
+        if ($cursor === null) {
+            $items = $orderQuery($query)->limit($size + 1)->get();
+        } else {
+            $null = $cursor->toArray()['list_sort_null'];
+            $part = (clone $query)->where('list_sort_null', $null);
+            if ($null === 1 || $sort === $identity) {
+                $part->where($identity, $comparison, $cursor->parameter($sort === $identity ? 'list_sort_value' : $identity));
+            } else {
+                $part->whereRowValues([$sort, $identity], $comparison, [$cursor->parameter('list_sort_value'), $cursor->parameter($identity)]);
+            }
+            $orderQuery($part)->limit($size + 1);
+            // Satu snapshot SQL; tiap cabang tetap dapat seek tanpa OR lintas kelompok NULL.
+            if (($forward && $null === 0) || (! $forward && $null === 1)) {
+                $tail = $orderQuery((clone $query)->where('list_sort_null', 1 - $null))->limit($size + 1);
+                $part->unionAll($tail);
+                $orderQuery($part)->limit($size + 1);
+            }
+            $items = $part->get();
+        }
+        $more = $items->count() > $size;
+        $items = $items->take($size);
+        if (! $forward) {
+            $items = $items->reverse()->values();
+        }
+        $next = null;
+        if ($items->isNotEmpty() && ($more || ! $forward)) {
+            $last = $items->last();
+            $parameters = ['list_sort_null' => (int) $last->list_sort_null, 'list_sort_value' => $last->list_sort_value];
+            if ($sort !== $identity) {
+                $parameters[$identity] = $last->{$identity};
+            }
+            $next = (new Cursor($parameters, true))->encode();
+        }
+
+        return [$items, $next];
     }
 
     /** @param literal-string $template SQL tetap; hanya nama kolom dari allowlist yang dibungkus grammar. */
