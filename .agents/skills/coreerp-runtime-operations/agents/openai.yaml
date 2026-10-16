@@ -1,0 +1,4 @@
+interface:
+    display_name: 'CoreERP runtime operations'
+    short_description: 'Pasang node, tuning, load test, dan profiling CoreERP'
+    default_prompt: 'Gunakan $coreerp-runtime-operations untuk menyiapkan atau mengukur runtime CoreERP dengan konfigurasi yang dapat diverifikasi dan dikembalikan.'

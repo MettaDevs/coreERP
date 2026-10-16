@@ -11,7 +11,7 @@ USER menyetujui rencana preview di BO melalui API dan meminta pengujian lokal. C
 | CORE-DOC-API-DEV | Rilis dan uji runtime dev | AGENT | COREERP DIPUSH; MENUNGGU BO + RELEASE | Commit CoreERP `9fe21508` ada di `origin/DIO` setelah pull origin/main. Belum deploy ke runtime; BO source masih lokal. BO PUSAT/PTDI credential terakhir tercatat HTTP401 (9 Okt). Setelah release/migration PO sesuai jalur dev, pulihkan/tes credential PTDI dan lakukan GET bukti pada receipt dev berlampiran. Migration source belum diterapkan ke DB dev. | 2026-10-14 |
 | CORE-DOC-CI-PR326 | Perbaiki check `tests / ci (8.4)` pada PR #326 | AGENT | LOKAL HIJAU; MENUNGGU RERUN GITHUB | `quality` lulus di CI setelah PHPStan memakai ID klien bertipe string (`96c976ab`). Diagnosis lokal suite menemukan empat sebab: inline YAML response 404 tidak valid untuk parser Symfony; DocsPortalTest belum mengharapkan dua endpoint bukti; test Penerimaan belum menetapkan disk lampiran lokal; test undangan memakai `first()` acak sehingga membership tenant yang salah kadang dicabut. Keempatnya diperbaiki. Bundler/coverage 25 route dan Pint 5 file lulus. Suite paralel PostgreSQL sementara: 2.412 test, 23.861 assertion, 5 skipped, lulus. Push koreksi dan tunggu CI GitHub sebelum menyatakan PR hijau. | 2026-10-14 |
 
-CoreERP runtime lokal memakai image turunan PHP/contract dari image existing dan app/worker/scheduler healthy tanpa migrate/seed. BO lokal telah mem-preview image PNG PNRA00028 pada source penyusutan ASTA00034. Token PTD1 kosong diisi terenkripsi dengan credential Windows existing setelah persetujuan eksplisit USER (perubahan hanya setting BO lokal); bukan token dev. PDF/S3/lintas server nyata belum dibuktikan. Bukti dan handoff kanonik: [E2E BO](../../../../bo_metta_anggaran_new/docs/integrasi-bo-coreerp/E2E_PROGRESS.md), [checklist BO](../../../../bo_metta_anggaran_new/docs/integrasi-bo-coreerp/CONFIG_TODO.md). Tidak membuat transaksi/GL/ACK.
+CoreERP runtime lokal memakai image turunan PHP/contract dari image existing dan app/worker/scheduler healthy tanpa migrate/seed. BO lokal telah mem-preview image PNG PNRA00028 pada source penyusutan ASTA00034. Token PTD1 kosong diisi terenkripsi dengan credential Windows existing setelah persetujuan eksplisit USER (perubahan hanya setting BO lokal); bukan token dev. PDF/S3/lintas server nyata belum dibuktikan. Bukti dan handoff kanonik: `docs/integrasi-bo-coreerp/E2E_PROGRESS.md` dan `docs/integrasi-bo-coreerp/CONFIG_TODO.md` di repo BO. Tidak membuat transaksi/GL/ACK.
 
 Rencana terbaru bukti PO/Penerimaan untuk Penerimaan dan Penyusutan BO: [catatan 14 Oktober 2026](#bukti-dokumen-perolehan-untuk-bo--14-oktober-2026). Bagian ini memperinci CORE-05/06/07/10/11; status dan keputusan lama di bawah adalah konteks historis, bukan pekerjaan yang sudah selesai atau otorisasi database.
 
@@ -250,7 +250,7 @@ Penerimaan yang sudah ada; referensi manual tidak membangun transaksi PO baru.
 
 Preflight baca-saja pada `erp-core-db-1 / core_erp / public` menemukan tiga migration main
 existing belum diterapkan (allow_straight_line, jenis/kondisi, indeks lokasi aktif), selain
-migration PO baru. [Preview SQL](LOCAL_DOCUMENTS_SCHEMA_REVIEW.sql) dihasilkan dengan
+migration PO baru. Preview SQL (`LOCAL_DOCUMENTS_SCHEMA_REVIEW.sql`) dihasilkan dengan
 Laravel connection pretend, tanpa DDL/DML. Penerapan empat migration dan penggunaan schema
 `core_erp_test` untuk regression telah diajukan ke USER; tidak menjalankan start.ps1 yang
 akan melakukan migration/seed lain otomatis.
