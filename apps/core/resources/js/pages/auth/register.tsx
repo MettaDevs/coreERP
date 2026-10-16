@@ -245,8 +245,8 @@ export default function Register({ passwordRules, apps }: Props) {
                                     </AlertTitle>
                                     <AlertDescription>
                                         {form.data.app_ids.length} produk
-                                        dipilih. Legal entity dan unit
-                                        operasional dibuat setelah tenant aktif.
+                                        dipilih. Perusahaan dan unit operasional
+                                        dibuat setelah tenant aktif.
                                     </AlertDescription>
                                 </Alert>
                                 <Field

@@ -198,7 +198,7 @@ export default function MutasiDetailPage({
     async function simpan() {
         if (!context.legal_entity_id) {
             toast.error(
-                'Pilih entitas legal aktif terlebih dahulu pada header CoreERP.',
+                'Pilih perusahaan aktif terlebih dahulu pada header CoreERP.',
             );
 
             return;
@@ -398,7 +398,7 @@ export default function MutasiDetailPage({
             <div ref={panelRef} className="min-h-0 flex-1 overflow-y-auto">
                 <div className="space-y-5 p-5">
                     <p className="text-muted-foreground text-sm">
-                        Entitas legal dan unit kerja pembuat dokumen mengikuti
+                        Perusahaan dan unit kerja pembuat dokumen mengikuti
                         konteks aktif Anda. Lokasi asal tiap aset diambil dari
                         keadaan aset itu sekarang, jadi tidak perlu diisi.
                     </p>

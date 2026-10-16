@@ -15,6 +15,7 @@ import { AddressBookManager } from './components/address-book-manager';
 import { PartyCard } from './components/party-card';
 import { PartyForm } from './components/party-form';
 import type { DirectoryMetadata, Party } from './types';
+import { partyTypeLabel } from './types';
 
 type Props = DirectoryMetadata & {
     parties: {
@@ -251,7 +252,10 @@ export default function GlobalAddressBook(props: Props) {
                                                 key={type.code}
                                                 value={type.code}
                                             >
-                                                {type.name}
+                                                {partyTypeLabel(
+                                                    type.code,
+                                                    partyTypes,
+                                                )}
                                             </NativeSelectOption>
                                         ))}
                                     </NativeSelect>
@@ -415,9 +419,7 @@ export default function GlobalAddressBook(props: Props) {
                                 width: 150,
                                 cell: (party) => (
                                     <DataTableText>
-                                        {partyTypes.find(
-                                            (type) => type.code === party.type,
-                                        )?.name ?? party.type}
+                                        {partyTypeLabel(party.type, partyTypes)}
                                     </DataTableText>
                                 ),
                             },

@@ -31,6 +31,7 @@ import {
     OrganizationContactsSection,
 } from '../../organization/components/address-book-section';
 import type { DirectoryMetadata, PartyDetail } from '../types';
+import { partyTypeLabel } from '../types';
 import { AddressBookHint } from './address-book-hint';
 import {
     commonProfileFields,
@@ -223,9 +224,10 @@ export function PartyCard({
                                         Jenis pihak
                                     </dt>
                                     <dd>
-                                        {metadata.partyTypes.find(
-                                            (type) => type.code === party.type,
-                                        )?.name ?? party.type}
+                                        {partyTypeLabel(
+                                            party.type,
+                                            metadata.partyTypes,
+                                        )}
                                     </dd>
                                 </div>
                                 <div>

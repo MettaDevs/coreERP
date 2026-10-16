@@ -154,7 +154,7 @@ export function VendorPicker({
             />
             <FieldDescription>
                 {error ??
-                    'Pemasok asetnya. Wajib untuk pembelian, kecuali entitas legal ini mencatat perolehan lewat akun perantara.'}
+                    'Vendor asetnya. Wajib untuk pembelian, kecuali perusahaan ini mencatat perolehan lewat akun perantara.'}
             </FieldDescription>
         </Field>
     );
@@ -200,7 +200,7 @@ function keadaan(
                 ? 'Jurnal ini akan tertahan sampai masalah di bawah dibenahi.'
                 : 'Jurnal ini akan tertahan sampai masalah di bawah dibenahi. Penerimaan tetap dapat diselesaikan.';
         case 'manual':
-            return 'Jurnal dicatat tetapi tidak dikirim: pengiriman posting entitas legal ini belum aktif, atau tanggalnya sebelum cutover.';
+            return 'Jurnal dicatat tetapi tidak dikirim: pengiriman posting perusahaan ini belum aktif, atau tanggalnya sebelum cutover.';
         case 'posted':
             return posting?.external_reference
                 ? `Sudah dibukukan aplikasi finance (${posting.external_reference}).`

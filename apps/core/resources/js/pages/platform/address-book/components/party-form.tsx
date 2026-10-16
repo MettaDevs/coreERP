@@ -35,6 +35,7 @@ import type {
     PartyDetail,
     PartyProfile,
 } from '../types';
+import { partyTypeLabel } from '../types';
 import { AddressBookHint } from './address-book-hint';
 
 type ProfileField = {
@@ -274,12 +275,10 @@ export function PartyForm({
                                     <Input
                                         label="Jenis pihak"
                                         readOnly
-                                        value={
-                                            metadata.partyTypes.find(
-                                                (type) =>
-                                                    type.code === party.type,
-                                            )?.name ?? party.type
-                                        }
+                                        value={partyTypeLabel(
+                                            party.type,
+                                            metadata.partyTypes,
+                                        )}
                                     />
                                 ) : (
                                     <NativeSelect

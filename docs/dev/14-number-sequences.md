@@ -127,7 +127,7 @@ Sampai 1 Oktober 2026 bawaannya `0`, sehingga dokumen pertama bernomor `XXXX0000
 
 ## Reference milik Core sendiri
 
-Sebagian kecil identitas dimiliki Core, bukan module. Saat ini hanya satu: nomor vendor (`core.vendor`, lihat [feed posting finance](../todo/feed-posting-finance/README.md)). Reference seperti ini tidak datang dari manifest, jadi aturannya berbeda:
+Sebagian identitas dimiliki Core, bukan module: nomor pihak (`core.party`) dan nomor akun vendor (`core.vendor`, lihat [feed posting finance](../todo/feed-posting-finance/README.md)). Reference seperti ini tidak datang dari manifest, jadi aturannya berbeda:
 
 - Ia milik baris app `core` berstatus `internal` di tabel `apps`. Status itu bukan `available`, jadi baris ini tidak pernah tampil di peluncur, pendaftaran, atau katalog produk, dan tidak butuh entitlement.
 - Reference dan baris `apps`-nya ditulis migration, bukan registrasi katalog, jadi aturan manifest di atas tidak diperiksa untuknya. Kodenya tetap diawali ID pemiliknya (`core.`).
@@ -135,6 +135,8 @@ Sebagian kecil identitas dimiliki Core, bukan module. Saat ini hanya satu: nomor
 - Urutan tenant lahir saat pertama kali dipakai atau saat layar Nomor dokumen dibuka, mana yang lebih dulu. Yang kedua penting: format terkunci begitu nomor pertama terbit, jadi admin harus bisa menyesuaikannya lebih dulu, misalnya dengan nomor pemasok lama yang akan diketik manual.
 
 Menambah reference Core berarti menambah baris di migration dan di `CoreNumberSequences`. Keputusannya tetap melewati gate yang sama dengan reference module: pemilik, scope, mode, periode reset, dan format.
+
+Nomor akun vendor memakai satu urutan tenant sehingga tidak berulang antarperusahaan. Reference lama berlingkup entitas legal menjadi `core.vendor-company-legacy` dan dihentikan; scope riwayatnya tidak diubah. Reference publik `core.vendor` menunjuk urutan bersama yang juga dapat dipakai image N-1. Migration mendaftarkan nomor yang dipertahankan pada urutan baru, memajukan counter melewati nomor terpakai, lalu memberi nomor pengganti pada akun yang kembar. Nomor manual tetap mengikuti izin pengaturan dan wajib unik lintas perusahaan dalam tenant.
 
 ## Konfigurasi owner/admin
 

@@ -162,7 +162,7 @@ export function useShellNavigation() {
                 href: '/settings/legal-entities',
                 children: [
                     {
-                        label: 'Entitas legal',
+                        label: 'Perusahaan',
                         icon: Building2,
                         href: '/settings/legal-entities',
                         permission: 'core.organization.read',

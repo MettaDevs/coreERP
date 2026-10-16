@@ -193,7 +193,7 @@ export default function MonitoringDetailPage({
     async function simpan() {
         if (!context.legal_entity_id) {
             toast.error(
-                'Pilih entitas legal aktif terlebih dahulu pada header CoreERP.',
+                'Pilih perusahaan aktif terlebih dahulu pada header CoreERP.',
             );
 
             return;

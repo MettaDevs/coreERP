@@ -141,8 +141,8 @@ export function ImporSaldoAwal({
                 <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-5">
                     {!context.legal_entity_id ? (
                         <p className="text-destructive text-sm">
-                            Pilih entitas legal aktif terlebih dahulu pada
-                            header CoreERP.
+                            Pilih perusahaan aktif terlebih dahulu pada header
+                            CoreERP.
                         </p>
                     ) : (
                         <FieldGroup>

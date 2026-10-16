@@ -71,7 +71,7 @@ export default function LifecycleDocumentPage({
     async function save(form: HTMLFormElement) {
         if (!context.legal_entity_id || !context.org_unit_id) {
             setError(
-                'Pilih entitas legal dan unit kerja aktif di CoreERP sebelum membuat dokumen.',
+                'Pilih perusahaan dan unit kerja aktif di CoreERP sebelum membuat dokumen.',
             );
 
             return;

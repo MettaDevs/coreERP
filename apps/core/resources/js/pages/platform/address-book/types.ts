@@ -1,4 +1,10 @@
 export type ReferenceValue = { code: string; name: string };
+
+export function partyTypeLabel(code: string, types: ReferenceValue[]): string {
+    return code === 'legal_entity'
+        ? 'Perusahaan'
+        : (types.find((type) => type.code === code)?.name ?? code);
+}
 export type RelationshipType = ReferenceValue & {
     inverse_name: string;
     from_type: string;

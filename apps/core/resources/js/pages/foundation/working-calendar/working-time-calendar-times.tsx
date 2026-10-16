@@ -674,9 +674,9 @@ export default function WorkingTimeCalendarTimes({
 
                         {templates.length === 0 ? (
                             <p className="text-xs text-destructive">
-                                Belum ada pola jam kerja aktif untuk entitas
-                                legal kalender ini. Buat polanya terlebih dahulu
-                                di menu <strong>Pola jam kerja</strong>.
+                                Belum ada pola jam kerja aktif untuk perusahaan
+                                kalender ini. Buat polanya terlebih dahulu di
+                                menu <strong>Pola jam kerja</strong>.
                             </p>
                         ) : (
                             <Field

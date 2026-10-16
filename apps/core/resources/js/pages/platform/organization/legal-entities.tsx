@@ -8,10 +8,10 @@ export default function LegalEntities(
         <OrganizationDirectory
             {...props}
             classification="legal_entity"
-            title="Entitas legal"
+            title="Perusahaan"
         />
     );
 }
 LegalEntities.layout = {
-    breadcrumbs: [{ title: 'Entitas legal', href: '/settings/legal-entities' }],
+    breadcrumbs: [{ title: 'Perusahaan', href: '/settings/legal-entities' }],
 };

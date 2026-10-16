@@ -2,7 +2,6 @@
 
 namespace App\Foundation\Vendor\Http\Controllers;
 
-use App\Foundation\NumberSequence\Models\NumberSequenceReference;
 use App\Foundation\NumberSequence\Models\TenantNumberSequence;
 use App\Foundation\NumberSequence\Support\CoreNumberSequences;
 use App\Foundation\Vendor\Actions\SaveVendor;
@@ -92,7 +91,7 @@ final class VendorController extends Controller
             'filters' => ['q' => $keyword, 'legal_entity' => $filter['legal_entity'] ?? null, 'status' => $filter['status'] ?? null],
             'legalEntities' => $this->legalEntities($tenant),
             'vendors' => $vendors,
-            'manualNumbers' => $this->manualNumberAllowed($tenant),
+            'automaticNumbers' => $this->automaticNumberAllowed($tenant),
             'initialParty' => $initialParty === null ? null : ['id' => $initialParty->id, 'name' => $initialParty->name, 'type' => $initialParty->identityType()],
             'canReadAddressBook' => $membership->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_READ),
             'canManageAddressBook' => $membership->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE),
@@ -233,24 +232,14 @@ final class VendorController extends Controller
         return $clean === '' ? null : $clean;
     }
 
-    /**
-     * Apakah nomor vendor boleh diketik manual. Urutan yang belum lahir memakai bawaan Core
-     * (boleh manual); sesudah lahir, setelan tenant di layar Nomor dokumen yang menentukan.
-     */
-    private function manualNumberAllowed(string $tenantId): bool
+    /** Urutan yang belum lahir mengikuti bawaan otomatis Core. */
+    private function automaticNumberAllowed(string $tenantId): bool
     {
-        $reference = NumberSequenceReference::query()
-            ->where('app_id', CoreNumberSequences::APP_ID)
-            ->where('code', Vendor::NUMBER_SEQUENCE)
-            ->value('id');
-        // Referensi yang belum ada akan dipasang dengan bawaan Core saat vendor pertama disimpan,
-        // dan bawaan itu boleh manual.
-        if ($reference === null) {
-            return true;
-        }
-        $sequence = TenantNumberSequence::query()->where('tenant_id', $tenantId)->where('reference_id', $reference)->first(['allow_manual']);
+        $sequence = TenantNumberSequence::query()->where('tenant_id', $tenantId)
+            ->whereHas('reference', fn ($query) => $query->where('app_id', CoreNumberSequences::APP_ID)
+                ->where('code', Vendor::NUMBER_SEQUENCE))->first(['allow_automatic']);
 
-        return $sequence === null || $sequence->allow_manual;
+        return $sequence === null || $sequence->allow_automatic;
     }
 
     /** Anggota yang sedang bekerja, bila role-nya memegang permission layar Core itu (SEC-22). */

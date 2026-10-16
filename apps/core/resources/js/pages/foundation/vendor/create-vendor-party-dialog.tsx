@@ -62,7 +62,7 @@ export function CreateVendorPartyDialog({
                 <PageDialogHeader>
                     <PageDialogTitle>Party baru</PageDialogTitle>
                     <PageDialogDescription className="sr-only">
-                        Buat identitas pemasok di buku alamat. Setelah disimpan,
+                        Buat identitas vendor di buku alamat. Setelah disimpan,
                         identitas ini dipilih pada vendor yang sedang dibuat.
                     </PageDialogDescription>
                 </PageDialogHeader>

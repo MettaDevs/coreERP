@@ -43,9 +43,9 @@ final class CoreNumberSequences
         'core.vendor' => [
             'name' => 'Nomor vendor',
             'default_prefix' => 'VND',
-            'allowed_scopes' => ['legal_entity'],
+            'allowed_scopes' => ['tenant'],
             'profile' => 'manual-compatible',
-            'scope' => 'legal_entity',
+            'scope' => 'tenant',
             'segments' => [['type' => 'constant', 'value' => 'VND-'], ['type' => 'number', 'length' => 6]],
             'maximum' => 999999,
         ],

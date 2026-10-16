@@ -331,8 +331,8 @@ export default function WorkingTimeCalendars({
                 {!currentLegalEntity && (
                     <div className="mx-4 mt-4 flex items-center justify-between rounded-md border border-warning/30 bg-warning/10 p-3 text-xs text-warning">
                         <span>
-                            Belum ada entitas legal yang aktif pada sesi ini.
-                            Kalender kerja selalu milik satu entitas legal.
+                            Belum ada perusahaan yang aktif pada sesi ini.
+                            Kalender kerja selalu milik satu perusahaan.
                         </span>
                         <a
                             href="/settings/organization"
@@ -452,7 +452,7 @@ export default function WorkingTimeCalendars({
                     <DialogHeader>
                         <DialogTitle>Tambah kalender kerja</DialogTitle>
                         <DialogDescription>
-                            Kalender kerja baru untuk entitas legal{' '}
+                            Kalender kerja baru untuk perusahaan{' '}
                             {currentLegalEntity?.name ?? 'yang aktif'}.
                         </DialogDescription>
                     </DialogHeader>

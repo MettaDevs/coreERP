@@ -86,7 +86,7 @@ type Props = {
     filters: { q: string; legal_entity: string | null; status: Status | null };
     legalEntities: LegalEntity[];
     vendors: Paginated<Vendor>;
-    manualNumbers: boolean;
+    automaticNumbers: boolean;
     initialParty: PartyOption | null;
     canReadAddressBook: boolean;
     canManageAddressBook: boolean;
@@ -129,14 +129,14 @@ function Filters({
             </div>
             <div className="w-full sm:w-56">
                 <NativeSelect
-                    label="Entitas legal"
+                    label="Perusahaan"
                     value={filters.legal_entity ?? ''}
                     onChange={(event) =>
                         go({ legal_entity: event.target.value || null })
                     }
                 >
                     <NativeSelectOption value="">
-                        Semua entitas legal
+                        Semua perusahaan
                     </NativeSelectOption>
                     {legalEntities.map((entity) => (
                         <NativeSelectOption key={entity.id} value={entity.id}>
@@ -208,7 +208,7 @@ function newKey(): string {
 function VendorCard({
     vendor,
     legalEntities,
-    manualNumbers,
+    automaticNumbers,
     onClose,
     initialParty,
     canReadAddressBook,
@@ -218,7 +218,7 @@ function VendorCard({
 }: {
     vendor: Vendor | null;
     legalEntities: LegalEntity[];
-    manualNumbers: boolean;
+    automaticNumbers: boolean;
     onClose: () => void;
     initialParty: PartyOption | null;
     canReadAddressBook: boolean;
@@ -247,14 +247,6 @@ function VendorCard({
     const [partyError, setPartyError] = useState('');
     const [creatingParty, setCreatingParty] = useState(false);
     const [resolvingExisting, setResolvingExisting] = useState(false);
-    const loadAccounts = useCallback<LookupLoader<Vendor>>(
-        (request) =>
-            loadLookupItems(
-                `/api/v1/vendors/lookup?legal_entity_id=${form.legal_entity_id}`,
-                request,
-            ),
-        [form.legal_entity_id],
-    );
     const loadCompanies = useCallback<LookupLoader<LegalEntity>>(
         (request) =>
             loadLookupItems('/api/v1/vendors/company-options', request),
@@ -405,7 +397,9 @@ function VendorCard({
                                   form.party_source === 'new'
                                       ? form.party_type
                                       : null,
-                              number: form.number.trim() || null,
+                              number: automaticNumbers
+                                  ? null
+                                  : form.number.trim() || null,
                               status: form.active ? 'active' : 'inactive',
                           }),
                       },
@@ -503,69 +497,39 @@ function VendorCard({
                             <CollapsibleSection
                                 value="general"
                                 title="General"
-                                summary={`${legalEntityName} · ${vendor?.number ?? 'Nomor otomatis'}`}
+                                summary={`${legalEntityName} · ${vendor?.number ?? (automaticNumbers ? 'Nomor otomatis' : form.number || 'Nomor manual')}`}
                             >
                                 <FieldGroup className="grid gap-4 sm:grid-cols-2">
                                     <VendorField
                                         label="Nomor vendor"
                                         error={error('number')}
-                                        hint="Cari nomor atau nama untuk membuka akun vendor yang sudah ada di perusahaan ini. Untuk akun baru, nomor diterbitkan saat disimpan; nomor manual hanya tersedia jika pengaturan nomor mengizinkannya."
+                                        hint={
+                                            automaticNumbers
+                                                ? 'Nomor dibuat otomatis saat vendor disimpan dan unik di seluruh perusahaan.'
+                                                : 'Isi nomor vendor yang belum dipakai di perusahaan mana pun.'
+                                        }
                                     >
-                                        <InlineLookup<Vendor>
+                                        <Input
                                             label="Nomor vendor"
-                                            loadItems={loadAccounts}
-                                            value={vendor}
-                                            displayValue={
-                                                manualNumbers ? form.number : ''
+                                            value={
+                                                vendor?.number ??
+                                                (automaticNumbers
+                                                    ? 'Otomatis saat disimpan'
+                                                    : form.number)
                                             }
-                                            onQueryChange={
-                                                manualNumbers && !vendor
-                                                    ? (number) =>
-                                                          set(
-                                                              'number',
-                                                              number.toUpperCase(),
-                                                          )
-                                                    : undefined
+                                            readOnly={
+                                                !!vendor || automaticNumbers
                                             }
-                                            placeholder={
-                                                manualNumbers
-                                                    ? 'Cari akun atau isi nomor baru'
-                                                    : 'Cari akun; nomor baru otomatis saat disimpan'
+                                            required={
+                                                !vendor && !automaticNumbers
                                             }
-                                            getItemValue={(account) =>
-                                                account.id
+                                            onChange={(event) =>
+                                                set(
+                                                    'number',
+                                                    event.target.value.toUpperCase(),
+                                                )
                                             }
-                                            getItemLabel={(account) =>
-                                                account.number
-                                            }
-                                            columns={[
-                                                {
-                                                    id: 'number',
-                                                    header: 'Nomor vendor',
-                                                    cell: (account) =>
-                                                        account.number,
-                                                    width: 180,
-                                                },
-                                                {
-                                                    id: 'name',
-                                                    header: 'Nama pemasok',
-                                                    cell: (account) =>
-                                                        account.name,
-                                                    width: 300,
-                                                },
-                                                {
-                                                    id: 'status',
-                                                    header: 'Status',
-                                                    cell: (account) =>
-                                                        account.status ===
-                                                        'active'
-                                                            ? 'Aktif'
-                                                            : 'Nonaktif',
-                                                    width: 120,
-                                                },
-                                            ]}
-                                            onValueChange={onOpenExisting}
-                                            onDetails={onOpenExisting}
+                                            aria-invalid={!!error('number')}
                                         />
                                     </VendorField>
                                     <VendorField
@@ -629,11 +593,11 @@ function VendorCard({
                                     </VendorField>
                                     {!vendor && (
                                         <VendorField
-                                            label="Identitas pemasok"
-                                            hint="Gunakan identitas yang sudah ada jika pemasok sudah tercatat, termasuk sebagai vendor perusahaan lain. Nama, alamat, dan kontak akan dipakai bersama."
+                                            label="Identitas vendor"
+                                            hint="Gunakan identitas yang sudah ada jika vendor sudah tercatat, termasuk sebagai vendor perusahaan lain. Nama, alamat, dan kontak akan dipakai bersama."
                                         >
                                             <NativeSelect
-                                                label="Identitas pemasok"
+                                                label="Identitas vendor"
                                                 value={form.party_source}
                                                 onChange={(event) =>
                                                     setForm((current) => ({
@@ -659,7 +623,7 @@ function VendorCard({
                                     {!vendor &&
                                     form.party_source === 'existing' ? (
                                         <VendorField
-                                            label="Nama pemasok"
+                                            label="Nama vendor"
                                             error={error('party_id')}
                                         >
                                             <InlineLookup
@@ -671,7 +635,7 @@ function VendorCard({
                                                               )
                                                         : undefined
                                                 }
-                                                label="Nama pemasok"
+                                                label="Nama vendor"
                                                 required
                                                 popupClassName="w-[58rem]"
                                                 loadItems={loadParties}
@@ -751,7 +715,7 @@ function VendorCard({
                                         </VendorField>
                                     ) : (
                                         <VendorField
-                                            label="Nama pemasok"
+                                            label="Nama vendor"
                                             error={error(
                                                 vendor ? 'name' : 'party_name',
                                             )}
@@ -790,7 +754,7 @@ function VendorCard({
                                                     Ada nama serupa di buku
                                                     alamat. Periksa melalui
                                                     pilihan identitas yang sudah
-                                                    ada sebelum membuat pemasok
+                                                    ada sebelum membuat vendor
                                                     baru.
                                                 </p>
                                             )}
@@ -798,11 +762,11 @@ function VendorCard({
                                     )}
                                     {!vendor && form.party_source === 'new' && (
                                         <VendorField
-                                            label="Jenis pemasok"
+                                            label="Jenis Vendor"
                                             error={error('party_type')}
                                         >
                                             <NativeSelect
-                                                label="Jenis pemasok"
+                                                label="Jenis Vendor"
                                                 value={form.party_type}
                                                 onChange={(event) =>
                                                     set(
@@ -824,7 +788,7 @@ function VendorCard({
                                     {vendor && (
                                         <VendorField
                                             label="NPWP"
-                                            hint="NPWP mengikuti identitas pemasok di buku alamat global. Ubah dari buku alamat agar semua akun yang terkait tetap sama."
+                                            hint="NPWP mengikuti identitas vendor di buku alamat global. Ubah dari buku alamat agar semua akun yang terkait tetap sama."
                                         >
                                             <Input
                                                 label="NPWP"
@@ -872,7 +836,7 @@ function VendorCard({
                         setCreatingParty(false);
                         if (party.status !== 'active') {
                             toast.message(
-                                'Pihak tersimpan sebagai nonaktif. Aktifkan di buku alamat sebelum dipilih sebagai pemasok.',
+                                'Pihak tersimpan sebagai nonaktif. Aktifkan di buku alamat sebelum dipilih sebagai vendor.',
                             );
                             return;
                         }
@@ -949,7 +913,7 @@ function VendorAddressTabs({
                 <div className="space-y-4">
                     <div className="flex items-center gap-2">
                         <h3 className="text-sm font-medium">Alamat</h3>
-                        <VendorHint label="alamat dan kontak pemasok">
+                        <VendorHint label="alamat dan kontak vendor">
                             Alamat dan kontak disimpan pada pihak yang sama di
                             buku alamat. Perubahan dari sini juga berlaku pada
                             akun vendor di perusahaan lain dan peran lain yang
@@ -1035,7 +999,7 @@ function VendorReadCard({
                                         vendor.name,
                                     ],
                                     [
-                                        'Jenis pemasok',
+                                        'Jenis Vendor',
                                         PARTY_TYPE_LABEL[vendor.party_type],
                                     ],
                                     ['NPWP', vendor.tax_number ?? '—'],
@@ -1073,7 +1037,7 @@ export default function Vendors({
     filters,
     legalEntities,
     vendors,
-    manualNumbers,
+    automaticNumbers,
     initialParty,
     canReadAddressBook,
     canManageAddressBook,
@@ -1081,6 +1045,8 @@ export default function Vendors({
     const [editing, setEditing] = useState<Vendor | null | undefined>(
         initialParty && canManage ? null : undefined,
     );
+    // Party dari GAB hanya mengisi pembukaan awal, bukan setiap klik Tambah vendor.
+    const [draftParty, setDraftParty] = useState(initialParty);
     const [selectedVendorId, setSelectedVendorId] = useState<string | null>(
         null,
     );
@@ -1100,11 +1066,11 @@ export default function Vendors({
             <>
                 <Head title="Vendor" />
                 <VendorCard
-                    key={editing?.id ?? initialParty?.id ?? 'new'}
+                    key={editing?.id ?? draftParty?.id ?? 'new'}
                     vendor={editing}
                     legalEntities={legalEntities}
-                    manualNumbers={manualNumbers}
-                    initialParty={initialParty}
+                    automaticNumbers={automaticNumbers}
+                    initialParty={draftParty}
                     canReadAddressBook={canReadAddressBook}
                     canManageAddressBook={canManageAddressBook}
                     onClose={() => setEditing(undefined)}
@@ -1156,7 +1122,7 @@ export default function Vendors({
                             <div className="flex items-center gap-2">
                                 <Heading title="Vendor" />
                                 <VendorHint label="vendor">
-                                    Akun pemasok per perusahaan. Identitas,
+                                    Akun vendor per perusahaan. Identitas,
                                     alamat, dan kontak memakai buku alamat
                                     bersama.
                                 </VendorHint>
@@ -1172,7 +1138,11 @@ export default function Vendors({
                                     <ActionButton
                                         action="create"
                                         disabled={legalEntities.length === 0}
-                                        onClick={() => setEditing(null)}
+                                        onClick={() => {
+                                            setDraftParty(null);
+                                            setViewing(null);
+                                            setEditing(null);
+                                        }}
                                     >
                                         Tambah vendor
                                     </ActionButton>

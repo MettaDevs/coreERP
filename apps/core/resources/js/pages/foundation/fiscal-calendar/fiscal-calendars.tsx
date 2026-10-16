@@ -217,7 +217,7 @@ export default function FiscalCalendars({
                 <div>
                     <h1 className="text-lg font-semibold">Kalender fiskal</h1>
                     <p className="text-sm text-muted-foreground">
-                        Kalender fiskal dimiliki entitas legal dan menentukan
+                        Kalender fiskal dimiliki perusahaan dan menentukan
                         periode penomoran dokumen. Periode harus berurutan tanpa
                         celah dan menutup seluruh tahun fiskal.
                     </p>
@@ -229,7 +229,7 @@ export default function FiscalCalendars({
                     <p className="text-sm text-muted-foreground">
                         Belum ada kalender fiskal. Reset nomor per tahun atau
                         periode fiskal baru dapat dipakai setelah kalender
-                        dibuat dan ditetapkan ke entitas legal.
+                        dibuat dan ditetapkan ke perusahaan.
                     </p>
                 )}
 
@@ -259,10 +259,10 @@ export default function FiscalCalendars({
                 ))}
 
                 <section className="space-y-1 rounded-md border p-3">
-                    <h2 className="font-medium">Entitas legal</h2>
+                    <h2 className="font-medium">Perusahaan</h2>
                     {legalEntities.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
-                            Belum ada entitas legal pada bisnis ini.
+                            Belum ada perusahaan pada bisnis ini.
                         </p>
                     ) : (
                         legalEntities.map((entity) => (

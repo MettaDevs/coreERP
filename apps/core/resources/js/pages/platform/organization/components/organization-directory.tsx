@@ -176,7 +176,7 @@ function CreateOrganizationDialog({
                 <SheetHeader>
                     <SheetTitle>
                         {legalEntity
-                            ? 'Buat entitas legal'
+                            ? 'Buat perusahaan'
                             : 'Buat operating unit'}
                     </SheetTitle>
                 </SheetHeader>
@@ -222,7 +222,7 @@ function CreateOrganizationDialog({
                                     }
                                     placeholder={
                                         legalEntity
-                                            ? 'Nama entitas legal'
+                                            ? 'Nama perusahaan'
                                             : 'Nama operating unit'
                                     }
                                     aria-invalid={Boolean(form.errors.name)}
@@ -487,7 +487,7 @@ function OrganizationDetailPage({
                   value: 'addresses',
                   title: 'Alamat Utama & Cabang',
                   description:
-                      'Alamat utama dan lokasi kantor legal entity; alamat utama tampil pada kop dokumen.',
+                      'Alamat utama dan lokasi kantor perusahaan; alamat utama tampil pada kop dokumen.',
                   icon: MapPin,
               },
               {
@@ -530,7 +530,7 @@ function OrganizationDetailPage({
                   value: 'print-identity',
                   title: 'Identitas Cetak Unit (Kop Sendiri)',
                   description:
-                      'Isi hanya bila unit ini mencetak dengan kop sendiri, misalnya puskesmas di bawah dinas. Kosong berarti memakai kop legal entity.',
+                      'Isi hanya bila unit ini mencetak dengan kop sendiri, misalnya puskesmas di bawah dinas. Kosong berarti memakai kop perusahaan.',
                   icon: Image,
               },
           ];
@@ -560,9 +560,7 @@ function OrganizationDetailPage({
                         </div>
                         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                             <Badge variant="outline">
-                                {legalEntity
-                                    ? 'Legal entity'
-                                    : 'Operating unit'}
+                                {legalEntity ? 'Perusahaan' : 'Operating unit'}
                             </Badge>
                             <span>
                                 {legalEntity
@@ -1129,12 +1127,12 @@ export default function OrganizationDirectory({
                                     <EmptyTitle>
                                         Belum Ada{' '}
                                         {classification === 'legal_entity'
-                                            ? 'Legal Entity'
+                                            ? 'Perusahaan'
                                             : 'Operating Unit'}
                                     </EmptyTitle>
                                     <EmptyDescription className="max-w-sm text-xs text-muted-foreground">
                                         {classification === 'legal_entity'
-                                            ? 'Buat legal entity pertama agar transaksi resmi dan perpajakan memiliki identitas badan hukum.'
+                                            ? 'Buat perusahaan pertama agar transaksi resmi dan perpajakan memiliki identitas badan hukum.'
                                             : 'Buat operating unit bila proses bisnis membutuhkan struktur departemen atau divisi.'}
                                     </EmptyDescription>
                                 </EmptyHeader>

@@ -336,7 +336,7 @@ export default function PenerimaanDetailPage({
 
         if (!context.legal_entity_id) {
             toast.error(
-                'Pilih entitas legal aktif terlebih dahulu pada header CoreERP.',
+                'Pilih perusahaan aktif terlebih dahulu pada header CoreERP.',
             );
 
             return;
@@ -711,7 +711,7 @@ export default function PenerimaanDetailPage({
                         </Alert>
                     )}
                     <p className="text-muted-foreground text-sm">
-                        Entitas legal mengikuti konteks aktif Anda. Satu dokumen
+                        Perusahaan mengikuti konteks aktif Anda. Satu dokumen
                         adalah satu kedatangan: tiap unit yang datang menjadi
                         satu aset dengan kodenya sendiri saat dokumen
                         diselesaikan.
@@ -900,7 +900,7 @@ export default function PenerimaanDetailPage({
                                         {pesan('cara_perolehan') ??
                                             (saldoAwal
                                                 ? 'Aset lama dari sistem sebelumnya: jurnalnya saldo awal, dengan akumulasi penyusutan sampai cutover.'
-                                                : 'Hibah tidak ditagih pemasok: jurnalnya ke akun lawan hibah, bukan hutang.')}
+                                                : 'Hibah tidak ditagih vendor: jurnalnya ke akun lawan hibah, bukan hutang.')}
                                     </FieldDescription>
                                 </Field>
 

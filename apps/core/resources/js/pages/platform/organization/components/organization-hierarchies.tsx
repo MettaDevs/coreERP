@@ -391,7 +391,7 @@ function OrganizationHierarchyFlowNode({
             </div>
             <p className="mt-1 text-[11px] text-muted-foreground">
                 {data.classification === 'legal_entity'
-                    ? 'Legal Entity (Badan Hukum)'
+                    ? 'Perusahaan (Badan Hukum)'
                     : [
                           data.operatingUnitType ?? 'Operating Unit',
                           data.operatingUnitNumber,

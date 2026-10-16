@@ -191,7 +191,7 @@ function Filters({
                         Semua cakupan
                     </NativeSelectOption>
                     <NativeSelectOption value="all">
-                        Semua entitas legal
+                        Semua perusahaan
                     </NativeSelectOption>
                     {legalEntities.map((entity) => (
                         <NativeSelectOption key={entity.id} value={entity.id}>
@@ -407,7 +407,7 @@ function ImportSheet({
                                 }}
                             >
                                 <NativeSelectOption value="all">
-                                    Semua entitas legal
+                                    Semua perusahaan
                                 </NativeSelectOption>
                                 {legalEntities.map((entity) => (
                                     <NativeSelectOption
