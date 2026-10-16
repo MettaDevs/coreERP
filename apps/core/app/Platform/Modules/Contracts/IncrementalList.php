@@ -73,9 +73,20 @@ final class IncrementalList
             throw ValidationException::withMessages(['cursor' => 'Posisi daftar tidak valid. Muat ulang daftar.']);
         }
         if (array_key_exists($sort, $nativeSortColumns)) {
-            if ($cursor !== null && ($parameters['list_sort_null'] ?? null) === 0
-                && validator(['value' => $parameters['list_sort_value']], ['value' => [$nativeSortColumns[$sort] === 'string' ? 'present' : 'required', $nativeSortColumns[$sort]]])->fails()) {
-                throw ValidationException::withMessages(['cursor' => 'Posisi daftar tidak valid. Muat ulang daftar.']);
+            if ($cursor !== null) {
+                $values = [];
+                $rules = [];
+                if (($parameters['list_sort_null'] ?? null) === 0) {
+                    $values['value'] = $parameters['list_sort_value'];
+                    $rules['value'] = [$nativeSortColumns[$sort] === 'string' ? 'present' : 'required', $nativeSortColumns[$sort]];
+                }
+                if ($sort !== $identity && isset($nativeSortColumns[$identity])) {
+                    $values['identity'] = $parameters[$identity];
+                    $rules['identity'] = [$nativeSortColumns[$identity] === 'string' ? 'present' : 'required', $nativeSortColumns[$identity]];
+                }
+                if (validator($values, $rules)->fails()) {
+                    throw ValidationException::withMessages(['cursor' => 'Posisi daftar tidak valid. Muat ulang daftar.']);
+                }
             }
             [$items, $nextCursor] = self::nativeBatch($list, $cursor, $sort, $direction, $identity, (int) ($input['per_page'] ?? 40));
         } else {
@@ -101,32 +112,34 @@ final class IncrementalList
     {
         $forward = $cursor?->pointsToNextItems() ?? true;
         $comparison = ($direction === 'desc') === $forward ? '<' : '>';
-        if ($cursor !== null) {
-            $query->where(function (Builder $after) use ($cursor, $sort, $identity, $comparison, $forward): void {
-                if (($cursor->toArray()['list_sort_null'] ?? null) === 1) {
-                    $after->where(function (Builder $tie) use ($cursor, $sort, $identity, $comparison): void {
-                        $tie->whereNull($sort)->where($identity, $comparison, $cursor->parameter($identity === $sort ? 'list_sort_value' : $identity));
-                    });
-                    if (! $forward) {
-                        $after->orWhereNotNull($sort);
-                    }
-                } else {
-                    $after->where($sort, $comparison, $cursor->parameter('list_sort_value'));
-                    if ($sort !== $identity) {
-                        $after->orWhere(fn (Builder $tie) => $tie->where($sort, $cursor->parameter('list_sort_value'))->where($identity, $comparison, $cursor->parameter($identity)));
-                    }
-                    if ($forward) {
-                        $after->orWhereNull($sort);
-                    }
-                }
-            });
-        }
         $order = $direction === 'desc' ? ($forward ? 'desc' : 'asc') : ($forward ? 'asc' : 'desc');
-        $query->orderBy('list_sort_null', $forward ? 'asc' : 'desc')->orderBy($sort, $order);
-        if ($sort !== $identity) {
-            $query->orderBy($identity, $order);
+        $orderQuery = static function (Builder $ordered) use ($forward, $sort, $identity, $order): Builder {
+            $ordered->orderBy('list_sort_null', $forward ? 'asc' : 'desc')->orderBy($sort, $order);
+            if ($sort !== $identity) {
+                $ordered->orderBy($identity, $order);
+            }
+
+            return $ordered;
+        };
+        if ($cursor === null) {
+            $items = $orderQuery($query)->limit($size + 1)->get();
+        } else {
+            $null = $cursor->toArray()['list_sort_null'];
+            $part = (clone $query)->where('list_sort_null', $null);
+            if ($null === 1 || $sort === $identity) {
+                $part->where($identity, $comparison, $cursor->parameter($sort === $identity ? 'list_sort_value' : $identity));
+            } else {
+                $part->whereRowValues([$sort, $identity], $comparison, [$cursor->parameter('list_sort_value'), $cursor->parameter($identity)]);
+            }
+            $orderQuery($part)->limit($size + 1);
+            // Satu snapshot SQL; tiap cabang tetap dapat seek tanpa OR lintas kelompok NULL.
+            if (($forward && $null === 0) || (! $forward && $null === 1)) {
+                $tail = $orderQuery((clone $query)->where('list_sort_null', 1 - $null))->limit($size + 1);
+                $part->unionAll($tail);
+                $orderQuery($part)->limit($size + 1);
+            }
+            $items = $part->get();
         }
-        $items = $query->limit($size + 1)->get();
         $more = $items->count() > $size;
         $items = $items->take($size);
         if (! $forward) {

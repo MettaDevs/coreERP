@@ -49,6 +49,29 @@ class IncrementalListTest extends TestCase
         $this->assertSame(['b'], $next['data']->pluck('id')->all());
     }
 
+    public function test_native_previous_cursor_crosses_from_nulls_to_non_nulls(): void
+    {
+        $cursor = (new Cursor(['list_sort_null' => 1, 'list_sort_value' => '', 'id' => 'c'], false))->encode();
+        $previous = $this->batch(['per_page' => 2, 'cursor' => $cursor], true);
+        $this->assertSame(['a', 'b'], $previous['data']->pluck('id')->all());
+        $next = $this->batch(['per_page' => 2, 'cursor' => $previous['next_cursor']], true);
+        $this->assertSame(['c'], $next['data']->pluck('id')->all());
+        $this->assertNull($next['next_cursor']);
+    }
+
+    public function test_native_null_boundary_uses_one_snapshot_query(): void
+    {
+        $cursor = (new Cursor(['list_sort_null' => 0, 'list_sort_value' => 'Same', 'id' => 'b']))->encode();
+        DB::enableQueryLog();
+        try {
+            $next = $this->batch(['per_page' => 2, 'cursor' => $cursor], true);
+            $this->assertSame(['c'], $next['data']->pluck('id')->all());
+            $this->assertCount(1, DB::getQueryLog());
+        } finally {
+            DB::disableQueryLog();
+        }
+    }
+
     public function test_native_date_sort_rejects_a_cursor_from_another_column(): void
     {
         $cursor = (new Cursor(['list_sort_null' => 0, 'list_sort_value' => 'not-a-date', 'id' => 'a']))->encode();

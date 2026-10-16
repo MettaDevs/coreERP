@@ -20,6 +20,8 @@ Daftar work order memakai `IncrementalList` dengan tipe urut native yang dinyata
 seluruh data. Format cursor lama, pemecah seri ID, posisi NULL di belakang, search/filter server, dan
 pembacaan langsung dari PostgreSQL dipertahankan. Kolom yang tidak menyatakan tipe native tetap memakai
 perilaku urut sebelumnya; jangan mengubah arti urutan kolom hanya untuk mendapatkan indeks.
+Cursor lanjutan memakai perbandingan pasangan nilai/ID. Kelompok NULL digabung dengan `UNION ALL` dalam
+satu statement, supaya index seek tetap bekerja dan edit bersamaan tidak menggandakan baris dalam satu batch.
 
 ## Batas host, tenant, dan lingkungan
 
