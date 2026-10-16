@@ -49,10 +49,10 @@ class DokumenSiklusAsetController extends Controller
     {
         $this->guard($request, $type, 'read');
         $query = DokumenSiklusAset::query()->where('jenis_dokumen', $type);
-        app(OrganizationScope::class)->query($query, $request, 'legal_entity_id', 'responsible_org_unit_id');
+        $table = $query->getModel()->getTable();
+        app(OrganizationScope::class)->query($query, $request, $table.'.legal_entity_id', $table.'.responsible_org_unit_id');
 
         $list = $query->toBase();
-        $table = $query->getModel()->getTable();
         $list->leftJoin('aset_tr_aset as list_asset', function ($join) use ($table): void {
             $join->on('list_asset.id', '=', $table.'.aset_id')->on('list_asset.tenant_id', '=', $table.'.tenant_id');
         })->select([$table.'.*', 'list_asset.kode as aset_kode', 'list_asset.nama as aset_nama']);

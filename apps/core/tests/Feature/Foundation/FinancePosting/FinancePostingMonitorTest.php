@@ -121,7 +121,7 @@ class FinancePostingMonitorTest extends TestCase
             $total = null;
             $this->actingAs($this->owner)->get('/settings/finance-postings?'.http_build_query($saringan))->assertOk()
                 ->assertInertia(function (AssertableInertia $page) use (&$total): void {
-                    $total = $page->toArray()['props']['postings']['total'];
+                    $total = count($page->toArray()['props']['postings']['data']);
                 });
 
             return (int) $total;

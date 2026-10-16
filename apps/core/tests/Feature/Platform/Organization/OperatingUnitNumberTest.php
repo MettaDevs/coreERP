@@ -61,9 +61,12 @@ class OperatingUnitNumberTest extends TestCase
         $this->actingAs($this->owner)->get('/settings/operating-units?section=legal-entities')->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->component('platform/organization/operating-units')
-                ->where('organizations.0.id', $unit->id)
-                ->where('organizations.0.classification', 'operating_unit')
+                ->where('organizations', [])
                 ->missing('hierarchies'));
+        $this->getJson('/settings/operating-units?incremental=1&section=legal-entities')->assertOk()
+            ->assertJsonPath('data.0.id', $unit->id)
+            ->assertJsonPath('data.0.classification', 'operating_unit')
+            ->assertJsonPath('next_cursor', null);
         $this->get('/settings/legal-entities')->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page->component('platform/organization/legal-entities')->missing('hierarchies'));
         $this->get('/settings/organization-hierarchies')->assertOk()

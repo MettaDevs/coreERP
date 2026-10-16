@@ -52,7 +52,7 @@ final class OrganizationDirectoryCore implements OrganizationDirectory
         foreach ($members as $alias => $column) {
             $query->selectSub(DB::table('tenant_memberships as directory_member')->join('users as directory_user', 'directory_user.id', '=', 'directory_member.user_id')
                 ->where('directory_member.tenant_id', $tenantId)->where('directory_member.status', 'active')
-                ->whereColumn('directory_user.id', $column)->select('directory_user.name')->limit(1), $alias);
+                ->whereColumn(DB::raw('CAST(directory_user.id AS TEXT)'), $column)->select('directory_user.name')->limit(1), $alias);
         }
     }
 
