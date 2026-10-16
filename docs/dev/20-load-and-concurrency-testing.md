@@ -122,6 +122,12 @@ siap, waktu sampai termination selesai, dan waktu query dari PHP. Selisih HTTP d
 worker mencakup antrean serta jaringan. Waktu PHP di luar query bukan otomatis waktu CPU,
 dan waktu query dari PHP sudah mencakup round trip serta wait database.
 
+Periksa juga waktu waiting/receiving, ukuran respons, jumlah baris, dan encoding klien.
+Parameter `per_page` yang dikirim test belum membuktikan endpoint memakainya. Respons yang
+mengirim seluruh dataset dapat lambat diterima walaupun eksekusi query cepat. Uji compression
+sebagai faktor terpisah dan catat apakah profil klien memang menyerupai browser atau consumer
+integrasi yang dimaksud.
+
 Pada FrankenPHP ZTS, CPU seluruh proses mencakup worker lain. Gunakan pengukuran per thread
 bila tersedia. Catat jumlah serta bentuk query dari request yang sama; penghitung transaksi
 PostgreSQL tidak boleh langsung dianggap jumlah query aplikasi. Jalankan SELECT representatif
