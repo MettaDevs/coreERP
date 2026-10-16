@@ -743,9 +743,14 @@ class PenerimaanAsetController extends Controller
     /** @param array<string, mixed> $data */
     private function validateRequestLinks(Request $request, array $data): void
     {
-        $lines = PermintaanPengadaanAsetDetail::query()->whereIn('id', array_filter(array_column($data['details'], 'permintaan_pembelian_detail_id')))->get()->keyBy('id');
+        $requestLineIds = array_filter(array_column($data['details'], 'permintaan_pembelian_detail_id'));
+        if ($requestLineIds === []) {
+            return;
+        }
+
+        $lines = PermintaanPengadaanAsetDetail::query()->whereIn('id', $requestLineIds)->get()->keyBy('id');
         $requests = PermintaanPengadaanAset::query()->whereIn('id', $lines->pluck('request_id'))->orderBy('id')->lockForUpdate()->get()->keyBy('id');
-        $lines = PermintaanPengadaanAsetDetail::query()->whereIn('id', array_filter(array_column($data['details'], 'permintaan_pembelian_detail_id')))->get()->keyBy('id');
+        $lines = PermintaanPengadaanAsetDetail::query()->whereIn('id', $requestLineIds)->get()->keyBy('id');
         foreach ($data['details'] as $index => $detail) {
             if (empty($detail['permintaan_pembelian_detail_id'])) {
                 continue;

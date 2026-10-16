@@ -46,6 +46,11 @@ fallback per-instance untuk menutupi kegagalan penyimpan bersama. Verifikasi kon
 
 ## Profiling bila kapasitas tetap rendah
 
+Untuk workload banyak tulis, jangan menutupi query mahal dengan TTL respons transaksi. Ukur pengulangan
+query, urutan yang menghalangi indeks, dan biaya commit. Pakai ulang bacaan referensi hanya dengan scope
+database/tenant yang benar serta invalidasi pada perubahan dan rollback; request berikutnya wajib melihat
+hasil simpan terbaru. Periksa kompatibilitas cursor, NULL, search/filter/sort ketika mempercepat daftar.
+
 Baca [profiling.md](references/profiling.md) untuk membedakan antrean runtime, eksekusi PHP, query, dan scheduler. Mulai tanpa beban dan pada concurrency tertahan; latensi saat jenuh terutama mengukur antrean.
 
 Pakai profiler/tracing yang tersedia. Instrumentasi tambahan perlu sementara, dibatasi pada run/fixture, diukur overhead-nya, tidak merekam cookie/token/password/bindings sensitif, dan dilepas sesudahnya. Hindari restart database hanya demi profiler bila sampled traces dan EXPLAIN dapat menjawab pertanyaan.
