@@ -59,13 +59,15 @@ class PenerimaanAsetTest extends TestCase
 
     public function test_standalone_receipt_does_not_read_purchase_request_records(): void
     {
+        $group = $this->groupSiapSusut();
         $reads = [];
         DB::listen(static function ($query) use (&$reads): void {
             if (str_contains($query->sql, 'from "aset_tr_permintaan_pengadaan_aset')) {
                 $reads[] = $query->sql;
             }
         });
-        $this->draf([$this->baris(jumlah: 1)]);
+        $receipt = $this->draf([$this->baris(jumlah: 1, group: $group)]);
+        $this->selesaikan($receipt)->assertOk();
         $this->assertSame([], $reads);
     }
 

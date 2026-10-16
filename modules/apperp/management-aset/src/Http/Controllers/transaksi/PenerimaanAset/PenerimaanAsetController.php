@@ -713,6 +713,10 @@ class PenerimaanAsetController extends Controller
     private function assertSisaPermintaan(Collection $lines, string $penerimaanId, bool $lock = true): void
     {
         $linked = $lines->filter(fn ($line) => $line->permintaan_pembelian_detail_id);
+        if ($linked->isEmpty()) {
+            return;
+        }
+
         $requestLines = PermintaanPengadaanAsetDetail::query()->whereIn('id', $linked->pluck('permintaan_pembelian_detail_id'))->get()->keyBy('id');
         $requests = PermintaanPengadaanAset::query()->whereIn('id', $requestLines->pluck('request_id'))->orderBy('id')->when($lock, fn ($query) => $query->lockForUpdate())->get()->keyBy('id');
         foreach ($linked->groupBy('permintaan_pembelian_detail_id') as $requestLineId => $receiptLines) {
