@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\Downtime;
 
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\RequestContext;
 use App\Platform\Modules\Contracts\RowVersion;
 use Carbon\CarbonInterface;
@@ -74,7 +75,13 @@ class AssetDowntimeController extends Controller
             $query->whereNull(self::TABLE.'.selesai');
         }
 
-        return response()->json(['data' => $query->orderByDesc(self::TABLE.'.mulai')->limit(500)->toBase()->get()->map($this->present(...))]);
+        $list = $query->toBase()->selectRaw('ROUND(GREATEST(0, EXTRACT(EPOCH FROM (COALESCE('.self::TABLE.'.selesai, ?::timestamptz) - '.self::TABLE.'.mulai))) / 3600, 2) AS durasi_jam', [now()]);
+        $batch = IncrementalList::query($request, $list, [
+            'id' => 'id', 'aset' => 'aset_kode', 'mulai' => 'mulai', 'durasi' => 'durasi_jam',
+        ], ['aset_kode', 'aset_nama', 'alasan_downtime_nama', 'keterangan'], 'mulai', ['durasi_jam'], 'desc');
+        $batch['data'] = $batch['data']->map($this->present(...));
+
+        return response()->json($batch);
     }
 
     public function store(Request $request): JsonResponse
@@ -308,7 +315,7 @@ class AssetDowntimeController extends Controller
     private function present(stdClass $row): stdClass
     {
         $end = $row->selesai === null ? now() : Carbon::parse($row->selesai);
-        $row->durasi_jam = round(max(0, Carbon::parse($row->mulai)->diffInSeconds($end, false)) / 3600, 2);
+        $row->durasi_jam = isset($row->durasi_jam) ? (float) $row->durasi_jam : round(max(0, Carbon::parse($row->mulai)->diffInSeconds($end, false)) / 3600, 2);
         $row->terbuka = $row->selesai === null;
         $row->masuk_kpi = $row->masuk_kpi === null ? true : (bool) $row->masuk_kpi;
 

@@ -3,6 +3,8 @@
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\InventarisasiAset;
 
 use App\Platform\Modules\Contracts\ChangeHistory;
+use App\Platform\Modules\Contracts\IncrementalList;
+use App\Platform\Modules\Contracts\OrganizationDirectory;
 use App\Platform\Modules\Contracts\RowVersion;
 use Brick\Math\BigDecimal;
 use Illuminate\Http\JsonResponse;
@@ -37,16 +39,38 @@ class AsetController extends Controller
     public function index(Request $request): JsonResponse
     {
         $this->requirePermission($request, 'read');
-        $data = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
+        $data = $request->validate([
+            'lifecycle_state' => ['nullable', Rule::in(array_keys(StatusAset::LABELS))],
+            'exclude_state' => ['nullable', Rule::in(array_keys(StatusAset::LABELS))],
+        ]);
         $query = app(OrganizationScope::class)->asetQuery(Aset::query(), $request);
-        if (($q = trim((string) ($data['q'] ?? ''))) !== '') {
-            $query->where(fn ($builder) => $builder
-                ->whereRaw('LOWER(kode) LIKE ?', ['%'.mb_strtolower($q).'%'])
-                ->orWhereRaw('LOWER(nama) LIKE ?', ['%'.mb_strtolower($q).'%'])
-                ->orWhereRaw('LOWER(serial_number) LIKE ?', ['%'.mb_strtolower($q).'%']));
+        if (! empty($data['lifecycle_state'])) {
+            $query->where('lifecycle_state', $data['lifecycle_state']);
+        }
+        if (! empty($data['exclude_state'])) {
+            $query->where('lifecycle_state', '!=', $data['exclude_state']);
         }
 
-        return response()->json(['data' => $query->orderByDesc('created_at')->get()->map($this->present(...))->values()]);
+        $list = $query->toBase()->newQuery()->fromSub($query->toBase(), 'asset')->select('asset.*');
+        foreach (['group' => ['aset_m_group_aset', 'group_aset_id'], 'type' => ['aset_m_jenis_aset', 'jenis_aset_id'], 'location' => ['aset_m_lokasi_aset', 'lokasi_aset_id']] as $alias => [$table, $foreignKey]) {
+            $list->leftJoin($table.' as '.$alias, function ($join) use ($alias, $foreignKey): void {
+                $join->on($alias.'.id', '=', 'asset.'.$foreignKey)->on($alias.'.tenant_id', '=', 'asset.tenant_id');
+            })->addSelect($alias.'.nama as '.$alias.'_nama');
+        }
+        app(OrganizationDirectory::class)->addNames($list, (string) $request->attributes->get('coreerp.tenant_id'), ['legal_entity_nama' => 'asset.legal_entity_id']);
+
+        $batch = IncrementalList::query($request, $list, [
+            'id' => 'id', 'created_at' => 'created_at', 'kode' => 'kode', 'nama' => 'nama', 'serial' => 'serial_number',
+            'legal_entity' => 'legal_entity_nama', 'group' => 'group_nama', 'jenis' => 'type_nama',
+            'lokasi' => 'location_nama', 'nilai' => 'acquisition_value', 'status' => 'lifecycle_state',
+        ], ['kode', 'nama', 'serial_number'], 'created_at', ['acquisition_value'], 'desc');
+        $batch['data'] = $batch['data']->map(fn ($row) => [
+            ...$this->present((new Aset)->newFromBuilder((array) $row)),
+            'legal_entity_nama' => $row->legal_entity_nama, 'group_nama' => $row->group_nama,
+            'type_nama' => $row->type_nama, 'location_nama' => $row->location_nama,
+        ]);
+
+        return response()->json($batch);
     }
 
     public function show(Request $request, string $id): JsonResponse

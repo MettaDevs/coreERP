@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PemeliharaanAset;
 
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -10,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
 use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobType;
 use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeJenisAset;
@@ -57,9 +59,16 @@ class PemeliharaanAsetController extends Controller
         $query = PemeliharaanAset::query();
         app(OrganizationScope::class)->query($query, $request, 'legal_entity_id', 'responsible_org_unit_id');
 
-        return response()->json(['data' => $this->withLookups($query)
-            ->orderByDesc(self::TABEL.'.created_at')
-            ->get()]);
+        if ($request->filled('status')) {
+            $request->validate(['status' => ['string', Rule::in(WorkOrderStatus::ALL)]]);
+            $query->where(self::TABEL.'.status', $request->string('status')->toString());
+        }
+
+        return response()->json(IncrementalList::query($request, $this->withLookups($query), [
+            'id' => 'id', 'created_at' => 'created_at', 'kode' => 'kode', 'jenis' => 'tipe_work_order_nama',
+            'keterangan' => 'keterangan', 'layanan' => 'tingkat_layanan_nama',
+            'status' => 'status', 'jadwal' => 'dijadwalkan_mulai', 'baris' => 'jumlah_baris',
+        ], ['kode', 'tipe_work_order_nama', 'keterangan', 'tingkat_layanan_nama', 'status'], 'created_at', ['jumlah_baris'], 'desc'));
     }
 
     public function jobTypesForAset(Request $request): JsonResponse
@@ -71,45 +80,18 @@ class PemeliharaanAsetController extends Controller
         app(OrganizationScope::class)->asetQuery($asetQuery, $request);
         $aset = $asetQuery->toBase()->first(['jenis_aset_id']);
         if (! $aset || $aset->jenis_aset_id === null) {
-            return response()->json(['data' => []]);
+            return response()->json(['data' => [], 'next_cursor' => null]);
         }
 
-        $linkedJobTypes = MaintenanceJobTypeJenisAset::query()->distinct()->pluck('job_type_id');
+        $links = MaintenanceJobTypeJenisAset::query();
+        // Job type tanpa relasi tetap umum; yang memiliki relasi hanya untuk jenis aset itu.
+        $query = MaintenanceJobType::query()->where('aktif', true)
+            ->where(fn (Builder $jobs) => $jobs
+                ->whereIn('id', (clone $links)->where('jenis_aset_id', $aset->jenis_aset_id)->select('job_type_id')->toBase())
+                ->orWhereNotIn('id', $links->select('job_type_id')->toBase()));
 
-        $data = MaintenanceJobType::query()
-            ->join('aset_m_maintenance_job_type_jenis_aset as relasi', function ($join): void {
-                $join->on('relasi.job_type_id', '=', 'aset_m_maintenance_job_type.id')
-                    ->on('relasi.tenant_id', '=', 'aset_m_maintenance_job_type.tenant_id');
-            })
-            ->where([
-                'aset_m_maintenance_job_type.aktif' => true,
-                'relasi.jenis_aset_id' => $aset->jenis_aset_id,
-            ])
-            ->orderBy('aset_m_maintenance_job_type.kode')
-            ->toBase()
-            ->get(['aset_m_maintenance_job_type.id', 'aset_m_maintenance_job_type.kode', 'aset_m_maintenance_job_type.nama']);
-
-        // Tenant yang belum mengisi relasi jenis aset tetap dapat membuat work order.
-        // Begitu satu job type mulai dikonfigurasi, pilihan untuk job type tersebut
-        // mengikuti relasi F&O dan hanya muncul untuk jenis aset yang sesuai.
-        if ($linkedJobTypes->isEmpty()) {
-            $data = MaintenanceJobType::query()
-                ->where('aktif', true)
-                ->orderBy('kode')
-                ->toBase()
-                ->get(['id', 'kode', 'nama']);
-        } else {
-            $data = $data->merge(
-                MaintenanceJobType::query()
-                    ->where('aktif', true)
-                    ->whereNotIn('id', $linkedJobTypes)
-                    ->orderBy('kode')
-                    ->toBase()
-                    ->get(['id', 'kode', 'nama'])
-            )->sortBy('kode')->values();
-        }
-
-        return response()->json(['data' => $data]);
+        return response()->json(IncrementalList::query($request, $query->select(['id', 'kode', 'nama'])->toBase(),
+            ['id' => 'id', 'kode' => 'kode', 'nama' => 'nama'], ['kode', 'nama'], 'kode'));
     }
 
     public function show(Request $request, string $id): JsonResponse

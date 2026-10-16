@@ -25,6 +25,10 @@ export type Context = {
 };
 
 export type Aset = {
+    legal_entity_nama?: string | null;
+    group_nama?: string | null;
+    type_nama?: string | null;
+    location_nama?: string | null;
     legal_entity_id: string;
     id: string;
     kode: string;
@@ -334,9 +338,14 @@ export function DepreciationPreview({ groupId }: { groupId: string }) {
     const rows = useGroupBooks(groupId);
     const { options: books } = useMasterOptions(
         groupId ? 'buku-penyusutan' : null,
+        '',
+        rows?.map((row) => row.buku_id) ?? [],
     );
     const { options: profiles } = useMasterOptions(
         groupId ? 'profil-penyusutan' : null,
+        '',
+        rows?.map((row) => row.depreciation_profile_id ?? '').filter(Boolean) ??
+            [],
     );
 
     if (!groupId) {

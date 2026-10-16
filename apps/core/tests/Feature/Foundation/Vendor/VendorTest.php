@@ -265,7 +265,7 @@ class VendorTest extends TestCase
 
         $this->grantDuties($membership, ['core.vendor.inquire']);
         $this->actingAs($anggota)->get('/settings/vendors')->assertOk()
-            ->assertInertia(fn (AssertableInertia $page) => $page->where('canManage', false)->where('vendors.total', 1));
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('canManage', false)->has('vendors.data', 1));
         $this->actingAs($anggota)->postJson('/api/v1/vendors', [
             'legal_entity_id' => $this->le, 'party_name' => 'CV Alkes Jaya',
         ])->assertForbidden();
@@ -286,7 +286,7 @@ class VendorTest extends TestCase
 
         $this->actingAs($this->owner)->get('/settings/vendors')
             ->assertInertia(fn (AssertableInertia $page) => $page
-                ->where('vendors.total', 1)
+                ->has('vendors.data', 1)
                 ->where('vendors.data.0.name', 'PT Sarana Medika'));
         $this->actingAs($this->owner)->patchJson("/api/v1/vendors/{$vendorLain['id']}", ['name' => 'X', 'status' => 'inactive'])
             ->assertNotFound();
@@ -401,14 +401,14 @@ class VendorTest extends TestCase
                 ->component('foundation/vendor/vendors')
                 ->where('canManage', true)
                 ->where('automaticNumbers', true)
-                ->where('vendors.total', 3)
+                ->has('vendors.data', 3)
                 ->has('legalEntities', 2));
         $this->actingAs($this->owner)->get("/settings/vendors?legal_entity={$this->le}&status=active")
-            ->assertInertia(fn (AssertableInertia $page) => $page->where('vendors.total', 1)->where('vendors.data.0.name', 'PT Sarana Medika'));
+            ->assertInertia(fn (AssertableInertia $page) => $page->has('vendors.data', 1)->where('vendors.data.0.name', 'PT Sarana Medika'));
         $this->actingAs($this->owner)->get('/settings/vendors?q=901.000')
-            ->assertInertia(fn (AssertableInertia $page) => $page->where('vendors.total', 1));
+            ->assertInertia(fn (AssertableInertia $page) => $page->has('vendors.data', 1));
         $this->actingAs($this->owner)->get('/settings/vendors?q=alkes')
-            ->assertInertia(fn (AssertableInertia $page) => $page->where('vendors.total', 1)->where('vendors.data.0.status', 'inactive'));
+            ->assertInertia(fn (AssertableInertia $page) => $page->has('vendors.data', 1)->where('vendors.data.0.status', 'inactive'));
     }
 
     public function test_database_menolak_status_tak_dikenal_dan_nomor_kembar_per_entitas(): void

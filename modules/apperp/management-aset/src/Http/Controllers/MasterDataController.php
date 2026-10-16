@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers;
 
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\NumberSequenceIssuer;
 use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Database\Eloquent\Builder;
@@ -144,17 +145,15 @@ abstract class MasterDataController extends Controller
             }
         }
 
-        $page = $query->orderBy('kode')->paginate((int) ($validated['per_page'] ?? 20));
+        $batch = IncrementalList::query($request, (clone $query)->toBase(), [
+            'id' => 'id', 'kode' => 'kode', 'nama' => 'nama',
+        ], [], 'kode');
+        // Pertahankan cast, eager-load, dan presenter tiap master hanya untuk batch ini.
+        $records = $query->getModel()->hydrate($batch['data']->map(fn ($row) => (array) $row)->all());
+        $records->load($query->getEagerLoads());
+        $batch['data'] = $records->map($this->present(...));
 
-        return response()->json([
-            'data' => collect($page->items())->map($this->present(...))->values(),
-            'meta' => [
-                'current_page' => $page->currentPage(),
-                'last_page' => $page->lastPage(),
-                'per_page' => $page->perPage(),
-                'total' => $page->total(),
-            ],
-        ]);
+        return response()->json($batch);
     }
 
     public function numberPolicy(Request $request, NumberSequenceIssuer $numbers): JsonResponse

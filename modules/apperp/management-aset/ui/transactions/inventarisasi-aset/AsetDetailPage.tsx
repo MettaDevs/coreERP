@@ -24,6 +24,7 @@ import DynamicField from '../../master/DynamicField';
 import type { FieldValue } from '../../master/fields';
 import { emptyValue, payloadValue } from '../../master/fields';
 import { useMasterOptions } from '../../master/useMasterOptions';
+import { useRecordOptions } from '../../use-record-list';
 import AssetDowntimeSection from '../downtime/AssetDowntimeSection';
 import AssetInsuranceSection from '../insurance/AssetInsuranceSection';
 import AssetWarrantySection from '../warranty/AssetWarrantySection';
@@ -104,7 +105,6 @@ export default function AsetDetailPage({
         Record<string, FieldValue>
     >({});
     const [placements, setPlacements] = useState<Placement[]>([]);
-    const [aset, setAset] = useState<Aset[]>([]);
     const [alasanKoreksi, setAlasanKoreksi] = useState('');
 
     const readOnly = mode === 'view';
@@ -122,26 +122,41 @@ export default function AsetDetailPage({
             ? attributesMuatan.items
             : TANPA_ATRIBUT;
 
-    const { options: locationOptions } = useMasterOptions('lokasi-aset');
+    const { options: locationOptions } = useMasterOptions(
+        'lokasi-aset',
+        '',
+        [
+            String(references.lokasi_aset_id ?? ''),
+            ...placements.map((item) => item.lokasi_aset_id ?? ''),
+        ].filter(Boolean),
+    );
     const { options: unitOptions } = useMasterOptions(
         'reference-data/unit-kerja',
+        '',
+        [
+            String(references.usage_org_unit_id ?? ''),
+            ...placements.map((item) => item.usage_org_unit_id ?? ''),
+        ].filter(Boolean),
     );
     const { options: anggotaOptions } = useMasterOptions(
         'reference-data/anggota',
+        '',
+        [
+            String(references.custodian_user_id ?? ''),
+            ...placements.map((item) => item.custodian_user_id ?? ''),
+        ].filter(Boolean),
     );
 
     // Daftar aset hanya dibutuhkan untuk memilih induk, dan itu tidak berlaku saat
     // membaca: menariknya di mode baca berarti satu permintaan untuk kotak yang tidak
     // pernah dibuka.
-    useEffect(() => {
-        if (readOnly) {
-            return;
-        }
 
-        api<{ data: Aset[] }>('/aset')
-            .then((result) => setAset(result.data))
-            .catch(() => setAset([]));
-    }, [readOnly]);
+    const assetSource = useRecordOptions<Aset>(
+        '/aset',
+        (item) => (item.nama ? `${item.kode} \u00b7 ${item.nama}` : item.kode),
+        parentAsetId,
+    );
+    const aset = assetSource.options;
 
     useEffect(() => {
         if (!asetId) {
@@ -742,6 +757,7 @@ export default function AsetDetailPage({
                             ) : (
                                 <Field>
                                     <Select
+                                        {...assetSource.selectProps}
                                         label="Aset induk"
                                         items={parentOptions.map(
                                             (option) => option.label,

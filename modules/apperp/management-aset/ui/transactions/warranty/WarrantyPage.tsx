@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useToday } from '@/hooks/use-work-date';
 import { Badge } from '@apperp/ui/badge';
@@ -37,8 +37,9 @@ import {
     newIdempotencyKey,
     toastSaveError,
 } from '../../api';
-import type { MasterOption } from '../../master/useMasterOptions';
-import { optionLabel } from '../../master/useMasterOptions';
+
+import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
+import { useRecordList } from '../../use-record-list';
 import type { Contract, Expiring, Warranty } from './warranty';
 import { WARRANTY_TYPES } from './warranty';
 
@@ -107,15 +108,8 @@ export default function WarrantyPage({
     const [tab, setTab] = useState(
         can('garansi-aset.read') ? 'garansi' : 'kontrak',
     );
-    const [warranties, setWarranties] = useState<Warranty[] | null>(null);
-    const [contracts, setContracts] = useState<Contract[] | null>(null);
-    const [expiring, setExpiring] = useState<{
-        days: string;
-        items: Expiring[];
-    } | null>(null);
     const [days, setDays] = useState('30');
     const [reload, setReload] = useState(0);
-    const [assets, setAssets] = useState<MasterOption[]>([]);
     const [warrantyDraft, setWarrantyDraft] = useState<WarrantyDraft | null>(
         null,
     );
@@ -126,82 +120,60 @@ export default function WarrantyPage({
     const [busy, setBusy] = useState(false);
     const warrantyRef = useRef<HTMLDivElement>(null);
     const contractRef = useRef<HTMLDivElement>(null);
-    const warrantyVendors = useVendors(
+    const assetSource = useMasterOptions(
+        warrantyDraft || contractDraft ? 'aset' : null,
+        '',
+        [
+            ...(warrantyDraft?.aset_id ? [warrantyDraft.aset_id] : []),
+            ...(contractDraft?.aset_ids ?? []),
+        ],
+    );
+    const assets = assetSource.options;
+    const warrantyVendorsSource = useVendors(
         '/garansi-aset/vendor',
         warrantyDraft?.legal_entity_id ?? null,
     );
-    const contractVendors = useVendors(
+    const contractVendorsSource = useVendors(
         '/garansi-aset/vendor',
         contractDraft?.legal_entity_id ?? null,
     );
+    const warrantyVendors = warrantyVendorsSource.options;
+    const contractVendors = contractVendorsSource.options;
     const message = (field: string) => errors[field]?.[0];
     const refresh = () => setReload((current) => current + 1);
 
-    useEffect(() => {
-        let cancelled = false;
-        const fail = (caught: unknown) =>
-            !cancelled &&
-            toast.error(errorMessage(caught, 'Data belum dapat dimuat.'));
-
-        if (permissions.includes('management-aset.garansi-aset.read')) {
-            api<{ data: Warranty[] }>('/garansi-aset')
-                .then((result) => !cancelled && setWarranties(result.data))
-                .catch(fail);
-        }
-
-        if (permissions.includes('management-aset.kontrak-servis.read')) {
-            api<{ data: Contract[] }>('/kontrak-servis')
-                .then((result) => !cancelled && setContracts(result.data))
-                .catch(fail);
-        }
-
-        return () => {
-            cancelled = true;
-        };
-    }, [permissions, reload]);
-
-    useEffect(() => {
-        let cancelled = false;
-        api<{ data: Expiring[] }>(`/garansi-aset/akan-berakhir?hari=${days}`)
-            .then(
-                (result) =>
-                    !cancelled && setExpiring({ days, items: result.data }),
-            )
-            .catch(
-                (caught) =>
-                    !cancelled &&
-                    toast.error(
-                        errorMessage(caught, 'Daftar belum dapat dimuat.'),
-                    ),
-            );
-
-        return () => {
-            cancelled = true;
-        };
-    }, [days, reload]);
-
-    // Pemilih aset dibutuhkan kedua form; dimuat sekali saat salah satunya dibuka.
-    const needAssets = warrantyDraft !== null || contractDraft !== null;
-    useEffect(() => {
-        if (!needAssets) {
-            return;
-        }
-
-        let cancelled = false;
-        api<{ data: MasterOption[] }>('/aset')
-            .then((result) => !cancelled && setAssets(result.data))
-            .catch(
-                () =>
-                    !cancelled &&
-                    toast.error(
-                        'Daftar aset belum dapat dimuat. Anda memerlukan akses lihat register aset.',
-                    ),
-            );
-
-        return () => {
-            cancelled = true;
-        };
-    }, [needAssets]);
+    const warrantyList = useRecordList<Warranty>(
+        '/garansi-aset',
+        '',
+        { refresh: String(reload) },
+        tab === 'garansi' && can('garansi-aset.read'),
+    );
+    const contractList = useRecordList<Contract>(
+        '/kontrak-servis',
+        '',
+        { refresh: String(reload) },
+        tab === 'kontrak' && can('kontrak-servis.read'),
+    );
+    const expiryList = useRecordList<Expiring>(
+        '/garansi-aset/akan-berakhir',
+        '',
+        { hari: days, refresh: String(reload) },
+        tab === 'berakhir',
+        undefined,
+        (row) => `${row.jenis}:${row.id}`,
+    );
+    const warranties =
+        warrantyList.loading && !warrantyList.items.length
+            ? null
+            : warrantyList.items;
+    const contracts =
+        contractList.loading && !contractList.items.length
+            ? null
+            : contractList.items;
+    const expiring =
+        expiryList.loading && !expiryList.items.length
+            ? null
+            : { days, items: expiryList.items };
 
     const assetChoices = assets.map((asset) => ({
         value: asset.id,
@@ -536,7 +508,9 @@ export default function WarrantyPage({
             </RecordActionBar>
 
             <TabsContent value="garansi">
-                {warranties !== null && warranties.length === 0 ? (
+                {warranties !== null &&
+                warranties.length === 0 &&
+                !warrantyList.error ? (
                     <Empty>
                         <EmptyHeader>
                             <EmptyTitle>Belum ada garansi tercatat</EmptyTitle>
@@ -550,6 +524,9 @@ export default function WarrantyPage({
                 ) : (
                     <DataTable
                         columns={warrantyColumns}
+                        incremental={warrantyList}
+                        sort={warrantyList.sort}
+                        onSortChange={warrantyList.onSortChange}
                         data={warranties ?? []}
                         getRowKey={(row) => row.id}
                         getRowLabel={(row) => row.aset_kode}
@@ -597,7 +574,9 @@ export default function WarrantyPage({
             </TabsContent>
 
             <TabsContent value="kontrak">
-                {contracts !== null && contracts.length === 0 ? (
+                {contracts !== null &&
+                contracts.length === 0 &&
+                !contractList.error ? (
                     <Empty>
                         <EmptyHeader>
                             <EmptyTitle>Belum ada kontrak servis</EmptyTitle>
@@ -610,6 +589,9 @@ export default function WarrantyPage({
                 ) : (
                     <DataTable
                         columns={contractColumns}
+                        incremental={contractList}
+                        sort={contractList.sort}
+                        onSortChange={contractList.onSortChange}
                         data={contracts ?? []}
                         getRowKey={(row) => row.id}
                         getRowLabel={(row) => row.kode}
@@ -649,7 +631,9 @@ export default function WarrantyPage({
                         />
                     </div>
                 </div>
-                {expiring !== null && expiringItems.length === 0 ? (
+                {expiring !== null &&
+                expiringItems.length === 0 &&
+                !expiryList.error ? (
                     <Empty>
                         <EmptyHeader>
                             <EmptyTitle>
@@ -664,6 +648,9 @@ export default function WarrantyPage({
                 ) : (
                     <DataTable
                         columns={expiringColumns}
+                        incremental={expiryList}
+                        sort={expiryList.sort}
+                        onSortChange={expiryList.onSortChange}
                         data={expiringItems}
                         getRowKey={(row) => `${row.jenis}-${row.id}`}
                         getRowLabel={(row) => row.referensi ?? row.id}
@@ -687,6 +674,7 @@ export default function WarrantyPage({
                         <DialogBody className="space-y-4">
                             <Field>
                                 <Select
+                                    {...assetSource.selectProps}
                                     label="Aset"
                                     required
                                     items={assetChoices}
@@ -715,6 +703,7 @@ export default function WarrantyPage({
                             </Field>
                             <Field>
                                 <Select
+                                    {...warrantyVendorsSource.selectProps}
                                     label="Penjamin"
                                     items={warrantyVendors.map((vendor) => ({
                                         value: vendor.id,
@@ -869,6 +858,7 @@ export default function WarrantyPage({
                                 />
                                 <Field>
                                     <Select
+                                        {...contractVendorsSource.selectProps}
                                         label="Vendor servis"
                                         required
                                         items={contractVendors.map(
@@ -940,6 +930,7 @@ export default function WarrantyPage({
                             )}
                             <Field>
                                 <MultiSelect
+                                    {...assetSource.selectProps}
                                     label="Aset yang ditanggung"
                                     items={assetChoices}
                                     value={contractDraft.aset_ids}

@@ -19,11 +19,15 @@ import {
     CollapsibleSectionGroup,
 } from '@apperp/ui/collapsible-section';
 import { Field, FieldError, FieldLabel } from '@apperp/ui/field';
+import { IncrementalListStatus } from '@apperp/ui/incremental-list-status';
 import { Input } from '@apperp/ui/input';
+import { MasterDetailLayout } from '@apperp/ui/master-detail-layout';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
+import { RecordEditBoundary } from '@apperp/ui/record-edit-boundary';
 import { Switch } from '@apperp/ui/switch';
 import EditShield from '../../_shared/EditShield';
 import { api, ApiError, errorMessage, newIdempotencyKey } from '../../api';
+import { useRecordList } from '../../use-record-list';
 
 type Classification = {
     id: string;
@@ -47,14 +51,11 @@ export default function AssetClassificationPage({
 }: {
     permissions: string[];
 }) {
-    const [items, setItems] = useState<Classification[]>([]);
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [search, setSearch] = useState('');
-    const [page, setPage] = useState(1);
-    const [lastPage, setLastPage] = useState(1);
-    const [loading, setLoading] = useState(true);
-    const [loadError, setLoadError] = useState('');
-    const [reload, setReload] = useState(0);
+    const [showDetail, setShowDetail] = useState(false);
+    const list = useRecordList<Classification>('/kelompok-harta', search);
+    const { items, setItems, loading, error: loadError } = list;
     const [editing, setEditing] = useState(false);
     const [creating, setCreating] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -67,7 +68,7 @@ export default function AssetClassificationPage({
     const [actionError, setActionError] = useState('');
     const selected = creating
         ? null
-        : (items.find((item) => item.id === selectedId) ?? items[0]);
+        : (items.find((item) => item.id === selectedId) ?? null);
     const canCreate = permissions.includes(
         'management-aset.kelompok-harta.create',
     );
@@ -82,12 +83,12 @@ export default function AssetClassificationPage({
         change: { id: string } | { search: string } | { create: true },
     ) {
         setCreating('create' in change);
+        setShowDetail(!('search' in change));
 
         if ('id' in change) {
             setSelectedId(change.id);
         } else if ('search' in change) {
             setSearch(change.search);
-            setPage(1);
             setSelectedId(null);
         }
 
@@ -101,7 +102,13 @@ export default function AssetClassificationPage({
     function requestChange(
         change: { id: string } | { search: string } | { create: true },
     ) {
-        if (saving || ('id' in change && change.id === selected?.id)) {
+        if ('id' in change && change.id === selected?.id) {
+            setShowDetail(true);
+
+            return;
+        }
+
+        if (saving) {
             return;
         }
 
@@ -131,8 +138,7 @@ export default function AssetClassificationPage({
                 current.filter((item) => item.id !== selected.id),
             );
             setSelectedId(null);
-            setPage(1);
-            setReload((value) => value + 1);
+            list.reload();
             toast.success('Kelompok Aset diarsipkan.');
         } catch (caught) {
             setActionError(
@@ -143,48 +149,6 @@ export default function AssetClassificationPage({
             setArchiving(false);
         }
     }
-
-    useEffect(() => {
-        let cancelled = false;
-        const timer = window.setTimeout(async () => {
-            setLoading(true);
-
-            try {
-                const result = await api<{
-                    data: Classification[];
-                    meta: { last_page: number };
-                }>(
-                    `/kelompok-harta?${new URLSearchParams({ q: search, page: String(page) })}`,
-                );
-
-                if (!cancelled) {
-                    setItems((current) =>
-                        page === 1 ? result.data : [...current, ...result.data],
-                    );
-                    setLastPage(result.meta.last_page);
-                    setLoadError('');
-                }
-            } catch (caught) {
-                if (!cancelled) {
-                    setLoadError(
-                        errorMessage(
-                            caught,
-                            'Kelompok Aset belum dapat dimuat.',
-                        ),
-                    );
-                }
-            } finally {
-                if (!cancelled) {
-                    setLoading(false);
-                }
-            }
-        }, 250);
-
-        return () => {
-            cancelled = true;
-            window.clearTimeout(timer);
-        };
-    }, [search, page, reload]);
 
     return (
         <div className="flex h-full min-h-0 flex-col">
@@ -226,7 +190,10 @@ export default function AssetClassificationPage({
                             <ActionButton
                                 action="edit"
                                 disabled={!selected || loading || !!loadError}
-                                onClick={() => setEditing(true)}
+                                onClick={() => {
+                                    setEditing(true);
+                                    setShowDetail(true);
+                                }}
                             >
                                 Ubah
                             </ActionButton>
@@ -256,80 +223,79 @@ export default function AssetClassificationPage({
                     {actionError}
                 </p>
             )}
-            <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[16rem_minmax(0,1fr)] lg:grid-cols-[20rem_minmax(0,1fr)]">
-                <aside
-                    aria-label="Daftar kelompok aset"
-                    className="flex min-h-0 flex-col border-r"
-                >
-                    <div className="space-y-2 border-b px-4 py-3">
-                        <p className="text-sm font-semibold">
-                            Daftar kelompok aset
-                        </p>
-                        <Input
-                            type="search"
-                            label="Cari nama"
-                            value={search}
-                            readOnly={saving}
-                            onChange={(event) => {
-                                requestChange({ search: event.target.value });
-                            }}
-                        />
-                    </div>
-                    <div className="min-h-0 overflow-y-auto">
-                        {loadError && (
-                            <div role="alert" className="space-y-2 p-4">
-                                <p>{loadError}</p>
-                                <Button
-                                    variant="outline"
+            <MasterDetailLayout
+                detailOpen={showDetail}
+                onDetailOpenChange={setShowDetail}
+                list={
+                    <aside
+                        aria-label="Daftar kelompok aset"
+                        className="flex h-full min-h-0 min-w-0 flex-col"
+                    >
+                        <div className="space-y-2 border-b px-4 py-3">
+                            <p className="text-sm font-semibold">
+                                Daftar kelompok aset
+                            </p>
+                            <Input
+                                type="search"
+                                label="Cari nama"
+                                value={search}
+                                readOnly={saving}
+                                onChange={(event) => {
+                                    requestChange({
+                                        search: event.target.value,
+                                    });
+                                }}
+                            />
+                        </div>
+                        <div className="min-h-0 overflow-y-auto">
+                            {loadError && (
+                                <div role="alert" className="space-y-2 p-4">
+                                    <p>{loadError}</p>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => list.retry()}
+                                    >
+                                        Coba lagi
+                                    </Button>
+                                </div>
+                            )}
+                            {items.map((item) => (
+                                <button
+                                    type="button"
+                                    key={item.id}
+                                    aria-pressed={selected?.id === item.id}
+                                    disabled={saving || loading || !!loadError}
                                     onClick={() =>
-                                        setReload((value) => value + 1)
+                                        requestChange({ id: item.id })
                                     }
+                                    className="hover:bg-accent aria-pressed:bg-accent block w-full border-b px-4 py-3 text-left disabled:cursor-default"
                                 >
-                                    Coba lagi
-                                </Button>
-                            </div>
-                        )}
-                        {items.map((item) => (
-                            <button
-                                type="button"
-                                key={item.id}
-                                aria-pressed={selected?.id === item.id}
-                                disabled={saving || loading || !!loadError}
-                                onClick={() => requestChange({ id: item.id })}
-                                className="hover:bg-accent aria-pressed:bg-accent block w-full border-b px-4 py-3 text-left disabled:cursor-default"
-                            >
-                                <span className="block truncate font-semibold">
-                                    {item.label}
-                                </span>
-                                <span className="text-muted-foreground block text-xs">
-                                    {item.aktif ? 'Aktif' : 'Tidak aktif'}
-                                </span>
-                            </button>
-                        ))}
-                        {loading && (
-                            <p role="status" className="p-4 text-sm">
-                                Memuat kelompok aset…
-                            </p>
-                        )}
-                        {!loading && !loadError && items.length === 0 && (
-                            <p className="text-muted-foreground p-4 text-sm">
-                                {search
-                                    ? 'Tidak ada kelompok yang cocok dengan pencarian.'
-                                    : 'Belum ada kelompok aset.'}
-                            </p>
-                        )}
-                        {page < lastPage && (
-                            <Button
-                                variant="ghost"
-                                disabled={loading || saving}
-                                onClick={() => setPage((value) => value + 1)}
-                            >
-                                Lihat lainnya
-                            </Button>
-                        )}
-                    </div>
-                </aside>
-                <div className="min-h-0 overflow-y-auto p-4">
+                                    <span className="block truncate font-semibold">
+                                        {item.label}
+                                    </span>
+                                    <span className="text-muted-foreground block text-xs">
+                                        {item.aktif ? 'Aktif' : 'Tidak aktif'}
+                                    </span>
+                                </button>
+                            ))}
+                            {loading && (
+                                <p role="status" className="p-4 text-sm">
+                                    Memuat kelompok aset…
+                                </p>
+                            )}
+                            {!loading && !loadError && items.length === 0 && (
+                                <p className="text-muted-foreground p-4 text-sm">
+                                    {search
+                                        ? 'Tidak ada kelompok yang cocok dengan pencarian.'
+                                        : 'Belum ada kelompok aset.'}
+                                </p>
+                            )}
+                            <IncrementalListStatus state={list} />
+                        </div>
+                    </aside>
+                }
+            >
+                <div className="h-full min-h-0 min-w-0 overflow-y-auto p-4">
                     {(selected || creating) && (
                         <ClassificationForm
                             key={`${selected?.id ?? 'new'}:${selected?.version ?? 0}:${formNonce}`}
@@ -364,7 +330,7 @@ export default function AssetClassificationPage({
                         />
                     )}
                 </div>
-            </div>
+            </MasterDetailLayout>
             <AlertDialog
                 open={pendingChange !== null}
                 onOpenChange={(open) => !open && setPendingChange(null)}
@@ -563,185 +529,192 @@ function ClassificationForm({
     }
 
     return (
-        <form
-            ref={formRef}
-            id="asset-classification-form"
-            onSubmit={(event) => void save(event)}
-            className="space-y-4"
-            onChange={() => editing && onDirtyChange(true)}
+        <RecordEditBoundary
+            editing={editing}
+            canEdit={canEdit}
+            disabled={saving}
+            onEdit={onRequestEdit}
+            className="flex min-h-0 min-w-0 flex-col"
         >
-            <Field data-field-name="kode">
-                <Input
-                    name="kode"
-                    label="Kode kelompok aset"
-                    defaultValue={record?.kode ?? ''}
-                    readOnly={!editing || saving}
-                    onFocus={() => enterEdit('kode')}
-                    required
-                    maxLength={10}
-                    aria-invalid={!!errors.kode}
-                />
-                <FieldError>{errors.kode?.join(' ')}</FieldError>
-            </Field>
-            <div className="flex items-center gap-3">
-                <Field className="flex-1" data-field-name="label">
+            <form
+                ref={formRef}
+                id="asset-classification-form"
+                onSubmit={(event) => void save(event)}
+                className="space-y-4"
+                onChange={() => editing && onDirtyChange(true)}
+            >
+                <Field data-field-name="kode">
                     <Input
-                        name="label"
-                        label="Nama kelompok aset"
-                        defaultValue={record?.label ?? ''}
+                        name="kode"
+                        label="Kode kelompok aset"
+                        defaultValue={record?.kode ?? ''}
                         readOnly={!editing || saving}
-                        onFocus={() => enterEdit('label')}
                         required
-                        maxLength={150}
-                        aria-invalid={!!errors.label}
+                        maxLength={10}
+                        aria-invalid={!!errors.kode}
                     />
-                    <FieldError>{errors.label?.join(' ')}</FieldError>
+                    <FieldError>{errors.kode?.join(' ')}</FieldError>
                 </Field>
-                <Badge variant={active ? 'default' : 'secondary'}>
-                    {active ? 'Aktif' : 'Tidak aktif'}
-                </Badge>
-            </div>
-            {error && (
-                <p role="alert" className="text-destructive text-sm">
-                    {error}
-                </p>
-            )}
-            <CollapsibleSectionGroup defaultValue={['depreciation']}>
-                <CollapsibleSection
-                    value="depreciation"
-                    title="Aturan penyusutan"
-                    summary={`${depreciable ? 'Disusutkan' : 'Tidak disusutkan'} · ${active ? 'Aktif' : 'Tidak aktif'}`}
-                >
-                    <div className="space-y-4">
-                        <div className="grid gap-4 sm:grid-cols-3">
-                            <Field data-field-name="depreciable">
-                                <FieldLabel htmlFor="classification-depreciable">
-                                    Disusutkan
-                                </FieldLabel>
-                                <EditShield
-                                    active={!editing}
-                                    label="Disusutkan"
-                                    onActivate={() => enterEdit('depreciable')}
-                                >
-                                    <Switch
-                                        id="classification-depreciable"
-                                        checked={depreciable}
-                                        onCheckedChange={(value) => {
-                                            if (editing && !saving) {
-                                                onDirtyChange(true);
-                                                setDepreciable(value);
-                                            }
-                                        }}
-                                    />
-                                </EditShield>
-                            </Field>
-                            <Field data-field-name="allow_reducing_balance">
-                                <FieldLabel htmlFor="classification-reducing">
-                                    Boleh memakai saldo menurun
-                                </FieldLabel>
-                                <EditShield
-                                    active={!editing}
-                                    label="Boleh memakai saldo menurun"
-                                    onActivate={() =>
-                                        enterEdit('allow_reducing_balance')
-                                    }
-                                >
-                                    <Switch
-                                        id="classification-reducing"
-                                        checked={reducingBalance}
-                                        onCheckedChange={(value) => {
-                                            if (editing && !saving) {
-                                                onDirtyChange(true);
-                                                setReducingBalance(value);
-                                            }
-                                        }}
-                                    />
-                                </EditShield>
-                            </Field>
-                            <Field data-field-name="allow_straight_line">
-                                <FieldLabel htmlFor="classification-straight-line">
-                                    Boleh memakai garis lurus
-                                </FieldLabel>
-                                <EditShield
-                                    active={!editing}
-                                    label="Boleh memakai garis lurus"
-                                    onActivate={() =>
-                                        enterEdit('allow_straight_line')
-                                    }
-                                >
-                                    <Switch
-                                        id="classification-straight-line"
-                                        checked={straightLine}
-                                        onCheckedChange={(value) => {
-                                            if (editing && !saving) {
-                                                onDirtyChange(true);
-                                                setStraightLine(value);
-                                            }
-                                        }}
-                                    />
-                                </EditShield>
-                            </Field>
-                        </div>
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            {fields.map((field) => (
-                                <Field
-                                    key={field.name}
-                                    data-field-name={field.name}
-                                >
-                                    <Input
-                                        name={field.name}
-                                        label={field.label}
-                                        type={field.type}
-                                        defaultValue={
-                                            record?.[field.name] ?? ''
+                <div className="flex items-center gap-3">
+                    <Field className="flex-1" data-field-name="label">
+                        <Input
+                            name="label"
+                            label="Nama kelompok aset"
+                            defaultValue={record?.label ?? ''}
+                            readOnly={!editing || saving}
+                            required
+                            maxLength={150}
+                            aria-invalid={!!errors.label}
+                        />
+                        <FieldError>{errors.label?.join(' ')}</FieldError>
+                    </Field>
+                    <Badge variant={active ? 'default' : 'secondary'}>
+                        {active ? 'Aktif' : 'Tidak aktif'}
+                    </Badge>
+                </div>
+                {error && (
+                    <p role="alert" className="text-destructive text-sm">
+                        {error}
+                    </p>
+                )}
+                <CollapsibleSectionGroup defaultValue={['depreciation']}>
+                    <CollapsibleSection
+                        value="depreciation"
+                        title="Aturan penyusutan"
+                        summary={`${depreciable ? 'Disusutkan' : 'Tidak disusutkan'} · ${active ? 'Aktif' : 'Tidak aktif'}`}
+                    >
+                        <div className="space-y-4">
+                            <div className="grid gap-4 sm:grid-cols-3">
+                                <Field data-field-name="depreciable">
+                                    <FieldLabel htmlFor="classification-depreciable">
+                                        Disusutkan
+                                    </FieldLabel>
+                                    <EditShield
+                                        active={!editing}
+                                        label="Disusutkan"
+                                        onActivate={() =>
+                                            enterEdit('depreciable')
                                         }
-                                        readOnly={!editing || saving}
-                                        onFocus={() => enterEdit(field.name)}
-                                        required={field.required}
-                                        {...('max' in field
-                                            ? {
-                                                  min: field.min,
-                                                  max: field.max,
-                                                  step: field.step,
-                                              }
-                                            : {})}
-                                        aria-invalid={!!errors[field.name]}
-                                    />
-                                    <FieldError>
-                                        {errors[field.name]?.join(' ')}
-                                    </FieldError>
+                                    >
+                                        <Switch
+                                            id="classification-depreciable"
+                                            checked={depreciable}
+                                            onCheckedChange={(value) => {
+                                                if (editing && !saving) {
+                                                    onDirtyChange(true);
+                                                    setDepreciable(value);
+                                                }
+                                            }}
+                                        />
+                                    </EditShield>
                                 </Field>
-                            ))}
-                            <Field data-field-name="aktif">
-                                <FieldLabel htmlFor="classification-active">
-                                    Aktif
-                                </FieldLabel>
-                                <EditShield
-                                    active={!editing}
-                                    label="Aktif"
-                                    onActivate={() => enterEdit('aktif')}
-                                >
-                                    <Switch
-                                        id="classification-active"
-                                        checked={active}
-                                        onCheckedChange={(value) => {
-                                            if (editing && !saving) {
-                                                onDirtyChange(true);
-                                                setActive(value);
+                                <Field data-field-name="allow_reducing_balance">
+                                    <FieldLabel htmlFor="classification-reducing">
+                                        Boleh memakai saldo menurun
+                                    </FieldLabel>
+                                    <EditShield
+                                        active={!editing}
+                                        label="Boleh memakai saldo menurun"
+                                        onActivate={() =>
+                                            enterEdit('allow_reducing_balance')
+                                        }
+                                    >
+                                        <Switch
+                                            id="classification-reducing"
+                                            checked={reducingBalance}
+                                            onCheckedChange={(value) => {
+                                                if (editing && !saving) {
+                                                    onDirtyChange(true);
+                                                    setReducingBalance(value);
+                                                }
+                                            }}
+                                        />
+                                    </EditShield>
+                                </Field>
+                                <Field data-field-name="allow_straight_line">
+                                    <FieldLabel htmlFor="classification-straight-line">
+                                        Boleh memakai garis lurus
+                                    </FieldLabel>
+                                    <EditShield
+                                        active={!editing}
+                                        label="Boleh memakai garis lurus"
+                                        onActivate={() =>
+                                            enterEdit('allow_straight_line')
+                                        }
+                                    >
+                                        <Switch
+                                            id="classification-straight-line"
+                                            checked={straightLine}
+                                            onCheckedChange={(value) => {
+                                                if (editing && !saving) {
+                                                    onDirtyChange(true);
+                                                    setStraightLine(value);
+                                                }
+                                            }}
+                                        />
+                                    </EditShield>
+                                </Field>
+                            </div>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                {fields.map((field) => (
+                                    <Field
+                                        key={field.name}
+                                        data-field-name={field.name}
+                                    >
+                                        <Input
+                                            name={field.name}
+                                            label={field.label}
+                                            type={field.type}
+                                            defaultValue={
+                                                record?.[field.name] ?? ''
                                             }
-                                        }}
-                                    />
-                                </EditShield>
-                            </Field>
+                                            readOnly={!editing || saving}
+                                            required={field.required}
+                                            {...('max' in field
+                                                ? {
+                                                      min: field.min,
+                                                      max: field.max,
+                                                      step: field.step,
+                                                  }
+                                                : {})}
+                                            aria-invalid={!!errors[field.name]}
+                                        />
+                                        <FieldError>
+                                            {errors[field.name]?.join(' ')}
+                                        </FieldError>
+                                    </Field>
+                                ))}
+                                <Field data-field-name="aktif">
+                                    <FieldLabel htmlFor="classification-active">
+                                        Aktif
+                                    </FieldLabel>
+                                    <EditShield
+                                        active={!editing}
+                                        label="Aktif"
+                                        onActivate={() => enterEdit('aktif')}
+                                    >
+                                        <Switch
+                                            id="classification-active"
+                                            checked={active}
+                                            onCheckedChange={(value) => {
+                                                if (editing && !saving) {
+                                                    onDirtyChange(true);
+                                                    setActive(value);
+                                                }
+                                            }}
+                                        />
+                                    </EditShield>
+                                </Field>
+                            </div>
+                            <p className="text-muted-foreground text-sm">
+                                Perubahan di sini tidak otomatis mengubah metode
+                                penyusutan yang sudah dibuat. Periksa metode
+                                yang digunakan sebelum menghitung penyusutan.
+                            </p>
                         </div>
-                        <p className="text-muted-foreground text-sm">
-                            Perubahan di sini tidak otomatis mengubah metode
-                            penyusutan yang sudah dibuat. Periksa metode yang
-                            digunakan sebelum menghitung penyusutan.
-                        </p>
-                    </div>
-                </CollapsibleSection>
-            </CollapsibleSectionGroup>
-        </form>
+                    </CollapsibleSection>
+                </CollapsibleSectionGroup>
+            </form>
+        </RecordEditBoundary>
     );
 }

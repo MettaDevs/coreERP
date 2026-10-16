@@ -7,6 +7,7 @@ use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -15,6 +16,9 @@ class IdentityMonitorController extends Controller
     public function index(Request $request): Response
     {
         abort_unless($request->user()->can('monitor-identities'), 403);
+        $input = $request->validate(['sort' => ['nullable', Rule::in(['identity', 'last-login'])], 'direction' => ['nullable', Rule::in(['asc', 'desc'])]]);
+        $sort = ['identity' => 'name', 'last-login' => 'last_login_at'][$input['sort'] ?? ''] ?? 'created_at';
+        $direction = $input['direction'] ?? 'desc';
         $search = trim((string) $request->query('search'));
         // Akun aplikasi klien integrasi bukan identitas yang dapat masuk; ia tidak dipantau di sini.
         $identities = User::query()
@@ -23,8 +27,8 @@ class IdentityMonitorController extends Controller
                 ->where('name', 'like', "%{$search}%")
                 ->orWhere('email', 'like', "%{$search}%")))
             ->with(['memberships.tenant:id,name', 'memberships.roleAssignments' => fn ($query) => $query->where('status', 'active'), 'memberships.roleAssignments.role:id,name'])
-            ->latest()
-            ->paginate(20)
+            ->orderBy($sort, $direction)->orderBy('id', $direction)
+            ->simplePaginate(40)
             ->withQueryString()
             ->through(fn (User $user) => [
                 'id' => $user->id,
@@ -45,7 +49,7 @@ class IdentityMonitorController extends Controller
             abort(500, 'API route must use apiIndex.');
         }
 
-        return Inertia::render('platform/identity/identities', ['identities' => $identities, 'filters' => ['search' => $search]]);
+        return Inertia::render('platform/identity/identities', ['identities' => Inertia::scroll($identities)->matchOn('data.id'), 'filters' => ['search' => $search]]);
     }
 
     public function apiIndex(Request $request): JsonResponse

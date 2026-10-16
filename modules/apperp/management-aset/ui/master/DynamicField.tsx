@@ -1,18 +1,13 @@
 import { CircleAlert } from 'lucide-react';
 import type { ReactNode, RefObject } from 'react';
-import {
-    Field,
-    FieldDescription,
-    FieldHint,
-    FieldLabel,
-} from '@apperp/ui/field';
+import { Field, FieldHint, FieldLabel } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
 import EditShield from '../_shared/EditShield';
 import type { FieldConfig, FieldValue } from './fields';
-import { optionLabel, useMasterOptions } from './useMasterOptions';
+import MasterSelect from './MasterSelect';
 
 /**
  * Satu komponen untuk seluruh field yang dideklarasikan lewat `FieldConfig`.
@@ -80,55 +75,31 @@ export default function DynamicField({
     // ke teks label karena itu membuat indikator tampil dua kali.
     const label = config.label;
     const inputLabel = config.required ? `${config.label} *` : config.label;
-    // Dipanggil tanpa syarat karena hook tidak boleh berada di balik cabang; untuk
-    // field selain `reference` sumbernya null sehingga tidak ada permintaan apa pun.
-    const reference = useMasterOptions(
-        config.type === 'reference' ? config.resource : null,
-        referenceQuery,
-    );
 
     if (config.type === 'reference') {
-        const selected = reference.options.find(
-            (option) => option.id === value,
-        );
-
         return (
-            <Field data-invalid={Boolean(reference.error)} {...anchor}>
+            <Field {...anchor}>
                 {wrapHint(
                     <EditShield
                         active={readOnly}
                         label={config.label}
                         onActivate={requestEdit}
                     >
-                        <Select
+                        <MasterSelect
+                            resource={config.resource ?? ''}
                             label={label}
                             required={config.required}
-                            items={reference.options.map(optionLabel)}
-                            value={selected ? optionLabel(selected) : undefined}
+                            value={String(value ?? '')}
+                            onValueChange={onChange}
+                            query={referenceQuery}
                             placeholder={
                                 config.placeholder ??
                                 `Pilih ${config.label.toLowerCase()}`
                             }
-                            searchPlaceholder={`Cari ${config.label.toLowerCase()}`}
-                            emptyMessage={`${config.label} tidak ditemukan.`}
-                            ariaLabel={`Pilih ${config.label.toLowerCase()}`}
                             portalContainer={portalContainer}
-                            onValueChange={(item) =>
-                                onChange(
-                                    reference.options.find(
-                                        (option) =>
-                                            optionLabel(option) === item,
-                                    )?.id ?? '',
-                                )
-                            }
                         />
                     </EditShield>,
                     config.help,
-                )}
-                {/* Kegagalan memuat pilihan bukan penjelasan, melainkan masalah nyata:
-                    tetap tampil, tidak ikut disembunyikan di balik hover. */}
-                {reference.error && (
-                    <FieldDescription>{reference.error}</FieldDescription>
                 )}
             </Field>
         );
@@ -258,7 +229,6 @@ export default function DynamicField({
                         required={config.required}
                         placeholder={config.placeholder}
                         readOnly={readOnly}
-                        onFocus={readOnly ? requestEdit : undefined}
                         value={String(value ?? '')}
                         onChange={(event) => onChange(event.target.value)}
                     />,
@@ -292,7 +262,6 @@ export default function DynamicField({
                     step={config.step}
                     placeholder={config.placeholder}
                     readOnly={readOnly}
-                    onFocus={readOnly ? requestEdit : undefined}
                     value={String(value ?? '')}
                     onChange={(event) => onChange(event.target.value)}
                 />,

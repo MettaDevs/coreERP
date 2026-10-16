@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PermintaanPengadaanAset;
 
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\JsonResponse;
@@ -37,7 +38,17 @@ class PermintaanPengadaanAsetController extends Controller
         $q = PermintaanPengadaanAset::query();
         app(OrganizationScope::class)->query($q, $request, 'legal_entity_id', 'requesting_org_unit_id');
 
-        return response()->json(['data' => $q->toBase()->latest('requested_on')->get()]);
+        $filters = $request->validate(['legal_entity_id' => ['nullable', 'ulid'], 'exclude_cancelled' => ['nullable', 'boolean']]);
+        if (! empty($filters['legal_entity_id'])) {
+            $q->where('legal_entity_id', $filters['legal_entity_id']);
+        }
+        if ($request->boolean('exclude_cancelled')) {
+            $q->where('status', '!=', 'cancelled');
+        }
+
+        return response()->json(IncrementalList::query($request, $q->toBase(), [
+            'id' => 'id', 'kode' => 'kode', 'date' => 'requested_on', 'status' => 'status',
+        ], ['kode', 'description'], 'date', [], 'desc'));
     }
 
     public function show(Request $request, string $id): JsonResponse

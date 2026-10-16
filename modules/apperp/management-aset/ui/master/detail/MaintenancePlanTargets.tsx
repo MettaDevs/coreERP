@@ -14,6 +14,7 @@ import {
     TableRow,
 } from '@apperp/ui/table';
 import { api, errorMessage } from '../../api';
+import { useRecordOptions } from '../../use-record-list';
 import type { MasterOption } from '../useMasterOptions';
 import { optionLabel, useMasterOptions } from '../useMasterOptions';
 
@@ -86,9 +87,18 @@ export default function MaintenancePlanTargets({
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [saved, setSaved] = useState(false);
-    const [assets, setAssets] = useState<MasterOption[]>([]);
-    const [assetError, setAssetError] = useState('');
-    const jenis = useMasterOptions(canEdit ? 'jenis-aset' : null);
+    const assetSource = useRecordOptions<MasterOption>(
+        canEdit ? '/aset' : null,
+        optionLabel,
+        targets.map((target) => target.aset_id).filter(Boolean),
+    );
+    const assets = assetSource.options;
+    const assetError = assetSource.error;
+    const jenis = useMasterOptions(
+        canEdit ? 'jenis-aset' : null,
+        '',
+        targets.map((target) => target.jenis_aset_id).filter(Boolean),
+    );
 
     useEffect(() => {
         let dilepas = false;
@@ -119,33 +129,6 @@ export default function MaintenancePlanTargets({
             dilepas = true;
         };
     }, [planId]);
-
-    // Register aset hanya dimuat saat menyunting. Pengguna yang boleh menyusun rencana belum
-    // tentu boleh melihat register aset; yang tersisa baginya objek jenis aset.
-    useEffect(() => {
-        if (!canEdit) {
-            return;
-        }
-
-        let dilepas = false;
-        api<{ data: MasterOption[] }>('/aset')
-            .then((result) => {
-                if (!dilepas) {
-                    setAssets(result.data);
-                }
-            })
-            .catch(() => {
-                if (!dilepas) {
-                    setAssetError(
-                        'Daftar aset belum dapat dimuat. Anda tetap dapat memilih jenis aset.',
-                    );
-                }
-            });
-
-        return () => {
-            dilepas = true;
-        };
-    }, [canEdit]);
 
     function update(index: number, changes: Partial<Target>) {
         setSaved(false);
@@ -278,6 +261,7 @@ export default function MaintenancePlanTargets({
                                     <TableCell className="min-w-64">
                                         {target.kind === 'aset' ? (
                                             <Select
+                                                {...assetSource.selectProps}
                                                 items={items(assets)}
                                                 value={target.aset_id || null}
                                                 placeholder="Pilih aset"
@@ -290,6 +274,7 @@ export default function MaintenancePlanTargets({
                                             />
                                         ) : (
                                             <Select
+                                                {...jenis.selectProps}
                                                 items={items(jenis.options)}
                                                 value={
                                                     target.jenis_aset_id || null

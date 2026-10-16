@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\ValueAdjustment;
 
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\PostingFeed;
 use App\Platform\Modules\Contracts\RowVersion;
 use Brick\Math\BigDecimal;
@@ -79,7 +80,7 @@ class AssetValueAdjustmentController extends Controller
         }
 
         $tenant = $this->tenant($request);
-        $rows = $query
+        $list = $query
             ->leftJoin('aset_m_buku_penyusutan as buku', function ($join): void {
                 $join->on('buku.id', '=', self::HEADER.'.buku_id')->on('buku.tenant_id', '=', self::HEADER.'.tenant_id');
             })
@@ -88,11 +89,12 @@ class AssetValueAdjustmentController extends Controller
             ->addSelect([self::HEADER.'.*', 'buku.kode as buku_kode', 'buku.nama as buku_nama'])
             ->orderByDesc(self::HEADER.'.tanggal')
             ->orderByDesc(self::HEADER.'.created_at')
-            ->toBase()
-            ->get()
-            ->map(fn (stdClass $row): stdClass => $this->withNames($tenant, $row));
+            ->toBase();
 
-        return response()->json(['data' => $rows]);
+        $batch = IncrementalList::query($request, $list, ['id' => 'id', 'kode' => 'kode', 'tanggal' => 'tanggal', 'jenis' => 'jenis', 'buku' => 'buku_nama', 'jumlah' => 'jumlah_baris', 'total' => 'total_nilai', 'status' => 'status'], ['kode', 'keterangan', 'buku_nama'], 'tanggal', ['jumlah_baris', 'total_nilai'], 'desc');
+        $batch['data'] = $batch['data']->map(fn (stdClass $row): stdClass => $this->withNames($tenant, $row));
+
+        return response()->json($batch);
     }
 
     public function show(Request $request, string $id): JsonResponse

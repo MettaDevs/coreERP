@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Modules\Apperp\ManagementAset\Support\StatusAset;
+use Modules\Apperp\ManagementAset\Support\WorkOrderStatus;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
@@ -44,6 +45,29 @@ class WorkOrderTest extends TestCase
         $second = $this->create($seed)->assertCreated()->json('data');
         $this->assertSame($first['kode'], $second['kode']);
         $this->assertNotSame($first['id'], $second['id']);
+    }
+
+    public function test_list_batches_search_and_sort_cover_records_beyond_the_first_batch(): void
+    {
+        $seed = $this->seedMasters();
+        $records = [];
+        for ($index = 0; $index < 3; $index++) {
+            $records[] = $this->create($seed)->assertCreated()->json('data');
+        }
+        $url = '/api/modules/management-aset/v1/pemeliharaan-aset';
+        $read = ['management-aset.pemeliharaan-aset.read'];
+        $first = $this->headers($read)->getJson($url.'?per_page=1&sort=kode&direction=asc')
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $records[0]['id']);
+        $cursor = $first->json('next_cursor');
+        $this->headers($read)->getJson($url.'?'.http_build_query(['per_page' => 1, 'sort' => 'kode', 'direction' => 'asc', 'cursor' => $cursor]))
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $records[1]['id']);
+        $this->headers($read)->getJson($url.'?'.http_build_query(['q' => $records[2]['kode'], 'per_page' => 1]))
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $records[2]['id']);
+        $this->headers($read)->getJson($url.'?per_page=1&sort=kode&direction=desc')
+            ->assertOk()->assertJsonPath('data.0.id', $records[2]['id']);
+        $this->headers($read)->getJson($url.'?per_page=101')->assertUnprocessable();
+        $this->headers($read)->getJson($url.'?'.http_build_query(['record_id' => $records[2]['id'], 'status' => WorkOrderStatus::DIJADWALKAN]))
+            ->assertOk()->assertJsonCount(0, 'data');
     }
 
     public function test_work_order_disimpan_dengan_baris_pekerjaan_dan_nomor_dari_core(): void

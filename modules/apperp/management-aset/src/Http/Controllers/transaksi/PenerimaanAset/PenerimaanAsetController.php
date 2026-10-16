@@ -4,6 +4,8 @@ namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PenerimaanAse
 
 use App\Platform\Modules\Contracts\CurrencyRounding;
 use App\Platform\Modules\Contracts\FinancePostingSettings;
+use App\Platform\Modules\Contracts\IncrementalList;
+use App\Platform\Modules\Contracts\OrganizationDirectory;
 use App\Platform\Modules\Contracts\PostingFeed;
 use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Modules\Contracts\VendorDirectory;
@@ -114,11 +116,17 @@ class PenerimaanAsetController extends Controller
 
         $tenant = $this->tenant($request);
 
-        return response()->json(['data' => $this->withLookups($query)
-            ->orderByDesc(self::TABEL.'.tanggal')
-            ->orderByDesc(self::TABEL.'.created_at')
-            ->get()
-            ->map(fn (stdClass $baris): stdClass => $this->denganNama($tenant, $baris))]);
+        $list = $this->withLookups($query);
+        app(OrganizationDirectory::class)->addNames($list, $tenant, [
+            'legal_entity_nama' => self::TABEL.'.legal_entity_id',
+            'responsible_org_unit_nama' => self::TABEL.'.responsible_org_unit_id',
+            'receiving_org_unit_nama' => self::TABEL.'.receiving_org_unit_id',
+        ], ['diterima_oleh_nama' => self::TABEL.'.diterima_oleh_user_id', 'penanggung_jawab_nama' => self::TABEL.'.penanggung_jawab_user_id']);
+
+        return response()->json(IncrementalList::query($request, $list, [
+            'id' => 'id', 'legal_entity' => 'legal_entity_nama', 'kode' => 'kode', 'tanggal' => 'tanggal', 'siap' => 'tanggal_siap_pakai',
+            'unit' => 'responsible_org_unit_nama', 'lokasi' => 'lokasi_aset_nama', 'baris' => 'jumlah_baris', 'jumlah' => 'jumlah_aset', 'status' => 'status',
+        ], ['kode', 'legal_entity_nama', 'keterangan', 'lokasi_aset_nama', 'responsible_org_unit_nama', 'status'], 'tanggal', ['jumlah_baris', 'jumlah_aset'], 'desc'));
     }
 
     public function show(Request $request, string $id): JsonResponse
@@ -520,7 +528,7 @@ class PenerimaanAsetController extends Controller
 
         app(OrganizationScope::class)->require($request, $query['legal_entity_id'], null);
 
-        return response()->json(['data' => app(VendorDirectory::class)->active($this->tenant($request), $query['legal_entity_id'], (string) ($query['q'] ?? ''))]);
+        return response()->json(app(VendorDirectory::class)->lookup($this->tenant($request), $query['legal_entity_id'], $request->query()));
     }
 
     /**

@@ -215,11 +215,11 @@ export default function MaintenancePlanLines({
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [saved, setSaved] = useState(false);
-    const jobTypes = useMasterOptions(canEdit ? 'maintenance-job-types' : null);
-    const counters = useMasterOptions(canEdit ? 'jenis-counter' : null);
-    const tipe = useMasterOptions(canEdit ? 'tipe-work-order' : null);
-    const trades = useMasterOptions(canEdit ? 'trade' : null);
-    const layanan = useMasterOptions(canEdit ? 'tingkat-layanan' : null);
+    const jobTypes = useMasterOptions(canEdit ? 'maintenance-job-types' : null, '', lines.map(line => line.maintenance_job_type_id).filter(Boolean));
+    const counters = useMasterOptions(canEdit ? 'jenis-counter' : null, '', lines.map(line => line.jenis_counter_id).filter(Boolean));
+    const tipe = useMasterOptions(canEdit ? 'tipe-work-order' : null, '', lines.map(line => line.tipe_work_order_id).filter(Boolean));
+    const trades = useMasterOptions(canEdit ? 'trade' : null, '', lines.map(line => line.trade_id).filter(Boolean));
+    const layanan = useMasterOptions(canEdit ? 'tingkat-layanan' : null, '', lines.map(line => line.tingkat_layanan_id).filter(Boolean));
 
     useEffect(() => {
         let dilepas = false;
@@ -387,6 +387,7 @@ export default function MaintenancePlanLines({
                             <Field>
                                 <FieldLabel>Jenis counter</FieldLabel>
                                 <Select
+                                    {...counters.selectProps}
                                     items={items(counters.options)}
                                     value={line.jenis_counter_id || null}
                                     placeholder="Pilih counter"
@@ -472,6 +473,7 @@ export default function MaintenancePlanLines({
                         <Field>
                             <FieldLabel>Jenis pekerjaan</FieldLabel>
                             <Select
+                                {...jobTypes.selectProps}
                                 items={items(jobTypes.options)}
                                 value={line.maintenance_job_type_id || null}
                                 placeholder="Pilih jenis pekerjaan"
@@ -486,6 +488,7 @@ export default function MaintenancePlanLines({
                         <Field>
                             <FieldLabel>Tipe work order</FieldLabel>
                             <Select
+                                {...tipe.selectProps}
                                 items={items(tipe.options)}
                                 value={line.tipe_work_order_id || null}
                                 placeholder="Pilih tipe work order"
@@ -500,6 +503,7 @@ export default function MaintenancePlanLines({
                         <Field>
                             <FieldLabel>Bidang keahlian</FieldLabel>
                             <Select
+                                {...trades.selectProps}
                                 items={optional(
                                     trades.options,
                                     'Tidak ditentukan',
@@ -515,6 +519,7 @@ export default function MaintenancePlanLines({
                         <Field>
                             <FieldLabel>Tingkat layanan</FieldLabel>
                             <Select
+                                {...layanan.selectProps}
                                 items={optional(
                                     layanan.options,
                                     'Tidak ditentukan',

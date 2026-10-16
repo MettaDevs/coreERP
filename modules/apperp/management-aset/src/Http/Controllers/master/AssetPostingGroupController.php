@@ -3,6 +3,7 @@
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
 use App\Platform\Modules\Contracts\AccountDirectory;
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -40,7 +41,10 @@ class AssetPostingGroupController extends Controller
         $tenantId = $this->tenantId($request);
         $today = now()->toDateString();
 
-        $all = AssetPostingGroup::query()->orderByDesc('effective_from')->get();
+        $batch = IncrementalList::query($request, GroupAset::query()->select(['id', 'kode', 'nama', 'aktif'])->toBase(),
+            ['id' => 'id', 'kode' => 'kode', 'nama' => 'nama'], ['kode', 'nama'], 'kode');
+        $groupRows = GroupAset::hydrate($batch['data']->map(fn ($row) => (array) $row)->all());
+        $all = AssetPostingGroup::query()->whereIn('group_aset_id', $groupRows->modelKeys())->orderByDesc('effective_from')->get();
         $rows = $all->groupBy('group_aset_id');
 
         $accountIds = [];
@@ -57,7 +61,7 @@ class AssetPostingGroupController extends Controller
 
         $groups = [];
         $needingAttention = 0;
-        foreach (GroupAset::query()->orderBy('kode')->get(['id', 'kode', 'nama', 'aktif']) as $group) {
+        foreach ($groupRows as $group) {
             /** @var list<AssetPostingGroup> $history */
             $history = array_values(($rows->get($group->getKey()) ?? collect())->all());
             $current = null;
@@ -99,16 +103,16 @@ class AssetPostingGroupController extends Controller
             'groups' => $groups,
             'groups_needing_attention' => $needingAttention,
             'account_details' => (object) $details,
-        ]]);
+        ], 'next_cursor' => $batch['next_cursor']]);
     }
 
     /** Akun aktif yang berlaku untuk semua entitas legal, untuk pemilih akun di layar. */
     public function accounts(Request $request): JsonResponse
     {
         $this->requirePermission($request, 'read');
-        $query = $request->validate(['q' => ['sometimes', 'nullable', 'string', 'max:100']])['q'] ?? '';
+        $request->validate(['q' => ['sometimes', 'nullable', 'string', 'max:100']]);
 
-        return response()->json(['data' => $this->daftarAkun->search($this->tenantId($request), null, (string) $query)]);
+        return response()->json($this->daftarAkun->lookup($this->tenantId($request), null, $request->query()));
     }
 
     public function upsert(Request $request, string $groupAsetId, string $effectiveFrom): JsonResponse

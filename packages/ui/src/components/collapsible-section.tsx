@@ -1,7 +1,13 @@
-import * as React from "react"
+import * as React from 'react';
 
-import { cn } from "../utils"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./accordion"
+import { cn } from '../utils';
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from './accordion';
+import { useRecordEditActivation } from './record-edit-boundary';
 
 /**
  * A titled section that collapses, and keeps a summary of its contents readable while
@@ -11,82 +17,99 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./
  *
  * Sections are independent — opening one never closes another.
  */
-const OpenSectionsContext = React.createContext<readonly string[]>([])
+const OpenSectionsContext = React.createContext<readonly string[]>([]);
 
 function CollapsibleSectionGroup({
-  value,
-  defaultValue,
-  onValueChange,
-  className,
-  children,
+    value,
+    defaultValue,
+    onValueChange,
+    className,
+    children,
 }: {
-  /** Open section values. Pass this to control the group; omit it to let it manage itself. */
-  value?: string[]
-  defaultValue?: string[]
-  onValueChange?: (value: string[]) => void
-  className?: string
-  children: React.ReactNode
+    /** Open section values. Pass this to control the group; omit it to let it manage itself. */
+    value?: string[];
+    defaultValue?: string[];
+    onValueChange?: (value: string[]) => void;
+    className?: string;
+    children: React.ReactNode;
 }) {
-  const [uncontrolled, setUncontrolled] = React.useState<string[]>(defaultValue ?? [])
-  const open = value ?? uncontrolled
+    const [uncontrolled, setUncontrolled] = React.useState<string[]>(
+        defaultValue ?? [],
+    );
+    const open = value ?? uncontrolled;
 
-  return (
-    <OpenSectionsContext.Provider value={open}>
-      <Accordion
-        type="multiple"
-        value={open}
-        onValueChange={(next: string[]) => {
-          if (value === undefined) {
-setUncontrolled(next)
-}
+    return (
+        <OpenSectionsContext.Provider value={open}>
+            <Accordion
+                type="multiple"
+                value={open}
+                onValueChange={(next: string[]) => {
+                    if (value === undefined) {
+                        setUncontrolled(next);
+                    }
 
-          onValueChange?.(next)
-        }}
-        data-slot="collapsible-section-group"
-        className={cn("flex flex-col gap-3", className)}
-      >
-        {children}
-      </Accordion>
-    </OpenSectionsContext.Provider>
-  )
+                    onValueChange?.(next);
+                }}
+                data-slot="collapsible-section-group"
+                className={cn('flex w-full min-w-0 flex-col gap-3', className)}
+            >
+                {children}
+            </Accordion>
+        </OpenSectionsContext.Provider>
+    );
 }
 
 function CollapsibleSection({
-  value,
-  title,
-  summary,
-  className,
-  children,
+    value,
+    title,
+    summary,
+    className,
+    children,
 }: {
-  /** Identifier of this section, unique within its group. */
-  value: string
-  title: string
-  /**
-   * Key values shown beside the title while the section is collapsed. It is removed from
-   * the tree once the section opens rather than hidden with CSS, so a screen reader never
-   * reads the same value twice.
-   */
-  summary?: React.ReactNode
-  className?: string
-  children: React.ReactNode
+    /** Identifier of this section, unique within its group. */
+    value: string;
+    title: string;
+    /**
+     * Key values shown beside the title while the section is collapsed. It is removed from
+     * the tree once the section opens rather than hidden with CSS, so a screen reader never
+     * reads the same value twice.
+     */
+    summary?: React.ReactNode;
+    className?: string;
+    children: React.ReactNode;
 }) {
-  const isOpen = React.useContext(OpenSectionsContext).includes(value)
+    const isOpen = React.useContext(OpenSectionsContext).includes(value);
+    const activation = useRecordEditActivation();
 
-  return (
-    <AccordionItem
-      value={value}
-      data-slot="collapsible-section"
-      className={cn("rounded-lg border bg-card last:border-b", className)}
-    >
-      <AccordionTrigger className="items-center px-4 py-3 hover:no-underline">
-        <span className="flex min-w-0 flex-1 items-baseline gap-3">
-          <span className="shrink-0 text-base font-medium">{title}</span>
-          {!isOpen && summary != null && (
-            <span className="truncate text-sm font-normal text-muted-foreground">{summary}</span>
-          )}
-        </span>
-      </AccordionTrigger>
-      {/*
+    return (
+        <AccordionItem
+            value={value}
+            data-slot="collapsible-section"
+            className={cn(
+                'bg-card w-full min-w-0 rounded-lg border last:border-b',
+                className,
+            )}
+        >
+            <AccordionTrigger
+                className="w-full min-w-0 items-center px-4 py-3 hover:no-underline"
+                onClick={(event) => {
+                    if (!event.defaultPrevented) {
+                        activation?.activate(event.currentTarget);
+                    }
+                }}
+            >
+                <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <span className="min-w-0 max-w-full text-base font-medium [overflow-wrap:anywhere]">
+                        {title}
+                    </span>
+                    {!isOpen && summary != null && (
+                        <span className="text-muted-foreground min-w-0 flex-1 basis-40 truncate text-sm font-normal">
+                            {summary}
+                        </span>
+                    )}
+                </span>
+            </AccordionTrigger>
+            {/*
         `border-t` draws the line between the title row and its content — the trigger row
         has no border of its own, so this is the only seam that can carry it.
         `pt-3` (not `pt-0`) exists because `Input`'s floating label straddles the top edge
@@ -96,9 +119,11 @@ function CollapsibleSection({
         was clipped for any field placed first inside a section. This padding is what gives
         it room; it is not decorative spacing.
       */}
-      <AccordionContent className="border-t px-4 pt-3 pb-4">{children}</AccordionContent>
-    </AccordionItem>
-  )
+            <AccordionContent className="min-w-0 border-t px-4 pb-4 pt-3">
+                {children}
+            </AccordionContent>
+        </AccordionItem>
+    );
 }
 
-export { CollapsibleSectionGroup, CollapsibleSection }
+export { CollapsibleSectionGroup, CollapsibleSection };

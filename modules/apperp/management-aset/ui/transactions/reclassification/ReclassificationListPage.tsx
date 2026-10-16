@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { ActionButton } from '@apperp/ui/action-button';
 import { DataTable } from '@apperp/ui/data-table';
@@ -16,7 +16,7 @@ import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
-import { api, errorMessage } from '../../api';
+import { useRecordList } from '../../use-record-list';
 import type { Reclassification } from './reclassification';
 import {
     KINDS,
@@ -48,60 +48,22 @@ export default function ReclassificationListPage({
     permissions: string[];
 }) {
     const can = izin(permissions);
-    const [daftar, setDaftar] = useState<Reclassification[]>([]);
     const [status, setStatus] = useState(SEMUA);
     const [jenis, setJenis] = useState(SEMUA);
     const [search, setSearch] = useState('');
-    const [memuat, setMemuat] = useState(true);
 
-    useEffect(() => {
-        let dibatalkan = false;
-        const query = new URLSearchParams(
+    const list = useRecordList<Reclassification>(
+        '/reklasifikasi-aset',
+        search,
+        Object.fromEntries(
             Object.entries({ status, jenis }).filter(
-                ([, value]) => value !== SEMUA,
+                ([, value]) => value !== '' && value !== SEMUA,
             ),
-        ).toString();
-
-        api<{ data: Reclassification[] }>(
-            `/reklasifikasi-aset${query ? `?${query}` : ''}`,
-        )
-            .then((result) => {
-                if (!dibatalkan) {
-                    setDaftar(result.data);
-                }
-            })
-            .catch((caught) => {
-                if (!dibatalkan) {
-                    toast.error(
-                        errorMessage(
-                            caught,
-                            'Reklasifikasi aset belum dapat dimuat.',
-                        ),
-                    );
-                }
-            })
-            .finally(() => {
-                if (!dibatalkan) {
-                    setMemuat(false);
-                }
-            });
-
-        return () => {
-            dibatalkan = true;
-        };
-    }, [status, jenis]);
-
-    const query = search.trim().toLowerCase();
-    const terlihat =
-        query === ''
-            ? daftar
-            : daftar.filter((baris) =>
-                  [baris.kode, baris.keterangan].some((value) =>
-                      String(value ?? '')
-                          .toLowerCase()
-                          .includes(query),
-                  ),
-              );
+        ),
+    );
+    const daftar = list.items;
+    const terlihat = daftar;
+    const memuat = list.loading;
 
     const columns: DataTableColumn<Reclassification>[] = [
         {
@@ -244,6 +206,9 @@ export default function ReclassificationListPage({
             ) : (
                 <DataTable
                     columns={columns}
+                    incremental={list}
+                    sort={list.sort}
+                    onSortChange={list.onSortChange}
                     data={terlihat}
                     getRowKey={(baris) => baris.id}
                     getRowLabel={(baris) => baris.kode}

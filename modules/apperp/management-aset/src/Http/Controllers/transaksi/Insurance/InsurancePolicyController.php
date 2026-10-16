@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\Insurance;
 
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\RequestContext;
 use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Modules\Contracts\VendorDirectory;
@@ -75,11 +76,17 @@ class InsurancePolicyController extends Controller
         }
 
         $today = $this->today();
-        $rows = $this->withLookups($query)->orderByDesc(self::TABLE.'.berlaku_mulai')->orderBy(self::TABLE.'.kode')->limit(500)->get();
-        $totals = $insured->perPolicy(array_values($rows->pluck('id')->map(strval(...))->all()), $today);
+        $list = $this->withLookups($query)
+            ->leftJoinSub($insured->perPolicyQuery($today), 'list_insured', 'list_insured.polis_asuransi_id', '=', self::TABLE.'.id')
+            ->selectRaw('COALESCE(list_insured.total, 0) AS total_nilai_tertanggung');
+        $batch = IncrementalList::query($request, $list, [
+            'id' => 'id', 'periode' => 'berlaku_mulai', 'tertanggung' => 'total_nilai_tertanggung',
+        ], ['kode', 'nama', 'nomor_polis'], 'periode', ['total_nilai_tertanggung'], 'desc');
         $tenant = $this->tenant($request);
+        $vendors = app(VendorDirectory::class)->findMany($tenant, $batch['data']->pluck('vendor_id')->filter()->map(strval(...))->unique()->values()->all());
+        $batch['data'] = $batch['data']->map(fn (stdClass $row): stdClass => $this->present($tenant, $row, number_format((float) $row->total_nilai_tertanggung, 2, '.', ''), $today, $vendors));
 
-        return response()->json(['data' => $rows->map(fn (stdClass $row): stdClass => $this->present($tenant, $row, $totals[(string) $row->id] ?? null, $today))]);
+        return response()->json($batch);
     }
 
     public function show(Request $request, string $id): JsonResponse
@@ -100,7 +107,7 @@ class InsurancePolicyController extends Controller
 
         app(OrganizationScope::class)->require($request, $query['legal_entity_id'], null);
 
-        return response()->json(['data' => app(VendorDirectory::class)->active($this->tenant($request), $query['legal_entity_id'], (string) ($query['q'] ?? ''))]);
+        return response()->json(app(VendorDirectory::class)->lookup($this->tenant($request), $query['legal_entity_id'], $request->query()));
     }
 
     public function store(Request $request, AssetNumberSequenceIssuer $numbers): JsonResponse
@@ -501,9 +508,9 @@ class InsurancePolicyController extends Controller
     }
 
     /** Total yang ditanggung, selisih terhadap plafon, status berlaku, dan nama penanggung. */
-    private function present(string $tenant, stdClass $row, ?string $totalInsured, string $today): stdClass
+    private function present(string $tenant, stdClass $row, ?string $totalInsured, string $today, ?array $vendors = null): stdClass
     {
-        $vendor = $row->vendor_id === null ? null : app(VendorDirectory::class)->find($tenant, (string) $row->vendor_id);
+        $vendor = $vendors !== null ? ($vendors[$row->vendor_id] ?? null) : ($row->vendor_id === null ? null : app(VendorDirectory::class)->find($tenant, (string) $row->vendor_id));
         $row->vendor = $vendor === null ? null : ['id' => $vendor['id'], 'number' => $vendor['number'], 'name' => $vendor['name'], 'status' => $vendor['status']];
         $row->diblokir = (bool) $row->diblokir;
         $row->total_nilai_tertanggung = $totalInsured ?? '0.00';

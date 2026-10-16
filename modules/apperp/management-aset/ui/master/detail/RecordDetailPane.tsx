@@ -8,6 +8,7 @@ import {
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
 import { Field, FieldDescription, FieldError } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
+import { RecordEditBoundary } from '@apperp/ui/record-edit-boundary';
 import { api, errorMessage, newIdempotencyKey } from '../../api';
 import DynamicField from '../DynamicField';
 import type { FieldValue } from '../fields';
@@ -600,7 +601,6 @@ export default function RecordDetailPane({
                                     frequency={values.frequency}
                                     required={field.required}
                                     readOnly={readOnly}
-                                    onRequestEdit={() => enterEdit(field.name)}
                                     onChange={(next) => {
                                         markDirty();
                                         setValues((current) => ({
@@ -641,102 +641,108 @@ export default function RecordDetailPane({
     }
 
     return (
-        <form
-            id={formId}
-            ref={formRef}
-            onSubmit={submit}
-            className="[&_[data-readonly]:hover]:bg-muted/40 flex min-h-0 flex-col [&_[data-readonly]]:rounded-md [&_[data-readonly]]:transition-colors"
+        <RecordEditBoundary
+            editing={!readOnly}
+            canEdit={canEdit && !!record}
+            onEdit={onRequestEdit}
+            className="flex h-full min-h-0 min-w-0 flex-col"
         >
-            <div className="shrink-0 border-b px-6 py-4">
-                <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
-                    <div className="w-60">
-                        <Input
-                            id="kode"
-                            label={config.kodeLabel}
-                            value={
-                                record?.kode ??
-                                (numberPolicy.loading
-                                    ? 'Memuat pengaturan kode…'
-                                    : numberPolicy.allowManual
-                                      ? manualCode
-                                      : 'Dibuat otomatis saat disimpan')
-                            }
-                            disabled={
-                                Boolean(record) ||
-                                numberPolicy.loading ||
-                                !numberPolicy.allowManual
-                            }
-                            required={!record && !numberPolicy.allowAutomatic}
-                            maxLength={50}
-                            onChange={(event) => {
-                                setManualCode(event.target.value);
-                                markDirty();
-                            }}
-                        />
-                        {!record && numberPolicy.allowManual && (
-                            <FieldDescription>
-                                {numberPolicy.allowAutomatic
-                                    ? 'Isi kode sendiri, atau kosongkan untuk membuatnya otomatis.'
-                                    : 'Isi kode yang mudah dikenali.'}
-                            </FieldDescription>
-                        )}
-                        <FieldError>{numberPolicy.error}</FieldError>
-                    </div>
-                    <div
-                        className="min-w-64 flex-1"
-                        data-field-name="nama"
-                        data-readonly={readOnly || undefined}
-                    >
-                        <Input
-                            id="nama"
-                            label={config.namaLabel}
-                            required
-                            maxLength={150}
-                            readOnly={readOnly}
-                            onFocus={
-                                readOnly ? () => enterEdit('nama') : undefined
-                            }
-                            value={nama}
-                            onChange={(event) => {
-                                markDirty();
-                                setNama(event.target.value);
-                            }}
-                        />
-                    </div>
-                    <Badge variant={values.aktif ? 'default' : 'secondary'}>
-                        {values.aktif ? 'Aktif' : 'Tidak aktif'}
-                    </Badge>
-                </div>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-                {(config.parents?.length ?? 0) > 0 && (
-                    <Field data-invalid="true" className="mb-4">
-                        <FieldError>
-                            Master ini memiliki induk, dan panel detail belum
-                            merendernya. Pakai tampilan daftar sampai dukungan
-                            induk ditambahkan.
-                        </FieldError>
-                    </Field>
-                )}
-                <CollapsibleSectionGroup
-                    defaultValue={sections
-                        .filter((section) => section.defaultOpen)
-                        .map((section) => section.id)}
-                >
-                    {sections.map((section) => (
-                        <CollapsibleSection
-                            key={section.id}
-                            value={section.id}
-                            title={section.title}
-                            summary={summaryFor(section, values)}
+            <form
+                id={formId}
+                ref={formRef}
+                onSubmit={submit}
+                className="[&_[data-readonly]:hover]:bg-muted/40 flex min-h-0 flex-col [&_[data-readonly]]:rounded-md [&_[data-readonly]]:transition-colors"
+            >
+                <div className="shrink-0 border-b px-6 py-4">
+                    <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+                        <div className="w-60">
+                            <Input
+                                id="kode"
+                                label={config.kodeLabel}
+                                value={
+                                    record?.kode ??
+                                    (numberPolicy.loading
+                                        ? 'Memuat pengaturan kode…'
+                                        : numberPolicy.allowManual
+                                          ? manualCode
+                                          : 'Dibuat otomatis saat disimpan')
+                                }
+                                disabled={
+                                    Boolean(record) ||
+                                    numberPolicy.loading ||
+                                    !numberPolicy.allowManual
+                                }
+                                required={
+                                    !record && !numberPolicy.allowAutomatic
+                                }
+                                maxLength={50}
+                                onChange={(event) => {
+                                    setManualCode(event.target.value);
+                                    markDirty();
+                                }}
+                            />
+                            {!record && numberPolicy.allowManual && (
+                                <FieldDescription>
+                                    {numberPolicy.allowAutomatic
+                                        ? 'Isi kode sendiri, atau kosongkan untuk membuatnya otomatis.'
+                                        : 'Isi kode yang mudah dikenali.'}
+                                </FieldDescription>
+                            )}
+                            <FieldError>{numberPolicy.error}</FieldError>
+                        </div>
+                        <div
+                            className="min-w-64 flex-1"
+                            data-field-name="nama"
+                            data-readonly={readOnly || undefined}
                         >
-                            {sectionBody(section)}
-                        </CollapsibleSection>
-                    ))}
-                </CollapsibleSectionGroup>
-                {error && <FieldError className="pt-4">{error}</FieldError>}
-            </div>
-        </form>
+                            <Input
+                                id="nama"
+                                label={config.namaLabel}
+                                required
+                                maxLength={150}
+                                readOnly={readOnly}
+                                value={nama}
+                                onChange={(event) => {
+                                    markDirty();
+                                    setNama(event.target.value);
+                                }}
+                            />
+                        </div>
+                        <Badge variant={values.aktif ? 'default' : 'secondary'}>
+                            {values.aktif ? 'Aktif' : 'Tidak aktif'}
+                        </Badge>
+                    </div>
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+                    {(config.parents?.length ?? 0) > 0 && (
+                        <Field data-invalid="true" className="mb-4">
+                            <FieldError>
+                                Master ini memiliki induk, dan panel detail
+                                belum merendernya. Pakai tampilan daftar sampai
+                                dukungan induk ditambahkan.
+                            </FieldError>
+                        </Field>
+                    )}
+                    <CollapsibleSectionGroup
+                        defaultValue={sections
+                            .filter((section) => section.defaultOpen)
+                            .map((section) => section.id)}
+                    >
+                        {sections.map((section) => (
+                            <CollapsibleSection
+                                key={section.id}
+                                value={section.id}
+                                title={section.title}
+                                summary={summaryFor(section, values)}
+                            >
+                                {sectionBody(section)}
+                            </CollapsibleSection>
+                        ))}
+                    </CollapsibleSectionGroup>
+                    {error && <FieldError className="pt-4">{error}</FieldError>}
+                </div>
+            </form>
+        </RecordEditBoundary>
     );
 }

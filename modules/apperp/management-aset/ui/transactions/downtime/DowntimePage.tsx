@@ -1,5 +1,5 @@
 import { usePage } from '@inertiajs/react';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDateTimeFormat } from '@/hooks/use-date-time';
 import { Badge } from '@apperp/ui/badge';
@@ -28,15 +28,10 @@ import { Input } from '@apperp/ui/input';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import { zonedInput } from '../../_shared/format';
-import {
-    ApiError,
-    api,
-    errorMessage,
-    newIdempotencyKey,
-    toastSaveError,
-} from '../../api';
-import type { MasterOption } from '../../master/useMasterOptions';
+import { ApiError, api, newIdempotencyKey, toastSaveError } from '../../api';
+
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
+import { useRecordList } from '../../use-record-list';
 import type { Downtime } from './downtime';
 
 type Draft = {
@@ -66,11 +61,11 @@ export default function DowntimePage({
     const { clock } = usePage().props;
     const timeZone = clock?.timezone ?? 'UTC';
     const formatDateTime = useDateTimeFormat();
-    const [rows, setRows] = useState<Downtime[] | null>(null);
     const [reload, setReload] = useState(0);
     const [filterAset, setFilterAset] = useState('');
     const [openOnly, setOpenOnly] = useState(false);
-    const [assets, setAssets] = useState<MasterOption[]>([]);
+    const assetSource = useMasterOptions('aset');
+    const assets = assetSource.options;
     const reasons = useMasterOptions('alasan-downtime');
     const [draft, setDraft] = useState<Draft | null>(null);
     const [errors, setErrors] = useState<Record<string, string[]>>({});
@@ -78,39 +73,12 @@ export default function DowntimePage({
     const dialogRef = useRef<HTMLDivElement>(null);
     const message = (field: string) => errors[field]?.[0];
 
-    useEffect(() => {
-        let cancelled = false;
-        api<{ data: MasterOption[] }>('/aset')
-            .then((result) => !cancelled && setAssets(result.data))
-            .catch(() => !cancelled && setAssets([]));
-
-        return () => {
-            cancelled = true;
-        };
-    }, []);
-
-    useEffect(() => {
-        let cancelled = false;
-        const query = new URLSearchParams(
-            Object.entries({
-                aset_id: filterAset,
-                terbuka: openOnly ? '1' : '',
-            }).filter(([, value]) => Boolean(value)),
-        ).toString();
-        api<{ data: Downtime[] }>(`/downtime-aset${query ? `?${query}` : ''}`)
-            .then((result) => !cancelled && setRows(result.data))
-            .catch(
-                (caught) =>
-                    !cancelled &&
-                    toast.error(
-                        errorMessage(caught, 'Downtime belum dapat dimuat.'),
-                    ),
-            );
-
-        return () => {
-            cancelled = true;
-        };
-    }, [filterAset, openOnly, reload]);
+    const list = useRecordList<Downtime>('/downtime-aset', '', {
+        aset_id: filterAset,
+        terbuka: openOnly ? '1' : '',
+        refresh: String(reload),
+    });
+    const rows = list.loading && !list.items.length ? null : list.items;
 
     async function save() {
         if (!draft) {
@@ -268,6 +236,7 @@ export default function DowntimePage({
             <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
                 <div className="w-full sm:w-80">
                     <Select
+                        {...assetSource.selectProps}
                         label="Aset"
                         items={[
                             { value: '', label: 'Semua aset' },
@@ -306,6 +275,9 @@ export default function DowntimePage({
             ) : (
                 <DataTable
                     columns={columns}
+                    incremental={list}
+                    sort={list.sort}
+                    onSortChange={list.onSortChange}
                     data={rows ?? []}
                     getRowKey={(row) => row.id}
                     getRowLabel={(row) => row.aset_kode}
@@ -348,6 +320,7 @@ export default function DowntimePage({
                         <DialogBody className="space-y-4">
                             <Field>
                                 <Select
+                                    {...assetSource.selectProps}
                                     label="Aset"
                                     required
                                     items={assetChoices}
@@ -407,6 +380,7 @@ export default function DowntimePage({
                             )}
                             <Field>
                                 <Select
+                                    {...reasons.selectProps}
                                     label="Alasan"
                                     items={reasons.options.map((option) => ({
                                         value: option.id,

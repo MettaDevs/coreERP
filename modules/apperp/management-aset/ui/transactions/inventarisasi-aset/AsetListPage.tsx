@@ -1,6 +1,6 @@
 import { usePage } from '@inertiajs/react';
 import { FileSpreadsheet, QrCode } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { RecordFactBox } from '@/components/record-fact-box';
 import type { Workspace } from '@/types';
@@ -11,7 +11,6 @@ import { DataTable } from '@apperp/ui/data-table';
 import type {
     DataTableColumn,
     DataTableRowAction,
-    DataTableSort,
 } from '@apperp/ui/data-table';
 import {
     Empty,
@@ -22,9 +21,9 @@ import {
 import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
-import { api, errorMessage } from '../../api';
+
 import { requestListExport } from '../../listExport';
-import { useMasterOptions } from '../../master/useMasterOptions';
+import { useRecordList } from '../../use-record-list';
 import type { Aset } from './aset';
 import { LIFECYCLE, bukaAset, bukaAsetUbah, money } from './aset';
 import AssetPicture from './AssetPicture';
@@ -49,65 +48,18 @@ export default function AsetListPage({
     const legalEntityNames = new Map(
         workspace.legal_entities.map((entity) => [entity.id, entity.name]),
     );
-    const [aset, setAset] = useState<Aset[]>([]);
     const [search, setSearch] = useState('');
-    const [memuat, setMemuat] = useState(true);
     // Urutan yang sedang tampil, supaya berkas ekspor berurutan sama dengan layar.
-    const [sort, setSort] = useState<DataTableSort | null>(null);
     // Aset yang dicentang untuk dicetak labelnya. Tanpa centang, yang dicetak semua yang tampil.
     const [selected, setSelected] = useState<string[]>([]);
     const [activeRowId, setActiveRowId] = useState<string | null>(null);
 
-    const { options: groupOptions } = useMasterOptions('group-aset');
-    const { options: typeOptions } = useMasterOptions('jenis-aset');
-    const { options: locationOptions } = useMasterOptions('lokasi-aset');
-
-    useEffect(() => {
-        let dibatalkan = false;
-        api<{ data: Aset[] }>('/aset')
-            .then((result) => {
-                if (!dibatalkan) {
-                    setAset(result.data);
-                }
-            })
-            .catch((caught) => {
-                if (!dibatalkan) {
-                    toast.error(
-                        errorMessage(
-                            caught,
-                            'Register aset belum dapat dimuat.',
-                        ),
-                    );
-                }
-            })
-            .finally(() => {
-                if (!dibatalkan) {
-                    setMemuat(false);
-                }
-            });
-
-        return () => {
-            dibatalkan = true;
-        };
-    }, []);
-
-    const nameOf = (options: { id: string; nama: string }[], id: unknown) =>
-        options.find((option) => option.id === String(id ?? ''))?.nama ?? null;
-
-    const visible = useMemo(() => {
-        const query = search.trim().toLowerCase();
-
-        if (!query) {
-            return aset;
-        }
-
-        return aset.filter(
-            (aset) =>
-                aset.kode.toLowerCase().includes(query) ||
-                aset.nama.toLowerCase().includes(query) ||
-                (aset.serial_number ?? '').toLowerCase().includes(query),
-        );
-    }, [aset, search]);
+    const list = useRecordList<Aset>('/aset', search);
+    const aset = list.items;
+    const visible = aset;
+    const memuat = list.loading;
+    const sort = list.sort;
+    const setSort = list.onSortChange;
 
     const activeAsset = visible.find((asset) => asset.id === activeRowId);
 
@@ -138,10 +90,13 @@ export default function AsetListPage({
             id: 'legal_entity',
             header: 'Perusahaan',
             cell: (asset) =>
+                asset.legal_entity_nama ??
                 legalEntityNames.get(asset.legal_entity_id) ??
                 'Perusahaan tidak dikenal',
             sortValue: (asset) =>
-                legalEntityNames.get(asset.legal_entity_id) ?? '',
+                asset.legal_entity_nama ??
+                legalEntityNames.get(asset.legal_entity_id) ??
+                '',
             width: 220,
         },
         {
@@ -160,10 +115,10 @@ export default function AsetListPage({
             header: 'Group aset',
             cell: (aset) => (
                 <span className="text-muted-foreground">
-                    {nameOf(groupOptions, aset.group_aset_id) ?? '—'}
+                    {aset.group_nama ?? '—'}
                 </span>
             ),
-            sortValue: (aset) => nameOf(groupOptions, aset.group_aset_id) ?? '',
+            sortValue: (aset) => aset.group_nama ?? '',
             width: 180,
         },
         {
@@ -171,10 +126,10 @@ export default function AsetListPage({
             header: 'Jenis aset',
             cell: (aset) => (
                 <span className="text-muted-foreground">
-                    {nameOf(typeOptions, aset.jenis_aset_id) ?? '—'}
+                    {aset.type_nama ?? '—'}
                 </span>
             ),
-            sortValue: (aset) => nameOf(typeOptions, aset.jenis_aset_id) ?? '',
+            sortValue: (aset) => aset.type_nama ?? '',
             width: 180,
         },
         {
@@ -182,11 +137,10 @@ export default function AsetListPage({
             header: 'Lokasi',
             cell: (aset) => (
                 <span className="text-muted-foreground">
-                    {nameOf(locationOptions, aset.lokasi_aset_id) ?? '—'}
+                    {aset.location_nama ?? '—'}
                 </span>
             ),
-            sortValue: (aset) =>
-                nameOf(locationOptions, aset.lokasi_aset_id) ?? '',
+            sortValue: (aset) => aset.location_nama ?? '',
             width: 180,
         },
         {
@@ -232,9 +186,9 @@ export default function AsetListPage({
         });
 
     const printLabels = () =>
-        selected.length
-            ? printAssetLabels({ ids: selected })
-            : printAssetLabels({ search, count: visible.length });
+        printAssetLabels({
+            ids: selected.length ? selected : visible.map((asset) => asset.id),
+        });
 
     const rowActions: DataTableRowAction[] = [
         { id: 'detail', label: 'Buka rincian' },
@@ -266,13 +220,13 @@ export default function AsetListPage({
                         title={
                             selected.length
                                 ? 'Cetak label berkode QR untuk aset yang dicentang'
-                                : 'Cetak label berkode QR untuk semua aset yang tampil. Centang aset untuk mencetak sebagian saja.'
+                                : 'Cetak label untuk aset yang sudah tampil di daftar. Geser daftar ke bawah untuk menampilkan aset lainnya, atau centang aset yang ingin dicetak.'
                         }
                     >
                         <QrCode />
                         {selected.length
                             ? `Cetak label (${selected.length})`
-                            : 'Cetak label'}
+                            : `Cetak label (${visible.length})`}
                     </Button>
                     {/*
                      * Satu pintu. Aset hanya lahir dari dokumen penerimaan sejak 18 September
@@ -324,7 +278,7 @@ export default function AsetListPage({
                     )
                 }
             >
-                {!memuat && !visible.length ? (
+                {!memuat && !visible.length && !list.error ? (
                     <Empty>
                         <EmptyHeader>
                             <EmptyTitle>
@@ -342,6 +296,7 @@ export default function AsetListPage({
                 ) : (
                     <DataTable
                         columns={columns}
+                        incremental={list}
                         data={visible}
                         getRowKey={(aset) => aset.id}
                         getRowLabel={(aset) => aset.kode}

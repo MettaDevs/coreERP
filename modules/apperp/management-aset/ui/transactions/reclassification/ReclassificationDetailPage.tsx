@@ -39,6 +39,7 @@ import {
     toastSaveError,
 } from '../../api';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
+import { useRecordOptions } from '../../use-record-list';
 import { PostingPreviewPanel } from '../_shared/PostingPreviewPanel';
 import type { PostingPreview } from '../_shared/PostingPreviewPanel';
 import type {
@@ -139,7 +140,6 @@ export default function ReclassificationDetailPage({
     const [memuat, setMemuat] = useState(mode !== 'create');
     const [menyimpan, setMenyimpan] = useState(false);
     const [galat, setGalat] = useState<Record<string, string[]>>({});
-    const [aset, setAset] = useState<AsetPilihan[]>([]);
     const [pratinjau, setPratinjau] = useState<
         (PostingPreview & { moves: Move[] }) | null
     >(null);
@@ -147,7 +147,7 @@ export default function ReclassificationDetailPage({
         null,
     );
     const grup = useMasterOptions('group-aset');
-    const unitKerja = useMasterOptions('reference-data/unit-kerja');
+    const unitKerja = useMasterOptions('reference-data/unit-kerja', '', record.responsible_org_unit_id);
     const panelRef = useRef<HTMLDivElement>(null);
 
     const readOnly = mode === 'view';
@@ -155,25 +155,13 @@ export default function ReclassificationDetailPage({
     const pecah = record.jenis === 'pecah';
 
     // Daftar aset hanya dibutuhkan untuk menambah baris; aset yang sudah dilepas tidak ditawarkan.
-    useEffect(() => {
-        if (readOnly) {
-            return;
-        }
 
-        api<{ data: AsetPilihan[] }>('/aset')
-            .then((result) =>
-                setAset(
-                    result.data.filter(
-                        (item) => item.lifecycle_state !== 'disposed',
-                    ),
-                ),
-            )
-            .catch(() =>
-                toast.error(
-                    'Daftar aset tidak dapat dimuat, jadi aset belum bisa ditambahkan.',
-                ),
-            );
-    }, [readOnly]);
+    const assetSource = useRecordOptions<AsetPilihan>(
+        '/aset?exclude_state=disposed',
+        (item) => (item.nama ? `${item.kode} \u00b7 ${item.nama}` : item.kode),
+        record.details.map((row) => row.aset_id),
+    );
+    const aset = assetSource.options;
 
     useEffect(() => {
         if (!reclassificationId) {
@@ -538,6 +526,7 @@ export default function ReclassificationDetailPage({
                                             />
                                         ) : (
                                             <Select
+                                                {...unitKerja.selectProps}
                                                 label="Unit penanggung jawab"
                                                 required
                                                 items={unitKerja.options.map(
@@ -689,6 +678,7 @@ export default function ReclassificationDetailPage({
                                                                 {!baris.id &&
                                                                 !readOnly ? (
                                                                     <Select
+                                                                        {...assetSource.selectProps}
                                                                         items={aset.map(
                                                                             labelAset,
                                                                         )}
@@ -771,6 +761,7 @@ export default function ReclassificationDetailPage({
                                                                         : '—'))
                                                                 ) : (
                                                                     <Select
+                                                                        {...grup.selectProps}
                                                                         items={
                                                                             pecah
                                                                                 ? [

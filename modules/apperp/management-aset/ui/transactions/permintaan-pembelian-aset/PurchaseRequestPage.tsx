@@ -26,6 +26,7 @@ import {
     saveErrorMessage,
 } from '../../api';
 import { requestPrint } from '../../print';
+import { useRecordList, useRecordOptions } from '../../use-record-list';
 
 type Context = { legal_entity_id: string | null; org_unit_id: string | null };
 type PlanLine = {
@@ -82,8 +83,6 @@ export default function PurchaseRequestPage({
             `management-aset.permintaan-pembelian-aset.${action}`,
         );
     const { date: workDate } = useWorkDate();
-    const [records, setRecords] = useState<PurchaseRequest[]>([]);
-    const [plans, setPlans] = useState<Plan[]>([]);
     const [record, setRecord] = useState<PurchaseRequest | null>(null);
     const [lines, setLines] = useState<RequestLine[]>([]);
     const [planId, setPlanId] = useState<string | null>(null);
@@ -91,59 +90,37 @@ export default function PurchaseRequestPage({
     const [description, setDescription] = useState('');
     const [open, setOpen] = useState(false);
     const [editing, setEditing] = useState(false);
-    const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const [reload, setReload] = useState(0);
     const portalContainer = useRef<HTMLDivElement>(null);
     const creationKey = useRef(newIdempotencyKey());
 
-    useEffect(() => {
-        let cancelled = false;
-        api<{ data: PurchaseRequest[] }>('/permintaan-pembelian-aset')
-            .then((result) => {
-                if (!cancelled) {
-                    setRecords(result.data);
-                }
-            })
-            .catch((caught) => {
-                if (!cancelled) {
-                    setError(
-                        errorMessage(caught, 'Permintaan belum dapat dimuat.'),
-                    );
-                }
-            })
-            .finally(() => {
-                if (!cancelled) {
-                    setLoading(false);
-                }
-            });
+    const list = useRecordList<PurchaseRequest>(
+        '/permintaan-pembelian-aset',
+        '',
+        { refresh: String(reload) },
+    );
+    const records = list.items;
+    const loading = list.loading;
+    const planSource = useRecordOptions<Plan>(
+        open && !record ? '/perencanaan-aset' : null,
+        (plan) =>
+            `${plan.kode} · ${plan.description || 'Tanpa tujuan'} · ${plan.planned_on.slice(0, 10)}`,
+        planId ?? '',
+    );
+    const plans = planSource.options;
 
-        return () => {
-            cancelled = true;
-        };
-    }, [reload, context.legal_entity_id, context.org_unit_id]);
-
-    async function create() {
+    function create() {
         setError('');
-        setBusy(true);
-
-        try {
-            const result = await api<{ data: Plan[] }>('/perencanaan-aset');
-            setPlans(result.data);
-            setRecord(null);
-            setLines([]);
-            setPlanId(null);
-            setDate(workDate);
-            setDescription('');
-            creationKey.current = newIdempotencyKey();
-            setEditing(true);
-            setOpen(true);
-        } catch (caught) {
-            setError(errorMessage(caught, 'Perencanaan belum dapat dimuat.'));
-        } finally {
-            setBusy(false);
-        }
+        setRecord(null);
+        setLines([]);
+        setPlanId(null);
+        setDate(workDate);
+        setDescription('');
+        creationKey.current = newIdempotencyKey();
+        setEditing(true);
+        setOpen(true);
     }
 
     async function selectPlan(id: string | null, selectedIds?: string[]) {
@@ -188,41 +165,36 @@ export default function PurchaseRequestPage({
     const sourceQuery = new URL(url, 'http://localhost').searchParams;
     const sourceId = sourceQuery.get('planning');
     const sourceLines = sourceQuery.get('lines');
-    const openSourceForm = useEffectEvent(
-        (source: Plan, availablePlans: Plan[]) => {
-            if (!can('create')) {
-                return;
-            }
+    const openSourceForm = useEffectEvent((source: Plan) => {
+        if (!can('create')) {
+            return;
+        }
 
-            setPlans(availablePlans);
-            setRecord(null);
-            setPlanId(source.id);
-            setDate(workDate);
-            setDescription('');
-            creationKey.current = newIdempotencyKey();
-            const selectedIds =
-                sourceLines === null ? null : sourceLines.split(',');
-            setLines(
-                (source.details ?? [])
-                    .filter(
-                        (line) => !selectedIds || selectedIds.includes(line.id),
-                    )
-                    .map((line) => ({
-                        planning_detail_id: line.id,
-                        planning_code: source.kode,
-                        jenis_aset_id: line.jenis_aset_id,
-                        satuan_id: line.satuan_id,
-                        nama_aset: line.nama_aset,
-                        unit: line.unit,
-                        quantity: line.quantity,
-                        specification: line.requested_specification,
-                    })),
-            );
-            setError('');
-            setEditing(true);
-            setOpen(true);
-        },
-    );
+        setRecord(null);
+        setPlanId(source.id);
+        setDate(workDate);
+        setDescription('');
+        creationKey.current = newIdempotencyKey();
+        const selectedIds =
+            sourceLines === null ? null : sourceLines.split(',');
+        setLines(
+            (source.details ?? [])
+                .filter((line) => !selectedIds || selectedIds.includes(line.id))
+                .map((line) => ({
+                    planning_detail_id: line.id,
+                    planning_code: source.kode,
+                    jenis_aset_id: line.jenis_aset_id,
+                    satuan_id: line.satuan_id,
+                    nama_aset: line.nama_aset,
+                    unit: line.unit,
+                    quantity: line.quantity,
+                    specification: line.requested_specification,
+                })),
+        );
+        setError('');
+        setEditing(true);
+        setOpen(true);
+    });
     useEffect(() => {
         if (!sourceId) {
             return;
@@ -231,13 +203,12 @@ export default function PurchaseRequestPage({
         let cancelled = false;
         const loadSource = async () => {
             try {
-                const [source, availablePlans] = await Promise.all([
-                    api<{ data: Plan }>(`/perencanaan-aset/${sourceId}`),
-                    api<{ data: Plan[] }>('/perencanaan-aset'),
-                ]);
+                const source = await api<{ data: Plan }>(
+                    `/perencanaan-aset/${sourceId}`,
+                );
 
                 if (!cancelled) {
-                    openSourceForm(source.data, availablePlans.data);
+                    openSourceForm(source.data);
                 }
             } catch (caught) {
                 if (!cancelled) {
@@ -410,6 +381,9 @@ export default function PurchaseRequestPage({
                 {loading && <p className="p-4 text-sm">Memuat permintaan…</p>}
                 <DataTable
                     columns={columns}
+                    incremental={list}
+                    sort={list.sort}
+                    onSortChange={list.onSortChange}
                     data={records}
                     getRowKey={(row) => row.id}
                     actions={actions}
@@ -471,6 +445,7 @@ export default function PurchaseRequestPage({
                         {!record && (
                             <fieldset className="min-w-0" disabled={busy}>
                                 <Select
+                                    {...planSource.selectProps}
                                     label="Perencanaan"
                                     required
                                     items={plans.map((plan) => ({

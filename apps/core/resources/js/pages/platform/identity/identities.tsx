@@ -15,6 +15,10 @@ import { Users } from 'lucide-react';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
 import Heading from '@/components/heading';
+import {
+    RecordListScroll,
+    useRecordListSort,
+} from '@/components/record-list-scroll';
 import { useDateTimeFormat } from '@/hooks/use-date-time';
 
 type Identity = {
@@ -40,6 +44,7 @@ type Props = {
 };
 
 export default function Identities({ identities, filters }: Props) {
+    const listSort = useRecordListSort('identities');
     const [search, setSearch] = useState(filters.search);
     const formatDateTime = useDateTimeFormat();
     const columns: DataTableColumn<Identity>[] = [
@@ -88,7 +93,11 @@ export default function Identities({ identities, filters }: Props) {
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        router.get('/control/identities', { search }, { preserveState: true });
+        router.get(
+            '/control/identities',
+            { search },
+            { preserveState: true, reset: ['identities'] },
+        );
     };
 
     return (
@@ -112,11 +121,14 @@ export default function Identities({ identities, filters }: Props) {
                             />
                         </form>
                         {identities.data.length ? (
-                            <DataTable
-                                columns={columns}
-                                data={identities.data}
-                                getRowKey={(identity) => identity.id}
-                            />
+                            <RecordListScroll data="identities">
+                                <DataTable
+                                    {...listSort}
+                                    columns={columns}
+                                    data={identities.data}
+                                    getRowKey={(identity) => identity.id}
+                                />
+                            </RecordListScroll>
                         ) : (
                             <Empty>
                                 <EmptyHeader>

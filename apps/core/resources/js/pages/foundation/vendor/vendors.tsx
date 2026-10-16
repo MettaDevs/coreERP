@@ -1,3 +1,4 @@
+import { RecordListScroll } from '@/components/record-list-scroll';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
@@ -106,7 +107,12 @@ function Filters({
         router.get(
             '/settings/vendors',
             { ...filters, q, ...next },
-            { preserveState: true, preserveScroll: true, replace: true },
+            {
+                preserveState: true,
+                reset: ['vendors'],
+                preserveScroll: true,
+                replace: true,
+            },
         );
 
     return (
@@ -1160,142 +1166,128 @@ export default function Vendors({
                         </div>
                     }
                     footer={
-                        <div className="flex items-center justify-between gap-3 border-t p-3 text-sm">
-                            <span>
-                                {vendors.from ?? 0}–{vendors.to ?? 0} dari{' '}
-                                {vendors.total} vendor
-                            </span>
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={!vendors.prev_page_url}
-                                    onClick={() =>
-                                        vendors.prev_page_url &&
-                                        router.visit(vendors.prev_page_url)
-                                    }
-                                >
-                                    Sebelumnya
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={!vendors.next_page_url}
-                                    onClick={() =>
-                                        vendors.next_page_url &&
-                                        router.visit(vendors.next_page_url)
-                                    }
-                                >
-                                    Berikutnya
-                                </Button>
-                            </div>
-                        </div>
+                        <p className="p-3 text-sm text-muted-foreground">
+                            {vendors.data.length} data dimuat
+                        </p>
                     }
                 >
-                    <DataTable
-                        data={vendors.data}
-                        getRowKey={(vendor) => vendor.id}
-                        getRowLabel={(vendor) => vendor.name}
-                        showRowNumbers
-                        actionsPlacement="inline"
-                        actions={[
-                            { id: 'view', label: 'Lihat vendor' },
-                            ...(canManage
-                                ? [{ id: 'edit', label: 'Ubah vendor' }]
-                                : []),
-                        ]}
-                        onRowAction={(action, vendor) =>
-                            action === 'edit'
-                                ? setEditing(vendor)
-                                : setViewing(vendor)
-                        }
-                        rowActivation="single-click"
-                        activeRowKey={selectedVendorId ?? undefined}
-                        onRowClick={(vendor) => setSelectedVendorId(vendor.id)}
-                        emptyMessage={
-                            legalEntities.length === 0
-                                ? 'Buat perusahaan di Organisasi lebih dulu sebelum menambahkan vendor.'
-                                : 'Belum ada vendor yang sesuai. Tambahkan vendor atau ubah saringan.'
-                        }
-                        columns={[
-                            {
-                                id: 'number',
-                                header: 'Nomor vendor',
-                                width: 180,
-                                cell: (vendor) => (
-                                    <Button
-                                        type="button"
-                                        variant="link"
-                                        className="h-auto p-0"
-                                        onClick={(event) => {
-                                            event.stopPropagation();
-                                            setViewing(vendor);
-                                        }}
-                                    >
-                                        {vendor.number}
-                                    </Button>
-                                ),
-                            },
-                            {
-                                id: 'name',
-                                header: 'Nama',
-                                width: 280,
-                                cell: (vendor) => (
-                                    <DataTableText>{vendor.name}</DataTableText>
-                                ),
-                            },
-                            {
-                                id: 'company',
-                                header: 'Perusahaan',
-                                width: 220,
-                                cell: (vendor) => (
-                                    <DataTableText>
-                                        {legalEntityName(
-                                            vendor.legal_entity_id,
-                                        )}
-                                    </DataTableText>
-                                ),
-                            },
-                            {
-                                id: 'tax',
-                                header: 'NPWP',
-                                width: 200,
-                                cell: (vendor) => (
-                                    <DataTableText>
-                                        {vendor.tax_number ?? '—'}
-                                    </DataTableText>
-                                ),
-                            },
-                            {
-                                id: 'type',
-                                header: 'Jenis pihak',
-                                width: 140,
-                                cell: (vendor) => (
-                                    <DataTableText>
-                                        {PARTY_TYPE_LABEL[vendor.party_type]}
-                                    </DataTableText>
-                                ),
-                            },
-                            {
-                                id: 'status',
-                                header: 'Status',
-                                width: 120,
-                                cell: (vendor) => (
-                                    <Badge
-                                        variant={
-                                            vendor.status === 'active'
-                                                ? 'secondary'
-                                                : 'outline'
-                                        }
-                                    >
-                                        {vendor.status === 'active'
-                                            ? 'Aktif'
-                                            : 'Nonaktif'}
-                                    </Badge>
-                                ),
-                            },
-                        ]}
-                    />
+                    <RecordListScroll
+                        data="vendors"
+                        className="flex h-full min-h-0 flex-1 flex-col"
+                    >
+                        <DataTable
+                            data={vendors.data}
+                            getRowKey={(vendor) => vendor.id}
+                            getRowLabel={(vendor) => vendor.name}
+                            showRowNumbers
+                            actionsPlacement="inline"
+                            actions={[
+                                { id: 'view', label: 'Lihat vendor' },
+                                ...(canManage
+                                    ? [{ id: 'edit', label: 'Ubah vendor' }]
+                                    : []),
+                            ]}
+                            onRowAction={(action, vendor) =>
+                                action === 'edit'
+                                    ? setEditing(vendor)
+                                    : setViewing(vendor)
+                            }
+                            rowActivation="single-click"
+                            activeRowKey={selectedVendorId ?? undefined}
+                            onRowClick={(vendor) =>
+                                setSelectedVendorId(vendor.id)
+                            }
+                            emptyMessage={
+                                legalEntities.length === 0
+                                    ? 'Buat perusahaan di Organisasi lebih dulu sebelum menambahkan vendor.'
+                                    : 'Belum ada vendor yang sesuai. Tambahkan vendor atau ubah saringan.'
+                            }
+                            columns={[
+                                {
+                                    id: 'number',
+                                    header: 'Nomor vendor',
+                                    width: 180,
+                                    cell: (vendor) => (
+                                        <Button
+                                            type="button"
+                                            variant="link"
+                                            className="h-auto p-0"
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                setViewing(vendor);
+                                            }}
+                                        >
+                                            {vendor.number}
+                                        </Button>
+                                    ),
+                                },
+                                {
+                                    id: 'name',
+                                    header: 'Nama',
+                                    width: 280,
+                                    cell: (vendor) => (
+                                        <DataTableText>
+                                            {vendor.name}
+                                        </DataTableText>
+                                    ),
+                                },
+                                {
+                                    id: 'company',
+                                    header: 'Perusahaan',
+                                    width: 220,
+                                    cell: (vendor) => (
+                                        <DataTableText>
+                                            {legalEntityName(
+                                                vendor.legal_entity_id,
+                                            )}
+                                        </DataTableText>
+                                    ),
+                                },
+                                {
+                                    id: 'tax',
+                                    header: 'NPWP',
+                                    width: 200,
+                                    cell: (vendor) => (
+                                        <DataTableText>
+                                            {vendor.tax_number ?? '—'}
+                                        </DataTableText>
+                                    ),
+                                },
+                                {
+                                    id: 'type',
+                                    header: 'Jenis pihak',
+                                    width: 140,
+                                    cell: (vendor) => (
+                                        <DataTableText>
+                                            {
+                                                PARTY_TYPE_LABEL[
+                                                    vendor.party_type
+                                                ]
+                                            }
+                                        </DataTableText>
+                                    ),
+                                },
+                                {
+                                    id: 'status',
+                                    header: 'Status',
+                                    width: 120,
+                                    cell: (vendor) => (
+                                        <Badge
+                                            variant={
+                                                vendor.status === 'active'
+                                                    ? 'secondary'
+                                                    : 'outline'
+                                            }
+                                        >
+                                            {vendor.status === 'active'
+                                                ? 'Aktif'
+                                                : 'Nonaktif'}
+                                        </Badge>
+                                    ),
+                                },
+                            ]}
+                        />
+                    </RecordListScroll>
                 </ListPageLayout>
             </VendorContextPanel>
             <Dialog open={importing} onOpenChange={setImporting}>

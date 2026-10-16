@@ -9,6 +9,11 @@ namespace App\Platform\Modules\Contracts;
  */
 interface UnitOfMeasureDirectory
 {
+    /** @param array<string, mixed> $input
+     * @return array{data: mixed, next_cursor: ?string}
+     */
+    public function lookup(string $tenantId, array $input): array;
+
     /**
      * Satuan aktif milik sebuah tenant, untuk layar yang menampilkan pilihan.
      *

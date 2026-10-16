@@ -1,5 +1,6 @@
 import '@xyflow/react/dist/style.css';
 
+import { ActionButton } from '@apperp/ui/action-button';
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -12,31 +13,13 @@ import {
 } from '@apperp/ui/alert-dialog';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
-import {
-    Card,
-    CardAction,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@apperp/ui/card';
-import {
-    Dialog,
-    DialogAction,
-    DialogBody,
-    DialogCancel,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@apperp/ui/dialog';
+import { DataTable, DataTableText } from '@apperp/ui/data-table';
+import { DialogCancel } from '@apperp/ui/dialog';
+
 import {
     Empty,
     EmptyDescription,
     EmptyHeader,
-    EmptyMedia,
     EmptyTitle,
 } from '@apperp/ui/empty';
 import {
@@ -47,9 +30,25 @@ import {
     FieldSet,
 } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
-import { NativeSelect } from '@apperp/ui/native-select';
+import { ListPageLayout } from '@apperp/ui/list-page-layout';
+import { MasterDetailLayout } from '@apperp/ui/master-detail-layout';
+import {
+    PageDialog as Dialog,
+    PageDialogAction as DialogAction,
+    PageDialogBody as DialogBody,
+    PageDialogContent as DialogContent,
+    PageDialogDescription as DialogDescription,
+    PageDialogFooter as DialogFooter,
+    PageDialogHeader as DialogHeader,
+    PageDialogTitle as DialogTitle,
+    PageDialogTrigger as DialogTrigger,
+} from '@apperp/ui/page-dialog';
+import { RecordActionBar } from '@apperp/ui/record-action-bar';
+import { Select } from '@apperp/ui/select';
 
 import { ToggleGroup, ToggleGroupItem } from '@apperp/ui/toggle-group';
+import { useIncrementalList } from '@apperp/ui/use-incremental-list';
+import type { ListLoader } from '@apperp/ui/use-incremental-list';
 
 import { Head, useForm } from '@inertiajs/react';
 import type {
@@ -67,53 +66,52 @@ import {
     ReactFlow,
 } from '@xyflow/react';
 import { Check, Network, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
-import Heading from '@/components/heading';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useToday } from '@/hooks/use-work-date';
+import { apiJson, errorText } from '@/lib/core-api';
+import { OrganizationLookup } from './organization-lookup';
 
 import { needsNumber, MissingNumberBadge } from './organization-number-status';
 import type {
     Props,
     Organization,
+    Hierarchy,
     HierarchyNode,
     Version,
 } from './organization-types';
-function CreateHierarchyDialog({
-    organizations,
-    purposes,
-}: Pick<Props, 'organizations' | 'purposes'>) {
+function CreateHierarchyDialog({ purposes }: Pick<Props, 'purposes'>) {
     const [open, setOpen] = useState(false);
+    const contentRef = useRef<HTMLDivElement>(null);
     const today = useToday();
     const form = useForm({
         name: '',
         purpose_codes: [] as string[],
-        root_organization_id: organizations[0]?.id ?? '',
+        root_organization_id: '',
         effective_from: today,
     });
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+            open={open}
+            onOpenChange={(next) => {
+                if (!form.processing) {
+                    setOpen(next);
+                }
+            }}
+        >
             <DialogTrigger asChild>
-                <Button size="sm" className="text-xs font-medium shadow-xs">
-                    <Plus className="mr-1.5 size-3.5" /> Hierarchy Baru
-                </Button>
+                <ActionButton action="create">Tambah hierarki</ActionButton>
             </DialogTrigger>
-            <DialogContent size="wide">
+            <DialogContent ref={contentRef}>
                 <DialogHeader>
-                    <div className="flex items-center gap-3">
-                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
-                            <Network className="size-5" />
-                        </div>
-                        <div>
-                            <DialogTitle>Draft Hierarchy Baru</DialogTitle>
-                            <DialogDescription>
-                                Satu hierarchy dapat dipakai oleh beberapa
-                                tujuan proses bisnis yang memiliki susunan sama.
-                            </DialogDescription>
-                        </div>
-                    </div>
+                    <DialogTitle>Hierarki organisasi baru</DialogTitle>
+                    <DialogDescription>
+                        Susun organisasi berdasarkan tujuan dan tanggal
+                        berlakunya.
+                    </DialogDescription>
                 </DialogHeader>
                 <form
+                    className="flex min-h-0 flex-1 flex-col"
                     onSubmit={(event) => {
                         event.preventDefault();
                         form.post('/settings/organization/hierarchies', {
@@ -124,11 +122,12 @@ function CreateHierarchyDialog({
                         });
                     }}
                 >
-                    <DialogBody className="space-y-4 py-3">
+                    <DialogBody className="space-y-4">
                         <FieldGroup>
                             <Field data-invalid={Boolean(form.errors.name)}>
                                 <Input
-                                    label="Nama Hierarchy"
+                                    label="Nama hierarki"
+                                    required
                                     value={form.data.name}
                                     onChange={(event) =>
                                         form.setData('name', event.target.value)
@@ -144,7 +143,7 @@ function CreateHierarchyDialog({
                                 )}
                             >
                                 <FieldLegend hint="Pilih proses bisnis yang akan membaca susunan ini.">
-                                    Tujuan Hierarchy
+                                    Tujuan hierarki
                                 </FieldLegend>
                                 <ToggleGroup
                                     type="multiple"
@@ -159,7 +158,7 @@ function CreateHierarchyDialog({
                                         <ToggleGroupItem
                                             key={purpose.code}
                                             value={purpose.code}
-                                            className="border-border/80 text-xs font-medium"
+                                            className="border-border/80 font-medium"
                                         >
                                             {purpose.name}
                                         </ToggleGroupItem>
@@ -175,28 +174,17 @@ function CreateHierarchyDialog({
                                         form.errors.root_organization_id,
                                     )}
                                 >
-                                    <NativeSelect
-                                        label="Organisasi Paling Atas (Root)"
+                                    <OrganizationLookup
+                                        label="Organisasi paling atas"
                                         value={form.data.root_organization_id}
-                                        onChange={(event) =>
+                                        onChange={(value) =>
                                             form.setData(
                                                 'root_organization_id',
-                                                event.target.value,
+                                                value,
                                             )
                                         }
-                                        aria-invalid={Boolean(
-                                            form.errors.root_organization_id,
-                                        )}
-                                    >
-                                        {organizations.map((organization) => (
-                                            <option
-                                                key={organization.id}
-                                                value={organization.id}
-                                            >
-                                                {organization.name}
-                                            </option>
-                                        ))}
-                                    </NativeSelect>
+                                        portalContainer={contentRef}
+                                    />
                                     <FieldError>
                                         {form.errors.root_organization_id}
                                     </FieldError>
@@ -207,7 +195,8 @@ function CreateHierarchyDialog({
                                     )}
                                 >
                                     <Input
-                                        label="Berlaku Mulai Tanggal"
+                                        label="Berlaku mulai"
+                                        required
                                         type="date"
                                         value={form.data.effective_from}
                                         onChange={(event) =>
@@ -229,7 +218,7 @@ function CreateHierarchyDialog({
                     </DialogBody>
                     <DialogFooter>
                         <DialogAction type="submit" disabled={form.processing}>
-                            Buat Draf Hierarchy
+                            Buat draft hierarki
                         </DialogAction>
                         <DialogCancel />
                     </DialogFooter>
@@ -242,20 +231,12 @@ function CreateHierarchyDialog({
 function DraftActions({
     version,
     rowVersion,
-    organizations,
 }: {
     version: Version;
     rowVersion: number;
-    organizations: Organization[];
 }) {
-    const placedIds = new Set(
-        version.nodes.map((node) => node.organization.id),
-    );
-    const unplaced = organizations.filter(
-        (organization) => !placedIds.has(organization.id),
-    );
     const form = useForm({
-        organization_id: unplaced[0]?.id ?? '',
+        organization_id: '',
         parent_organization_id: version.nodes[0]?.organization.id ?? '',
     });
 
@@ -276,56 +257,40 @@ function DraftActions({
         >
             <div className="grid gap-3 md:grid-cols-2">
                 <Field data-invalid={Boolean(form.errors.organization_id)}>
-                    <NativeSelect
-                        label="Organisasi Yang Ditambahkan"
+                    <OrganizationLookup
+                        label="Organisasi yang ditambahkan"
                         value={form.data.organization_id}
-                        onChange={(event) =>
-                            form.setData('organization_id', event.target.value)
+                        onChange={(value) =>
+                            form.setData('organization_id', value)
                         }
-                        disabled={!unplaced.length}
-                    >
-                        <option value="">Pilih organisasi</option>
-                        {unplaced.map((organization) => (
-                            <option
-                                key={organization.id}
-                                value={organization.id}
-                            >
-                                {organization.name}
-                            </option>
-                        ))}
-                    </NativeSelect>
+                        excludeVersionId={version.id}
+                    />
                     <FieldError>{form.errors.organization_id}</FieldError>
                 </Field>
                 <Field
                     data-invalid={Boolean(form.errors.parent_organization_id)}
                 >
-                    <NativeSelect
-                        label="Berada Di Bawah Parent"
+                    <Select
+                        label="Berada di bawah"
+                        required
                         value={form.data.parent_organization_id}
-                        onChange={(event) =>
-                            form.setData(
-                                'parent_organization_id',
-                                event.target.value,
-                            )
+                        onValueChange={(value) =>
+                            value &&
+                            form.setData('parent_organization_id', value)
                         }
-                    >
-                        {version.nodes.map((node) => (
-                            <option
-                                key={node.organization.id}
-                                value={node.organization.id}
-                            >
-                                {node.organization.name}
-                            </option>
-                        ))}
-                    </NativeSelect>
+                        items={version.nodes.map((node) => ({
+                            value: node.organization.id,
+                            label: node.organization.name,
+                        }))}
+                    />
                     <FieldError>
                         {form.errors.parent_organization_id}
                     </FieldError>
                 </Field>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/40 pt-2">
-                <p className="text-xs text-muted-foreground">
-                    Hubungan ini berlaku pada draf hierarchy ini untuk menyusun
+                <p className="text-muted-foreground">
+                    Hubungan ini berlaku pada draft hierarki ini untuk menyusun
                     struktur pohon.
                 </p>
                 <div className="flex gap-2">
@@ -333,15 +298,15 @@ function DraftActions({
                         variant="outline"
                         type="submit"
                         size="sm"
-                        className="text-xs font-medium"
-                        disabled={!unplaced.length || form.processing}
+                        className="font-medium"
+                        disabled={!form.data.organization_id || form.processing}
                     >
                         <Plus className="mr-1.5 size-3.5" /> Tambah Penempatan
                     </Button>
                     <Button
                         type="button"
                         size="sm"
-                        className="text-xs font-medium shadow-xs"
+                        className="font-medium shadow-xs"
                         disabled={form.processing}
                         onClick={() => {
                             form.transform(() => ({ version: rowVersion }));
@@ -382,14 +347,14 @@ function OrganizationHierarchyFlowNode({
                 className="!size-3 !border-2 !border-background !bg-muted-foreground"
             />
             <div className="flex items-center gap-2">
-                <span className="flex size-5 items-center justify-center rounded bg-primary/10 text-[10px] font-bold text-primary">
+                <span className="flex size-5 items-center justify-center rounded bg-primary/10 font-bold text-primary">
                     {data.classification === 'legal_entity' ? 'LE' : 'OU'}
                 </span>
-                <p className="truncate text-xs font-bold text-foreground">
+                <p className="truncate font-bold text-foreground">
                     {data.label}
                 </p>
             </div>
-            <p className="mt-1 text-[11px] text-muted-foreground">
+            <p className="mt-1 text-muted-foreground">
                 {data.classification === 'legal_entity'
                     ? 'Perusahaan (Badan Hukum)'
                     : [
@@ -558,14 +523,14 @@ function HierarchyCanvas({
 
     return (
         <div className="overflow-hidden rounded-xl border border-border bg-background shadow-xs">
-            <div className="flex items-center justify-between border-b border-border bg-card/80 px-4 py-2.5 text-xs font-semibold text-foreground">
+            <div className="flex items-center justify-between border-b border-border bg-card/80 px-4 py-2.5 font-semibold text-foreground">
                 <span className="flex items-center gap-2">
                     <Network className="size-4 text-primary" /> Visualisasi
                     Organigram Struktur Perusahaan
                 </span>
                 <Badge
                     variant="outline"
-                    className="border-primary/20 bg-primary/5 font-mono text-[10px] text-primary"
+                    className="border-primary/20 bg-primary/5 font-mono text-primary"
                 >
                     {version.nodes.length} Unit Terhubung
                 </Badge>
@@ -663,25 +628,29 @@ function CreateVersionDraftAction({
     const [open, setOpen] = useState(false);
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+            open={open}
+            onOpenChange={(next) => {
+                if (!form.processing) {
+                    setOpen(next);
+                }
+            }}
+        >
             <DialogTrigger asChild>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs font-medium"
-                >
-                    <Plus className="mr-1.5 size-3.5" /> Buat Versi Baru
+                <Button variant="outline" size="sm" className="font-medium">
+                    <Plus className="mr-1.5 size-3.5" /> Buat versi baru
                 </Button>
             </DialogTrigger>
-            <DialogContent size="wide">
+            <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Buat Draft Versi Baru</DialogTitle>
+                    <DialogTitle>Buat draft versi baru</DialogTitle>
                     <DialogDescription>
                         Versi yang sudah dipublikasikan tetap menjadi riwayat
                         resmi.
                     </DialogDescription>
                 </DialogHeader>
                 <form
+                    className="flex min-h-0 flex-1 flex-col"
                     onSubmit={(event) => {
                         event.preventDefault();
                         form.transform((data) => ({
@@ -694,7 +663,7 @@ function CreateVersionDraftAction({
                         );
                     }}
                 >
-                    <DialogBody className="space-y-4 py-3">
+                    <DialogBody className="space-y-4">
                         <FieldGroup>
                             <Field
                                 data-invalid={Boolean(
@@ -702,7 +671,8 @@ function CreateVersionDraftAction({
                                 )}
                             >
                                 <Input
-                                    label="Berlaku Mulai Tanggal"
+                                    label="Berlaku mulai"
+                                    required
                                     type="date"
                                     value={form.data.effective_from}
                                     onChange={(event) =>
@@ -735,10 +705,9 @@ function CreateVersionDraftAction({
 
 export default function OrganizationHierarchies({
     canManage,
-    organizations,
-    hierarchies,
     purposes,
     operatingUnitTypes,
+    savedHierarchy,
 }: Pick<
     Props,
     | 'canManage'
@@ -746,31 +715,145 @@ export default function OrganizationHierarchies({
     | 'hierarchies'
     | 'purposes'
     | 'operatingUnitTypes'
+    | 'savedHierarchy'
 >) {
+    const [showDetail, setShowDetail] = useState(false);
+    const [query, setQuery] = useState('');
+    const [selected, setSelected] = useState<Hierarchy | null>(null);
+    const [error, setError] = useState('');
+    const pending = useRef<AbortController | null>(null);
+    useEffect(() => () => pending.current?.abort(), []);
+    const loader = useCallback<
+        ListLoader<Pick<Hierarchy, 'id' | 'name' | 'status'>>
+    >(async ({ query, cursor, signal }) => {
+        const params = new URLSearchParams({ incremental: '1', q: query });
+
+        if (cursor) {
+            params.set('cursor', cursor);
+        }
+
+        const result = await apiJson<{
+            data: Pick<Hierarchy, 'id' | 'name' | 'status'>[];
+            next_cursor: string | null;
+        }>(`/settings/organization-hierarchies?${params}`, { signal });
+
+        return { items: result.data, nextCursor: result.next_cursor };
+    }, []);
+    const list = useIncrementalList({
+        loadItems: loader,
+        query,
+        getKey: (item) => item.id,
+    });
+    const refreshList = useRef(list.reload);
+    useEffect(() => {
+        if (savedHierarchy) {
+            Promise.resolve().then(() => {
+                pending.current?.abort();
+                setSelected(savedHierarchy);
+                setShowDetail(true);
+                refreshList.current();
+            });
+        }
+    }, [savedHierarchy]);
+    const open = async (id: string) => {
+        pending.current?.abort();
+        const controller = new AbortController();
+        pending.current = controller;
+        setError('');
+
+        try {
+            const result = await apiJson<{ data: Hierarchy[] }>(
+                `/settings/organization-hierarchies?incremental=1&record_id=${encodeURIComponent(id)}`,
+                { signal: controller.signal },
+            );
+
+            if (!controller.signal.aborted) {
+                setSelected(result.data[0]);
+                setShowDetail(true);
+            }
+        } catch (caught) {
+            if (!controller.signal.aborted) {
+                setError(
+                    errorText(
+                        caught,
+                        'Hierarki belum dapat dibuka. Pilih kembali untuk mencoba lagi.',
+                    ),
+                );
+            }
+        }
+    };
+
     return (
         <>
             <Head title="Hierarki organisasi" />
-            <main className="flex min-w-0 flex-col gap-6 p-4 sm:p-6">
-                <Heading title="Hierarki organisasi" />{' '}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Hierarki organisasi</CardTitle>
-                        <CardDescription>
-                            Susun hubungan organisasi berdasarkan tujuan dan
-                            tanggal berlakunya.
-                        </CardDescription>
+            <ListPageLayout
+                filters={
+                    error && (
+                        <p role="alert" className="px-4 py-2 text-destructive">
+                            {error}
+                        </p>
+                    )
+                }
+                header={
+                    <RecordActionBar title="Hierarki organisasi">
                         {canManage && (
-                            <CardAction className="col-span-2 col-start-1 row-span-1 row-start-3 justify-self-start sm:col-span-1 sm:col-start-2 sm:row-span-2 sm:row-start-1 sm:justify-self-end">
-                                <CreateHierarchyDialog
-                                    organizations={organizations}
-                                    purposes={purposes}
-                                />
-                            </CardAction>
+                            <CreateHierarchyDialog purposes={purposes} />
                         )}
-                    </CardHeader>
-                    <CardContent className="space-y-8 p-6">
-                        {hierarchies.length ? (
-                            hierarchies.map((hierarchy) => {
+                    </RecordActionBar>
+                }
+            >
+                <MasterDetailLayout
+                    detailOpen={showDetail}
+                    onDetailOpenChange={setShowDetail}
+                    list={
+                        <aside className="flex h-full min-h-0 min-w-0 flex-col">
+                            <div className="shrink-0 border-b p-3">
+                                <Input
+                                    type="search"
+                                    aria-label="Cari hierarki"
+                                    placeholder="Cari hierarki..."
+                                    value={query}
+                                    onChange={(event) =>
+                                        setQuery(event.target.value)
+                                    }
+                                />
+                            </div>
+                            <DataTable
+                                data={list.items}
+                                getRowKey={(item) => item.id}
+                                columns={[
+                                    {
+                                        id: 'name',
+                                        header: 'Nama hierarki',
+                                        cell: (item) => (
+                                            <DataTableText>
+                                                {item.name}
+                                            </DataTableText>
+                                        ),
+                                    },
+                                ]}
+                                activeRowKey={selected?.id}
+                                rowActivation="single-click"
+                                onRowClick={(item) => {
+                                    if (selected?.id === item.id) {
+                                        setShowDetail(true);
+                                    } else {
+                                        void open(item.id);
+                                    }
+                                }}
+                                incremental={list}
+                                emptyMessage="Belum ada hierarki yang cocok."
+                            />
+                        </aside>
+                    }
+                >
+                    <div
+                        className="h-full min-h-0 min-w-0 flex-1 space-y-4 overflow-auto p-4 lg:p-6"
+                        scroll-region=""
+                    >
+                        {selected ? (
+                            (() => {
+                                const hierarchy = selected;
                                 const version = hierarchy.versions[0];
 
                                 if (!version) {
@@ -787,7 +870,7 @@ export default function OrganizationHierarchies({
                                                 <h3 className="text-base font-bold text-foreground">
                                                     {hierarchy.name}
                                                 </h3>
-                                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                                <p className="mt-0.5 text-muted-foreground">
                                                     Tujuan:{' '}
                                                     {hierarchy.purposes
                                                         .map(
@@ -800,7 +883,7 @@ export default function OrganizationHierarchies({
                                             <Badge variant="outline">
                                                 {version.status === 'draft'
                                                     ? 'Draft'
-                                                    : `Published v${version.version_number}`}
+                                                    : `Terbit v${version.version_number}`}
                                             </Badge>
                                         </div>
 
@@ -813,11 +896,11 @@ export default function OrganizationHierarchies({
 
                                         <div className="space-y-3 pt-2">
                                             <div className="flex items-center justify-between">
-                                                <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                                <p className="font-semibold tracking-wider text-muted-foreground uppercase">
                                                     Daftar Penempatan Unit
                                                     Organisasi
                                                 </p>
-                                                <span className="text-xs text-muted-foreground">
+                                                <span className="text-muted-foreground">
                                                     {version.nodes.length} Unit
                                                     Terpasang
                                                 </span>
@@ -826,7 +909,7 @@ export default function OrganizationHierarchies({
                                                 {version.nodes.map((node) => (
                                                     <div
                                                         key={node.id}
-                                                        className="flex items-center justify-between gap-2 rounded-lg border border-border/80 bg-card px-3.5 py-2.5 text-xs shadow-2xs"
+                                                        className="flex items-center justify-between gap-2 rounded-lg border border-border/80 bg-card px-3.5 py-2.5 shadow-2xs"
                                                     >
                                                         <div className="min-w-0 flex-1">
                                                             <span className="block truncate font-bold text-foreground">
@@ -849,10 +932,10 @@ export default function OrganizationHierarchies({
                                                                     </span>
                                                                 )}
                                                             </span>
-                                                            <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
+                                                            <span className="mt-0.5 block truncate text-muted-foreground">
                                                                 {node.parent_node
                                                                     ? `Di bawah ${node.parent_node.organization.name}`
-                                                                    : 'Root (Organisasi Puncak)'}
+                                                                    : 'Organisasi paling atas'}
                                                             </span>
                                                         </div>
                                                         {canManage &&
@@ -881,9 +964,6 @@ export default function OrganizationHierarchies({
                                                     rowVersion={
                                                         hierarchy.version
                                                     }
-                                                    organizations={
-                                                        organizations
-                                                    }
                                                 />
                                             )}
                                         {canManage &&
@@ -899,27 +979,23 @@ export default function OrganizationHierarchies({
                                             )}
                                     </div>
                                 );
-                            })
+                            })()
                         ) : (
-                            <Empty className="py-16">
+                            <Empty>
                                 <EmptyHeader>
-                                    <EmptyMedia variant="icon">
-                                        <Network className="size-8 text-muted-foreground" />
-                                    </EmptyMedia>
                                     <EmptyTitle>
-                                        Belum Ada Hierarchy Organisasi
+                                        Pilih hierarki organisasi
                                     </EmptyTitle>
-                                    <EmptyDescription className="max-w-sm text-xs text-muted-foreground">
-                                        Buat hierarchy baru untuk menyusun bagan
-                                        organigram dan struktur hubungan antar
-                                        unit bisnis.
+                                    <EmptyDescription>
+                                        Pilih hierarki dari daftar untuk melihat
+                                        susunan dan versi yang berlaku.
                                     </EmptyDescription>
                                 </EmptyHeader>
                             </Empty>
                         )}
-                    </CardContent>
-                </Card>
-            </main>
+                    </div>
+                </MasterDetailLayout>
+            </ListPageLayout>
         </>
     );
 }

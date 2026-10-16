@@ -13,13 +13,6 @@ import {
 import ServiceLifeFields from './ServiceLifeFields';
 import { optionLabel, useMasterOptions } from './useMasterOptions';
 
-type Buku = {
-    id: string;
-    kode: string;
-    nama: string;
-    depreciation_profile_id: string | null;
-};
-
 type Row = {
     buku_id: string;
     depreciation_profile_id: string;
@@ -76,28 +69,38 @@ export default function GroupBookMatrix({
     version: number;
     onVersionChange: (version: number) => void;
 }) {
-    const [books, setBooks] = useState<Buku[]>([]);
     const [rows, setRows] = useState<Row[]>([]);
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
-    const profiles = useMasterOptions('profil-penyusutan');
+    const profiles = useMasterOptions(
+        'profil-penyusutan',
+        '',
+        rows
+            .flatMap((row) => [
+                row.depreciation_profile_id,
+                row.alternative_profile_id,
+            ])
+            .filter(Boolean),
+    );
+    const bookSource = useMasterOptions(
+        'buku-penyusutan',
+        '',
+        rows.map((row) => row.buku_id),
+    );
+    const books = bookSource.options;
 
     useEffect(() => {
         let cancelled = false;
-        Promise.all([
-            api<{ data: Buku[] }>('/buku-penyusutan?per_page=100&aktif=true'),
-            api<{ data: Record<string, unknown>[] }>(
-                `/group-aset/${groupId}/buku-penyusutan`,
-            ),
-        ])
-            .then(([bookList, matrix]) => {
+        api<{ data: Record<string, unknown>[] }>(
+            `/group-aset/${groupId}/buku-penyusutan`,
+        )
+            .then((matrix) => {
                 if (cancelled) {
                     return;
                 }
 
-                setBooks(bookList.data);
                 setRows(
                     matrix.data.map((row) => ({
                         buku_id: String(row.buku_id ?? ''),
@@ -272,6 +275,7 @@ export default function GroupBookMatrix({
                         <div className="grid gap-3 sm:grid-cols-2">
                             <Field>
                                 <Select
+                                    {...profiles.selectProps}
                                     label="Metode utama untuk group ini"
                                     items={profiles.options.map(optionLabel)}
                                     value={
@@ -324,6 +328,7 @@ export default function GroupBookMatrix({
                             </Field>
                             <Field>
                                 <Select
+                                    {...profiles.selectProps}
                                     label="Metode pengganti (opsional)"
                                     items={profiles.options.map(optionLabel)}
                                     value={

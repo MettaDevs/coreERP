@@ -200,6 +200,7 @@ export default function MaintenanceKpiPage() {
                 </div>
                 <div className="w-full sm:w-56">
                     <Select
+                        {...types.selectProps}
                         label="Jenis aset"
                         items={[
                             { value: '', label: 'Semua jenis' },
@@ -216,6 +217,7 @@ export default function MaintenanceKpiPage() {
                 </div>
                 <div className="w-full sm:w-56">
                     <Select
+                        {...locations.selectProps}
                         label="Lokasi"
                         items={[
                             { value: '', label: 'Semua lokasi' },

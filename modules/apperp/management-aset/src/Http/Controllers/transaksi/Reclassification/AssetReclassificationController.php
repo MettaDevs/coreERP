@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\Reclassification;
 
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\PostingFeed;
 use App\Platform\Modules\Contracts\RowVersion;
 use Brick\Math\BigDecimal;
@@ -71,16 +72,17 @@ class AssetReclassificationController extends Controller
         }
 
         $tenant = $this->tenant($request);
-        $rows = $query
+        $list = $query
             ->selectSub(AssetReclassificationLine::query()->selectRaw('count(*)')->whereColumn('aset_tr_reklasifikasi_aset_details.reklasifikasi_aset_id', self::HEADER.'.id')->toBase(), 'jumlah_baris')
             ->addSelect([self::HEADER.'.*'])
             ->orderByDesc(self::HEADER.'.tanggal')
             ->orderByDesc(self::HEADER.'.created_at')
-            ->toBase()
-            ->get()
-            ->map(fn (stdClass $row): stdClass => $this->withNames($tenant, $row));
+            ->toBase();
 
-        return response()->json(['data' => $rows]);
+        $batch = IncrementalList::query($request, $list, ['id' => 'id', 'kode' => 'kode', 'tanggal' => 'tanggal', 'jenis' => 'jenis', 'keterangan' => 'keterangan', 'jumlah' => 'jumlah_baris', 'status' => 'status'], ['kode', 'keterangan'], 'tanggal', ['jumlah_baris', 'total_nilai'], 'desc');
+        $batch['data'] = $batch['data']->map(fn (stdClass $row): stdClass => $this->withNames($tenant, $row));
+
+        return response()->json($batch);
     }
 
     public function show(Request $request, string $id): JsonResponse

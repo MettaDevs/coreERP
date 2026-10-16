@@ -6,7 +6,9 @@ namespace App\Foundation\FinancePosting\ModuleServices;
 
 use App\Foundation\FinancePosting\Models\FinanceReferenceAccount;
 use App\Platform\Modules\Contracts\AccountDirectory;
+use App\Platform\Modules\Contracts\IncrementalList;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 
 /**
  * Membaca daftar akun referensi untuk module, sebagai baris biasa, bukan model Core.
@@ -16,6 +18,17 @@ use Illuminate\Database\Eloquent\Builder;
  */
 final class AccountDirectoryCore implements AccountDirectory
 {
+    public function lookup(string $tenantId, ?string $legalEntityId, array $input): array
+    {
+        $query = FinanceReferenceAccount::query()->where('tenant_id', $tenantId)->where('active', true)
+            ->where(fn (Builder $scope) => $legalEntityId === null ? $scope->whereNull('legal_entity_id') : $scope->whereNull('legal_entity_id')->orWhere('legal_entity_id', $legalEntityId));
+        $batch = IncrementalList::query(Request::create('/lookup', 'GET', $input), $query->toBase(),
+            ['id' => 'id', 'code' => 'code', 'name' => 'name'], ['code', 'name', 'external_id'], 'code');
+        $batch['data'] = FinanceReferenceAccount::hydrate($batch['data']->map(fn ($row) => (array) $row)->all())->map(self::row(...));
+
+        return $batch;
+    }
+
     public function search(string $tenantId, ?string $legalEntityId, string $keyword = '', int $limit = 20): array
     {
         $keyword = trim($keyword);
