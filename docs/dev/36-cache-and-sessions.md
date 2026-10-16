@@ -13,7 +13,8 @@ eksekusinya dahulu; pembacaan referensi hanya boleh dipakai ulang bila batas hid
 `MoneyPrecision` berbagi hasil baca dalam satu scope request/job. Kuncinya membedakan koneksi/database,
 tenant, dan mata uang. Penyimpanan atau penghapusan `CurrencyPrecision`, awal/commit transaksi terluar,
 serta rollback termasuk savepoint membuang hasil itu. Savepoint yang berhasil tidak mengulang bacaan
-referensi yang sama. Request berikutnya pada worker Octane membaca ulang; tidak ada TTL lintas
+referensi yang sama. Penulisan tabel presisi melalui query builder atau SQL Laravel juga membuang cache,
+karena jalur itu tidak menerbitkan event model; SELECT biasa tidak membuangnya. Request berikutnya pada worker Octane membaca ulang; tidak ada TTL lintas
 API yang membuat perubahan presisi terlambat terlihat. Counter dan nomor tidak ikut cache ini.
 
 Daftar work order memakai `IncrementalList` dengan tipe urut native yang dinyatakan server melalui

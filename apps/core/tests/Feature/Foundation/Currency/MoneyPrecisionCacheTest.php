@@ -64,6 +64,20 @@ class MoneyPrecisionCacheTest extends TestCase
         }
     }
 
+    public function test_query_builder_and_bulk_sql_changes_invalidate_existing_readers(): void
+    {
+        $tenant = (string) Str::ulid();
+        $precision = app(MoneyPrecision::class);
+        $this->assertSame(2, $precision->amountDecimals($tenant, 'IDR'));
+        DB::table('currency_precisions')->insert([
+            'id' => (string) Str::ulid(), 'tenant_id' => $tenant, 'currency_code' => 'IDR',
+            'amount_decimals' => 0, 'unit_amount_decimals' => 3,
+        ]);
+        $this->assertSame(0, $precision->amountDecimals($tenant, 'IDR'));
+        DB::statement('WITH changed AS (UPDATE currency_precisions SET amount_decimals = 1 WHERE tenant_id = ? RETURNING id) SELECT count(*) FROM changed', [$tenant]);
+        $this->assertSame(1, $precision->amountDecimals($tenant, 'IDR'));
+    }
+
     public function test_new_scope_observes_updates_from_another_writer(): void
     {
         $tenant = (string) Str::ulid();
@@ -96,11 +110,12 @@ class MoneyPrecisionCacheTest extends TestCase
             ]);
             DB::setDefaultConnection($copy);
             $this->assertSame(0, $precision->amountDecimals($tenant, 'IDR'));
-            $connection->table('currency_precisions')->update(['amount_decimals' => 1]);
+            // Penulis lain tidak melewati dispatcher aplikasi; batas transaksi tetap harus menyegarkan.
+            $connection->getPdo()->exec('UPDATE currency_precisions SET amount_decimals = 1');
             $connection->beginTransaction();
             try {
                 $this->assertSame(1, $precision->amountDecimals($tenant, 'IDR'));
-                $connection->table('currency_precisions')->update(['amount_decimals' => 2]);
+                $connection->getPdo()->exec('UPDATE currency_precisions SET amount_decimals = 2');
                 $connection->commit();
             } catch (\Throwable $exception) {
                 $connection->rollBack();
