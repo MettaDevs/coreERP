@@ -7,6 +7,8 @@ namespace App\Platform\Organization\ModuleServices;
 use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\OrganizationDirectory;
 use App\Platform\Organization\Support\BusinessUnitResolver;
+use Illuminate\Contracts\Database\Query\Expression;
+use Illuminate\Database\Grammar;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -52,8 +54,22 @@ final class OrganizationDirectoryCore implements OrganizationDirectory
         foreach ($members as $alias => $column) {
             $query->selectSub(DB::table('tenant_memberships as directory_member')->join('users as directory_user', 'directory_user.id', '=', 'directory_member.user_id')
                 ->where('directory_member.tenant_id', $tenantId)->where('directory_member.status', 'active')
-                ->whereColumn(DB::raw('CAST(directory_user.id AS TEXT)'), $column)->select('directory_user.name')->limit(1), $alias);
+                ->whereColumn(DB::raw('CAST(directory_user.id AS TEXT)'), self::textColumn($column))->select('directory_user.name')->limit(1), $alias);
         }
+    }
+
+    /** ID pengguna pada dokumen lama berupa teks, sedangkan dokumen lain memakai angka. */
+    private static function textColumn(string $column): Expression
+    {
+        return new class($column) implements Expression
+        {
+            public function __construct(private readonly string $column) {}
+
+            public function getValue(Grammar $grammar): string
+            {
+                return 'CAST('.$grammar->wrap($this->column).' AS TEXT)';
+            }
+        };
     }
 
     public function members(string $tenantId): array
