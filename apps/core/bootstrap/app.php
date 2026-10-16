@@ -5,6 +5,7 @@ use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\ThrottleRequestsPerRoute;
 use App\Platform\ControlPlane\Http\Middleware\ControlPlaneOnly;
 use App\Platform\Environment\Http\Middleware\ResolveEnvironment;
+use App\Platform\Identity\Http\Middleware\EndSessionAfterProviderLogout;
 use App\Platform\Identity\Http\Middleware\RequirePasswordChange;
 use App\Platform\Identity\Http\Middleware\ResolvePasskeyOrigin;
 use App\Platform\Integration\Http\Middleware\AuthenticateIntegrationClient;
@@ -88,6 +89,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->web(append: [
             HandleAppearance::class,
+            EndSessionAfterProviderLogout::class,
             // Sebelum Inertia: akun yang bukan anggota tenant pemilik alamat ditolak sebelum prop
             // workspace sempat disusun. Sesudah sesi, karena yang diperiksa akun yang sudah masuk.
             RequireTenantMembershipAtAddress::class,

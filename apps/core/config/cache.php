@@ -81,7 +81,15 @@ return [
         'redis' => [
             'driver' => 'redis',
             'connection' => env('REDIS_CACHE_CONNECTION', 'cache'),
-            'lock_connection' => env('REDIS_CACHE_LOCK_CONNECTION', 'default'),
+            'lock_connection' => env('REDIS_CACHE_LOCK_CONNECTION', 'cache'),
+        ],
+
+        // Penyimpanan sesi juga menahan penanda pencabutan login; bukan cache yang boleh dibersihkan.
+        'sessions' => [
+            'driver' => 'redis',
+            'connection' => 'sessions',
+            'lock_connection' => 'sessions',
+            'prefix' => env('SESSION_CACHE_PREFIX', 'sessions:'),
         ],
 
         'dynamodb' => [

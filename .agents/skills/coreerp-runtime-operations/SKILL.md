@@ -26,6 +26,11 @@ Jangan merestart database runtime lokal bersama demi memperbaiki lingkungan tes.
 
 ## Load test dan tuning
 
+Untuk Valkey/session/cache bersama, ikuti `docs/dev/36-cache-and-sessions.md`: bedakan data tenant dari identitas
+pusat, pertahankan cookie host-only dan logout SSO lintas host, audit namespace lingkungan, ACL database, serta
+eviction untuk lock/rate limit. Jangan mengganti driver tanpa cutover sesi, dan jangan memakai flush global atau
+fallback per-instance untuk menutupi kegagalan penyimpan bersama. Verifikasi koneksi web sesudah recreate.
+
 - Ikuti `docs/dev/20-load-and-concurrency-testing.md` dan gate proyek. Nyatakan gap topology, tenant, durasi, dan permukaan; satu instance tidak membuktikan multi-instance.
 - Uji business flow lewat sesi nyata. GET login hanya uji halaman login. Provision fixture lewat jalur tepercaya yang berlaku; setup dan smoke harus selesai sebelum pengukuran. Jangan mematikan limiter atau memalsukan konteks tenant agar setup lolos.
 - Pisahkan generator bila memungkinkan, tetapi periksa bebannya juga. Pakai fixture sama dan RUN_ID baru: idempotency key lama dapat mengembalikan dokumen selesai. Catat pertumbuhan data, warm-up, beban penuh, think time, dan drain terpisah.

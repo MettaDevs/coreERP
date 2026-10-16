@@ -61,6 +61,7 @@ Target yang dikunci:
 | [33-muatan-halaman-dan-paginasi.md](33-muatan-halaman-dan-paginasi.md) | Batas muatan satu halaman: paginasi sisi server, prop `Inertia::defer()`, bentuk yang dikirim bukan baris model, dan query yang tidak tumbuh mengikuti baris |
 | [34-feed-posting-finance.md](34-feed-posting-finance.md) | Feed posting finance: penerbit dan urutan pemeriksaannya, status, idempotensi, ack, mode pull dan push, klien integrasi, layar pantau, dan cara menambah jenis posting dari module lain |
 | [35-analitik.md](35-analitik.md) | Engine analitik: dataset yang dinyatakan module, query JSON yang dikompilasi ke SQL baca-saja, dasbor pribadi dan bersama, rantai permission dan data pribadi, cache dan batas beban, dan cara module menyatakan dataset |
+| [36-cache-and-sessions.md](36-cache-and-sessions.md) | Valkey untuk session/cache, batas tenant dan lingkungan, ACL, logout SSO, serta cutover dan rollback |
 
 ## Referensi utama
 

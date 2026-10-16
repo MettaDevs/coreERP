@@ -335,6 +335,7 @@ class EnvironmentAddressTest extends TestCase
      */
     public function test_choosing_a_database_pins_every_control_plane_store(): void
     {
+        config(['session.driver' => 'database']);
         $controlPlane = (string) config('database.default');
 
         $environment = $this->environment('demo', 'punyasendiri', 'active');
@@ -362,6 +363,21 @@ class EnvironmentAddressTest extends TestCase
         // Dipulihkan sendiri supaya test berikutnya tidak mewarisi koneksi yang digeser.
         // `useForRequest` sengaja tidak punya blok penutup — yang menutupnya berakhirnya permintaan.
         config(['database.default' => $controlPlane, 'coreerp.control_connection' => null]);
+    }
+
+    public function test_choosing_an_environment_does_not_redirect_valkey_sessions_to_postgresql(): void
+    {
+        $controlPlane = (string) config('database.default');
+        $environment = $this->environment('demo', 'separate-store', 'active');
+        $environment->forceFill(['database_name' => 'env_valkey_test'])->save();
+        config(['session.driver' => 'redis', 'session.connection' => 'sessions']);
+        try {
+            app(EnvironmentConnection::class)->useForRequest($environment);
+            $this->assertSame('sessions', config('session.connection'));
+            $this->assertSame($controlPlane, config('cache.stores.database.connection'));
+        } finally {
+            config(['database.default' => $controlPlane, 'coreerp.control_connection' => null]);
+        }
     }
 
     /**

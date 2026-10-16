@@ -12,6 +12,7 @@ use App\Platform\Geography\Models\CountryRegion;
 use DateTime;
 use DateTimeZone;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class TimezoneResolverService
 {
@@ -23,11 +24,21 @@ class TimezoneResolverService
      */
     public function resolve(string $divisionType, string $divisionId): ?array
     {
-        $cacheKey = "timezone:division:{$divisionType}:{$divisionId}";
+        $cacheKey = $this->cacheKey($divisionType, $divisionId);
 
         return Cache::remember($cacheKey, 3600, function () use ($divisionType, $divisionId) {
             return $this->resolveDirectOrParent($divisionType, $divisionId);
         });
+    }
+
+    public function cacheKey(string $divisionType, string $divisionId): string
+    {
+        $connection = DB::connection();
+        $database = hash('sha256', json_encode([
+            $connection->getConfig('host'), $connection->getConfig('port'), $connection->getDatabaseName(),
+        ], JSON_THROW_ON_ERROR));
+
+        return "timezone:database:{$database}:division:{$divisionType}:{$divisionId}";
     }
 
     /**

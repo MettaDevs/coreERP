@@ -251,7 +251,7 @@ final class AddressSetupController extends Controller
                 'updated_at' => now(),
             ]
         );
-        Cache::forget("timezone:division:province:{$savedId}");
+        Cache::forget(app(TimezoneResolverService::class)->cacheKey('province', (string) $savedId));
 
         return back()->with([
             'saved_id' => $savedId,

@@ -134,6 +134,7 @@ jobs:
         with:
           php-version: ${{ matrix.php-version }}
           tools: composer:v2
+          extensions: redis
           # `none`, bukan `xdebug`. Tidak ada satu pun yang memakai hasil coverage di sini:
           # tidak ada flag --coverage, tidak ada unggahan laporan, dan phpunit.xml tidak punya
           # elemen <coverage>. Sementara `coverage: xdebug` menyetel xdebug.mode=coverage, yang
@@ -170,6 +171,28 @@ jobs:
 
       - name: Copy Environment File
         run: cp .env.example .env
+
+      - name: Start isolated Valkey for cache and session integration
+        working-directory: .
+        run: |
+          umask 077
+          cache_password=$(openssl rand -hex 32)
+          session_password=$(openssl rand -hex 32)
+          printf '::add-mask::%s\n' "$cache_password"
+          printf '::add-mask::%s\n' "$session_password"
+          printf 'VALKEY_CACHE_PASSWORD=%s\nVALKEY_SESSION_PASSWORD=%s\n' "$cache_password" "$session_password" > "$RUNNER_TEMP/valkey.env"
+          cat "$RUNNER_TEMP/valkey.env" >> "$GITHUB_ENV"
+          printf 'VALKEY_TEST_PORT=16389\n' >> "$GITHUB_ENV"
+          docker run -d --name coreerp-valkey-ci --env-file "$RUNNER_TEMP/valkey.env" \
+            -p 127.0.0.1:16389:6379 -v "$GITHUB_WORKSPACE/deploy/saas/valkey:/etc/valkey:ro" \
+            --entrypoint sh valkey/valkey:9.1.2-alpine /etc/valkey/start.sh
+          for attempt in $(seq 1 30); do
+            if docker exec coreerp-valkey-ci sh -c 'VALKEYCLI_AUTH="$VALKEY_CACHE_PASSWORD" valkey-cli --user cache ping' | grep -q PONG; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
 
       - name: Generate Application Key
         run: php artisan key:generate

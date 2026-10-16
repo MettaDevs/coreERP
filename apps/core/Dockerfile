@@ -177,7 +177,7 @@ ARG VERSI_KLIEN_PG=17
 #
 # `pcntl` dipakai `octane:frankenphp` untuk meneruskan SIGTERM ke server saat container dihentikan.
 RUN apt-get update && apt-get install -y --no-install-recommends libcap2-bin "postgresql-client-${VERSI_KLIEN_PG}" \
-    && install-php-extensions bcmath gd intl pdo_pgsql pgsql zip pcntl opcache \
+    && install-php-extensions bcmath gd intl pdo_pgsql pgsql redis zip pcntl opcache \
     && if [ "$PASANG_OTEL" = "1" ]; then install-php-extensions opentelemetry-1.2.1; fi \
     && setcap CAP_NET_BIND_SERVICE=+eip /usr/local/bin/frankenphp \
     && chown -R www-data:www-data /config /data \
