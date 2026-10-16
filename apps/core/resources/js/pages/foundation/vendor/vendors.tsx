@@ -252,7 +252,18 @@ function VendorCard({
     );
     const [partyError, setPartyError] = useState('');
     const [creatingParty, setCreatingParty] = useState(false);
-    const [resolvingExisting, setResolvingExisting] = useState(false);
+    const existingLookupKey =
+        vendor ||
+        form.party_source !== 'existing' ||
+        !form.party_id ||
+        !form.legal_entity_id
+            ? null
+            : JSON.stringify([form.legal_entity_id, form.party_id]);
+    const [resolvedLookupKey, setResolvedLookupKey] = useState<string | null>(
+        null,
+    );
+    const resolvingExisting =
+        existingLookupKey !== null && resolvedLookupKey !== existingLookupKey;
     const loadCompanies = useCallback<LookupLoader<LegalEntity>>(
         (request) =>
             loadLookupItems('/api/v1/vendors/company-options', request),
@@ -266,7 +277,7 @@ function VendorCard({
             );
 
             if (!request.signal.aborted) {
-setParties((current) => {
+                setParties((current) => {
                     const unique = new Map(
                         current.map((party) => [party.id, party]),
                     );
@@ -276,7 +287,7 @@ setParties((current) => {
 
                     return [...unique.values()];
                 });
-}
+            }
 
             return result;
         },
@@ -334,43 +345,37 @@ setParties((current) => {
     }, [vendor, form.party_source, form.party_name, initialParty]);
 
     useEffect(() => {
-        if (
-            vendor ||
-            form.party_source !== 'existing' ||
-            !form.party_id ||
-            !form.legal_entity_id
-        ) {
-            setResolvingExisting(false);
-
+        if (!existingLookupKey || existingLookupKey === resolvedLookupKey) {
             return;
         }
 
         const controller = new AbortController();
-        setResolvingExisting(true);
         apiJson<{ data: Vendor[] }>(
             `/api/v1/vendors/lookup?legal_entity_id=${form.legal_entity_id}&party_id=${form.party_id}`,
             { signal: controller.signal },
         )
             .then((result) => {
                 if (!controller.signal.aborted && result.data[0]) {
-onOpenExisting(result.data[0]);
-}
+                    onOpenExisting(result.data[0]);
+                }
             })
             .catch((caught) => {
                 if (!controller.signal.aborted) {
-setSaveError(
+                    setSaveError(
                         errorText(caught, 'Akun vendor belum dapat diperiksa.'),
                     );
-}
+                }
             })
             .finally(() => {
                 if (!controller.signal.aborted) {
-setResolvingExisting(false);
-}
+                    setResolvedLookupKey(existingLookupKey);
+                }
             });
 
         return () => controller.abort();
     }, [
+        existingLookupKey,
+        resolvedLookupKey,
         vendor,
         form.party_source,
         form.party_id,
@@ -1079,10 +1084,13 @@ export default function Vendors({
     const selectedVendor =
         vendors.data.find((vendor) => vendor.id === selectedVendorId) ?? null;
     const [viewing, setViewing] = useState<Vendor | null>(null);
-    const openExisting = useCallback((account: Vendor) => {
-        setEditing(undefined);
-        setViewing(account);
-    }, []);
+    const openExisting = useCallback(
+        (account: Vendor) => {
+            setEditing(undefined);
+            setViewing(account);
+        },
+        [setEditing, setViewing],
+    );
     const [importing, setImporting] = useState(false);
     const legalEntityName = (id: string) =>
         legalEntities.find((entity) => entity.id === id)?.name ?? id;
