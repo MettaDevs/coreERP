@@ -597,7 +597,8 @@ function LineDetails({
     const variables = variableSource.options,
         templates = templateSource.options.filter(
             (item) => item.id !== templateId,
-        );
+        ),
+        units = unitSource.options;
     const pick = (items: Option[], id: string | null) =>
         items.find((item) => item.id === id);
     const picker = (

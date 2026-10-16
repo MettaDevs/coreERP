@@ -2,11 +2,12 @@
 
 namespace App\Platform\Modules\Contracts;
 
+use Illuminate\Contracts\Database\Query\Expression;
+use Illuminate\Database\Grammar;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\Cursor;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -44,16 +45,17 @@ final class IncrementalList
             $pattern = '%'.addcslashes(mb_strtolower($keyword), '\\%_').'%';
             $list->where(function (Builder $match) use ($searchColumns, $pattern): void {
                 foreach ($searchColumns as $column) {
-                    $match->orWhere(DB::raw('LOWER(CAST('.$match->getGrammar()->wrap($column).' AS TEXT))'), 'like', $pattern);
+                    $match->orWhere(self::columnExpression($column, 'LOWER(CAST(%s AS TEXT))'), 'like', $pattern);
                 }
             });
         }
         $sort = $columns[$input['sort'] ?? $defaultSort];
         $direction = $input['direction'] ?? (isset($input['sort']) ? 'asc' : $defaultDirection);
         // NULL juga harus memiliki posisi supaya cursor tidak melewatkan record.
-        $wrapped = $list->getGrammar()->wrap($sort);
-        $value = in_array($sort, $numericColumns, true) ? "COALESCE($wrapped, 0)" : "COALESCE(CAST($wrapped AS TEXT), '')";
-        $list->select('list_records.*')->addSelect(DB::raw('CASE WHEN '.$wrapped.' IS NULL THEN 1 ELSE 0 END AS list_sort_null'), DB::raw($value.' AS list_sort_value'));
+        $list->select('list_records.*')->addSelect(
+            self::columnExpression($sort, 'CASE WHEN %s IS NULL THEN 1 ELSE 0 END AS list_sort_null'),
+            self::columnExpression($sort, in_array($sort, $numericColumns, true) ? 'COALESCE(%s, 0) AS list_sort_value' : "COALESCE(CAST(%s AS TEXT), '') AS list_sort_value"),
+        );
         $list = $list->newQuery()->fromSub($list, 'sorted_records');
         $list->orderBy('list_sort_null')->orderBy('list_sort_value', $direction);
         if ($sort !== $identity) {
@@ -82,5 +84,19 @@ final class IncrementalList
         });
 
         return ['data' => $rows, 'next_cursor' => $nextCursor];
+    }
+
+    /** @param literal-string $template SQL tetap; hanya nama kolom dari allowlist yang dibungkus grammar. */
+    private static function columnExpression(string $column, string $template): Expression
+    {
+        return new class($column, $template) implements Expression
+        {
+            public function __construct(private readonly string $column, private readonly string $template) {}
+
+            public function getValue(Grammar $grammar): string
+            {
+                return sprintf($this->template, $grammar->wrap($this->column));
+            }
+        };
     }
 }

@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Exists;
 use Illuminate\Validation\ValidationException;
+use LogicException;
 use Modules\Apperp\ManagementAset\Models\master\BukuPenyusutan;
 use Modules\Apperp\ManagementAset\Models\master\GroupAset;
 use Modules\Apperp\ManagementAset\Models\master\GroupBukuPenyusutan;
@@ -149,9 +150,16 @@ abstract class MasterDataController extends Controller
             'id' => 'id', 'kode' => 'kode', 'nama' => 'nama',
         ], [], 'kode');
         // Pertahankan cast, eager-load, dan presenter tiap master hanya untuk batch ini.
-        $records = $query->hydrate($batch['data']->map(fn ($row) => (array) $row)->all());
+        $model = $this->model();
+        $records = $model::hydrate($batch['data']->map(fn ($row) => (array) $row)->all());
         $records->load($query->getEagerLoads());
-        $batch['data'] = $records->map($this->present(...));
+        $batch['data'] = $records->map(function (MasterData $record) use ($model): array {
+            if (! $record instanceof $model) {
+                throw new LogicException('Model master tidak sesuai dengan resource yang diminta.');
+            }
+
+            return $this->present($record);
+        });
 
         return response()->json($batch);
     }

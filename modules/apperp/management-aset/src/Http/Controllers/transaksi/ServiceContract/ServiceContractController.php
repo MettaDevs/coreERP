@@ -289,8 +289,10 @@ class ServiceContractController extends Controller
         return response()->json(['data' => $data], $status, [...$headers, 'ETag' => RowVersion::etag($contract->version)]);
     }
 
-    /** @return array<string, mixed> */
-    /** @param array<string, array{id: string, number: string, name: string, tax_number: ?string, status: string, legal_entity_id: string}>|null $vendors */
+    /**
+     * @param  array<string, array{id: string, number: string, name: string, tax_number: ?string, status: string, legal_entity_id: string}>|null  $vendors
+     * @return array<string, mixed>
+     */
     private function present(string $tenant, ServiceContract $contract, string $today, ?array $vendors = null): array
     {
         $vendor = $vendors !== null ? ($vendors[$contract->vendor_id] ?? null) : app(VendorDirectory::class)->find($tenant, $contract->vendor_id);
