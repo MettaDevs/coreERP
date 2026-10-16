@@ -24,9 +24,8 @@ return new class extends Migration
         $tenantIds = DB::table('tenant_memberships')->select('tenant_id')
             ->union(DB::table('vendors')->select('tenant_id'))
             ->union(DB::table('tenant_number_sequences')->select('tenant_id'))->pluck('tenant_id');
-        $issuer = app(NumberSequenceService::class);
-
         foreach ($tenantIds as $tenantId) {
+            $issuer = app(NumberSequenceService::class);
             app(CoreNumberSequences::class)->ensure($tenantId, Vendor::NUMBER_SEQUENCE);
             $sequence = TenantNumberSequence::query()->where('tenant_id', $tenantId)
                 ->whereHas('reference', fn ($query) => $query->where('code', Vendor::NUMBER_SEQUENCE))->firstOrFail();
