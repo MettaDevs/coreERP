@@ -207,7 +207,11 @@ export function useIncrementalList<T>({
             state.nextCursor
         ) {
             void fetchBatch(state.nextCursor);
+
+            return true;
         }
+
+        return false;
     }, [active, current, state, fetchBatch]);
 
     return {

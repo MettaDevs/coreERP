@@ -56,6 +56,27 @@ class AssetDowntimeTest extends TestCase
         $this->jenisAset = $this->seedMaster('aset_m_jenis_aset', 'Mesin produksi');
     }
 
+    public function test_exact_record_read_requires_only_read_and_hides_inaccessible_records(): void
+    {
+        $asset = $this->seedAsset($this->jenisAset, 'EXACT-DOWNTIME');
+        $created = $this->record(['aset_id' => $asset, 'mulai' => '2026-09-01 08:00', 'selesai' => '2026-09-01 09:00'])->assertCreated();
+        $id = (string) $created->json('data.id');
+        $this->record(['aset_id' => $asset, 'mulai' => '2026-09-02 08:00', 'selesai' => '2026-09-02 10:00'])->assertCreated();
+        $reader = ['management-aset.downtime-aset.read'];
+        $this->as($reader)->getJson(self::URL.'?per_page=1')->assertOk()->assertJsonCount(1, 'data');
+        $this->as($reader)->getJson(self::URL.'/'.$id.'?q=not-a-match')->assertOk()
+            ->assertJsonPath('data.id', $id)->assertJsonPath('data.aset_kode', 'EXACT-DOWNTIME')
+            ->assertJsonPath('data.durasi_jam', 1)->assertJsonPath('data.version', $created->json('data.version'));
+        $this->as([])->getJson(self::URL.'/'.$id)->assertForbidden();
+        $this->as($reader)->getJson(self::URL.'/'.Str::ulid())->assertNotFound();
+        $this->sebagaiPenggunaBernama('Outside unit', $this->tenantId, $reader, [[
+            'policy_code' => self::KEBIJAKAN_TANGGUNG_JAWAB, 'legal_entity_id' => $this->legalEntityId, 'organization_id' => (string) Str::ulid(),
+        ]])->getJson(self::URL.'/'.$id)->assertNotFound();
+        $this->sebagaiPenggunaBernama('Other tenant', $this->buatTenantUji(), $reader)->getJson(self::URL.'/'.$id)->assertNotFound();
+        $this->as(self::RECORDER)->deleteJson(self::URL.'/'.$id, ['version' => $this->version($id)])->assertNoContent();
+        $this->as($reader)->getJson(self::URL.'/'.$id)->assertNotFound();
+    }
+
     public function test_manual_downtime_cannot_overlap_or_lie_in_the_future(): void
     {
         $aset = $this->seedAsset($this->jenisAset, 'MSN-01');

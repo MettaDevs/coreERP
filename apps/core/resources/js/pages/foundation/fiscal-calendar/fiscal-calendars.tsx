@@ -1,3 +1,4 @@
+import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
 import { Input } from '@apperp/ui/input';
 import { NativeSelect } from '@apperp/ui/native-select';
@@ -72,9 +73,11 @@ function CreateCalendar({ canManage }: { canManage: boolean }) {
                 disabled={!canManage}
                 onChange={(event) => form.setData('name', event.target.value)}
             />
-            <Button type="submit" disabled={!canManage || form.processing}>
-                Tambah kalender
-            </Button>
+            <ActionButton
+                action="save"
+                type="submit"
+                disabled={!canManage || form.processing}
+            />
         </form>
     );
 }
@@ -131,13 +134,11 @@ function AddYear({
                     form.setData('months', Number(event.target.value))
                 }
             />
-            <Button
+            <ActionButton
+                action="save"
                 type="submit"
-                variant="secondary"
                 disabled={!canManage || form.processing}
-            >
-                Tambah tahun
-            </Button>
+            />
             {/* The service rejects overlapping years and periods that leave gaps, and reports them against
                 starts_on or name, so both are surfaced here rather than swallowed. */}
             {form.errors.starts_on && (

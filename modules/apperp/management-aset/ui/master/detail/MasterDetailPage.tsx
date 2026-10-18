@@ -13,6 +13,7 @@ import {
 import { Button } from '@apperp/ui/button';
 import { MasterDetailLayout } from '@apperp/ui/master-detail-layout';
 import { api, errorMessage } from '../../api';
+import { useRecordQueryTarget } from '../../transactions/_shared/use-record-query-target';
 import { useRecordList } from '../../use-record-list';
 import type {
     MasterAction,
@@ -70,6 +71,27 @@ export default function MasterDetailPage({
         items.find((item) => item.id === selectedId) ??
         (snapshot?.id === selectedId ? snapshot : null);
 
+    const clearRecordTarget = useRecordQueryTarget({
+        scopeKey: config.resource,
+        enabled: can('read'),
+        onOpen: async (id, signal) => {
+            const result = await api<{ data: MasterRecord }>(
+                `/${config.resource}/${encodeURIComponent(id)}`,
+                { signal },
+            );
+
+            if (signal.aborted) {
+                return;
+            }
+
+            setSnapshot(result.data);
+            setSelectedId(result.data.id);
+            setMode('view');
+            setShowDetail(true);
+        },
+        onError: (caught) =>
+            setError(errorMessage(caught, 'Record belum dapat dibuka.')),
+    });
     function commitSelect(id: string | null) {
         setShowDetail(id !== null);
         setSnapshot(items.find((item) => item.id === id) ?? null);
@@ -202,16 +224,18 @@ export default function MasterDetailPage({
                 <span className="mr-2 font-semibold">{config.title}</span>
                 {editing ? (
                     <>
-                        <Button type="submit" form={FORM_ID} disabled={saving}>
-                            {saving ? 'Menyimpan…' : 'Simpan'}
-                        </Button>
-                        <Button
-                            variant="outline"
+                        <ActionButton
+                            action="save"
+                            type="submit"
+                            form={FORM_ID}
+                            disabled={saving}
+                            pending={saving}
+                        />
+                        <ActionButton
+                            action="cancel"
                             type="button"
                             onClick={cancelEditing}
-                        >
-                            Batal
-                        </Button>
+                        />
                     </>
                 ) : (
                     <>
@@ -221,9 +245,7 @@ export default function MasterDetailPage({
                                 type="button"
                                 disabled={!selected}
                                 onClick={() => setMode('edit')}
-                            >
-                                Ubah
-                            </ActionButton>
+                            />
                         )}
                         {can('create') && (
                             <ActionButton
@@ -232,12 +254,11 @@ export default function MasterDetailPage({
                                 onClick={() => {
                                     setSnapshot(null);
                                     setSelectedId(null);
+                                    clearRecordTarget();
                                     setMode('create');
                                     setShowDetail(true);
                                 }}
-                            >
-                                Tambah {config.singular}
-                            </ActionButton>
+                            />
                         )}
                         {/* Ubah status sengaja netral: ia bolak-balik dan tidak merusak apa pun,
                             jadi tidak pantas bersaing perhatian dengan aksi yang berkonsekuensi. */}
@@ -257,9 +278,7 @@ export default function MasterDetailPage({
                                 type="button"
                                 disabled={!selected}
                                 onClick={() => setArchiving(true)}
-                            >
-                                Arsipkan
-                            </ActionButton>
+                            />
                         )}
                     </>
                 )}
@@ -267,7 +286,13 @@ export default function MasterDetailPage({
 
             <MasterDetailLayout
                 detailOpen={showDetail}
-                onDetailOpenChange={setShowDetail}
+                onDetailOpenChange={(open) => {
+                    if (!open) {
+                        clearRecordTarget();
+                    }
+
+                    setShowDetail(open);
+                }}
                 list={
                     <RecordListPane
                         config={config}
@@ -359,7 +384,7 @@ export default function MasterDetailPage({
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>
-                            Arsipkan {selected?.nama}?
+                            Delete {selected?.nama}?
                         </AlertDialogTitle>
                         <AlertDialogDescription>
                             Data ini tidak lagi tampil pada daftar pilihan.
@@ -368,8 +393,11 @@ export default function MasterDetailPage({
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Batal</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => void archive()}>
-                            Arsipkan
+                        <AlertDialogAction
+                            onClick={() => void archive()}
+                            asChild
+                        >
+                            <ActionButton action="archive" />
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

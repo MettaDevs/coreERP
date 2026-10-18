@@ -7,6 +7,7 @@ use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\Downtime\Maintenanc
 // Downtime aset dan KPI pemeliharaan. Master alasan downtime terdaftar di `master-data.php`.
 Route::get('downtime-aset', [AssetDowntimeController::class, 'index']);
 Route::post('downtime-aset', [AssetDowntimeController::class, 'store']);
+Route::get('downtime-aset/{id}', [AssetDowntimeController::class, 'show'])->whereUlid('id');
 Route::patch('downtime-aset/{id}', [AssetDowntimeController::class, 'update']);
 Route::delete('downtime-aset/{id}', [AssetDowntimeController::class, 'destroy']);
 Route::get('kpi-pemeliharaan', MaintenanceKpiController::class);

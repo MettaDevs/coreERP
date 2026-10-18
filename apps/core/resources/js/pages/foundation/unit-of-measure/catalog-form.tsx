@@ -1,20 +1,18 @@
-import { Button } from '@apperp/ui/button';
+import { ActionButton } from '@apperp/ui/action-button';
+
 import { DataTableText } from '@apperp/ui/data-table';
 import { Field, FieldError, FieldHint, FieldLabel } from '@apperp/ui/field';
 import { InlineLookup } from '@apperp/ui/inline-lookup';
 import type { LookupLoader } from '@apperp/ui/inline-lookup';
 import { Input } from '@apperp/ui/input';
 import {
+    PageDialogToolbar,
     PageDialog,
     PageDialogContent,
     PageDialogBody,
-    PageDialogDescription,
-    PageDialogFooter,
-    PageDialogHeader,
-    PageDialogTitle,
 } from '@apperp/ui/page-dialog';
 import { Switch } from '@apperp/ui/switch';
-import { Info, Save, X } from 'lucide-react';
+import { Info } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import type { FormEvent, RefObject } from 'react';
 import { apiJson, CoreApiError, errorText } from '@/lib/core-api';
@@ -64,10 +62,10 @@ export function CatalogForm({
             : record
               ? 'Ubah satuan'
               : draft.kind === 'units'
-                ? 'Tambah satuan'
+                ? 'Satuan baru'
                 : draft.kind === 'classes'
-                  ? 'Tambah kelas'
-                  : 'Tambah sistem';
+                  ? 'Kelas baru'
+                  : 'Sistem baru';
     const fieldError = (field: string) =>
         errors[field]?.length ? (
             <FieldError>{errors[field].join(' ')}</FieldError>
@@ -170,21 +168,50 @@ export function CatalogForm({
                     }
                 }}
                 onInteractOutside={(event) => event.preventDefault()}
+                title={
+                    draft.kind === 'conversions'
+                        ? 'Konversi satuan'
+                        : draft.kind === 'classes'
+                          ? 'Kelas satuan'
+                          : draft.kind === 'systems'
+                            ? 'Sistem satuan'
+                            : 'Satuan'
+                }
+                recordTitle={
+                    draft.kind === 'conversions'
+                        ? source && target
+                            ? `${source.code} → ${target.code}`
+                            : title
+                        : [code, name].filter(Boolean).join(' · ') || title
+                }
+                editing
+                description={
+                    draft.kind === 'conversions'
+                        ? 'Atur perbandingan dua satuan aktif dalam kelas yang sama. Menyimpan pasangan yang sudah ada memperbarui aturannya.'
+                        : record
+                          ? 'Kode, kelas, dan sistem satuan tetap mengikuti saat dibuat.'
+                          : `${draft.kind === 'units' ? 'Satuan' : draft.kind === 'classes' ? 'Kelas' : 'Sistem'} baru langsung aktif dan dapat dipilih.`
+                }
+                busy={saving}
             >
-                <PageDialogHeader>
-                    <PageDialogTitle>{title}</PageDialogTitle>
-                    <PageDialogDescription>
-                        {draft.kind === 'conversions'
-                            ? 'Atur perbandingan dua satuan aktif dalam kelas yang sama. Menyimpan pasangan yang sudah ada memperbarui aturannya.'
-                            : record
-                              ? 'Kode, kelas, dan sistem satuan tetap mengikuti saat dibuat.'
-                              : `${draft.kind === 'units' ? 'Satuan' : draft.kind === 'classes' ? 'Kelas' : 'Sistem'} baru langsung aktif dan dapat dipilih.`}
-                    </PageDialogDescription>
-                </PageDialogHeader>
                 <form
                     onSubmit={submit}
                     className="flex min-h-0 flex-1 flex-col overflow-hidden"
                 >
+                    <PageDialogToolbar>
+                        <ActionButton
+                            action="save"
+                            type="submit"
+                            disabled={saving}
+                            pending={saving}
+                        />
+                        <ActionButton
+                            action="cancel"
+                            type="button"
+                            disabled={saving}
+                            onClick={onClose}
+                        />
+                    </PageDialogToolbar>
                     <PageDialogBody className="space-y-4" scroll-region="true">
                         {error && (
                             <div
@@ -425,21 +452,6 @@ export function CatalogForm({
                             </>
                         )}
                     </PageDialogBody>
-                    <PageDialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            disabled={saving}
-                            onClick={onClose}
-                        >
-                            <X />
-                            Batal
-                        </Button>
-                        <Button type="submit" disabled={saving}>
-                            <Save />
-                            {saving ? 'Menyimpan...' : 'Simpan'}
-                        </Button>
-                    </PageDialogFooter>
                 </form>
             </PageDialogContent>
         </PageDialog>

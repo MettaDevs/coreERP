@@ -1,5 +1,5 @@
 import { usePage } from '@inertiajs/react';
-import { Plus, Trash2, TriangleAlert } from 'lucide-react';
+import { Info, Trash2, TriangleAlert } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { RecordAttachments } from '@/components/record-attachments';
@@ -22,18 +22,19 @@ import {
     CollapsibleSection,
     CollapsibleSectionGroup,
 } from '@apperp/ui/collapsible-section';
-import { Field, FieldDescription } from '@apperp/ui/field';
+import { DataTable } from '@apperp/ui/data-table';
+import type { DataTableColumn } from '@apperp/ui/data-table';
+import {
+    FieldHint,
+    FieldError,
+    Field,
+    FieldDescription,
+} from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
+import { usePageDialogRecord } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
+
 import { Textarea } from '@apperp/ui/textarea';
 import EditShield from '../../_shared/EditShield';
 import {
@@ -49,6 +50,9 @@ import type { MasterOption } from '../../master/useMasterOptions';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import { CancellationAction } from '../_shared/CancellationAction';
 import { CancellationStatus } from '../_shared/CancellationStatus';
+import { RecordCardHeader } from '../_shared/record-card';
+import type { RecordCardControls } from '../_shared/record-card';
+import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
 import {
     AcquisitionJournal,
     VendorPicker,
@@ -71,9 +75,9 @@ import {
     barisKosong,
     bolehMendaftarkan,
     bolehMengoreksiAset,
-    bukaPenerimaan,
-    bukaPenerimaanDaftar,
-    bukaPenerimaanUbah,
+    bukaPenerimaan as navigateView,
+    bukaPenerimaanDaftar as navigateClose,
+    bukaPenerimaanUbah as navigateEdit,
     izin,
     penerimaanKosong,
     tanggalTampil,
@@ -104,12 +108,26 @@ export default function PenerimaanDetailPage({
     permissions,
     penerimaanId,
     mode,
+    onClose,
+    onSaved,
+    onRequestView,
+    onRequestEdit,
+    onBusyChange,
+    onDirtyChange,
+    portalContainer,
 }: {
     context: Context;
     permissions: string[];
     penerimaanId?: string;
     mode: Mode;
-}) {
+} & RecordCardControls) {
+    const embedded = usePageDialogRecord(undefined);
+
+    const bukaPenerimaan = (id: string) => (onRequestView ?? navigateView)(id);
+    const bukaPenerimaanUbah = (id: string) =>
+        (onRequestEdit ?? navigateEdit)(id);
+    const bukaPenerimaanDaftar = () => (onClose ?? navigateClose)();
+
     const can = izin(permissions);
     const { workspace } = usePage<{ workspace: Workspace }>().props;
     const canRegister = bolehMendaftarkan(permissions);
@@ -125,8 +143,14 @@ export default function PenerimaanDetailPage({
     const [tersimpan, setTersimpan] = useState<Penerimaan | null>(null);
     const [ringkasan, setRingkasan] = useState<Ringkasan | null>(null);
     const [terbit, setTerbit] = useState<AsetTerbit[]>([]);
+    const [issuedLoaded, setIssuedLoaded] = useState(false);
     const [memuat, setMemuat] = useState(mode !== 'create');
     const [menyimpan, setMenyimpan] = useState(false);
+    useEffect(() => {
+        onBusyChange?.(menyimpan);
+
+        return () => onBusyChange?.(false);
+    }, [menyimpan, onBusyChange]);
     const [galat, setGalat] = useState<Record<string, string[]>>({});
     const [saveError, setSaveError] = useState<string | null>(null);
     const [konfirmasiSelesai, setKonfirmasiSelesai] = useState(false);
@@ -326,7 +350,12 @@ export default function PenerimaanDetailPage({
         let dibatalkan = false;
         api<{ data: AsetTerbit[] }>(`/penerimaan-aset/${penerimaanId}/aset`)
             .then((result) => !dibatalkan && setTerbit(result.data))
-            .catch(() => undefined);
+            .catch(() => undefined)
+            .finally(() => {
+                if (!dibatalkan) {
+                    setIssuedLoaded(true);
+                }
+            });
 
         return () => {
             dibatalkan = true;
@@ -456,7 +485,7 @@ export default function PenerimaanDetailPage({
                 toast.success(
                     `Penerimaan ${hasil.data.kode} disimpan sebagai draf.`,
                 );
-                bukaPenerimaan(hasil.data.id);
+                (onSaved ?? bukaPenerimaan)(hasil.data.id);
 
                 return;
             }
@@ -473,7 +502,7 @@ export default function PenerimaanDetailPage({
             );
             setTersimpan(hasil.data);
             toast.success('Perubahan penerimaan disimpan.');
-            bukaPenerimaan(String(penerimaanId));
+            (onSaved ?? bukaPenerimaan)(String(penerimaanId));
         } catch (caught) {
             if (caught instanceof ApiError) {
                 setGalat(caught.validationErrors);
@@ -508,7 +537,7 @@ export default function PenerimaanDetailPage({
             toast.success(
                 `Penerimaan diselesaikan. ${totalAset} aset terdaftar dengan kodenya masing-masing.`,
             );
-            bukaPenerimaan(String(penerimaanId));
+            (onSaved ?? bukaPenerimaan)(String(penerimaanId));
         } catch (caught) {
             if (caught instanceof ApiError) {
                 setGalat(caught.validationErrors);
@@ -570,6 +599,7 @@ export default function PenerimaanDetailPage({
 
     async function arsipkan() {
         setKonfirmasiArsip(false);
+        setMenyimpan(true);
 
         try {
             await api(`/penerimaan-aset/${penerimaanId}`, {
@@ -580,8 +610,17 @@ export default function PenerimaanDetailPage({
             bukaPenerimaanDaftar();
         } catch (caught) {
             toastSaveError(caught, 'Penerimaan belum dapat diarsipkan.');
+        } finally {
+            setMenyimpan(false);
         }
     }
+
+    useRecordCardDirty({
+        value: { record, terbit },
+        ready: !memuat && (!selesai || issuedLoaded),
+        scopeKey: JSON.stringify([penerimaanId, mode, tersimpan?.version]),
+        onDirtyChange: onDirtyChange,
+    });
 
     if (memuat) {
         return (
@@ -641,7 +680,7 @@ export default function PenerimaanDetailPage({
                             : sumber.error || `${label} tidak ditemukan.`
                     }
                     ariaLabel={label}
-                    portalContainer={panelRef}
+                    portalContainer={portalContainer ?? panelRef}
                     onValueChange={(item) =>
                         onPilih(idDari(sumber.options, item))
                     }
@@ -666,22 +705,39 @@ export default function PenerimaanDetailPage({
 
     return (
         <div className="flex h-full min-h-0 flex-col overflow-hidden">
+            <RecordCardHeader
+                recordTitle={tersimpan?.kode ?? 'Baru'}
+                editing={!readOnly}
+                recordUrl={
+                    penerimaanId
+                        ? `/management-aset/inventarisasi-aset/penerimaan/${penerimaanId}`
+                        : undefined
+                }
+                onEdit={
+                    mode === 'view' && !selesai && can('update')
+                        ? () => bukaPenerimaanUbah(String(penerimaanId))
+                        : undefined
+                }
+                onDelete={
+                    mode === 'view' && !selesai && can('archive')
+                        ? () => setKonfirmasiArsip(true)
+                        : undefined
+                }
+            />
             <RecordActionBar
-                title={judul}
+                title={embedded ? undefined : judul}
                 trailing={
                     tersimpan ? (
                         <StatusBadge status={tersimpan.status} />
                     ) : undefined
                 }
             >
-                {mode === 'view' && !selesai && can('update') && (
+                {mode === 'view' && !selesai && can('update') && !embedded && (
                     <ActionButton
                         action="edit"
                         type="button"
                         onClick={() => bukaPenerimaanUbah(String(penerimaanId))}
-                    >
-                        Ubah
-                    </ActionButton>
+                    />
                 )}
                 {mode === 'view' && !selesai && canRegister && (
                     <Button
@@ -692,35 +748,32 @@ export default function PenerimaanDetailPage({
                         Selesaikan penerimaan
                     </Button>
                 )}
-                {mode === 'view' && !selesai && can('archive') && (
+                {mode === 'view' && !selesai && can('archive') && !embedded && (
                     <ActionButton
                         action="archive"
                         type="button"
                         onClick={() => setKonfirmasiArsip(true)}
-                    >
-                        Arsipkan
-                    </ActionButton>
+                    />
                 )}
                 {mode !== 'view' && (
                     <>
-                        <Button
+                        <ActionButton
+                            action="save"
                             type="button"
-                            variant="outline"
+                            onClick={() => void simpan()}
+                            disabled={menyimpan}
+                            pending={menyimpan}
+                        />
+                        <ActionButton
+                            action="cancel"
+                            disabled={menyimpan}
+                            type="button"
                             onClick={() =>
                                 penerimaanId
                                     ? bukaPenerimaan(penerimaanId)
                                     : bukaPenerimaanDaftar()
                             }
-                        >
-                            Batal
-                        </Button>
-                        <Button
-                            type="button"
-                            onClick={() => void simpan()}
-                            disabled={menyimpan}
-                        >
-                            {menyimpan ? 'Menyimpan…' : 'Simpan draf'}
-                        </Button>
+                        />
                     </>
                 )}
                 {mode === 'view' &&
@@ -733,13 +786,39 @@ export default function PenerimaanDetailPage({
                             awaitingApproval={
                                 tersimpan.cancellation?.status === 'pending'
                             }
-                            onComplete={() => setReload((value) => value + 1)}
+                            onComplete={() => {
+                                setReload((value) => value + 1);
+                                onSaved?.(penerimaanId);
+                            }}
                         />
                     )}
+                <FieldHint
+                    hint={
+                        <>
+                            Perusahaan mengikuti konteks aktif Anda. Satu
+                            dokumen adalah satu kedatangan: tiap unit yang
+                            datang menjadi satu aset dengan kodenya sendiri saat
+                            dokumen diselesaikan.
+                        </>
+                    }
+                >
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="Tentang penerimaan aset"
+                    >
+                        <Info aria-hidden="true" />
+                    </Button>
+                </FieldHint>
             </RecordActionBar>
             <CancellationStatus summary={tersimpan?.cancellation} />
 
-            <div ref={panelRef} className="min-h-0 flex-1 overflow-y-auto">
+            <div
+                data-page-dialog-body
+                ref={panelRef}
+                className="min-h-0 flex-1 overflow-y-auto"
+            >
                 <div className="space-y-5 p-5">
                     {saveError && (
                         <Alert variant="destructive" role="alert">
@@ -748,12 +827,6 @@ export default function PenerimaanDetailPage({
                             <AlertDescription>{saveError}</AlertDescription>
                         </Alert>
                     )}
-                    <p className="text-muted-foreground text-sm">
-                        Perusahaan mengikuti konteks aktif Anda. Satu dokumen
-                        adalah satu kedatangan: tiap unit yang datang menjadi
-                        satu aset dengan kodenya sendiri saat dokumen
-                        diselesaikan.
-                    </p>
 
                     {ringkasan && ringkasan.peringatan.length > 0 && (
                         <div className="border-destructive/40 bg-destructive/5 space-y-2 rounded-md border px-4 py-3">
@@ -806,12 +879,31 @@ export default function PenerimaanDetailPage({
                                             })
                                         }
                                     />
-                                    {(pesan('tanggal') || saldoAwal) && (
-                                        <FieldDescription>
-                                            {pesan('tanggal') ??
-                                                'Tanggal aset diperoleh di sistem lama, paling lambat tanggal cutover. Jurnal saldo awalnya bertanggal cutover.'}
-                                        </FieldDescription>
-                                    )}
+                                    {(pesan('tanggal') || saldoAwal) &&
+                                        (pesan('tanggal') ? (
+                                            <FieldError>
+                                                {pesan('tanggal')}
+                                            </FieldError>
+                                        ) : (
+                                            <FieldHint
+                                                hint={
+                                                    <>
+                                                        {
+                                                            'Tanggal aset diperoleh di sistem lama, paling lambat tanggal cutover. Jurnal saldo awalnya bertanggal cutover.'
+                                                        }
+                                                    </>
+                                                }
+                                            >
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon-sm"
+                                                    aria-label="Bantuan field"
+                                                >
+                                                    <Info aria-hidden="true" />
+                                                </Button>
+                                            </FieldHint>
+                                        ))}
                                 </Field>
 
                                 <Field>
@@ -828,12 +920,30 @@ export default function PenerimaanDetailPage({
                                             })
                                         }
                                     />
-                                    <FieldDescription>
-                                        {pesan('tanggal_siap_pakai') ??
-                                            (saldoAwal
-                                                ? 'Tanggal aset mulai dipakai di sistem lama. Penyusutannya di sini berlanjut mulai cutover.'
-                                                : 'Penyusutan dimulai dari tanggal ini, bukan dari tanggal barang tiba. Kosongkan bila keduanya sama.')}
-                                    </FieldDescription>
+                                    {pesan('tanggal_siap_pakai') ? (
+                                        <FieldError>
+                                            {pesan('tanggal_siap_pakai')}
+                                        </FieldError>
+                                    ) : (
+                                        <FieldHint
+                                            hint={
+                                                <>
+                                                    {saldoAwal
+                                                        ? 'Tanggal aset mulai dipakai di sistem lama. Penyusutannya di sini berlanjut mulai cutover.'
+                                                        : 'Penyusutan dimulai dari tanggal ini, bukan dari tanggal barang tiba. Kosongkan bila keduanya sama.'}
+                                                </>
+                                            }
+                                        >
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                aria-label="Bantuan field"
+                                            >
+                                                <Info aria-hidden="true" />
+                                            </Button>
+                                        </FieldHint>
+                                    )}
                                 </Field>
 
                                 <Field>
@@ -859,10 +969,28 @@ export default function PenerimaanDetailPage({
                                             }),
                                         { placeholder: 'Tanpa lokasi' },
                                     )}
-                                    <FieldDescription>
-                                        {lokasi.error ||
-                                            'Lokasi yang dipetakan ke unit organisasi menentukan dimensi keuangan aset.'}
-                                    </FieldDescription>
+                                    {lokasi.error ? (
+                                        <FieldError>{lokasi.error}</FieldError>
+                                    ) : (
+                                        <FieldHint
+                                            hint={
+                                                <>
+                                                    {
+                                                        'Lokasi yang dipetakan ke unit organisasi menentukan dimensi keuangan aset.'
+                                                    }
+                                                </>
+                                            }
+                                        >
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                aria-label="Bantuan field"
+                                            >
+                                                <Info aria-hidden="true" />
+                                            </Button>
+                                        </FieldHint>
+                                    )}
                                 </Field>
 
                                 <Field>
@@ -924,7 +1052,9 @@ export default function PenerimaanDetailPage({
                                                 'pembelian'
                                             }
                                             ariaLabel="Cara perolehan"
-                                            portalContainer={panelRef}
+                                            portalContainer={
+                                                portalContainer ?? panelRef
+                                            }
                                             onValueChange={(cara) =>
                                                 setRecord({
                                                     ...record,
@@ -934,12 +1064,30 @@ export default function PenerimaanDetailPage({
                                             }
                                         />
                                     )}
-                                    <FieldDescription>
-                                        {pesan('cara_perolehan') ??
-                                            (saldoAwal
-                                                ? 'Aset lama dari sistem sebelumnya: jurnalnya saldo awal, dengan akumulasi penyusutan sampai cutover.'
-                                                : 'Hibah tidak ditagih vendor: jurnalnya ke akun lawan hibah, bukan hutang.')}
-                                    </FieldDescription>
+                                    {pesan('cara_perolehan') ? (
+                                        <FieldError>
+                                            {pesan('cara_perolehan')}
+                                        </FieldError>
+                                    ) : (
+                                        <FieldHint
+                                            hint={
+                                                <>
+                                                    {saldoAwal
+                                                        ? 'Aset lama dari sistem sebelumnya: jurnalnya saldo awal, dengan akumulasi penyusutan sampai cutover.'
+                                                        : 'Hibah tidak ditagih vendor: jurnalnya ke akun lawan hibah, bukan hutang.'}
+                                                </>
+                                            }
+                                        >
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                aria-label="Bantuan field"
+                                            >
+                                                <Info aria-hidden="true" />
+                                            </Button>
+                                        </FieldHint>
+                                    )}
                                 </Field>
 
                                 {!tanpaVendor && (
@@ -952,7 +1100,7 @@ export default function PenerimaanDetailPage({
                                         saved={tersimpan?.vendor ?? null}
                                         readOnly={readOnly}
                                         error={pesan('vendor_id')}
-                                        portal={panelRef}
+                                        portal={portalContainer ?? panelRef}
                                         onChange={(vendorId) =>
                                             setRecord({
                                                 ...record,
@@ -1007,10 +1155,30 @@ export default function PenerimaanDetailPage({
                                             })
                                         }
                                     />
-                                    <FieldDescription>
-                                        {pesan('purchase_order_reference') ??
-                                            'Isi nomor pada dokumen PO. Kosongkan jika tidak ada.'}
-                                    </FieldDescription>
+                                    {pesan('purchase_order_reference') ? (
+                                        <FieldError>
+                                            {pesan('purchase_order_reference')}
+                                        </FieldError>
+                                    ) : (
+                                        <FieldHint
+                                            hint={
+                                                <>
+                                                    {
+                                                        'Isi nomor pada dokumen PO. Kosongkan jika tidak ada.'
+                                                    }
+                                                </>
+                                            }
+                                        >
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                aria-label="Bantuan field"
+                                            >
+                                                <Info aria-hidden="true" />
+                                            </Button>
+                                        </FieldHint>
+                                    )}
                                 </Field>
 
                                 {!tanpaVendor && (
@@ -1030,10 +1198,30 @@ export default function PenerimaanDetailPage({
                                                 })
                                             }
                                         />
-                                        <FieldDescription>
-                                            {pesan('vendor_invoice_date') ??
-                                                'Menjadi tanggal dokumen jurnalnya. Kosongkan bila fakturnya belum datang.'}
-                                        </FieldDescription>
+                                        {pesan('vendor_invoice_date') ? (
+                                            <FieldError>
+                                                {pesan('vendor_invoice_date')}
+                                            </FieldError>
+                                        ) : (
+                                            <FieldHint
+                                                hint={
+                                                    <>
+                                                        {
+                                                            'Menjadi tanggal dokumen jurnalnya. Kosongkan bila fakturnya belum datang.'
+                                                        }
+                                                    </>
+                                                }
+                                            >
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon-sm"
+                                                    aria-label="Bantuan field"
+                                                >
+                                                    <Info aria-hidden="true" />
+                                                </Button>
+                                            </FieldHint>
+                                        )}
                                     </Field>
                                 )}
                             </div>
@@ -1060,10 +1248,30 @@ export default function PenerimaanDetailPage({
                                             }),
                                         { required: true },
                                     )}
-                                    <FieldDescription>
-                                        {unitKerja.error ||
-                                            'Unit kerja yang menanggung seluruh aset pada dokumen ini setelah diterima. Terisi sendiri dari unit kerja bawaan lokasi awal, dan masih dapat diganti.'}
-                                    </FieldDescription>
+                                    {unitKerja.error ? (
+                                        <FieldError>
+                                            {unitKerja.error}
+                                        </FieldError>
+                                    ) : (
+                                        <FieldHint
+                                            hint={
+                                                <>
+                                                    {
+                                                        'Unit kerja yang menanggung seluruh aset pada dokumen ini setelah diterima. Terisi sendiri dari unit kerja bawaan lokasi awal, dan masih dapat diganti.'
+                                                    }
+                                                </>
+                                            }
+                                        >
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon-sm"
+                                                aria-label="Bantuan field"
+                                            >
+                                                <Info aria-hidden="true" />
+                                            </Button>
+                                        </FieldHint>
+                                    )}
                                 </Field>
 
                                 <Field>
@@ -1077,11 +1285,24 @@ export default function PenerimaanDetailPage({
                                                 receiving_org_unit_id: id,
                                             }),
                                     )}
-                                    <FieldDescription>
-                                        Loket atau gudang yang menerima
-                                        fisiknya. Sering berbeda dari unit
-                                        pengguna.
-                                    </FieldDescription>
+                                    <FieldHint
+                                        hint={
+                                            <>
+                                                Loket atau gudang yang menerima
+                                                fisiknya. Sering berbeda dari
+                                                unit pengguna.
+                                            </>
+                                        }
+                                    >
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            aria-label="Bantuan field"
+                                        >
+                                            <Info aria-hidden="true" />
+                                        </Button>
+                                    </FieldHint>
                                 </Field>
 
                                 <Field>
@@ -1095,9 +1316,9 @@ export default function PenerimaanDetailPage({
                                                 diterima_oleh_user_id: id,
                                             }),
                                     )}
-                                    <FieldDescription>
-                                        {anggota.error || ' '}
-                                    </FieldDescription>
+                                    {anggota.error ? (
+                                        <FieldError>{anggota.error}</FieldError>
+                                    ) : null}
                                 </Field>
 
                                 <Field>
@@ -1111,10 +1332,24 @@ export default function PenerimaanDetailPage({
                                                 penanggung_jawab_user_id: id,
                                             }),
                                     )}
-                                    <FieldDescription>
-                                        Tercatat sebagai pemegang pertama pada
-                                        riwayat penempatan tiap aset.
-                                    </FieldDescription>
+                                    <FieldHint
+                                        hint={
+                                            <>
+                                                Tercatat sebagai pemegang
+                                                pertama pada riwayat penempatan
+                                                tiap aset.
+                                            </>
+                                        }
+                                    >
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            aria-label="Bantuan field"
+                                        >
+                                            <Info aria-hidden="true" />
+                                        </Button>
+                                    </FieldHint>
                                 </Field>
                             </div>
                         </CollapsibleSection>
@@ -1130,473 +1365,546 @@ export default function PenerimaanDetailPage({
                                         {pesan('details')}
                                     </p>
                                 )}
-                                <div className="overflow-x-auto">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead className="w-10">
-                                                    #
-                                                </TableHead>
-                                                {record.cara_perolehan ===
-                                                    'pembelian' && (
-                                                    <TableHead className="min-w-64">
-                                                        Permintaan asal
-                                                    </TableHead>
-                                                )}
-                                                <TableHead className="min-w-52">
-                                                    Nama barang
-                                                </TableHead>
-                                                <TableHead className="min-w-44">
-                                                    Group aset
-                                                </TableHead>
-                                                <TableHead className="min-w-44">
-                                                    Jenis aset
-                                                </TableHead>
-                                                <TableHead className="min-w-40">
-                                                    Kondisi
-                                                </TableHead>
-                                                <TableHead className="w-24 text-right">
-                                                    Jumlah
-                                                </TableHead>
-                                                <TableHead className="min-w-40 text-right">
-                                                    Nilai / unit
-                                                </TableHead>
-                                                {!saldoAwal && (
-                                                    <TableHead className="min-w-36 text-right">
-                                                        PPN / unit
-                                                    </TableHead>
-                                                )}
-                                                <TableHead className="min-w-40 text-right">
-                                                    Residu / unit
-                                                </TableHead>
-                                                {saldoAwal && (
-                                                    <TableHead className="min-w-40 text-right">
-                                                        Akumulasi / unit
-                                                    </TableHead>
-                                                )}
-                                                {saldoAwal && (
-                                                    <TableHead className="min-w-32 text-right">
-                                                        Periode berjalan
-                                                    </TableHead>
-                                                )}
-                                                {!readOnly && (
-                                                    <TableHead className="w-12" />
-                                                )}
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {record.details.map(
-                                                (baris, index) => (
-                                                    <TableRow
-                                                        key={
-                                                            baris.id ??
-                                                            baris.clientKey ??
-                                                            `baris-${index}`
+                                {(() => {
+                                    const sdkRows = record.details.map(
+                                        (baris, index) => {
+                                            return { baris, index };
+                                        },
+                                    );
+                                    const sdkColumns: DataTableColumn<
+                                        (typeof sdkRows)[number]
+                                    >[] = [
+                                        {
+                                            id: 'column-0',
+                                            header: '#',
+                                            width: 40,
+                                            cell: ({ index }) => (
+                                                <div className="text-muted-foreground">
+                                                    {index + 1}
+                                                </div>
+                                            ),
+                                        } satisfies DataTableColumn<
+                                            (typeof sdkRows)[number]
+                                        >,
+                                        ...(record.cara_perolehan ===
+                                        'pembelian'
+                                            ? [
+                                                  {
+                                                      id: 'column-1',
+                                                      header: 'Permintaan asal',
+                                                      minWidth: 256,
+                                                      cell: ({
+                                                          baris,
+                                                          index,
+                                                      }) => (
+                                                          <>
+                                                              {readOnly ? (
+                                                                  <span>
+                                                                      {baris.purchase_request_code ??
+                                                                          'Tanpa permintaan asal'}
+                                                                  </span>
+                                                              ) : (
+                                                                  <PurchaseRequestPicker
+                                                                      companyId={
+                                                                          record.legal_entity_id ??
+                                                                          context.legal_entity_id ??
+                                                                          undefined
+                                                                      }
+                                                                      initialRequestId={
+                                                                          baris.purchase_request_id
+                                                                      }
+                                                                      value={
+                                                                          baris.permintaan_pembelian_detail_id
+                                                                      }
+                                                                      readOnly={
+                                                                          readOnly
+                                                                      }
+                                                                      portalContainer={
+                                                                          portalContainer ??
+                                                                          panelRef
+                                                                      }
+                                                                      onChange={(
+                                                                          line,
+                                                                      ) =>
+                                                                          ubahBaris(
+                                                                              index,
+                                                                              line
+                                                                                  ? {
+                                                                                        permintaan_pembelian_detail_id:
+                                                                                            line.id ??
+                                                                                            '',
+                                                                                        nama: line.nama_aset,
+                                                                                        jenis_aset_id:
+                                                                                            line.jenis_aset_id,
+                                                                                        atribut:
+                                                                                            line.jenis_aset_id ===
+                                                                                            baris.jenis_aset_id
+                                                                                                ? baris.atribut
+                                                                                                : [],
+                                                                                        kondisi_aset_id:
+                                                                                            '',
+                                                                                        model_aset_id:
+                                                                                            '',
+                                                                                        model_number:
+                                                                                            '',
+                                                                                        jumlah: Math.max(
+                                                                                            1,
+                                                                                            Math.floor(
+                                                                                                Number(
+                                                                                                    line.remaining_quantity,
+                                                                                                ),
+                                                                                            ),
+                                                                                        ),
+                                                                                        keterangan:
+                                                                                            line.specification,
+                                                                                    }
+                                                                                  : {
+                                                                                        permintaan_pembelian_detail_id:
+                                                                                            '',
+                                                                                    },
+                                                                          )
+                                                                      }
+                                                                  />
+                                                              )}
+                                                          </>
+                                                      ),
+                                                  } satisfies DataTableColumn<
+                                                      (typeof sdkRows)[number]
+                                                  >,
+                                              ]
+                                            : []),
+                                        {
+                                            id: 'column-2',
+                                            header: 'Nama barang',
+                                            minWidth: 208,
+                                            cell: ({ baris, index }) => (
+                                                <>
+                                                    <Input
+                                                        aria-label="Nama barang"
+                                                        maxLength={150}
+                                                        readOnly={readOnly}
+                                                        value={baris.nama}
+                                                        onChange={(event) =>
+                                                            ubahBaris(index, {
+                                                                nama: event
+                                                                    .target
+                                                                    .value,
+                                                            })
                                                         }
-                                                    >
-                                                        <TableCell className="text-muted-foreground">
-                                                            {index + 1}
-                                                        </TableCell>
-                                                        {record.cara_perolehan ===
-                                                            'pembelian' && (
-                                                            <TableCell>
-                                                                {readOnly ? (
-                                                                    <span>
-                                                                        {baris.purchase_request_code ??
-                                                                            'Tanpa permintaan asal'}
-                                                                    </span>
-                                                                ) : (
-                                                                    <PurchaseRequestPicker
-                                                                        companyId={
-                                                                            record.legal_entity_id ??
-                                                                            context.legal_entity_id ??
-                                                                            undefined
-                                                                        }
-                                                                        initialRequestId={
-                                                                            baris.purchase_request_id
-                                                                        }
-                                                                        value={
-                                                                            baris.permintaan_pembelian_detail_id
-                                                                        }
-                                                                        readOnly={
-                                                                            readOnly
-                                                                        }
-                                                                        portalContainer={
-                                                                            panelRef
-                                                                        }
-                                                                        onChange={(
-                                                                            line,
-                                                                        ) =>
-                                                                            ubahBaris(
-                                                                                index,
-                                                                                line
-                                                                                    ? {
-                                                                                          permintaan_pembelian_detail_id:
-                                                                                              line.id ??
-                                                                                              '',
-                                                                                          nama: line.nama_aset,
-                                                                                          jenis_aset_id:
-                                                                                              line.jenis_aset_id,
-                                                                                          atribut:
-                                                                                              line.jenis_aset_id ===
-                                                                                              baris.jenis_aset_id
-                                                                                                  ? baris.atribut
-                                                                                                  : [],
-                                                                                          kondisi_aset_id:
-                                                                                              '',
-                                                                                          model_aset_id:
-                                                                                              '',
-                                                                                          model_number:
-                                                                                              '',
-                                                                                          jumlah: Math.max(
-                                                                                              1,
-                                                                                              Math.floor(
-                                                                                                  Number(
-                                                                                                      line.remaining_quantity,
-                                                                                                  ),
-                                                                                              ),
-                                                                                          ),
-                                                                                          keterangan:
-                                                                                              line.specification,
-                                                                                      }
-                                                                                    : {
-                                                                                          permintaan_pembelian_detail_id:
-                                                                                              '',
-                                                                                      },
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                )}
-                                                            </TableCell>
+                                                    />
+                                                </>
+                                            ),
+                                        } satisfies DataTableColumn<
+                                            (typeof sdkRows)[number]
+                                        >,
+                                        {
+                                            id: 'column-3',
+                                            header: 'Group aset',
+                                            minWidth: 176,
+                                            cell: ({ baris, index }) => (
+                                                <>
+                                                    {pilihan(
+                                                        'Group aset',
+                                                        grup,
+                                                        baris.group_aset_id,
+                                                        (id) =>
+                                                            ubahBaris(index, {
+                                                                group_aset_id:
+                                                                    id,
+                                                            }),
+                                                    )}
+                                                </>
+                                            ),
+                                        } satisfies DataTableColumn<
+                                            (typeof sdkRows)[number]
+                                        >,
+                                        {
+                                            id: 'column-4',
+                                            header: 'Jenis aset',
+                                            minWidth: 176,
+                                            cell: ({ baris, index }) => (
+                                                <>
+                                                    {pilihan(
+                                                        'Jenis aset',
+                                                        jenis,
+                                                        baris.jenis_aset_id,
+                                                        (id) =>
+                                                            ubahBaris(index, {
+                                                                jenis_aset_id:
+                                                                    id,
+                                                                atribut:
+                                                                    id ===
+                                                                    baris.jenis_aset_id
+                                                                        ? baris.atribut
+                                                                        : [],
+                                                                kondisi_aset_id:
+                                                                    '',
+                                                                model_aset_id:
+                                                                    '',
+                                                                model_number:
+                                                                    '',
+                                                            }),
+                                                    )}
+                                                </>
+                                            ),
+                                        } satisfies DataTableColumn<
+                                            (typeof sdkRows)[number]
+                                        >,
+                                        {
+                                            id: 'column-5',
+                                            header: 'Kondisi',
+                                            minWidth: 160,
+                                            cell: ({ baris, index }) => (
+                                                <>
+                                                    {readOnly ? (
+                                                        (kondisi.options.find(
+                                                            (item) =>
+                                                                item.id ===
+                                                                baris.kondisi_aset_id,
+                                                        )?.nama ?? '—')
+                                                    ) : (
+                                                        <AssetConditionSelect
+                                                            assetTypeId={
+                                                                baris.jenis_aset_id
+                                                            }
+                                                            value={
+                                                                baris.kondisi_aset_id
+                                                            }
+                                                            label="Kondisi"
+                                                            portalContainer={
+                                                                portalContainer ??
+                                                                panelRef
+                                                            }
+                                                            onChange={(value) =>
+                                                                ubahBaris(
+                                                                    index,
+                                                                    {
+                                                                        kondisi_aset_id:
+                                                                            value,
+                                                                    },
+                                                                )
+                                                            }
+                                                        />
+                                                    )}
+                                                </>
+                                            ),
+                                        } satisfies DataTableColumn<
+                                            (typeof sdkRows)[number]
+                                        >,
+                                        {
+                                            id: 'column-6',
+                                            header: 'Jumlah',
+                                            width: 96,
+                                            align: 'right',
+                                            cell: ({ baris, index }) => (
+                                                <>
+                                                    <Input
+                                                        aria-label="Jumlah unit"
+                                                        type="number"
+                                                        min={1}
+                                                        readOnly={readOnly}
+                                                        value={String(
+                                                            baris.jumlah,
                                                         )}
-                                                        <TableCell>
-                                                            <Input
-                                                                aria-label="Nama barang"
-                                                                maxLength={150}
-                                                                readOnly={
-                                                                    readOnly
-                                                                }
-                                                                value={
-                                                                    baris.nama
-                                                                }
-                                                                onChange={(
-                                                                    event,
-                                                                ) =>
-                                                                    ubahBaris(
-                                                                        index,
-                                                                        {
-                                                                            nama: event
-                                                                                .target
-                                                                                .value,
-                                                                        },
-                                                                    )
-                                                                }
-                                                            />
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {pilihan(
-                                                                'Group aset',
-                                                                grup,
-                                                                baris.group_aset_id,
-                                                                (id) =>
-                                                                    ubahBaris(
-                                                                        index,
-                                                                        {
-                                                                            group_aset_id:
-                                                                                id,
-                                                                        },
-                                                                    ),
-                                                            )}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {pilihan(
-                                                                'Jenis aset',
-                                                                jenis,
-                                                                baris.jenis_aset_id,
-                                                                (id) =>
-                                                                    ubahBaris(
-                                                                        index,
-                                                                        {
-                                                                            jenis_aset_id:
-                                                                                id,
-                                                                            atribut:
-                                                                                id ===
-                                                                                baris.jenis_aset_id
-                                                                                    ? baris.atribut
-                                                                                    : [],
-                                                                            kondisi_aset_id:
-                                                                                '',
-                                                                            model_aset_id:
-                                                                                '',
-                                                                            model_number:
-                                                                                '',
-                                                                        },
-                                                                    ),
-                                                            )}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {readOnly ? (
-                                                                (kondisi.options.find(
-                                                                    (item) =>
-                                                                        item.id ===
-                                                                        baris.kondisi_aset_id,
-                                                                )?.nama ?? '—')
-                                                            ) : (
-                                                                <AssetConditionSelect
-                                                                    assetTypeId={
-                                                                        baris.jenis_aset_id
-                                                                    }
-                                                                    value={
-                                                                        baris.kondisi_aset_id
-                                                                    }
-                                                                    label="Kondisi"
-                                                                    portalContainer={
-                                                                        panelRef
-                                                                    }
-                                                                    onChange={(
-                                                                        value,
-                                                                    ) =>
-                                                                        ubahBaris(
-                                                                            index,
-                                                                            {
-                                                                                kondisi_aset_id:
-                                                                                    value,
-                                                                            },
-                                                                        )
-                                                                    }
-                                                                />
-                                                            )}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <Input
-                                                                aria-label="Jumlah unit"
-                                                                type="number"
-                                                                min={1}
-                                                                readOnly={
-                                                                    readOnly
-                                                                }
-                                                                value={String(
-                                                                    baris.jumlah,
-                                                                )}
-                                                                onChange={(
-                                                                    event,
-                                                                ) =>
-                                                                    ubahBaris(
-                                                                        index,
-                                                                        {
-                                                                            jumlah: event
-                                                                                .target
-                                                                                .value,
-                                                                        },
-                                                                    )
-                                                                }
-                                                            />
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <Input
-                                                                aria-label="Nilai per unit"
-                                                                type="number"
-                                                                min={0}
-                                                                readOnly={
-                                                                    readOnly
-                                                                }
-                                                                value={String(
-                                                                    baris.nilai_per_unit,
-                                                                )}
-                                                                onChange={(
-                                                                    event,
-                                                                ) =>
-                                                                    ubahBaris(
-                                                                        index,
-                                                                        {
-                                                                            nilai_per_unit:
-                                                                                event
-                                                                                    .target
-                                                                                    .value,
-                                                                        },
-                                                                    )
-                                                                }
-                                                            />
-                                                        </TableCell>
-                                                        {!saldoAwal && (
-                                                            <TableCell>
-                                                                <Input
-                                                                    aria-label="PPN per unit"
-                                                                    type="number"
-                                                                    min={0}
-                                                                    readOnly={
-                                                                        readOnly
-                                                                    }
-                                                                    value={String(
-                                                                        baris.ppn_per_unit ??
-                                                                            '',
-                                                                    )}
-                                                                    onChange={(
-                                                                        event,
-                                                                    ) =>
-                                                                        ubahBaris(
-                                                                            index,
-                                                                            {
-                                                                                ppn_per_unit:
-                                                                                    event
-                                                                                        .target
-                                                                                        .value,
-                                                                            },
-                                                                        )
-                                                                    }
-                                                                />
-                                                            </TableCell>
+                                                        onChange={(event) =>
+                                                            ubahBaris(index, {
+                                                                jumlah: event
+                                                                    .target
+                                                                    .value,
+                                                            })
+                                                        }
+                                                    />
+                                                </>
+                                            ),
+                                        } satisfies DataTableColumn<
+                                            (typeof sdkRows)[number]
+                                        >,
+                                        {
+                                            id: 'column-7',
+                                            header: 'Nilai / unit',
+                                            minWidth: 160,
+                                            align: 'right',
+                                            cell: ({ baris, index }) => (
+                                                <>
+                                                    <Input
+                                                        aria-label="Nilai per unit"
+                                                        type="number"
+                                                        min={0}
+                                                        readOnly={readOnly}
+                                                        value={String(
+                                                            baris.nilai_per_unit,
                                                         )}
-                                                        <TableCell>
-                                                            <Input
-                                                                aria-label="Residu per unit"
-                                                                type="number"
-                                                                min={0}
-                                                                readOnly={
-                                                                    readOnly
-                                                                }
-                                                                value={String(
-                                                                    baris.residu_per_unit,
-                                                                )}
-                                                                onChange={(
-                                                                    event,
-                                                                ) =>
-                                                                    ubahBaris(
-                                                                        index,
-                                                                        {
-                                                                            residu_per_unit:
-                                                                                event
-                                                                                    .target
-                                                                                    .value,
-                                                                        },
-                                                                    )
-                                                                }
-                                                            />
-                                                        </TableCell>
-                                                        {saldoAwal && (
-                                                            <TableCell>
-                                                                <Input
-                                                                    aria-label="Akumulasi per unit"
-                                                                    type="number"
-                                                                    min={0}
-                                                                    readOnly={
-                                                                        readOnly
-                                                                    }
-                                                                    value={String(
-                                                                        baris.akumulasi_per_unit ??
-                                                                            '',
-                                                                    )}
-                                                                    onChange={(
-                                                                        event,
-                                                                    ) =>
-                                                                        ubahBaris(
-                                                                            index,
-                                                                            {
-                                                                                akumulasi_per_unit:
-                                                                                    event
-                                                                                        .target
-                                                                                        .value,
-                                                                            },
-                                                                        )
-                                                                    }
-                                                                />
-                                                            </TableCell>
+                                                        onChange={(event) =>
+                                                            ubahBaris(index, {
+                                                                nilai_per_unit:
+                                                                    event.target
+                                                                        .value,
+                                                            })
+                                                        }
+                                                    />
+                                                </>
+                                            ),
+                                        } satisfies DataTableColumn<
+                                            (typeof sdkRows)[number]
+                                        >,
+                                        ...(!saldoAwal
+                                            ? [
+                                                  {
+                                                      id: 'column-8',
+                                                      header: 'PPN / unit',
+                                                      minWidth: 144,
+                                                      align: 'right',
+                                                      cell: ({
+                                                          baris,
+                                                          index,
+                                                      }) => (
+                                                          <>
+                                                              <Input
+                                                                  aria-label="PPN per unit"
+                                                                  type="number"
+                                                                  min={0}
+                                                                  readOnly={
+                                                                      readOnly
+                                                                  }
+                                                                  value={String(
+                                                                      baris.ppn_per_unit ??
+                                                                          '',
+                                                                  )}
+                                                                  onChange={(
+                                                                      event,
+                                                                  ) =>
+                                                                      ubahBaris(
+                                                                          index,
+                                                                          {
+                                                                              ppn_per_unit:
+                                                                                  event
+                                                                                      .target
+                                                                                      .value,
+                                                                          },
+                                                                      )
+                                                                  }
+                                                              />
+                                                          </>
+                                                      ),
+                                                  } satisfies DataTableColumn<
+                                                      (typeof sdkRows)[number]
+                                                  >,
+                                              ]
+                                            : []),
+                                        {
+                                            id: 'column-9',
+                                            header: 'Residu / unit',
+                                            minWidth: 160,
+                                            align: 'right',
+                                            cell: ({ baris, index }) => (
+                                                <>
+                                                    <Input
+                                                        aria-label="Residu per unit"
+                                                        type="number"
+                                                        min={0}
+                                                        readOnly={readOnly}
+                                                        value={String(
+                                                            baris.residu_per_unit,
                                                         )}
-                                                        {saldoAwal && (
-                                                            <TableCell>
-                                                                <Input
-                                                                    aria-label="Periode berjalan"
-                                                                    type="number"
-                                                                    min={0}
-                                                                    step={1}
-                                                                    readOnly={
-                                                                        readOnly
-                                                                    }
-                                                                    value={String(
-                                                                        baris.periode_berjalan ??
-                                                                            '',
-                                                                    )}
-                                                                    onChange={(
-                                                                        event,
-                                                                    ) =>
-                                                                        ubahBaris(
-                                                                            index,
-                                                                            {
-                                                                                periode_berjalan:
-                                                                                    event
-                                                                                        .target
-                                                                                        .value,
-                                                                            },
-                                                                        )
-                                                                    }
-                                                                />
-                                                            </TableCell>
-                                                        )}
-                                                        {!readOnly && (
-                                                            <TableCell>
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    aria-label={`Hapus baris ${index + 1}`}
-                                                                    onClick={() =>
-                                                                        setRecord(
-                                                                            (
-                                                                                sebelumnya,
-                                                                            ) => ({
-                                                                                ...sebelumnya,
-                                                                                details:
-                                                                                    sebelumnya.details.filter(
-                                                                                        (
-                                                                                            _,
-                                                                                            posisi,
-                                                                                        ) =>
-                                                                                            posisi !==
-                                                                                            index,
-                                                                                    ),
-                                                                            }),
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    <Trash2 />
-                                                                </Button>
-                                                            </TableCell>
-                                                        )}
-                                                    </TableRow>
-                                                ),
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                </div>
+                                                        onChange={(event) =>
+                                                            ubahBaris(index, {
+                                                                residu_per_unit:
+                                                                    event.target
+                                                                        .value,
+                                                            })
+                                                        }
+                                                    />
+                                                </>
+                                            ),
+                                        } satisfies DataTableColumn<
+                                            (typeof sdkRows)[number]
+                                        >,
+                                        ...(saldoAwal
+                                            ? [
+                                                  {
+                                                      id: 'column-10',
+                                                      header: 'Akumulasi / unit',
+                                                      minWidth: 160,
+                                                      align: 'right',
+                                                      cell: ({
+                                                          baris,
+                                                          index,
+                                                      }) => (
+                                                          <>
+                                                              <Input
+                                                                  aria-label="Akumulasi per unit"
+                                                                  type="number"
+                                                                  min={0}
+                                                                  readOnly={
+                                                                      readOnly
+                                                                  }
+                                                                  value={String(
+                                                                      baris.akumulasi_per_unit ??
+                                                                          '',
+                                                                  )}
+                                                                  onChange={(
+                                                                      event,
+                                                                  ) =>
+                                                                      ubahBaris(
+                                                                          index,
+                                                                          {
+                                                                              akumulasi_per_unit:
+                                                                                  event
+                                                                                      .target
+                                                                                      .value,
+                                                                          },
+                                                                      )
+                                                                  }
+                                                              />
+                                                          </>
+                                                      ),
+                                                  } satisfies DataTableColumn<
+                                                      (typeof sdkRows)[number]
+                                                  >,
+                                              ]
+                                            : []),
+                                        ...(saldoAwal
+                                            ? [
+                                                  {
+                                                      id: 'column-11',
+                                                      header: 'Periode berjalan',
+                                                      minWidth: 128,
+                                                      align: 'right',
+                                                      cell: ({
+                                                          baris,
+                                                          index,
+                                                      }) => (
+                                                          <>
+                                                              <Input
+                                                                  aria-label="Periode berjalan"
+                                                                  type="number"
+                                                                  min={0}
+                                                                  step={1}
+                                                                  readOnly={
+                                                                      readOnly
+                                                                  }
+                                                                  value={String(
+                                                                      baris.periode_berjalan ??
+                                                                          '',
+                                                                  )}
+                                                                  onChange={(
+                                                                      event,
+                                                                  ) =>
+                                                                      ubahBaris(
+                                                                          index,
+                                                                          {
+                                                                              periode_berjalan:
+                                                                                  event
+                                                                                      .target
+                                                                                      .value,
+                                                                          },
+                                                                      )
+                                                                  }
+                                                              />
+                                                          </>
+                                                      ),
+                                                  } satisfies DataTableColumn<
+                                                      (typeof sdkRows)[number]
+                                                  >,
+                                              ]
+                                            : []),
+                                        ...(!readOnly
+                                            ? [
+                                                  {
+                                                      id: 'column-12',
+                                                      header: '',
+                                                      width: 48,
+                                                      cell: ({ index }) => (
+                                                          <>
+                                                              <Button
+                                                                  type="button"
+                                                                  variant="ghost"
+                                                                  size="icon"
+                                                                  aria-label={`Hapus baris ${index + 1}`}
+                                                                  onClick={() =>
+                                                                      setRecord(
+                                                                          (
+                                                                              sebelumnya,
+                                                                          ) => ({
+                                                                              ...sebelumnya,
+                                                                              details:
+                                                                                  sebelumnya.details.filter(
+                                                                                      (
+                                                                                          _,
+                                                                                          posisi,
+                                                                                      ) =>
+                                                                                          posisi !==
+                                                                                          index,
+                                                                                  ),
+                                                                          }),
+                                                                      )
+                                                                  }
+                                                              >
+                                                                  <Trash2 />
+                                                              </Button>
+                                                          </>
+                                                      ),
+                                                  } satisfies DataTableColumn<
+                                                      (typeof sdkRows)[number]
+                                                  >,
+                                              ]
+                                            : []),
+                                    ];
 
-                                {!readOnly && (
+                                    return (
+                                        <DataTable
+                                            scrollMode="inline"
+                                            showRowNumbers={false}
+                                            serverSort
+                                            data={sdkRows}
+                                            columns={sdkColumns}
+                                            getRowKey={({ baris, index }) =>
+                                                baris.id ??
+                                                baris.clientKey ??
+                                                `baris-${index}`
+                                            }
+                                            onAddRow={
+                                                !readOnly
+                                                    ? () =>
+                                                          setRecord(
+                                                              (sebelumnya) => ({
+                                                                  ...sebelumnya,
+                                                                  details: [
+                                                                      ...sebelumnya.details,
+                                                                      barisKosong(),
+                                                                  ],
+                                                              }),
+                                                          )
+                                                    : undefined
+                                            }
+                                            addRowLabel="Tambah"
+                                        />
+                                    );
+                                })()}
+
+                                <FieldHint
+                                    hint={
+                                        <>
+                                            {saldoAwal
+                                                ? 'Akumulasi dan periode berjalan adalah angka buku yang di-post ke finance sampai cutover; buku lain diatur di bagian Saldo awal per buku. Nilai dan akumulasi diisi per unit, bukan total. '
+                                                : 'Nilai dan PPN diisi per unit, bukan total. '}
+                                            Ambang kapitalisasi group
+                                            dibandingkan terhadap nilai satu
+                                            aset — dua puluh kursi lima ratus
+                                            ribu tidak melewati ambang sepuluh
+                                            juta hanya karena datang bersamaan.
+                                        </>
+                                    }
+                                >
                                     <Button
                                         type="button"
-                                        variant="outline"
-                                        onClick={() =>
-                                            setRecord((sebelumnya) => ({
-                                                ...sebelumnya,
-                                                details: [
-                                                    ...sebelumnya.details,
-                                                    barisKosong(),
-                                                ],
-                                            }))
-                                        }
+                                        variant="ghost"
+                                        size="icon-sm"
+                                        aria-label="Bantuan field"
                                     >
-                                        <Plus />
-                                        Tambah baris
+                                        <Info aria-hidden="true" />
                                     </Button>
-                                )}
-
-                                <FieldDescription>
-                                    {saldoAwal
-                                        ? 'Akumulasi dan periode berjalan adalah angka buku yang di-post ke finance sampai cutover; buku lain diatur di bagian Saldo awal per buku. Nilai dan akumulasi diisi per unit, bukan total. '
-                                        : 'Nilai dan PPN diisi per unit, bukan total. '}
-                                    Ambang kapitalisasi group dibandingkan
-                                    terhadap nilai satu aset — dua puluh kursi
-                                    lima ratus ribu tidak melewati ambang
-                                    sepuluh juta hanya karena datang bersamaan.
-                                </FieldDescription>
+                                </FieldHint>
                             </div>
                         </CollapsibleSection>
 
@@ -1625,7 +1933,10 @@ export default function PenerimaanDetailPage({
                                                     typeId={line.jenis_aset_id}
                                                     values={line.atribut ?? []}
                                                     readOnly={readOnly}
-                                                    portalContainer={panelRef}
+                                                    portalContainer={
+                                                        portalContainer ??
+                                                        panelRef
+                                                    }
                                                     onChange={(values) =>
                                                         ubahBaris(index, {
                                                             atribut: values,
@@ -1757,9 +2068,23 @@ export default function PenerimaanDetailPage({
                                         })
                                     }
                                 />
-                                <FieldDescription>
-                                    Mis. nomor surat jalan atau nama pengirim.
-                                </FieldDescription>
+                                <FieldHint
+                                    hint={
+                                        <>
+                                            Mis. nomor surat jalan atau nama
+                                            pengirim.
+                                        </>
+                                    }
+                                >
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon-sm"
+                                        aria-label="Bantuan field"
+                                    >
+                                        <Info aria-hidden="true" />
+                                    </Button>
+                                </FieldHint>
                             </Field>
                         </CollapsibleSection>
 
@@ -1801,28 +2126,42 @@ export default function PenerimaanDetailPage({
                                 summary={`${terbit.length} aset`}
                             >
                                 <div className="space-y-3">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead className="w-44">
-                                                    Kode aset
-                                                </TableHead>
-                                                <TableHead>Nama</TableHead>
-                                                <TableHead className="w-64">
-                                                    Nomor seri
-                                                </TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {terbit.map((aset, index) => (
-                                                <TableRow key={aset.id}>
-                                                    <TableCell className="text-primary font-medium">
+                                    {(() => {
+                                        const sdkRows = terbit.map(
+                                            (aset, index) => {
+                                                return { aset, index };
+                                            },
+                                        );
+                                        const sdkColumns: DataTableColumn<
+                                            (typeof sdkRows)[number]
+                                        >[] = [
+                                            {
+                                                id: 'column-0',
+                                                header: 'Kode aset',
+                                                width: 176,
+                                                cell: ({ aset }) => (
+                                                    <div className="text-primary font-medium">
                                                         {aset.kode}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {aset.nama}
-                                                    </TableCell>
-                                                    <TableCell>
+                                                    </div>
+                                                ),
+                                            } satisfies DataTableColumn<
+                                                (typeof sdkRows)[number]
+                                            >,
+                                            {
+                                                id: 'column-1',
+                                                header: 'Nama',
+                                                cell: ({ aset }) => (
+                                                    <>{aset.nama}</>
+                                                ),
+                                            } satisfies DataTableColumn<
+                                                (typeof sdkRows)[number]
+                                            >,
+                                            {
+                                                id: 'column-2',
+                                                header: 'Nomor seri',
+                                                width: 256,
+                                                cell: ({ aset, index }) => (
+                                                    <>
                                                         <Input
                                                             aria-label={`Nomor seri ${aset.kode}`}
                                                             maxLength={150}
@@ -1858,30 +2197,57 @@ export default function PenerimaanDetailPage({
                                                                 )
                                                             }
                                                         />
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
+                                                    </>
+                                                ),
+                                            } satisfies DataTableColumn<
+                                                (typeof sdkRows)[number]
+                                            >,
+                                        ];
+
+                                        return (
+                                            <DataTable
+                                                scrollMode="inline"
+                                                showRowNumbers={false}
+                                                serverSort
+                                                data={sdkRows}
+                                                columns={sdkColumns}
+                                                getRowKey={({ aset }) =>
+                                                    aset.id
+                                                }
+                                            />
+                                        );
+                                    })()}
                                     {canCorrect && (
-                                        <Button
+                                        <ActionButton
+                                            action="save"
                                             type="button"
                                             onClick={() =>
                                                 void simpanNomorSeri()
                                             }
                                             disabled={menyimpan}
-                                        >
-                                            {menyimpan
-                                                ? 'Menyimpan…'
-                                                : 'Simpan nomor seri'}
-                                        </Button>
+                                            pending={menyimpan}
+                                        />
                                     )}
-                                    <FieldDescription>
-                                        Satu simpan untuk seluruh dokumen, bukan
-                                        satu per aset: yang mengetiknya sedang
-                                        memegang setumpuk stiker dan membacanya
-                                        berurutan.
-                                    </FieldDescription>
+                                    <FieldHint
+                                        hint={
+                                            <>
+                                                Satu simpan untuk seluruh
+                                                dokumen, bukan satu per aset:
+                                                yang mengetiknya sedang memegang
+                                                setumpuk stiker dan membacanya
+                                                berurutan.
+                                            </>
+                                        }
+                                    >
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            aria-label="Bantuan field"
+                                        >
+                                            <Info aria-hidden="true" />
+                                        </Button>
+                                    </FieldHint>
                                 </div>
                             </CollapsibleSection>
                         )}
@@ -1931,7 +2297,7 @@ export default function PenerimaanDetailPage({
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>
-                            Arsipkan draf penerimaan?
+                            Delete draf penerimaan?
                         </AlertDialogTitle>
                         <AlertDialogDescription>
                             Draf ini belum melahirkan aset apa pun, jadi
@@ -1940,8 +2306,11 @@ export default function PenerimaanDetailPage({
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Batal</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => void arsipkan()}>
-                            Arsipkan
+                        <AlertDialogAction
+                            onClick={() => void arsipkan()}
+                            asChild
+                        >
+                            <ActionButton action="archive" />
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

@@ -9,6 +9,7 @@ use App\Foundation\NumberSequence\Support\CoreNumberSequences;
 use App\Foundation\Vendor\Models\Vendor;
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\AddressBook\Actions\SaveParty;
+use App\Platform\AddressBook\Actions\SavePartyDetails;
 use App\Platform\AddressBook\Events\PartyNameChanged;
 use App\Platform\AddressBook\Events\PartyTaxNumberChanged;
 use App\Platform\AddressBook\Models\Party;
@@ -34,10 +35,11 @@ final class SaveVendor
     public function __construct(
         private readonly NumberSequenceService $number,
         private readonly CoreNumberSequences $sequence,
+        private readonly SavePartyDetails $details,
     ) {}
 
     /**
-     * @param  array{legal_entity_id: string, party_id: ?string, party_type: ?string, party_name: ?string, number: ?string, tax_number: ?string, status: string, payment_priority?: ?int}  $data
+     * @param  array{legal_entity_id: string, party_id: ?string, party_type: ?string, party_name: ?string, number: ?string, tax_number: ?string, status: string, payment_priority?: ?int, party_details?: array{locations: list<array<string, mixed>>, contacts: list<array<string, mixed>>}}  $data
      */
     public function create(TenantMembership $actor, array $data, string $creationKey): Vendor
     {
@@ -123,6 +125,8 @@ final class SaveVendor
                     ],
                     ['owning_app_id' => CoreNumberSequences::APP_ID],
                 );
+
+                $this->details->create($actor, $party, $data['party_details'] ?? ['locations' => [], 'contacts' => []]);
 
                 return $vendor;
             });

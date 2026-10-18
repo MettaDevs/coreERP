@@ -155,15 +155,15 @@ export default function AssetClassificationPage({
             <RecordActionBar title="Kelompok Aset">
                 {editing ? (
                     <>
-                        <Button
+                        <ActionButton
+                            action="save"
                             type="submit"
                             form="asset-classification-form"
                             disabled={saving}
-                        >
-                            {saving ? 'Menyimpan…' : 'Simpan'}
-                        </Button>
-                        <Button
-                            variant="outline"
+                            pending={saving}
+                        />
+                        <ActionButton
+                            action="cancel"
                             disabled={saving}
                             onClick={() => {
                                 setEditing(false);
@@ -171,9 +171,7 @@ export default function AssetClassificationPage({
                                 setDirty(false);
                                 setFormNonce((value) => value + 1);
                             }}
-                        >
-                            Batal
-                        </Button>
+                        />
                     </>
                 ) : (
                     <>
@@ -182,9 +180,7 @@ export default function AssetClassificationPage({
                                 action="create"
                                 disabled={saving || loading || !!loadError}
                                 onClick={() => requestChange({ create: true })}
-                            >
-                                Tambah data
-                            </ActionButton>
+                            />
                         )}
                         {canUpdate && (
                             <ActionButton
@@ -194,9 +190,7 @@ export default function AssetClassificationPage({
                                     setEditing(true);
                                     setShowDetail(true);
                                 }}
-                            >
-                                Ubah
-                            </ActionButton>
+                            />
                         )}
                         {canArchive && (
                             <ActionButton
@@ -211,9 +205,7 @@ export default function AssetClassificationPage({
                                     setActionError('');
                                     setArchiving(true);
                                 }}
-                            >
-                                Arsipkan
-                            </ActionButton>
+                            />
                         )}
                     </>
                 )}
@@ -364,7 +356,7 @@ export default function AssetClassificationPage({
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>
-                            Arsipkan {selected?.label}?
+                            Delete {selected?.label}?
                         </AlertDialogTitle>
                         <AlertDialogDescription>
                             Data ini tidak lagi tampil pada daftar pilihan.
@@ -381,8 +373,9 @@ export default function AssetClassificationPage({
                                 event.preventDefault();
                                 void archive();
                             }}
+                            asChild
                         >
-                            {saving ? 'Mengarsipkan…' : 'Arsipkan'}
+                            <ActionButton action="archive" pending={saving} />
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

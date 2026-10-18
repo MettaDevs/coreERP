@@ -28,7 +28,7 @@ export default function MutationPage({
     const [pertama, kedua] = segments;
 
     if (!pertama) {
-        return <MutasiListPage permissions={permissions} />;
+        return <MutasiListPage context={context} permissions={permissions} />;
     }
 
     if (pertama === 'baru') {

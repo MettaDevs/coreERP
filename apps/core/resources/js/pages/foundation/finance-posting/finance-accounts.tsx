@@ -1,3 +1,4 @@
+import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import {
@@ -450,9 +451,11 @@ function ImportSheet({
                     {report && <ReportView report={report} />}
                 </div>
                 <SheetFooter className="border-t px-6 py-4 sm:flex-row sm:justify-end">
-                    <Button variant="outline" type="button" onClick={onClose}>
-                        Batal
-                    </Button>
+                    <ActionButton
+                        action="cancel"
+                        type="button"
+                        onClick={onClose}
+                    />
                     <Button
                         type="button"
                         variant="outline"

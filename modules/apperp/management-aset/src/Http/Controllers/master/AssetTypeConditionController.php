@@ -25,19 +25,25 @@ final class AssetTypeConditionController extends Controller
 
     public function replace(Request $request, string $assetTypeId): JsonResponse
     {
+        return $this->replacePayload($request, $assetTypeId, $request->all());
+    }
+
+    /** @param array<string, mixed> $payload */
+    public function replacePayload(Request $request, string $assetTypeId, array $payload, ?int $expectedVersion = null): JsonResponse
+    {
         $this->permission($request, 'update');
         $tenantId = (string) $request->attributes->get('coreerp.tenant_id');
         JenisAset::query()->findOrFail($assetTypeId);
-        $data = $request->validate([
+        $data = validator($payload, [
             'condition_ids' => ['present', 'array', 'max:200'],
             'condition_ids.*' => ['required', 'distinct', 'ulid', Rule::exists('aset_m_kondisi_aset', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
-        ]);
+        ])->validate();
         foreach ($data['condition_ids'] as $conditionId) {
             if (! KondisiAset::query()->whereKey($conditionId)->where('aktif', true)->exists() && ! AssetTypeCondition::query()->where('jenis_aset_id', $assetTypeId)->where('kondisi_aset_id', $conditionId)->exists()) {
                 throw ValidationException::withMessages(['condition_ids' => 'Kondisi yang dipilih sudah tidak aktif.']);
             }
         }
-        $expected = RowVersion::expected($request);
+        $expected = ($expectedVersion ?? RowVersion::expected($request));
 
         DB::transaction(function () use ($assetTypeId, $data, $expected, $tenantId): void {
             RowVersion::claim(JenisAset::query()->findOrFail($assetTypeId), $expected);

@@ -13,6 +13,7 @@ import type { LookupLoader } from '@apperp/ui/inline-lookup';
 import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { MasterDetailLayout } from '@apperp/ui/master-detail-layout';
+import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
 import { useIncrementalList } from '@apperp/ui/use-incremental-list';
@@ -20,7 +21,6 @@ import type { ListLoader } from '@apperp/ui/use-incremental-list';
 import { Head, router } from '@inertiajs/react';
 import { RotateCcw } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import Heading from '@/components/heading';
 import { apiJson, errorText } from '@/lib/core-api';
 import { loadLookupItems } from '@/lib/lookup-loader';
 import { AddressSidebar } from './components/address-sidebar';
@@ -363,8 +363,10 @@ export default function AddressSetup({
                 <ListPageLayout
                     className="min-w-0 flex-1"
                     header={
-                        <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
-                            <Heading title={currentSection.label} />
+                        <RecordActionBar>
+                            <h1 className="text-sm font-semibold">
+                                {currentSection.label}
+                            </h1>
                             <div className="flex items-center gap-2">
                                 <Badge variant="secondary">
                                     Data acuan · baca saja
@@ -382,7 +384,7 @@ export default function AddressSetup({
                                     Muat ulang
                                 </Button>
                             </div>
-                        </div>
+                        </RecordActionBar>
                     }
                     filters={
                         <div className="flex flex-wrap items-center gap-3 border-b p-4">

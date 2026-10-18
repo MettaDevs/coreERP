@@ -31,14 +31,20 @@ final class AssetTypeCounterController extends Controller
 
     public function replace(Request $request, string $jenisAsetId): JsonResponse
     {
+        return $this->replacePayload($request, $jenisAsetId, $request->all());
+    }
+
+    /** @param array<string, mixed> $payload */
+    public function replacePayload(Request $request, string $jenisAsetId, array $payload, ?int $expectedVersion = null): JsonResponse
+    {
         $this->permission($request, 'update');
         $tenant = (string) $request->attributes->get('coreerp.tenant_id');
         JenisAset::query()->findOrFail($jenisAsetId);
-        $data = $request->validate([
+        $data = validator($payload, [
             'jenis_counter_ids' => ['present', 'array', 'max:200'],
             'jenis_counter_ids.*' => ['required', 'distinct', 'ulid', Rule::exists('aset_m_jenis_counter', 'id')->where('tenant_id', $tenant)->whereNull('deleted_at')],
-        ]);
-        $expected = RowVersion::expected($request);
+        ])->validate();
+        $expected = ($expectedVersion ?? RowVersion::expected($request));
 
         DB::transaction(function () use ($jenisAsetId, $data, $expected, $tenant): void {
             RowVersion::claim(JenisAset::query()->findOrFail($jenisAsetId), $expected);

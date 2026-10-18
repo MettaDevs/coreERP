@@ -1,3 +1,4 @@
+import { ActionButton } from '@apperp/ui/action-button';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -25,15 +26,12 @@ import type { LookupLoader } from '@apperp/ui/inline-lookup';
 import { Input } from '@apperp/ui/input';
 import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
 import {
+    PageDialogToolbar,
     PageDialog as Dialog,
-    PageDialogAction as DialogAction,
     PageDialogBody as DialogBody,
     PageDialogContent as DialogContent,
-    PageDialogDescription as DialogDescription,
-    PageDialogFooter as DialogFooter,
-    PageDialogHeader as DialogHeader,
-    PageDialogTitle as DialogTitle,
 } from '@apperp/ui/page-dialog';
+import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
 import {
@@ -45,10 +43,10 @@ import {
     TableRow,
 } from '@apperp/ui/table';
 import { Textarea } from '@apperp/ui/textarea';
+import { Trash2 } from 'lucide-react';
 import {
-    Archive,
+    Check,
     Pencil,
-    Plus,
     Star,
     Mail,
     Phone,
@@ -200,7 +198,168 @@ const locationToForm = (
     postbox: location.postbox ?? '',
 });
 
-function useList<T, M>(url: string, fallback: string) {
+export function newPartyDraftKey() {
+    return (
+        globalThis.crypto?.randomUUID?.() ??
+        `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    );
+}
+
+export type PartyDraftValues = { locations: Location[]; contacts: Contact[] };
+type DraftMetadata = {
+    locationPurposes: Purpose[];
+    countries: Country[];
+    contactTypes: string[];
+};
+export type PartyDraftDetails = {
+    value: PartyDraftValues;
+    onChange: (value: PartyDraftValues) => void;
+    metadata: DraftMetadata | null;
+    loading: boolean;
+    error: string;
+    retry: () => void;
+    existing?: { locations: Location[]; contacts: Contact[] };
+};
+
+export function usePartyDraftDetails(
+    enabled: boolean,
+    partyId?: string | null,
+) {
+    const [value, onChange] = useState<PartyDraftValues>({
+        locations: [],
+        contacts: [],
+    });
+    const [metadata, setMetadata] = useState<DraftMetadata | null>(null);
+    const [error, setError] = useState('');
+    const [attempt, setAttempt] = useState(0);
+    const [existing, setExisting] = useState<{
+        partyId: string;
+        locations: Location[];
+        contacts: Contact[];
+        error: string;
+    } | null>(null);
+    useEffect(() => {
+        if (!enabled || !partyId) {
+            return;
+        }
+
+        const controller = new AbortController();
+        Promise.all([
+            apiJson<{ data: Location[] }>(
+                `/api/v1/parties/${partyId}/locations`,
+                { signal: controller.signal },
+            ),
+            apiJson<{ data: Contact[] }>(
+                `/api/v1/parties/${partyId}/contacts`,
+                { signal: controller.signal },
+            ),
+        ])
+            .then(([locations, contacts]) => {
+                if (!controller.signal.aborted) {
+                    setExisting({
+                        partyId,
+                        locations: locations.data,
+                        contacts: contacts.data,
+                        error: '',
+                    });
+                }
+            })
+            .catch((caught) => {
+                if (!controller.signal.aborted) {
+                    setExisting({
+                        partyId,
+                        locations: [],
+                        contacts: [],
+                        error: errorText(
+                            caught,
+                            'Alamat dan kontak tersimpan belum dapat dimuat.',
+                        ),
+                    });
+                }
+            });
+
+        return () => controller.abort();
+    }, [enabled, partyId, attempt]);
+    const existingDetails = existing?.partyId === partyId ? existing : null;
+    useEffect(() => {
+        if (!enabled) {
+            return;
+        }
+
+        const controller = new AbortController();
+        apiJson<{ data: DraftMetadata }>('/api/v1/parties/metadata', {
+            signal: controller.signal,
+        })
+            .then(({ data }) => {
+                if (controller.signal.aborted) {
+                    return;
+                }
+
+                setMetadata(data);
+                setError('');
+            })
+            .catch((caught) => {
+                if (!controller.signal.aborted) {
+                    setError(
+                        errorText(
+                            caught,
+                            'Pilihan alamat dan kontak belum dapat dimuat.',
+                        ),
+                    );
+                }
+            });
+
+        return () => controller.abort();
+    }, [enabled, attempt]);
+    const payload =
+        enabled && (value.locations.length > 0 || value.contacts.length > 0)
+            ? {
+                  locations: value.locations.map((location) => ({
+                      ...locationToForm(location),
+                      key: location.id,
+                      location_id: location.location_id || null,
+                      province_id: location.province_id || null,
+                      regency_id: location.regency_id || null,
+                      district_id: location.district_id || null,
+                      village_id: location.village_id || null,
+                      postal_code_id: location.postal_code_id || null,
+                  })),
+                  contacts: value.contacts.map((contact) => ({
+                      type: contact.type,
+                      value: contact.value,
+                      purpose: contact.purpose,
+                      is_primary: contact.is_primary,
+                      ...(contact.address_id &&
+                      value.locations.some(
+                          (location) => location.id === contact.address_id,
+                      )
+                          ? { address_key: contact.address_id }
+                          : { address_id: contact.address_id }),
+                  })),
+              }
+            : undefined;
+
+    return {
+        value,
+        onChange,
+        metadata,
+        error: error || existingDetails?.error || '',
+        existing: partyId
+            ? {
+                  locations: existingDetails?.locations ?? [],
+                  contacts: existingDetails?.contacts ?? [],
+              }
+            : undefined,
+        loading:
+            enabled &&
+            ((metadata === null && error === '') ||
+                (Boolean(partyId) && existingDetails === null)),
+        retry: () => setAttempt((current) => current + 1),
+        payload,
+    };
+}
+
+function useList<T, M>(url: string, fallback: string, enabled = true) {
     const [items, setItems] = useState<T[]>([]);
     const [meta, setMeta] = useState<M | null>(null);
     const [loading, setLoading] = useState(true);
@@ -208,6 +367,10 @@ function useList<T, M>(url: string, fallback: string) {
     const [reloadKey, setReloadKey] = useState(0);
 
     useEffect(() => {
+        if (!enabled) {
+            return;
+        }
+
         let cancelled = false;
         apiJson<{ data: T[]; meta: M }>(url)
             .then((result) => {
@@ -233,7 +396,7 @@ function useList<T, M>(url: string, fallback: string) {
         return () => {
             cancelled = true;
         };
-    }, [url, fallback, reloadKey]);
+    }, [url, fallback, reloadKey, enabled]);
 
     return {
         items,
@@ -249,17 +412,43 @@ export function OrganizationAddressesSection({
     resource = 'organizations',
     countryCode,
     canManage,
+    draft,
+    readOnlyData,
 }: {
     organizationId: string;
     resource?: 'organizations' | 'parties';
     countryCode: string;
     canManage: boolean;
+    draft?: PartyDraftDetails;
+    readOnlyData?: {
+        items: Location[];
+        meta: { purposes: Purpose[]; countries: Country[] };
+    };
 }) {
     const base = `/api/v1/${resource}/${organizationId}/locations`;
-    const list = useList<
+    const storedList = useList<
         Location,
         { purposes: Purpose[]; countries: Country[] }
-    >(base, 'Alamat belum dapat dimuat.');
+    >(base, 'Alamat belum dapat dimuat.', !draft && !readOnlyData);
+    const list = readOnlyData
+        ? {
+              ...readOnlyData,
+              loading: false,
+              error: '',
+              reload: () => undefined,
+          }
+        : draft
+          ? {
+                items: draft.value.locations,
+                meta: {
+                    purposes: draft.metadata?.locationPurposes ?? [],
+                    countries: draft.metadata?.countries ?? [],
+                },
+                loading: draft.loading,
+                error: draft.error,
+                reload: draft.retry,
+            }
+          : storedList;
     const [editing, setEditing] = useState<Location | 'new' | null>(null);
     const [form, setForm] = useState<LocationForm>(emptyLocation(countryCode));
     const [saving, setSaving] = useState(false);
@@ -491,6 +680,49 @@ export function OrganizationAddressesSection({
             return;
         }
 
+        if (draft && editing) {
+            const id = editing === 'new' ? newPartyDraftKey() : editing.id;
+            const isPrimary =
+                form.is_primary ||
+                (draft.value.locations.length === 0 &&
+                    !draft.existing?.locations.length);
+            const location: Location = {
+                ...form,
+                id,
+                version: 0,
+                location_id: chosenShared?.id ?? '',
+                is_location_owner: !chosenShared,
+                owner_party_name: null,
+                shared_with: 0,
+                is_primary: isPrimary,
+                formatted:
+                    chosenShared?.formatted ||
+                    [
+                        form.street,
+                        form.building,
+                        form.village,
+                        form.district,
+                        form.city,
+                        form.province,
+                        form.postal_code,
+                    ]
+                        .filter(Boolean)
+                        .join(', '),
+            };
+            const locations = draft.value.locations
+                .filter((row) => row.id !== id)
+                .map((row) =>
+                    isPrimary ? { ...row, is_primary: false } : row,
+                );
+            draft.onChange({
+                ...draft.value,
+                locations: [...locations, location],
+            });
+            setEditing(null);
+
+            return;
+        }
+
         setSaving(true);
 
         try {
@@ -545,6 +777,27 @@ export function OrganizationAddressesSection({
     };
 
     const remove = async (location: Location) => {
+        if (draft) {
+            const locations = draft.value.locations.filter(
+                (row) => row.id !== location.id,
+            );
+
+            if (location.is_primary && locations[0]) {
+                locations[0] = { ...locations[0], is_primary: true };
+            }
+
+            draft.onChange({
+                locations,
+                contacts: draft.value.contacts.map((contact) =>
+                    contact.address_id === location.id
+                        ? { ...contact, address_id: null, address_name: null }
+                        : contact,
+                ),
+            });
+
+            return;
+        }
+
         try {
             await apiRequest(`${base}/${location.id}`, {
                 method: 'DELETE',
@@ -558,6 +811,18 @@ export function OrganizationAddressesSection({
     };
 
     const makePrimary = async (location: Location) => {
+        if (draft) {
+            draft.onChange({
+                ...draft.value,
+                locations: draft.value.locations.map((row) => ({
+                    ...row,
+                    is_primary: row.id === location.id,
+                })),
+            });
+
+            return;
+        }
+
         try {
             await apiJson(base, {
                 method: 'POST',
@@ -622,23 +887,21 @@ export function OrganizationAddressesSection({
             {list.error && (
                 <p className="text-sm text-destructive">{list.error}</p>
             )}
-            <div className="flex flex-wrap items-center justify-end gap-2">
+            <RecordActionBar>
                 {canManage && (
-                    <Button
+                    <ActionButton
+                        action="create"
                         type="button"
-                        size="sm"
                         className="shrink-0"
+                        disabled={Boolean(list.error)}
                         onClick={() => open('new')}
-                    >
-                        <Plus className="mr-1.5 size-3.5" />
-                        Tambah alamat
-                    </Button>
+                    />
                 )}
                 <AddressBookHint label="alamat">
                     Alamat utama tampil pada kop dokumen. Alamat lain dapat
                     dipakai untuk pengiriman atau lokasi cabang.
                 </AddressBookHint>
-            </div>
+            </RecordActionBar>
 
             {list.items.length === 0 ? (
                 <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
@@ -734,15 +997,15 @@ export function OrganizationAddressesSection({
                                                         type="button"
                                                         variant="ghost"
                                                         size="icon"
-                                                        aria-label={`Arsipkan ${location.name}`}
+                                                        aria-label={`Delete ${location.name}`}
                                                     >
-                                                        <Archive className="size-4" />
+                                                        <Trash2 className="size-4" />
                                                     </Button>
                                                 </AlertDialogTrigger>
                                                 <AlertDialogContent>
                                                     <AlertDialogHeader>
                                                         <AlertDialogTitle>
-                                                            Arsipkan alamat{' '}
+                                                            Delete alamat{' '}
                                                             {location.name}?
                                                         </AlertDialogTitle>
                                                         <AlertDialogDescription>
@@ -765,7 +1028,7 @@ export function OrganizationAddressesSection({
                                                                 )
                                                             }
                                                         >
-                                                            Arsipkan
+                                                            Delete
                                                         </AlertDialogAction>
                                                     </AlertDialogFooter>
                                                 </AlertDialogContent>
@@ -781,12 +1044,17 @@ export function OrganizationAddressesSection({
 
             <Dialog
                 open={editing !== null}
-                onOpenChange={(isOpen) => !isOpen && setEditing(null)}
+                onOpenChange={(isOpen) => {
+                    if (!isOpen && !saving) {
+                        setEditing(null);
+                    }
+                }}
             >
                 <DialogContent
                     ref={dialogRef}
                     onEscapeKeyDown={(event) => {
                         if (
+                            saving ||
                             dialogRef.current?.querySelector(
                                 '[role="combobox"][aria-expanded="true"]',
                             )
@@ -794,9 +1062,8 @@ export function OrganizationAddressesSection({
                             event.preventDefault();
                         }
                     }}
-                >
-                    <DialogHeader>
-                        <DialogTitle>
+                    title={
+                        <>
                             <span className="inline-flex items-center gap-2">
                                 {editing === 'new'
                                     ? 'Alamat baru'
@@ -807,13 +1074,16 @@ export function OrganizationAddressesSection({
                                     kota, provinsi, dan kode pos.
                                 </AddressBookHint>
                             </span>
-                        </DialogTitle>
-                        <DialogDescription className="sr-only">
+                        </>
+                    }
+                    description={
+                        <>
                             Bentuk tercetaknya disusun otomatis: jalan dan
                             gedung, kelurahan atau kecamatan, lalu kota,
                             provinsi, dan kode pos.
-                        </DialogDescription>
-                    </DialogHeader>
+                        </>
+                    }
+                >
                     <form
                         className="flex min-h-0 flex-1 flex-col"
                         onSubmit={(event) => {
@@ -824,95 +1094,131 @@ export function OrganizationAddressesSection({
                             void save();
                         }}
                     >
-                        <DialogBody className="space-y-4 py-3">
-                            {editing === 'new' && (
-                                <FieldGroup className="grid gap-4 md:grid-cols-2">
-                                    <Field>
-                                        <InlineLookup
-                                            hint="Pilih alamat yang sudah ada jika tempatnya sama, atau tulis alamat baru. Alamat yang dipilih akan dipakai bersama. Jika alamat tersebut diubah, perubahan berlaku untuk semua pihak yang memakainya."
-                                            loadItems={loadSharedLocations}
-                                            value={
-                                                chosenShared ?? {
-                                                    id: '',
-                                                    name: 'Tulis alamat baru',
-                                                    formatted: '',
-                                                }
-                                            }
-                                            label="Gunakan alamat yang sudah ada"
-                                            placeholder="Cari nama atau alamat…"
-                                            emptyMessage="Alamat tidak ditemukan."
-                                            getItemValue={(item) => item.id}
-                                            getItemLabel={(item) => item.name}
-                                            getSearchText={(item) =>
-                                                `${item.name} ${item.formatted}`
-                                            }
-                                            columns={[
-                                                {
-                                                    id: 'name',
-                                                    header: 'Keterangan alamat',
-                                                    cell: (item) => item.name,
-                                                    sortValue: (item) =>
-                                                        item.name,
-                                                    width: 180,
-                                                },
-                                                {
-                                                    id: 'address',
-                                                    header: 'Alamat',
-                                                    cell: (item) =>
-                                                        item.formatted.replaceAll(
-                                                            '\n',
-                                                            ', ',
-                                                        ),
-                                                    sortValue: (item) =>
-                                                        item.formatted,
-                                                    width: 400,
-                                                },
-                                            ]}
-                                            portalContainer={dialogRef}
-                                            onValueChange={(item) => {
-                                                const location =
-                                                    sharableChoices.find(
-                                                        (choice) =>
-                                                            choice.id ===
-                                                            item?.id,
-                                                    );
-                                                setForm((current) => ({
-                                                    ...(location
-                                                        ? locationToForm({
-                                                              ...location,
-                                                              purposes:
-                                                                  current.purposes,
-                                                              is_primary:
-                                                                  current.is_primary,
-                                                          })
-                                                        : {
-                                                              ...emptyLocation(
-                                                                  countryCode,
-                                                              ),
-                                                              purposes:
-                                                                  current.purposes,
-                                                              is_primary:
-                                                                  current.is_primary,
-                                                          }),
-                                                    location_id:
-                                                        location?.id ?? '',
-                                                }));
-                                            }}
-                                        />
-                                        {chosenShared && (
-                                            <p
-                                                role="note"
-                                                className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm"
-                                            >
-                                                Alamat ini dipakai bersama. Jika
-                                                alamat ini diubah, perubahan
-                                                berlaku untuk semua pihak yang
-                                                memakai alamat tersebut.
-                                            </p>
-                                        )}
-                                    </Field>
-                                </FieldGroup>
+                        <PageDialogToolbar>
+                            {draft ? (
+                                editing === 'new' ? (
+                                    <ActionButton
+                                        action="add"
+                                        type="button"
+                                        onClick={(event) =>
+                                            event.currentTarget.form?.requestSubmit()
+                                        }
+                                    />
+                                ) : (
+                                    <Button type="submit" variant="ghost">
+                                        <Check aria-hidden="true" />
+                                        Selesai
+                                    </Button>
+                                )
+                            ) : (
+                                <ActionButton
+                                    action={chosenShared ? 'add' : 'save'}
+                                    type="submit"
+                                    disabled={saving}
+                                    pending={saving}
+                                />
                             )}
+                            <ActionButton
+                                action="cancel"
+                                type="button"
+                                disabled={saving}
+                                onClick={() => setEditing(null)}
+                            />
+                        </PageDialogToolbar>
+                        <DialogBody className="space-y-4 py-3">
+                            {editing === 'new' &&
+                                (!draft || organizationId !== '') && (
+                                    <FieldGroup className="grid gap-4 md:grid-cols-2">
+                                        <Field>
+                                            <InlineLookup
+                                                hint="Pilih alamat yang sudah ada jika tempatnya sama, atau tulis alamat baru. Alamat yang dipilih akan dipakai bersama. Jika alamat tersebut diubah, perubahan berlaku untuk semua pihak yang memakainya."
+                                                loadItems={loadSharedLocations}
+                                                value={
+                                                    chosenShared ?? {
+                                                        id: '',
+                                                        name: 'Tulis alamat baru',
+                                                        formatted: '',
+                                                    }
+                                                }
+                                                label="Gunakan alamat yang sudah ada"
+                                                placeholder="Cari nama atau alamat…"
+                                                emptyMessage="Alamat tidak ditemukan."
+                                                getItemValue={(item) => item.id}
+                                                getItemLabel={(item) =>
+                                                    item.name
+                                                }
+                                                getSearchText={(item) =>
+                                                    `${item.name} ${item.formatted}`
+                                                }
+                                                columns={[
+                                                    {
+                                                        id: 'name',
+                                                        header: 'Keterangan alamat',
+                                                        cell: (item) =>
+                                                            item.name,
+                                                        sortValue: (item) =>
+                                                            item.name,
+                                                        width: 180,
+                                                    },
+                                                    {
+                                                        id: 'address',
+                                                        header: 'Alamat',
+                                                        cell: (item) =>
+                                                            item.formatted.replaceAll(
+                                                                '\n',
+                                                                ', ',
+                                                            ),
+                                                        sortValue: (item) =>
+                                                            item.formatted,
+                                                        width: 400,
+                                                    },
+                                                ]}
+                                                portalContainer={dialogRef}
+                                                onValueChange={(item) => {
+                                                    const location =
+                                                        sharableChoices.find(
+                                                            (choice) =>
+                                                                choice.id ===
+                                                                item?.id,
+                                                        );
+                                                    setForm((current) => ({
+                                                        ...(location
+                                                            ? locationToForm({
+                                                                  ...location,
+                                                                  purposes:
+                                                                      current.purposes,
+                                                                  is_primary:
+                                                                      current.is_primary,
+                                                              })
+                                                            : {
+                                                                  ...emptyLocation(
+                                                                      countryCode,
+                                                                  ),
+                                                                  purposes:
+                                                                      current.purposes,
+                                                                  is_primary:
+                                                                      current.is_primary,
+                                                              }),
+                                                        location_id:
+                                                            location?.id ?? '',
+                                                    }));
+                                                }}
+                                            />
+                                            {chosenShared && (
+                                                <p
+                                                    role="note"
+                                                    className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm"
+                                                >
+                                                    Alamat ini dipakai bersama.
+                                                    Jika alamat ini diubah,
+                                                    perubahan berlaku untuk
+                                                    semua pihak yang memakai
+                                                    alamat tersebut.
+                                                </p>
+                                            )}
+                                        </Field>
+                                    </FieldGroup>
+                                )}
                             {editing !== null &&
                                 editing !== 'new' &&
                                 editing.shared_with > 0 && (
@@ -1081,18 +1387,6 @@ export function OrganizationAddressesSection({
                                 </p>
                             )}
                         </DialogBody>
-                        <DialogFooter>
-                            <DialogAction type="submit" disabled={saving}>
-                                {saving ? 'Menyimpan…' : 'Simpan alamat'}
-                            </DialogAction>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setEditing(null)}
-                            >
-                                Batal
-                            </Button>
-                        </DialogFooter>
                     </form>
                 </DialogContent>
             </Dialog>
@@ -1154,16 +1448,37 @@ export function OrganizationContactsSection({
     organizationId,
     resource = 'organizations',
     canManage,
+    draft,
+    readOnlyData,
 }: {
     organizationId: string;
     resource?: 'organizations' | 'parties';
     canManage: boolean;
+    draft?: PartyDraftDetails;
+    readOnlyData?: { items: Contact[]; meta: { types: string[] } };
 }) {
     const base = `/api/v1/${resource}/${organizationId}/contacts`;
-    const list = useList<Contact, { types: string[] }>(
+    const storedList = useList<Contact, { types: string[] }>(
         base,
         'Informasi kontak belum dapat dimuat.',
+        !draft && !readOnlyData,
     );
+    const list = readOnlyData
+        ? {
+              ...readOnlyData,
+              loading: false,
+              error: '',
+              reload: () => undefined,
+          }
+        : draft
+          ? {
+                items: draft.value.contacts,
+                meta: { types: draft.metadata?.contactTypes ?? [] },
+                loading: draft.loading,
+                error: draft.error,
+                reload: draft.retry,
+            }
+          : storedList;
     // Kontak menempel ke alamat; daftar alamat dibaca saat form dibuka.
     const [editing, setEditing] = useState<Contact | 'new' | null>(null);
     const [form, setForm] = useState<ContactForm>({
@@ -1178,6 +1493,10 @@ export function OrganizationContactsSection({
     const [formError, setFormError] = useState('');
     useEffect(() => {
         if (editing === null) {
+            return;
+        }
+
+        if (draft) {
             return;
         }
 
@@ -1212,7 +1531,7 @@ export function OrganizationContactsSection({
         return () => {
             cancelled = true;
         };
-    }, [editing, organizationId, resource]);
+    }, [editing, organizationId, resource, draft]);
 
     const open = (target: Contact | 'new') => {
         setForm(
@@ -1222,7 +1541,19 @@ export function OrganizationContactsSection({
                       value: '',
                       purpose: '',
                       is_primary: false,
-                      address_id: '',
+                      address_id:
+                          (
+                              draft?.value.locations.find(
+                                  (location) =>
+                                      location.is_primary &&
+                                      location.is_location_owner,
+                              ) ??
+                              draft?.existing?.locations.find(
+                                  (location) =>
+                                      location.is_primary &&
+                                      location.is_location_owner,
+                              )
+                          )?.id ?? '',
                   }
                 : {
                       type: target.type,
@@ -1237,6 +1568,44 @@ export function OrganizationContactsSection({
     };
 
     const save = async () => {
+        if (draft && editing) {
+            const id = editing === 'new' ? newPartyDraftKey() : editing.id;
+            const isPrimary =
+                form.is_primary ||
+                (!draft.value.contacts.some(
+                    (contact) => contact.type === form.type,
+                ) &&
+                    !draft.existing?.contacts.some(
+                        (contact) => contact.type === form.type,
+                    ));
+            const contact: Contact = {
+                ...form,
+                id,
+                version: 0,
+                is_location_owner: true,
+                is_primary: isPrimary,
+                address_id: form.address_id || null,
+                address_name:
+                    draft.value.locations.find(
+                        (location) => location.id === form.address_id,
+                    )?.name ?? null,
+            };
+            const contacts = draft.value.contacts
+                .filter((row) => row.id !== id)
+                .map((row) =>
+                    isPrimary && row.type === form.type
+                        ? { ...row, is_primary: false }
+                        : row,
+                );
+            draft.onChange({
+                ...draft.value,
+                contacts: [...contacts, contact],
+            });
+            setEditing(null);
+
+            return;
+        }
+
         setSaving(true);
 
         try {
@@ -1270,6 +1639,26 @@ export function OrganizationContactsSection({
     };
 
     const remove = async (contact: Contact) => {
+        if (draft) {
+            const contacts = draft.value.contacts.filter(
+                (row) => row.id !== contact.id,
+            );
+            const replacement = contacts.findIndex(
+                (row) => row.type === contact.type,
+            );
+
+            if (contact.is_primary && replacement >= 0) {
+                contacts[replacement] = {
+                    ...contacts[replacement],
+                    is_primary: true,
+                };
+            }
+
+            draft.onChange({ ...draft.value, contacts });
+
+            return;
+        }
+
         try {
             await apiRequest(`${base}/${contact.id}`, {
                 method: 'DELETE',
@@ -1283,6 +1672,19 @@ export function OrganizationContactsSection({
     };
 
     const makePrimary = async (contact: Contact) => {
+        if (draft) {
+            draft.onChange({
+                ...draft.value,
+                contacts: draft.value.contacts.map((row) =>
+                    row.type === contact.type
+                        ? { ...row, is_primary: row.id === contact.id }
+                        : row,
+                ),
+            });
+
+            return;
+        }
+
         try {
             await apiJson(`${base}/${contact.id}`, {
                 method: 'PUT',
@@ -1314,24 +1716,22 @@ export function OrganizationContactsSection({
             {list.error && (
                 <p className="text-sm text-destructive">{list.error}</p>
             )}
-            <div className="flex flex-wrap items-center justify-end gap-2">
+            <RecordActionBar>
                 {canManage && (
-                    <Button
+                    <ActionButton
+                        action="create"
                         type="button"
-                        size="sm"
                         className="shrink-0"
+                        disabled={Boolean(list.error)}
                         onClick={() => open('new')}
-                    >
-                        <Plus className="mr-1.5 size-3.5" />
-                        Tambah kontak
-                    </Button>
+                    />
                 )}
                 <AddressBookHint label="informasi kontak">
                     Kontak utama tiap jenis (telepon, WhatsApp, email, faks,
                     laman) tampil pada kop dokumen. Kontak lain disimpan untuk
                     keperluan internal.
                 </AddressBookHint>
-            </div>
+            </RecordActionBar>
 
             {list.items.length === 0 ? (
                 <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
@@ -1349,7 +1749,7 @@ export function OrganizationContactsSection({
                         canManage
                             ? [
                                   { id: 'edit', label: 'Ubah' },
-                                  { id: 'archive', label: 'Arsipkan' },
+                                  { id: 'archive', label: 'Delete' },
                               ]
                             : []
                     }
@@ -1460,11 +1860,20 @@ export function OrganizationContactsSection({
 
             <Dialog
                 open={editing !== null}
-                onOpenChange={(isOpen) => !isOpen && setEditing(null)}
+                onOpenChange={(isOpen) => {
+                    if (!isOpen && !saving) {
+                        setEditing(null);
+                    }
+                }}
             >
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>
+                <DialogContent
+                    onEscapeKeyDown={(event) => {
+                        if (saving) {
+                            event.preventDefault();
+                        }
+                    }}
+                    title={
+                        <>
                             <span className="inline-flex items-center gap-2">
                                 {editing === 'new'
                                     ? 'Kontak baru'
@@ -1475,12 +1884,15 @@ export function OrganizationContactsSection({
                                     tampil pada kop dokumen.
                                 </AddressBookHint>
                             </span>
-                        </DialogTitle>
-                        <DialogDescription className="sr-only">
+                        </>
+                    }
+                    description={
+                        <>
                             Satu kontak utama per jenis di setiap alamat; kontak
                             utama di alamat utama yang tampil pada kop dokumen.
-                        </DialogDescription>
-                    </DialogHeader>
+                        </>
+                    }
+                >
                     <form
                         className="flex min-h-0 flex-1 flex-col"
                         onSubmit={(event) => {
@@ -1491,6 +1903,37 @@ export function OrganizationContactsSection({
                             void save();
                         }}
                     >
+                        <PageDialogToolbar>
+                            {draft ? (
+                                editing === 'new' ? (
+                                    <ActionButton
+                                        action="add"
+                                        type="button"
+                                        onClick={(event) =>
+                                            event.currentTarget.form?.requestSubmit()
+                                        }
+                                    />
+                                ) : (
+                                    <Button type="submit" variant="ghost">
+                                        <Check aria-hidden="true" />
+                                        Selesai
+                                    </Button>
+                                )
+                            ) : (
+                                <ActionButton
+                                    action="save"
+                                    type="submit"
+                                    disabled={saving}
+                                    pending={saving}
+                                />
+                            )}
+                            <ActionButton
+                                action="cancel"
+                                type="button"
+                                disabled={saving}
+                                onClick={() => setEditing(null)}
+                            />
+                        </PageDialogToolbar>
                         <DialogBody className="space-y-4 py-3">
                             <FieldGroup>
                                 {' '}
@@ -1584,18 +2027,6 @@ export function OrganizationContactsSection({
                                 </p>
                             )}
                         </DialogBody>
-                        <DialogFooter>
-                            <DialogAction type="submit" disabled={saving}>
-                                {saving ? 'Menyimpan…' : 'Simpan kontak'}
-                            </DialogAction>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setEditing(null)}
-                            >
-                                Batal
-                            </Button>
-                        </DialogFooter>
                     </form>
                 </DialogContent>
             </Dialog>

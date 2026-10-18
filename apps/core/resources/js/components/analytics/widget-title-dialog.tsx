@@ -1,11 +1,11 @@
+import { ActionButton } from '@apperp/ui/action-button';
+import { DialogClose } from '@apperp/ui/dialog';
 import {
     Dialog,
-    DialogAction,
     DialogBody,
-    DialogCancel,
     DialogContent,
     DialogDescription,
-    DialogFooter,
+    DialogToolbar,
     DialogHeader,
     DialogTitle,
 } from '@apperp/ui/dialog';
@@ -80,6 +80,21 @@ export function WidgetTitleDialog({
                             : 'Judul tampil di atas bagian ini untuk semua yang membuka dasbor.'}
                     </DialogDescription>
                 </DialogHeader>
+                <DialogToolbar>
+                    <ActionButton
+                        action="save"
+                        type="submit"
+                        form="widget-title-form"
+                        disabled={
+                            saving ||
+                            title.trim() === '' ||
+                            (isText && text.trim() === '')
+                        }
+                    />
+                    <DialogClose asChild>
+                        <ActionButton action="cancel" type="button" />
+                    </DialogClose>
+                </DialogToolbar>
                 <DialogBody>
                     <form
                         id="widget-title-form"
@@ -120,20 +135,6 @@ export function WidgetTitleDialog({
                         </FieldGroup>
                     </form>
                 </DialogBody>
-                <DialogFooter>
-                    <DialogAction
-                        type="submit"
-                        form="widget-title-form"
-                        disabled={
-                            saving ||
-                            title.trim() === '' ||
-                            (isText && text.trim() === '')
-                        }
-                    >
-                        Simpan
-                    </DialogAction>
-                    <DialogCancel />
-                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

@@ -1,3 +1,4 @@
+import { ActionButton } from '@apperp/ui/action-button';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -8,17 +9,15 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@apperp/ui/alert-dialog';
-import { Button } from '@apperp/ui/button';
+
 import { DataTable, DataTableText } from '@apperp/ui/data-table';
 import { Input } from '@apperp/ui/input';
 import {
     PageDialog as Dialog,
     PageDialogContent as DialogContent,
-    PageDialogDescription as DialogDescription,
-    PageDialogHeader as DialogHeader,
-    PageDialogTitle as DialogTitle,
 } from '@apperp/ui/page-dialog';
 import { router } from '@inertiajs/react';
+import { Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { apiJson, apiRequest, errorText } from '@/lib/core-api';
 import type { AddressBook, DirectoryMetadata } from '../types';
@@ -110,9 +109,9 @@ export function AddressBookManager({
                 }
             }}
         >
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>
+            <DialogContent
+                title={
+                    <>
                         <span className="inline-flex items-center gap-2">
                             Buku alamat
                             <AddressBookHint label="Buku alamat">
@@ -121,12 +120,12 @@ export function AddressBookManager({
                                 di dalamnya.
                             </AddressBookHint>
                         </span>
-                    </DialogTitle>
-                    <DialogDescription className="sr-only">
-                        Kelompok pihak untuk memudahkan pencarian. Mengarsipkan
-                        kelompok tidak mengarsipkan pihak di dalamnya.
-                    </DialogDescription>
-                </DialogHeader>
+                    </>
+                }
+                description={
+                    'Kelompok pihak untuk memudahkan pencarian. Mengarsipkan\n                        kelompok tidak mengarsipkan pihak di dalamnya.'
+                }
+            >
                 {error && (
                     <p role="alert" className="text-sm text-destructive">
                         {error}
@@ -143,20 +142,17 @@ export function AddressBookManager({
                         disabled={busy}
                         onChange={(event) => setName(event.target.value)}
                     />
-                    <Button type="submit" disabled={busy}>
-                        {editing ? 'Simpan perubahan' : 'Tambah'}
-                    </Button>
+                    <ActionButton action="save" type="submit" disabled={busy} />
                     {editing && (
-                        <Button
-                            variant="outline"
+                        <ActionButton
+                            action="cancel"
                             disabled={busy}
                             onClick={() => {
                                 setEditing(null);
                                 setName('');
                             }}
-                        >
-                            Batal ubah
-                        </Button>
+                            type="button"
+                        />
                     )}
                 </form>
                 <div className="min-h-0 flex-1 overflow-hidden">
@@ -175,7 +171,11 @@ export function AddressBookManager({
                         ]}
                         actions={[
                             { id: 'edit', label: 'Ubah' },
-                            { id: 'archive', label: 'Arsipkan' },
+                            {
+                                id: 'archive',
+                                label: 'Delete',
+                                icon: <Trash2 aria-hidden="true" />,
+                            },
                         ]}
                         actionsPlacement="inline"
                         onRowAction={(action, book) => {
@@ -203,7 +203,7 @@ export function AddressBookManager({
                     <AlertDialogContent>
                         <AlertDialogHeader>
                             <AlertDialogTitle>
-                                Arsipkan buku alamat {archiving?.name}?
+                                Delete buku alamat {archiving?.name}?
                             </AlertDialogTitle>
                             <AlertDialogDescription>
                                 Pihak di dalamnya tetap tersimpan. Pengelompokan
@@ -229,7 +229,7 @@ export function AddressBookManager({
                                     void archive();
                                 }}
                             >
-                                Arsipkan
+                                Delete
                             </AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>

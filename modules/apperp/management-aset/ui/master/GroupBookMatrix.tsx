@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
+import type { SetStateAction } from 'react';
+import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
-import { Field, FieldDescription, FieldLabel } from '@apperp/ui/field';
+
+import { DialogToolbar } from '@apperp/ui/dialog';
+import {
+    Field,
+    FieldDescription,
+    FieldError,
+    FieldLabel,
+} from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
@@ -13,7 +22,7 @@ import {
 import ServiceLifeFields from './ServiceLifeFields';
 import { optionLabel, useMasterOptions } from './useMasterOptions';
 
-type Row = {
+export type GroupBookRow = {
     buku_id: string;
     depreciation_profile_id: string;
     alternative_profile_id: string;
@@ -22,6 +31,27 @@ type Row = {
     depreciate: boolean;
     round_off_depreciation: string;
 };
+type Row = GroupBookRow;
+type Draft = {
+    rows: Row[];
+    onChange: (rows: Row[]) => void;
+    errors?: Record<number, string[]>;
+    error?: string[];
+};
+type Props = { canEdit: boolean } & (
+    | {
+          draft: Draft;
+          groupId?: never;
+          version?: never;
+          onVersionChange?: never;
+      }
+    | {
+          draft?: never;
+          groupId: string;
+          version: number;
+          onVersionChange: (version: number) => void;
+      }
+);
 
 const CONVENTIONS: { value: string; label: string }[] = [
     { value: '', label: 'Tanpa penyesuaian' },
@@ -62,14 +92,22 @@ export default function GroupBookMatrix({
     canEdit,
     version,
     onVersionChange,
-}: {
-    groupId: string;
-    canEdit: boolean;
-    /** Versi record pemilik; penyimpanan rincian ini mengklaimnya. */
-    version: number;
-    onVersionChange: (version: number) => void;
-}) {
-    const [rows, setRows] = useState<Row[]>([]);
+    draft,
+}: Props) {
+    const [storedRows, setStoredRows] = useState<Row[]>([]);
+    const [loadedGroupId, setLoadedGroupId] = useState<string | null>(null);
+    const [loadAttempt, setLoadAttempt] = useState(0);
+    const rows = draft?.rows ?? storedRows;
+    const staging = draft !== undefined;
+    const setRows = (update: SetStateAction<Row[]>) => {
+        if (draft) {
+            draft.onChange(
+                typeof update === 'function' ? update(rows) : update,
+            );
+        } else {
+            setStoredRows(update);
+        }
+    };
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
@@ -92,6 +130,10 @@ export default function GroupBookMatrix({
     const books = bookSource.options;
 
     useEffect(() => {
+        if (staging || !groupId) {
+            return;
+        }
+
         let cancelled = false;
         api<{ data: Record<string, unknown>[] }>(
             `/group-aset/${groupId}/buku-penyusutan`,
@@ -101,7 +143,7 @@ export default function GroupBookMatrix({
                     return;
                 }
 
-                setRows(
+                setStoredRows(
                     matrix.data.map((row) => ({
                         buku_id: String(row.buku_id ?? ''),
                         depreciation_profile_id: String(
@@ -124,6 +166,7 @@ export default function GroupBookMatrix({
                                 : String(row.round_off_depreciation),
                     })),
                 );
+                setLoadedGroupId(groupId);
             })
             .catch((caught) => {
                 if (!cancelled) {
@@ -139,7 +182,7 @@ export default function GroupBookMatrix({
         return () => {
             cancelled = true;
         };
-    }, [groupId]);
+    }, [groupId, staging, loadAttempt]);
 
     const label = (id: string) => {
         const book = books.find((item) => item.id === id);
@@ -166,6 +209,10 @@ export default function GroupBookMatrix({
         );
 
     async function save() {
+        if (draft) {
+            return;
+        }
+
         if (
             rows.some(
                 (row) =>
@@ -223,16 +270,59 @@ export default function GroupBookMatrix({
         }
     }
 
-    return (
-        <div ref={containerRef} className="space-y-4 border-t px-5 py-4">
-            <div>
-                <p className="font-semibold">Buku dan Metode Penyusutan</p>
-                <p className="text-muted-foreground text-sm">
-                    Aset dari group ini akan mendapat satu buku untuk tiap baris
-                    di bawah. Buku komersial dan fiskal boleh memakai metode,
-                    masa manfaat, dan tanggal berlaku yang berbeda.
-                </p>
+    if (!staging && loadedGroupId !== groupId) {
+        return error ? (
+            <div role="alert" className="space-y-2">
+                <p className="text-destructive text-sm">{error}</p>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                        setError('');
+                        setLoadAttempt((attempt) => attempt + 1);
+                    }}
+                >
+                    Muat ulang
+                </Button>
             </div>
+        ) : (
+            <p role="status" className="text-muted-foreground text-sm">
+                Memuat buku dan metode penyusutan…
+            </p>
+        );
+    }
+
+    return (
+        <div
+            ref={(node) => {
+                containerRef.current =
+                    node?.closest<HTMLDivElement>(
+                        '[data-slot="page-dialog-contents"]',
+                    ) ?? node;
+            }}
+            className={staging ? 'space-y-4' : 'space-y-4 border-t px-5 py-4'}
+        >
+            {canEdit && !staging && (
+                <DialogToolbar className="px-0">
+                    <ActionButton
+                        action="save"
+                        type="button"
+                        disabled={saving}
+                        onClick={() => void save()}
+                        pending={saving}
+                    />
+                </DialogToolbar>
+            )}
+            {!staging && (
+                <div>
+                    <p className="font-semibold">Buku dan Metode Penyusutan</p>
+                    <p className="text-muted-foreground text-sm">
+                        Aset dari group ini akan mendapat satu buku untuk tiap
+                        baris di bawah. Buku komersial dan fiskal boleh memakai
+                        metode, masa manfaat, dan tanggal berlaku yang berbeda.
+                    </p>
+                </div>
+            )}
 
             {rows.length === 0 && (
                 <p className="text-muted-foreground text-sm">
@@ -258,20 +348,20 @@ export default function GroupBookMatrix({
                                 {label(row.buku_id) || 'Buku tidak dikenal'}
                             </span>
                             {canEdit && (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
+                                <ActionButton
+                                    action="delete"
                                     type="button"
                                     onClick={() =>
                                         setRows(
                                             rows.filter((_, i) => i !== index),
                                         )
                                     }
-                                >
-                                    Hapus
-                                </Button>
+                                />
                             )}
                         </div>
+                        <FieldError>
+                            {draft?.errors?.[index]?.join(' ')}
+                        </FieldError>
                         <div className="grid gap-3 sm:grid-cols-2">
                             <Field>
                                 <Select
@@ -484,10 +574,10 @@ export default function GroupBookMatrix({
                         items={unused.map(
                             (book) => `${book.kode} — ${book.nama}`,
                         )}
-                        placeholder="Tambah buku penyusutan"
+                        placeholder="Pilih buku penyusutan"
                         searchPlaceholder="Cari buku"
                         emptyMessage="Buku tidak ditemukan."
-                        ariaLabel="Tambah buku penyusutan"
+                        ariaLabel="Pilih buku penyusutan"
                         portalContainer={containerRef}
                         onValueChange={(item) => {
                             const book = unused.find(
@@ -505,20 +595,11 @@ export default function GroupBookMatrix({
             )}
 
             {error && <p className="text-destructive text-sm">{error}</p>}
+            <FieldError>{draft?.error?.join(' ')}</FieldError>
             {saved && (
                 <p className="text-muted-foreground text-sm">
                     Matriks tersimpan.
                 </p>
-            )}
-
-            {canEdit && (
-                <Button
-                    type="button"
-                    disabled={saving}
-                    onClick={() => void save()}
-                >
-                    {saving ? 'Menyimpan…' : 'Simpan matriks'}
-                </Button>
             )}
         </div>
     );

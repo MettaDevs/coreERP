@@ -184,7 +184,7 @@ final class EnforceSiteLicenseTest extends TestCase
         $this->get(route('login'))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->component('platform/identity/auth/login'));
         // Beranda tidak dijaga `auth` dan tidak ada di daftar yang dilepas; yang melepas tamu di sana
         // hanya pemeriksaan tamu itu sendiri.
-        $this->get(route('home'))->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->component('welcome'));
+        $this->get(route('home'))->assertRedirect(route('login'));
         // Halaman yang dijaga `auth` tetap mengalihkan tamu ke login, bukan menampilkan halaman kunci.
         $this->get(route('dashboard'))->assertRedirect(route('login'));
     }

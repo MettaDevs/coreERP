@@ -32,7 +32,7 @@ import {
 import { useIncrementalList } from '@apperp/ui/use-incremental-list';
 import type { ListLoader } from '@apperp/ui/use-incremental-list';
 import { Head, useForm } from '@inertiajs/react';
-import { ArrowDown, ArrowUp, CircleHelp, Save, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, CircleHelp } from 'lucide-react';
 import { useId, useState } from 'react';
 import { apiJson, CoreApiError, errorText } from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
@@ -281,9 +281,8 @@ function SegmentEditor({
                                 <ArrowDown /> Turun
                             </Button>
                             <ActionButton
-                                type="button"
                                 action="delete"
-                                size="sm"
+                                type="button"
                                 onClick={() =>
                                     onChange(
                                         value.filter(
@@ -291,23 +290,19 @@ function SegmentEditor({
                                         ),
                                     )
                                 }
-                            >
-                                Hapus bagian
-                            </ActionButton>
+                            />
                         </div>
                     )}
                 </fieldset>
             ))}
             {!disabled && (
                 <ActionButton
-                    type="button"
                     action="create"
+                    type="button"
                     onClick={() =>
                         onChange([...value, { type: 'constant', value: '' }])
                     }
-                >
-                    Tambah bagian
-                </ActionButton>
+                />
             )}
         </div>
     );
@@ -451,21 +446,19 @@ function SequenceForm({
                         <ActionButton
                             action="edit"
                             onClick={() => setEditing(true)}
-                        >
-                            Ubah
-                        </ActionButton>
+                            type="button"
+                        />
                     )}
                     {editing && (
                         <>
-                            <Button
+                            <ActionButton
+                                action="save"
                                 type="submit"
                                 disabled={!form.isDirty || saving}
-                            >
-                                <Save /> Simpan
-                            </Button>
-                            <Button
+                            />
+                            <ActionButton
+                                action="cancel"
                                 type="button"
-                                variant="outline"
                                 disabled={saving}
                                 onClick={() => {
                                     form.reset();
@@ -473,9 +466,7 @@ function SequenceForm({
                                     setSaveError('');
                                     setEditing(false);
                                 }}
-                            >
-                                <X /> Batal
-                            </Button>
+                            />
                         </>
                     )}
                 </RecordActionBar>

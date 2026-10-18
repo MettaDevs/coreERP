@@ -6,6 +6,7 @@ use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Organization\Models\OperatingUnit;
 use App\Platform\Organization\Models\Organization;
+use App\Platform\Reporting\Support\PrintIdentityStore;
 use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -13,6 +14,8 @@ use Illuminate\Support\Facades\DB;
 
 class UpdateOrganization
 {
+    public function __construct(private readonly PrintIdentityStore $identities) {}
+
     /**
      * Nomor unit hanya berubah bila kuncinya ada di `$data`. Lihat UpdateOrganizationRequest::payload().
      *
@@ -22,7 +25,7 @@ class UpdateOrganization
      * `$expectedVersion` adalah versi organisasi yang dibuka penggunanya; entitas legal atau unitnya
      * ikut terkunci bersamanya.
      *
-     * @param  array{name:string,company_code:?string,country_code:?string,timezone?:?string,operating_unit_type:?string,operating_unit_number?:?string}  $data
+     * @param  array{name:string,company_code:?string,country_code:?string,timezone?:?string,operating_unit_type:?string,operating_unit_number?:?string,print_identity?:array{version:int,display_name?:?string,parent_lines?:?list<?string>,tax_id?:?string,registration_id?:?string,footer_text?:?string}}  $data
      */
     public function handle(TenantMembership $actor, Organization $organization, array $data, int $expectedVersion): Organization
     {
@@ -43,6 +46,14 @@ class UpdateOrganization
             return DB::transaction(function () use ($organization, $data, $renumber, $number, $expectedVersion): Organization {
                 RowVersion::claim($organization, $expectedVersion);
                 $organization->update(['name' => $data['name']]);
+
+                if (isset($data['print_identity'])) {
+                    RowVersion::claimIfExists(
+                        DB::table('print_identities')->where('tenant_id', $organization->tenant_id)->where('organization_id', $organization->id),
+                        (int) $data['print_identity']['version'],
+                    );
+                    $this->identities->save($organization, $data['print_identity']);
+                }
 
                 if ($organization->classification === 'legal_entity') {
                     $organization->legalEntity()->update([

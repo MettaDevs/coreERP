@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@apperp/ui/button';
+import { DataTable } from '@apperp/ui/data-table';
+import type { DataTableColumn } from '@apperp/ui/data-table';
 import {
     Field,
     FieldDescription,
@@ -18,14 +20,7 @@ import {
     SheetHeader,
     SheetTitle,
 } from '@apperp/ui/sheet';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
+
 import { api, errorMessage, newIdempotencyKey } from '../../api';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import type { Context, LaporanImpor } from './penerimaan';
@@ -231,36 +226,61 @@ export function ImporSaldoAwal({
                                 {laporan.rejected.length} masalah; belum ada
                                 draf yang dibuat.
                             </p>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="w-20">
-                                            Baris
-                                        </TableHead>
-                                        <TableHead className="w-44">
-                                            Kolom
-                                        </TableHead>
-                                        <TableHead>Masalah</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {laporan.rejected.map((masalah, urut) => (
-                                        <TableRow
-                                            key={`${masalah.line}-${masalah.field}-${urut}`}
-                                        >
-                                            <TableCell>
-                                                {masalah.line}
-                                            </TableCell>
-                                            <TableCell>
-                                                {masalah.field ?? '—'}
-                                            </TableCell>
-                                            <TableCell className="whitespace-normal">
+                            {(() => {
+                                const sdkRows = laporan.rejected.map(
+                                    (masalah, urut) => {
+                                        return { masalah, urut };
+                                    },
+                                );
+                                const sdkColumns: DataTableColumn<
+                                    (typeof sdkRows)[number]
+                                >[] = [
+                                    {
+                                        id: 'column-0',
+                                        header: 'Baris',
+                                        width: 80,
+                                        cell: ({ masalah }) => (
+                                            <>{masalah.line}</>
+                                        ),
+                                    } satisfies DataTableColumn<
+                                        (typeof sdkRows)[number]
+                                    >,
+                                    {
+                                        id: 'column-1',
+                                        header: 'Kolom',
+                                        width: 176,
+                                        cell: ({ masalah }) => (
+                                            <>{masalah.field ?? '—'}</>
+                                        ),
+                                    } satisfies DataTableColumn<
+                                        (typeof sdkRows)[number]
+                                    >,
+                                    {
+                                        id: 'column-2',
+                                        header: 'Masalah',
+                                        cell: ({ masalah }) => (
+                                            <div className="whitespace-normal">
                                                 {masalah.reason}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
+                                            </div>
+                                        ),
+                                    } satisfies DataTableColumn<
+                                        (typeof sdkRows)[number]
+                                    >,
+                                ];
+
+                                return (
+                                    <DataTable
+                                        scrollMode="inline"
+                                        showRowNumbers={false}
+                                        serverSort
+                                        data={sdkRows}
+                                        columns={sdkColumns}
+                                        getRowKey={({ masalah, urut }) =>
+                                            `${masalah.line}-${masalah.field}-${urut}`
+                                        }
+                                    />
+                                );
+                            })()}
                         </div>
                     )}
 
@@ -270,48 +290,91 @@ export function ImporSaldoAwal({
                                 {laporan.receipts.length} draf dari{' '}
                                 {laporan.rows} baris siap dibuat.
                             </p>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Tanggal perolehan</TableHead>
-                                        <TableHead>Lokasi</TableHead>
-                                        <TableHead>Baris berkas</TableHead>
-                                        <TableHead className="text-right">
-                                            Aset
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            Nilai
-                                        </TableHead>
-                                        <TableHead className="text-right">
-                                            Akumulasi
-                                        </TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {laporan.receipts.map((draf, urut) => (
-                                        <TableRow key={urut}>
-                                            <TableCell>
-                                                {tanggalTampil(draf.tanggal)}
-                                            </TableCell>
-                                            <TableCell>
-                                                {draf.lokasi ?? 'Tanpa lokasi'}
-                                            </TableCell>
-                                            <TableCell>
-                                                {(draf.lines ?? []).join(', ')}
-                                            </TableCell>
-                                            <TableCell className="text-right">
+                            {(() => {
+                                const sdkRows = laporan.receipts.map(
+                                    (draf, urut) => {
+                                        return { draf, urut };
+                                    },
+                                );
+                                const sdkColumns: DataTableColumn<
+                                    (typeof sdkRows)[number]
+                                >[] = [
+                                    {
+                                        id: 'column-0',
+                                        header: 'Tanggal perolehan',
+                                        cell: ({ draf }) => (
+                                            <>{tanggalTampil(draf.tanggal)}</>
+                                        ),
+                                    } satisfies DataTableColumn<
+                                        (typeof sdkRows)[number]
+                                    >,
+                                    {
+                                        id: 'column-1',
+                                        header: 'Lokasi',
+                                        cell: ({ draf }) => (
+                                            <>{draf.lokasi ?? 'Tanpa lokasi'}</>
+                                        ),
+                                    } satisfies DataTableColumn<
+                                        (typeof sdkRows)[number]
+                                    >,
+                                    {
+                                        id: 'column-2',
+                                        header: 'Baris berkas',
+                                        cell: ({ draf }) => (
+                                            <>{(draf.lines ?? []).join(', ')}</>
+                                        ),
+                                    } satisfies DataTableColumn<
+                                        (typeof sdkRows)[number]
+                                    >,
+                                    {
+                                        id: 'column-3',
+                                        header: 'Aset',
+                                        align: 'right',
+                                        cell: ({ draf }) => (
+                                            <div className="text-right">
                                                 {draf.jumlah_aset}
-                                            </TableCell>
-                                            <TableCell className="text-right">
+                                            </div>
+                                        ),
+                                    } satisfies DataTableColumn<
+                                        (typeof sdkRows)[number]
+                                    >,
+                                    {
+                                        id: 'column-4',
+                                        header: 'Nilai',
+                                        align: 'right',
+                                        cell: ({ draf }) => (
+                                            <div className="text-right">
                                                 {rupiah(draf.nilai)}
-                                            </TableCell>
-                                            <TableCell className="text-right">
+                                            </div>
+                                        ),
+                                    } satisfies DataTableColumn<
+                                        (typeof sdkRows)[number]
+                                    >,
+                                    {
+                                        id: 'column-5',
+                                        header: 'Akumulasi',
+                                        align: 'right',
+                                        cell: ({ draf }) => (
+                                            <div className="text-right">
                                                 {rupiah(draf.akumulasi)}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
+                                            </div>
+                                        ),
+                                    } satisfies DataTableColumn<
+                                        (typeof sdkRows)[number]
+                                    >,
+                                ];
+
+                                return (
+                                    <DataTable
+                                        scrollMode="inline"
+                                        showRowNumbers={false}
+                                        serverSort
+                                        data={sdkRows}
+                                        columns={sdkColumns}
+                                        getRowKey={({ urut }) => urut}
+                                    />
+                                );
+                            })()}
                         </div>
                     )}
                 </div>

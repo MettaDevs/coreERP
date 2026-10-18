@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Button } from '@apperp/ui/button';
+import { ActionButton } from '@apperp/ui/action-button';
+import type { DataTableColumn } from '@apperp/ui/data-table';
+import { DataTable } from '@apperp/ui/data-table';
+
+import { DialogToolbar } from '@apperp/ui/dialog';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
+
 import { TransferList } from '@apperp/ui/transfer-list';
 import type { TransferListItem } from '@apperp/ui/transfer-list';
 import { api, errorMessage, newIdempotencyKey } from '../../api';
@@ -126,7 +123,7 @@ export default function MaintenanceJobTypeDetails({
     }
 
     async function removeVariant(variant: Variant) {
-        if (!window.confirm('Arsipkan varian ini?')) {
+        if (!window.confirm('Delete varian ini?')) {
             return;
         }
 
@@ -193,13 +190,12 @@ export default function MaintenanceJobTypeDetails({
                                     setVariantName(event.target.value)
                                 }
                             />
-                            <Button
+                            <ActionButton
+                                action="add"
                                 type="button"
                                 disabled={busy}
                                 onClick={() => void addVariant()}
-                            >
-                                Tambah
-                            </Button>
+                            />
                         </div>
                     )}
                 </div>
@@ -211,47 +207,79 @@ export default function MaintenanceJobTypeDetails({
                         </EmptyDescription>
                     </Empty>
                 ) : (
-                    <div className="overflow-x-auto rounded-md border">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Kode</TableHead>
-                                    <TableHead>Nama</TableHead>
-                                    {canEdit && (
-                                        <TableHead className="w-28">
-                                            Aksi
-                                        </TableHead>
-                                    )}
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {variants.map((item) => (
-                                    <TableRow key={item.id}>
-                                        <TableCell>{item.kode}</TableCell>
-                                        <TableCell>{item.nama}</TableCell>
-                                        {canEdit && (
-                                            <TableCell>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        void removeVariant(item)
-                                                    }
-                                                >
-                                                    Arsipkan
-                                                </Button>
-                                            </TableCell>
-                                        )}
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
+                    (() => {
+                        const sdkRows = variants.map((item, rowIndex) => {
+                            return { item, rowIndex };
+                        });
+                        const sdkColumns: DataTableColumn<
+                            (typeof sdkRows)[number]
+                        >[] = [
+                            {
+                                id: 'column-0',
+                                header: 'Kode',
+                                cell: ({ item }) => <>{item.kode}</>,
+                            } satisfies DataTableColumn<
+                                (typeof sdkRows)[number]
+                            >,
+                            {
+                                id: 'column-1',
+                                header: 'Nama',
+                                cell: ({ item }) => <>{item.nama}</>,
+                            } satisfies DataTableColumn<
+                                (typeof sdkRows)[number]
+                            >,
+                            ...(canEdit
+                                ? [
+                                      {
+                                          id: 'column-2',
+                                          header: 'Aksi',
+                                          width: 112,
+                                          cell: ({ item }) => (
+                                              <>
+                                                  <ActionButton
+                                                      action="archive"
+                                                      type="button"
+                                                      onClick={() =>
+                                                          void removeVariant(
+                                                              item,
+                                                          )
+                                                      }
+                                                  />
+                                              </>
+                                          ),
+                                      } satisfies DataTableColumn<
+                                          (typeof sdkRows)[number]
+                                      >,
+                                  ]
+                                : []),
+                        ];
+
+                        return (
+                            <DataTable
+                                scrollMode="inline"
+                                showRowNumbers={false}
+                                serverSort
+                                data={sdkRows}
+                                columns={sdkColumns}
+                                getRowKey={({ item }) => item.id}
+                            />
+                        );
+                    })()
                 )}
             </section>
 
             <section className="space-y-3">
+                {canEdit && (
+                    <DialogToolbar className="px-0">
+                        <ActionButton
+                            action="save"
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void saveAsetTypes()}
+                            pending={busy}
+                        />
+                    </DialogToolbar>
+                )}
                 <h3 className="font-semibold">
                     Jenis aset yang menggunakan pekerjaan ini
                 </h3>
@@ -273,15 +301,6 @@ export default function MaintenanceJobTypeDetails({
                     remainingEmptyLabel="Semua jenis aset sudah terpilih."
                     selectedEmptyLabel="Belum ada jenis aset yang dipilih."
                 />
-                {canEdit && (
-                    <Button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => void saveAsetTypes()}
-                    >
-                        {busy ? 'Menyimpan…' : 'Simpan relasi jenis aset'}
-                    </Button>
-                )}
             </section>
             {saved && (
                 <p className="text-muted-foreground text-sm">

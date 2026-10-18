@@ -6,14 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\AddressBook\Models\LocationPurpose;
 use App\Platform\AddressBook\Support\OrganizationAddressBook;
-use App\Platform\AddressBook\Support\PostalAddressReferences;
+use App\Platform\AddressBook\Support\PartyDetailData;
 use App\Platform\Geography\Models\CountryRegion;
 use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Organization\Models\Organization;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Validation\Rule;
 
 /**
  * Alamat utama dan cabang satu organisasi (padanan Addresses pada legal entity
@@ -76,38 +75,7 @@ class OrganizationLocationController extends Controller
     /** @return array<string, mixed> */
     private function validated(Request $request): array
     {
-        // Kode negara dinormalkan sebelum diperiksa ke tabel, supaya "id" dan "ID" sama.
-        if ($request->filled('country_region_code')) {
-            $request->merge(['country_region_code' => strtoupper((string) $request->input('country_region_code'))]);
-        }
-        // Satu kegunaan (`purpose`) tetap diterima; ia kegunaan pertama alamat itu.
-        if (! $request->has('purposes') && $request->filled('purpose')) {
-            $request->merge(['purposes' => [$request->input('purpose')]]);
-        }
-        $linking = $request->filled('location_id');
-
-        $data = $request->validate([
-            'location_id' => ['nullable', 'string', 'size:26'],
-            'name' => [$linking ? 'nullable' : 'required', 'string', 'max:120'],
-            'purposes' => ['required', 'array', 'min:1'],
-            'purposes.*' => ['string', 'distinct', Rule::exists('location_purposes', 'code')],
-            'is_primary' => ['sometimes', 'boolean'],
-            'country_region_code' => [$linking ? 'nullable' : 'required', 'string', 'size:2', Rule::exists('country_regions', 'code')],
-            'province' => ['nullable', 'string', 'max:100'],
-            'city' => ['nullable', 'string', 'max:100'],
-            'district' => ['nullable', 'string', 'max:100'],
-            'village' => ['nullable', 'string', 'max:100'],
-            'rt' => ['nullable', 'string', 'regex:/^[0-9]{1,3}$/D'],
-            'rw' => ['nullable', 'string', 'regex:/^[0-9]{1,3}$/D'],
-            'street' => ['nullable', 'string', 'max:250'],
-            'building' => ['nullable', 'string', 'max:120'],
-            'postbox' => ['nullable', 'string', 'max:60'],
-            'postal_code' => ['nullable', 'string', 'max:20'],
-            ...PostalAddressReferences::rules(),
-        ]);
-        $data['purposes'] = array_values(array_unique($data['purposes']));
-
-        return $data;
+        return PartyDetailData::location($request->all());
     }
 
     private function guardOrganization(Request $request, Organization $organization, bool $manage = false): void

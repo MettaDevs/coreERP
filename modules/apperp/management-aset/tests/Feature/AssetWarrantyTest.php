@@ -58,6 +58,26 @@ class AssetWarrantyTest extends TestCase
         $this->vendorId = $this->pastikanVendorUji($this->tenantId, $this->legalEntityId, 'PT Servis Alat');
     }
 
+    public function test_exact_record_read_requires_only_read_and_hides_inaccessible_records(): void
+    {
+        $asset = $this->seedAsset($this->jenisAset, 'EXACT-WARRANTY');
+        $created = $this->warranty($asset, $this->day(-1), $this->day(10))->assertCreated();
+        $id = (string) $created->json('data.id');
+        $reader = ['management-aset.garansi-aset.read'];
+        $this->as($reader)->getJson(self::URL.'/'.$id.'?q=not-a-match')->assertOk()
+            ->assertJsonPath('data.id', $id)->assertJsonPath('data.aset_kode', 'EXACT-WARRANTY')
+            ->assertJsonPath('data.vendor.id', $this->vendorId)->assertJsonPath('data.berlaku', true)
+            ->assertJsonPath('data.version', $created->json('data.version'));
+        $this->as([])->getJson(self::URL.'/'.$id)->assertForbidden();
+        $this->as($reader)->getJson(self::URL.'/'.Str::ulid())->assertNotFound();
+        $this->sebagaiPenggunaBernama('Outside unit', $this->tenantId, $reader, [[
+            'policy_code' => self::KEBIJAKAN_TANGGUNG_JAWAB, 'legal_entity_id' => $this->legalEntityId, 'organization_id' => (string) Str::ulid(),
+        ]])->getJson(self::URL.'/'.$id)->assertNotFound();
+        $this->sebagaiPenggunaBernama('Other tenant', $this->buatTenantUji(), $reader)->getJson(self::URL.'/'.$id)->assertNotFound();
+        $this->as(self::MANAGER)->deleteJson(self::URL.'/'.$id, ['version' => $this->version($id)])->assertNoContent();
+        $this->as($reader)->getJson(self::URL.'/'.$id)->assertNotFound();
+    }
+
     public function test_warranty_is_recorded_per_asset_and_edits_need_the_version(): void
     {
         $aset = $this->seedAsset($this->jenisAset, 'ALK-01');

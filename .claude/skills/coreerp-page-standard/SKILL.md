@@ -19,12 +19,12 @@ Apply `coreerp-ui` first. Treat an existing Core page with the same job as the v
 
 ## Memilih daftar dan kartu record
 
-Entitas kompleks, misalnya aset dengan banyak field dan relasi, memakai DataTable sebagai daftar dan `PageDialog` SDK sebagai kartu Tambah/Detail/Ubah. Split view dipilih untuk alur konfigurasi atau pemeriksaan berdampingan yang memang memerlukannya; banyak field saja tidak membuat split view menjadi pilihan yang benar. Pertahankan konteks daftar saat kartu dibuka, pisahkan izin baca/edit/create, dan jaga draft serta error penyimpanan.
+Entitas kompleks, misalnya aset dengan banyak field dan relasi, memakai DataTable sebagai daftar dan `PageDialog` SDK sebagai kartu Baru/Detail/Ubah. Split view dipilih untuk alur konfigurasi atau pemeriksaan berdampingan yang memang memerlukannya; banyak field saja tidak membuat split view menjadi pilihan yang benar. Pertahankan konteks daftar saat kartu dibuka, pisahkan izin baca/edit/create, dan jaga draft serta error penyimpanan.
 
 ## Page hierarchy
 
 - Use one content title. Do not add uppercase category eyebrows such as "MASTER DATA" unless the reference page has one for a real user need.
-- Match Core typography: ordinary page/card titles use `text-xl` or SDK `CardTitle`; never start a CRUD page at `text-3xl` or `text-4xl`.
+- Gunakan hierarki tipografi SDK: judul halaman pada bar perintah 14 px semibold, teks operasional 14 px, header kolom tabel 12 px regular, dan judul FastTab 18 px semibold dengan header ringkas. Identitas record boleh lebih menonjol, tetapi jangan membesarkan seluruh header CRUD dengan `text-xl`, `text-3xl`, atau `text-4xl`. Pilihan font pengguna tetap dihormati.
 - Keep page/card descriptions optional and page-wide. Do not add a hover/info hint to every heading. Give complex or non-obvious fields optional help text attached to that field; use `FieldDescription` when the guidance must be visible before entry, and keep field-specific meaning out of the page/card header.
 - Modules render in the Core Shell and inherit its React tree and theme. Do not recreate Shell chrome or iframe hosting.
 
@@ -34,18 +34,44 @@ Entitas kompleks, misalnya aset dengan banyak field dan relasi, memakai DataTabl
 - Props are what the server actually sends. Do not add optional fields to a props type speculatively — a reader takes `avatar_url?: string | null` as evidence the backend provides it. Either send it from the controller in the same change, or leave it out.
 - Read the controller before trusting a field. If it is absent there, the fallback you wrote is the only branch that will ever run.
 
+## Draft dan bagian kosong
+
+Alur record baru adalah **Baru → isi identitas dan rincian → Simpan sekali**. Semua bagian yang boleh diisi tersedia sejak kartu dibuka, sesuai izin dan pilihan pada form. Draft berarti isian sementara pada kartu yang sedang terbuka; belum menjadi record tersimpan dan tidak dijanjikan pulih setelah refresh browser.
+
+- **Baru** membuka kartu record baru. **Tambah** menambahkan baris rincian. Pada popup rincian yang masih berupa draft, Tambah memasukkan baris ke draft induk dan Selesai menerima perubahan baris; hanya Simpan utama yang menyimpan seluruh record ke server. Baris yang baru ditambahkan langsung terlihat pada bagian induknya.
+- Bagian rincian tidak boleh kosong tanpa penjelasan. Jika bisa diisi, tampilkan keadaan kosong singkat beserta tindakan yang tersedia, misalnya “Belum ada alamat. Pilih Baru untuk mengisi.” atau “Belum ada barang. Pilih Tambah untuk menambahkan baris.” Sesuaikan label dengan kontrol SDK yang benar-benar tampil dan izin pengguna.
+- Bedakan keadaan berikut; jangan mengubah semuanya menjadi “Belum ada data”.
+
+| Keadaan | Yang dilihat pengguna |
+| --- | --- |
+| Belum ada rincian pada draft | Pesan kosong singkat dan aksi untuk mengisi, sesuai izin. |
+| Record tersimpan memang tidak memiliki rincian | Pesan kosong yang sesuai; aksi hanya bagi pengguna yang boleh mengubahnya. |
+| Data sedang dimuat | Status memuat, bukan pesan kosong. |
+| Pemuatan gagal | Pesan gagal dan cara mencoba lagi; jangan menyimpulkan data tidak ada. |
+| Tidak punya izin | Sembunyikan bagian atau jelaskan batas akses bila bagian perlu tetap terlihat; jangan menampilkan data kosong palsu. |
+| Tidak berlaku untuk pilihan saat ini | Sembunyikan bagian, atau jelaskan pilihan yang membuatnya berlaku bila itu membantu pengisian. |
+| Hasil yang memang baru ada setelah proses bisnis | Jelaskan pemicunya, misalnya nomor diisi saat disimpan atau hasil penyusutan tersedia setelah proses penyusutan. Jangan mengunci rincian biasa dengan alasan ini. |
+
+- Batal pada kartu induk membuang draft induk beserta rincian barunya. Batal pada popup rincian hanya membuang perubahan popup itu. Back, Close, Baru, dan navigasi record menjaga perubahan yang belum disimpan melalui konfirmasi atau guard yang sama.
+- Bila Simpan gagal, pertahankan semua isian dan baris, tampilkan kesalahan pada bagian yang tepat, lalu izinkan pengguna memperbaiki dan mencoba lagi. Keberhasilan harus menampilkan record dan rincian hasil simpan; pengguna tidak perlu mengisi ulang atau melakukan Simpan kedua.
+- Pada halaman lama, audit seluruh alur Baru, Detail, dan Ubah, termasuk bagian yang ditampilkan bersyarat dan empty state. Jangan sekadar mengganti teks “simpan dahulu” atau menyembunyikan bagian. Alur baru memerlukan dukungan draft pada UI dan penyimpanan rincian bersama induknya. Nyatakan halaman yang belum dimigrasikan; perubahan SDK tidak otomatis memigrasikan logika halaman.
+
 ## Setelah menyimpan master
 
 - Respons `POST`/`PATCH` yang berhasil harus mengembalikan record lengkap yang baru disimpan, sekurangnya `id`, `kode`, `nama`, dan status. Teruskan record itu ke controller halaman; jangan hanya meneruskan `id` lalu berharap pemuatan ulang daftar mengisi form.
 - Masukkan atau perbarui record hasil respons di state daftar sebelum memulai refresh. Jika panel detail bisa terpasang ketika data daftar masih kosong, ia dapat menginisialisasi state form dari `null`: kode akhirnya terlihat dari props, tetapi nama tetap kosong karena state lokal sudah terlanjur dibuat.
-- Setelah membuat record baru, pilih record tersebut dan buka mode edit otomatis bila record memiliki rincian lanjutan yang perlu diisi setelah identitasnya dibuat—contohnya nilai variable checklist, baris template, model, atau relasi. Pada form `Sheet`, biarkan form tetap terbuka dan pasang ulang dengan record hasil respons agar kode otomatis dan nama ikut tampil. Pengguna tidak perlu menekan `Ubah` untuk kedua kalinya.
+- Setelah membuat record baru, pilih record hasil respons dan ikuti tujuan alur halaman: tampilkan kartu tersimpan atau kembali ke daftar dengan record tersebut terpilih. Rincian biasa sudah dapat diisi dalam draft sebelum Simpan; jangan memaksa pengguna masuk edit lagi untuk melengkapi alamat, kontak, nilai checklist, model, atau baris rincian. Data yang bergantung pada proses bisnis berikutnya mengikuti lifecycle proses tersebut.
 - Setelah `PATCH` pada record yang sedang diedit, pertahankan perilaku halaman yang sudah disepakati (biasanya kembali ke baca). Jangan menampilkan kartu `Belum disimpan` setelah respons sukses; kartu itu hanya untuk draft sebelum `POST` berhasil.
 
 ## Cards and actions
 
 - A full-height operational list uses SDK `ListPageLayout` with header/filter/footer slots and a DataTable child. The layout owns the height rules and automatically gives the table viewport scrolling. Card-based settings/list pages keep one primary `Card`; when their main table is bounded, use `scrollMode="viewport"` and keep the Card header/footer outside that scroll area.
 - Put its title in `CardHeader`. Add a hint there only when it explains the whole list, not an individual field.
-- Put the primary action in `CardAction`, not in a detached page header.
+- Aksi halaman memakai `RecordActionBar`; pada halaman berbasis Card gunakan `CardAction` di `CardHeader`. Tombol Baru/Tambah berada di kiri, bersama perintah lain. Jangan memakai `justify-between`, `justify-end`, atau `ms-auto` untuk mendorong aksi tersebut ke kanan. Status dan menu tambahan yang memang berbeda fungsi boleh berada di ujung kanan.
+- Simpan tetap eksplisit dan berada di kiri atas, sebelum Batal. Pada kartu form gunakan `PageDialogToolbar`/`DialogToolbar` sebelum body, di dalam form yang sama, atau pertahankan atribut `form` jika tombol sudah mengacu ke form terpisah. Urutan DOM mengikuti urutan visual dan keyboard; jangan memindahkan tombol dengan CSS `order` atau portal. Konfirmasi dan pemilih bantu tetap mengikuti tindakan masing-masing.
+- Perintah record memakai label dan ikon SDK: **Baru (+)**, **Ubah**, **Simpan**, **Batal (X)**, serta **Delete (tempat sampah)**. Jangan mengganti Baru dengan “Tambah [nama bagian]”. Tampil inline tanpa border/latar berisi. Delete tetap mengikuti handler penghapusan lunak yang sudah ada. Pada daftar DataTable, kartu create/detail/edit dibuka di atas daftar yang tetap terpasang; bukan form pengganti seluruh layar.
+- Bedakan **Baru** (`create`) untuk membuka kartu record baru dengan **Tambah** (`add`) untuk menambah baris atau memasukkan record ke kelompok/dokumen. Baris kosong baru di rincian dokumen tetap memakai Tambah. Contoh: membuat polis memakai Baru; menambah baris aset pada polis atau penerimaan memakai Tambah.
+- Kartu memakai header otomatis SDK dengan urutan tetap: Back dan nama fitur; ikon Ubah, Bagikan, Baru (+), Delete; di kanan buka di tab baru, expand, Close. Bar berikutnya menampilkan kode/nomor dan nama record sebagai identitas besar yang terpisah, lalu navigasi utama, navigasi sekunder, dan isi. Gunakan `PageDialogContent title` untuk fitur dan `recordTitle` untuk identitas record. Komponen anak dapat mendaftarkan state/handler melalui `usePageDialogRecord`; jangan mendobel Back, Ubah, Delete, atau judul fitur di body. URL Bagikan/tab baru harus benar-benar membuka record tersebut. Navigasi sebelumnya/berikutnya mengikuti daftar aktual serta guard busy/dirty. Simpan/Batal tetap eksplisit di kiri atas area perintah form. Alamat, kontak, dan rincian record baru diisi sebagai draft lalu disimpan bersama induknya sekali; kegagalan menyimpan detail membatalkan seluruh transaksi.
 - Put filters and data in `CardContent`. Daftar record dimuat bertahap saat scroll memakai mekanisme bersama pada skill `coreerp-ui`; jangan menyediakan navigasi nomor halaman. Search, filter, dan sort tetap di server. Footer boleh menampilkan status pemuatan/error dan jumlah yang sudah dimuat.
 - Use the SDK `Empty` composition when the comparable Core page does.
 - Collapsing a section hides secondary material, never the reason the user opened the page. A directory page whose record list starts closed shows a form and two clickable headings; the data it exists to show is behind a guess. Keep the primary list open and collapse what supports it. A section that is closed by default must still say what is inside it on its header line — `@apperp/ui/collapsible-section` exists for exactly that — or the user has to open it just to learn whether it was worth opening.

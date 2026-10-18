@@ -26,7 +26,9 @@ export default function WorkOrderPage({
     const [pertama, kedua, ketiga] = segments;
 
     if (!pertama) {
-        return <WorkOrderListPage permissions={permissions} />;
+        return (
+            <WorkOrderListPage context={context} permissions={permissions} />
+        );
     }
 
     if (pertama === 'baru') {

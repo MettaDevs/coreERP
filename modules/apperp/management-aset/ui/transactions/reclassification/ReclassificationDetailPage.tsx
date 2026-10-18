@@ -1,4 +1,4 @@
-import { Eye, Plus, Send, Trash2 } from 'lucide-react';
+import { Eye, Send, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useWorkDate } from '@/hooks/use-work-date';
@@ -18,18 +18,14 @@ import {
     CollapsibleSection,
     CollapsibleSectionGroup,
 } from '@apperp/ui/collapsible-section';
+import { DataTable } from '@apperp/ui/data-table';
+import type { DataTableColumn } from '@apperp/ui/data-table';
 import { Field, FieldDescription } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
+import { usePageDialogRecord } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
+
 import { Textarea } from '@apperp/ui/textarea';
 import {
     ApiError,
@@ -42,6 +38,9 @@ import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import { useRecordOptions } from '../../use-record-list';
 import { PostingPreviewPanel } from '../_shared/PostingPreviewPanel';
 import type { PostingPreview } from '../_shared/PostingPreviewPanel';
+import { RecordCardHeader } from '../_shared/record-card';
+import type { RecordCardControls } from '../_shared/record-card';
+import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
 import type {
     Context,
     EditableReclassification,
@@ -119,14 +118,18 @@ const keForm = (data: Reclassification): EditableReclassification => ({
 export default function ReclassificationDetailPage({
     context,
     permissions,
+    card,
     reclassificationId,
     mode,
 }: {
     context: Context;
     permissions: string[];
+    card?: RecordCardControls;
     reclassificationId?: string;
     mode: Mode;
 }) {
+    const embedded = usePageDialogRecord(undefined);
+
     const can = izin(permissions);
     const { date: workDate } = useWorkDate();
     const [record, setRecord] = useState<EditableReclassification>(() => ({
@@ -153,6 +156,38 @@ export default function ReclassificationDetailPage({
         record.responsible_org_unit_id,
     );
     const panelRef = useRef<HTMLDivElement>(null);
+    const lookupPortal = card?.portalContainer ?? panelRef;
+    const onBusyChange = card?.onBusyChange;
+    useEffect(() => {
+        onBusyChange?.(menyimpan);
+
+        return () => onBusyChange?.(false);
+    }, [menyimpan, onBusyChange]);
+    const viewRecord = (id: string) => {
+        if (!menyimpan) {
+            (card?.onRequestView ?? bukaReklasifikasi)(id);
+        }
+    };
+    const editRecord = (id: string) => {
+        if (!menyimpan) {
+            (card?.onRequestEdit ?? bukaReklasifikasiUbah)(id);
+        }
+    };
+    const closeRecord = () => {
+        if (!menyimpan) {
+            (card?.onClose ?? bukaDaftar)();
+        }
+    };
+    const saveCompleted = (id: string) =>
+        (card?.onSaved ?? bukaReklasifikasi)(id);
+    const deleteCompleted = () => {
+        if (card?.onClose) {
+            card.onSaved?.(String(reclassificationId));
+            card.onClose();
+        } else {
+            bukaDaftar();
+        }
+    };
 
     const readOnly = mode === 'view';
     const draf = mode === 'create' || tersimpan?.status === 'draft';
@@ -172,9 +207,11 @@ export default function ReclassificationDetailPage({
             return;
         }
 
+        const request = new AbortController();
         let dibatalkan = false;
         api<{ data: Reclassification }>(
             `/reklasifikasi-aset/${reclassificationId}`,
+            { signal: request.signal },
         )
             .then((result) => {
                 if (!dibatalkan) {
@@ -182,11 +219,16 @@ export default function ReclassificationDetailPage({
                     setRecord(keForm(result.data));
                 }
             })
-            .catch((caught) =>
-                toast.error(
-                    errorMessage(caught, 'Reklasifikasi belum dapat dimuat.'),
-                ),
-            )
+            .catch((caught) => {
+                if (!request.signal.aborted) {
+                    toast.error(
+                        errorMessage(
+                            caught,
+                            'Reklasifikasi belum dapat dimuat.',
+                        ),
+                    );
+                }
+            })
             .finally(() => {
                 if (!dibatalkan) {
                     setMemuat(false);
@@ -195,6 +237,7 @@ export default function ReclassificationDetailPage({
 
         return () => {
             dibatalkan = true;
+            request.abort();
         };
     }, [reclassificationId]);
 
@@ -258,7 +301,7 @@ export default function ReclassificationDetailPage({
                 toast.success(
                     `Reklasifikasi ${hasil.data.kode} disimpan sebagai draf.`,
                 );
-                bukaReklasifikasi(hasil.data.id);
+                saveCompleted(hasil.data.id);
 
                 return;
             }
@@ -271,7 +314,7 @@ export default function ReclassificationDetailPage({
                 }),
             });
             toast.success('Perubahan reklasifikasi disimpan.');
-            bukaReklasifikasi(String(reclassificationId));
+            saveCompleted(String(reclassificationId));
         } catch (caught) {
             if (caught instanceof ApiError) {
                 setGalat(caught.validationErrors);
@@ -319,6 +362,7 @@ export default function ReclassificationDetailPage({
             toast.success(
                 `Nilai aset dipindahkan. Jurnal: ${postingLabel(hasil.data.posting?.status)}.`,
             );
+            card?.onSaved?.(String(reclassificationId));
         } catch (caught) {
             if (caught instanceof ApiError) {
                 setGalat(caught.validationErrors);
@@ -333,17 +377,32 @@ export default function ReclassificationDetailPage({
     async function arsipkan() {
         setKonfirmasi(null);
 
+        setMenyimpan(true);
+
         try {
             await api(`/reklasifikasi-aset/${reclassificationId}`, {
                 method: 'DELETE',
                 body: JSON.stringify({ version: tersimpan?.version }),
             });
             toast.success('Draf reklasifikasi diarsipkan.');
-            bukaDaftar();
+            deleteCompleted();
         } catch (caught) {
             toastSaveError(caught, 'Reklasifikasi belum dapat diarsipkan.');
+        } finally {
+            setMenyimpan(false);
         }
     }
+
+    useRecordCardDirty({
+        value: record,
+        ready: !memuat,
+        scopeKey: JSON.stringify([
+            reclassificationId,
+            mode,
+            tersimpan?.version,
+        ]),
+        onDirtyChange: card?.onDirtyChange,
+    });
 
     if (memuat) {
         return (
@@ -374,25 +433,43 @@ export default function ReclassificationDetailPage({
 
     return (
         <div className="flex h-full min-h-0 flex-col overflow-hidden">
+            <RecordCardHeader
+                recordTitle={tersimpan?.kode ?? 'Baru'}
+                editing={!readOnly}
+                recordUrl={
+                    reclassificationId
+                        ? `/management-aset/reklasifikasi-aset/${reclassificationId}`
+                        : undefined
+                }
+                onEdit={
+                    readOnly && draf && can('update')
+                        ? () =>
+                              reclassificationId &&
+                              editRecord(reclassificationId)
+                        : undefined
+                }
+                onDelete={
+                    readOnly && draf && can('archive')
+                        ? () => setKonfirmasi('arsip')
+                        : undefined
+                }
+            />
             <RecordActionBar
-                title={judul}
+                title={embedded ? undefined : judul}
                 trailing={
                     tersimpan ? (
                         <StatusBadge status={tersimpan.status} />
                     ) : undefined
                 }
             >
-                {readOnly && draf && can('update') && (
+                {readOnly && draf && can('update') && !embedded && (
                     <ActionButton
                         action="edit"
                         type="button"
                         onClick={() =>
-                            reclassificationId &&
-                            bukaReklasifikasiUbah(reclassificationId)
+                            reclassificationId && editRecord(reclassificationId)
                         }
-                    >
-                        Ubah
-                    </ActionButton>
+                    />
                 )}
                 {readOnly && draf && (can('post') || can('update')) && (
                     <Button
@@ -415,40 +492,40 @@ export default function ReclassificationDetailPage({
                         Posting
                     </Button>
                 )}
-                {readOnly && draf && can('archive') && (
+                {readOnly && draf && can('archive') && !embedded && (
                     <ActionButton
                         action="archive"
                         type="button"
                         onClick={() => setKonfirmasi('arsip')}
-                    >
-                        Arsipkan
-                    </ActionButton>
+                    />
                 )}
                 {!readOnly && (
                     <>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() =>
-                                reclassificationId
-                                    ? bukaReklasifikasi(reclassificationId)
-                                    : bukaDaftar()
-                            }
-                        >
-                            Batal
-                        </Button>
-                        <Button
+                        <ActionButton
+                            action="save"
                             type="button"
                             onClick={() => void simpan()}
                             disabled={menyimpan}
-                        >
-                            {menyimpan ? 'Menyimpan…' : 'Simpan draf'}
-                        </Button>
+                            pending={menyimpan}
+                        />
+                        <ActionButton
+                            action="cancel"
+                            type="button"
+                            onClick={() =>
+                                reclassificationId
+                                    ? viewRecord(reclassificationId)
+                                    : closeRecord()
+                            }
+                        />
                     </>
                 )}
             </RecordActionBar>
 
-            <div ref={panelRef} className="min-h-0 flex-1 overflow-y-auto">
+            <div
+                data-page-dialog-body
+                ref={panelRef}
+                className="min-h-0 flex-1 overflow-y-auto"
+            >
                 <div className="space-y-5 p-5">
                     <CollapsibleSectionGroup
                         defaultValue={['general', 'lines']}
@@ -476,7 +553,7 @@ export default function ReclassificationDetailPage({
                                                 )}
                                                 value={kindLabel(record.jenis)}
                                                 ariaLabel="Jenis reklasifikasi"
-                                                portalContainer={panelRef}
+                                                portalContainer={lookupPortal}
                                                 onValueChange={(value) =>
                                                     setRecord({
                                                         ...record,
@@ -544,7 +621,7 @@ export default function ReclassificationDetailPage({
                                                 searchPlaceholder="Cari unit kerja"
                                                 emptyMessage="Unit kerja tidak ditemukan."
                                                 ariaLabel="Unit penanggung jawab"
-                                                portalContainer={panelRef}
+                                                portalContainer={lookupPortal}
                                                 onValueChange={(item) =>
                                                     setRecord({
                                                         ...record,
@@ -601,10 +678,9 @@ export default function ReclassificationDetailPage({
                                 <div className="space-y-2">
                                     <div className="flex flex-wrap items-center justify-end gap-2">
                                         {!readOnly && (
-                                            <Button
+                                            <ActionButton
+                                                action="add"
                                                 type="button"
-                                                variant="outline"
-                                                size="sm"
                                                 onClick={() =>
                                                     setRecord({
                                                         ...record,
@@ -614,10 +690,7 @@ export default function ReclassificationDetailPage({
                                                         ],
                                                     })
                                                 }
-                                            >
-                                                <Plus />
-                                                Tambah aset
-                                            </Button>
+                                            />
                                         )}
                                     </div>
                                     {pesan('details') && (
@@ -625,358 +698,427 @@ export default function ReclassificationDetailPage({
                                             {pesan('details')}
                                         </p>
                                     )}
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead className="w-12">
-                                                    No
-                                                </TableHead>
-                                                <TableHead>Aset</TableHead>
-                                                <TableHead>
-                                                    Group tujuan
-                                                </TableHead>
-                                                {pecah && (
-                                                    <>
-                                                        <TableHead className="text-right">
-                                                            Persen
-                                                        </TableHead>
-                                                        <TableHead className="text-right">
-                                                            Atau nilai perolehan
-                                                        </TableHead>
-                                                        <TableHead>
-                                                            Aset baru
-                                                        </TableHead>
-                                                    </>
-                                                )}
-                                                <TableHead>
-                                                    Keterangan
-                                                </TableHead>
-                                                {!readOnly && (
-                                                    <TableHead className="w-12" />
-                                                )}
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {record.details.map(
-                                                (baris, index) => {
-                                                    const dipilih = aset.find(
-                                                        (item) =>
-                                                            item.id ===
-                                                            baris.aset_id,
-                                                    );
-                                                    const masalah =
-                                                        masalahBaris(index);
+                                    {(() => {
+                                        const sdkRows = record.details.map(
+                                            (baris, index) => {
+                                                const dipilih = aset.find(
+                                                    (item) =>
+                                                        item.id ===
+                                                        baris.aset_id,
+                                                );
+                                                const masalah =
+                                                    masalahBaris(index);
 
-                                                    return (
-                                                        <TableRow
-                                                            key={
-                                                                baris.id ??
-                                                                `baru-${index}`
-                                                            }
-                                                        >
-                                                            <TableCell>
-                                                                {baris.line_number ??
-                                                                    index + 1}
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                {!baris.id &&
-                                                                !readOnly ? (
-                                                                    <Select
-                                                                        {...assetSource.selectProps}
-                                                                        items={aset.map(
-                                                                            labelAset,
-                                                                        )}
-                                                                        value={
-                                                                            dipilih
-                                                                                ? labelAset(
-                                                                                      dipilih,
-                                                                                  )
-                                                                                : null
-                                                                        }
-                                                                        placeholder="Pilih aset"
-                                                                        searchPlaceholder="Cari kode atau nama aset"
-                                                                        emptyMessage="Aset tidak ditemukan."
-                                                                        ariaLabel={`Aset baris ${index + 1}`}
-                                                                        portalContainer={
-                                                                            panelRef
-                                                                        }
-                                                                        onValueChange={(
-                                                                            item,
-                                                                        ) =>
-                                                                            ubahBaris(
-                                                                                index,
-                                                                                {
-                                                                                    aset_id:
-                                                                                        aset.find(
-                                                                                            (
-                                                                                                calon,
-                                                                                            ) =>
-                                                                                                labelAset(
-                                                                                                    calon,
-                                                                                                ) ===
-                                                                                                item,
-                                                                                        )
-                                                                                            ?.id ??
-                                                                                        '',
-                                                                                },
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                ) : (
-                                                                    <span>
-                                                                        {labelAset(
-                                                                            {
-                                                                                kode:
-                                                                                    baris.aset_kode ??
-                                                                                    dipilih?.kode ??
-                                                                                    '—',
-                                                                                nama:
-                                                                                    baris.aset_nama ??
-                                                                                    dipilih?.nama ??
-                                                                                    null,
-                                                                            },
-                                                                        )}
-                                                                    </span>
+                                                return {
+                                                    baris,
+                                                    index,
+                                                    dipilih,
+                                                    masalah,
+                                                };
+                                            },
+                                        );
+                                        const sdkColumns: DataTableColumn<
+                                            (typeof sdkRows)[number]
+                                        >[] = [
+                                            {
+                                                id: 'column-0',
+                                                header: 'No',
+                                                width: 48,
+                                                cell: ({ baris, index }) => (
+                                                    <>
+                                                        {baris.line_number ??
+                                                            index + 1}
+                                                    </>
+                                                ),
+                                            } satisfies DataTableColumn<
+                                                (typeof sdkRows)[number]
+                                            >,
+                                            {
+                                                id: 'column-1',
+                                                header: 'Aset',
+                                                cell: ({
+                                                    baris,
+                                                    index,
+                                                    dipilih,
+                                                    masalah,
+                                                }) => (
+                                                    <>
+                                                        {!baris.id &&
+                                                        !readOnly ? (
+                                                            <Select
+                                                                {...assetSource.selectProps}
+                                                                items={aset.map(
+                                                                    labelAset,
                                                                 )}
-                                                                {baris.group_aset_asal_nama && (
-                                                                    <span className="text-muted-foreground block text-xs">
-                                                                        Dari
-                                                                        group{' '}
+                                                                value={
+                                                                    dipilih
+                                                                        ? labelAset(
+                                                                              dipilih,
+                                                                          )
+                                                                        : null
+                                                                }
+                                                                placeholder="Pilih aset"
+                                                                searchPlaceholder="Cari kode atau nama aset"
+                                                                emptyMessage="Aset tidak ditemukan."
+                                                                ariaLabel={`Aset baris ${index + 1}`}
+                                                                portalContainer={
+                                                                    lookupPortal
+                                                                }
+                                                                onValueChange={(
+                                                                    item,
+                                                                ) =>
+                                                                    ubahBaris(
+                                                                        index,
                                                                         {
-                                                                            baris.group_aset_asal_nama
-                                                                        }
-                                                                        {baris.nilai_perolehan_aset &&
-                                                                            ` · harga perolehan ${uang(baris.nilai_perolehan_aset)}`}
-                                                                    </span>
-                                                                )}
-                                                                {masalah && (
-                                                                    <span className="text-destructive block text-xs">
-                                                                        {
-                                                                            masalah
-                                                                        }
-                                                                    </span>
-                                                                )}
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                {readOnly ? (
-                                                                    (baris.group_aset_tujuan_nama ??
+                                                                            aset_id:
+                                                                                aset.find(
+                                                                                    (
+                                                                                        calon,
+                                                                                    ) =>
+                                                                                        labelAset(
+                                                                                            calon,
+                                                                                        ) ===
+                                                                                        item,
+                                                                                )
+                                                                                    ?.id ??
+                                                                                '',
+                                                                        },
+                                                                    )
+                                                                }
+                                                            />
+                                                        ) : (
+                                                            <span>
+                                                                {labelAset({
+                                                                    kode:
+                                                                        baris.aset_kode ??
+                                                                        dipilih?.kode ??
+                                                                        '—',
+                                                                    nama:
+                                                                        baris.aset_nama ??
+                                                                        dipilih?.nama ??
+                                                                        null,
+                                                                })}
+                                                            </span>
+                                                        )}
+                                                        {baris.group_aset_asal_nama && (
+                                                            <span className="text-muted-foreground block text-xs">
+                                                                Dari group{' '}
+                                                                {
+                                                                    baris.group_aset_asal_nama
+                                                                }
+                                                                {baris.nilai_perolehan_aset &&
+                                                                    ` · harga perolehan ${uang(baris.nilai_perolehan_aset)}`}
+                                                            </span>
+                                                        )}
+                                                        {masalah && (
+                                                            <span className="text-destructive block text-xs">
+                                                                {masalah}
+                                                            </span>
+                                                        )}
+                                                    </>
+                                                ),
+                                            } satisfies DataTableColumn<
+                                                (typeof sdkRows)[number]
+                                            >,
+                                            {
+                                                id: 'column-2',
+                                                header: 'Group tujuan',
+                                                cell: ({ baris, index }) => (
+                                                    <>
+                                                        {readOnly ? (
+                                                            (baris.group_aset_tujuan_nama ??
+                                                            (pecah
+                                                                ? GROUP_ASAL
+                                                                : '—'))
+                                                        ) : (
+                                                            <Select
+                                                                {...grup.selectProps}
+                                                                items={
+                                                                    pecah
+                                                                        ? [
+                                                                              GROUP_ASAL,
+                                                                              ...grupItems,
+                                                                          ]
+                                                                        : grupItems
+                                                                }
+                                                                value={
+                                                                    pilihDari(
+                                                                        grup.options,
+                                                                        baris.group_aset_tujuan_id,
+                                                                    ) ??
                                                                     (pecah
                                                                         ? GROUP_ASAL
-                                                                        : '—'))
-                                                                ) : (
-                                                                    <Select
-                                                                        {...grup.selectProps}
-                                                                        items={
-                                                                            pecah
-                                                                                ? [
-                                                                                      GROUP_ASAL,
-                                                                                      ...grupItems,
-                                                                                  ]
-                                                                                : grupItems
-                                                                        }
-                                                                        value={
-                                                                            pilihDari(
-                                                                                grup.options,
-                                                                                baris.group_aset_tujuan_id,
-                                                                            ) ??
-                                                                            (pecah
-                                                                                ? GROUP_ASAL
-                                                                                : null)
-                                                                        }
-                                                                        placeholder="Pilih group tujuan"
-                                                                        searchPlaceholder="Cari group aset"
-                                                                        emptyMessage="Group aset tidak ditemukan."
-                                                                        ariaLabel={`Group tujuan baris ${index + 1}`}
-                                                                        portalContainer={
-                                                                            panelRef
-                                                                        }
-                                                                        onValueChange={(
-                                                                            item,
-                                                                        ) =>
-                                                                            ubahBaris(
-                                                                                index,
-                                                                                {
-                                                                                    group_aset_tujuan_id:
-                                                                                        grup.options.find(
-                                                                                            (
-                                                                                                option,
-                                                                                            ) =>
-                                                                                                optionLabel(
-                                                                                                    option,
-                                                                                                ) ===
-                                                                                                item,
-                                                                                        )
-                                                                                            ?.id ??
-                                                                                        '',
-                                                                                },
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                )}
-                                                            </TableCell>
-                                                            {pecah && (
-                                                                <>
-                                                                    <TableCell className="text-right">
-                                                                        {readOnly ? (
-                                                                            baris.persen ? (
-                                                                                `${baris.persen}%`
-                                                                            ) : (
-                                                                                '—'
-                                                                            )
-                                                                        ) : (
-                                                                            <Input
-                                                                                aria-label={`Persen baris ${index + 1}`}
-                                                                                type="number"
-                                                                                min="0"
-                                                                                max="100"
-                                                                                step="0.01"
-                                                                                value={
-                                                                                    baris.persen
-                                                                                }
-                                                                                disabled={
-                                                                                    baris.nilai_perolehan !==
-                                                                                    ''
-                                                                                }
-                                                                                onChange={(
-                                                                                    event,
-                                                                                ) =>
-                                                                                    ubahBaris(
-                                                                                        index,
-                                                                                        {
-                                                                                            persen: event
-                                                                                                .target
-                                                                                                .value,
-                                                                                        },
-                                                                                    )
-                                                                                }
-                                                                            />
-                                                                        )}
-                                                                    </TableCell>
-                                                                    <TableCell className="text-right">
-                                                                        {readOnly ? (
-                                                                            uang(
-                                                                                baris.nilai_perolehan_dipindah ??
-                                                                                    baris.nilai_perolehan,
-                                                                            )
-                                                                        ) : (
-                                                                            <Input
-                                                                                aria-label={`Nilai perolehan baris ${index + 1}`}
-                                                                                type="number"
-                                                                                min="0"
-                                                                                step="0.01"
-                                                                                value={
-                                                                                    baris.nilai_perolehan
-                                                                                }
-                                                                                disabled={
-                                                                                    baris.persen !==
-                                                                                    ''
-                                                                                }
-                                                                                onChange={(
-                                                                                    event,
-                                                                                ) =>
-                                                                                    ubahBaris(
-                                                                                        index,
-                                                                                        {
-                                                                                            nilai_perolehan:
-                                                                                                event
-                                                                                                    .target
-                                                                                                    .value,
-                                                                                        },
-                                                                                    )
-                                                                                }
-                                                                            />
-                                                                        )}
-                                                                    </TableCell>
-                                                                    <TableCell>
-                                                                        {readOnly ? (
-                                                                            (baris.aset_baru_kode ??
-                                                                            (baris.nama_aset_baru ||
-                                                                                '—'))
-                                                                        ) : (
-                                                                            <Input
-                                                                                aria-label={`Nama aset baru baris ${index + 1}`}
-                                                                                placeholder="Sama dengan aset asal"
-                                                                                value={
-                                                                                    baris.nama_aset_baru
-                                                                                }
-                                                                                onChange={(
-                                                                                    event,
-                                                                                ) =>
-                                                                                    ubahBaris(
-                                                                                        index,
-                                                                                        {
-                                                                                            nama_aset_baru:
-                                                                                                event
-                                                                                                    .target
-                                                                                                    .value,
-                                                                                        },
-                                                                                    )
-                                                                                }
-                                                                            />
-                                                                        )}
-                                                                    </TableCell>
-                                                                </>
-                                                            )}
-                                                            <TableCell>
-                                                                {readOnly ? (
-                                                                    baris.keterangan ||
-                                                                    '—'
-                                                                ) : (
-                                                                    <Input
-                                                                        aria-label={`Keterangan baris ${index + 1}`}
-                                                                        value={
-                                                                            baris.keterangan
-                                                                        }
-                                                                        onChange={(
-                                                                            event,
-                                                                        ) =>
-                                                                            ubahBaris(
-                                                                                index,
-                                                                                {
-                                                                                    keterangan:
-                                                                                        event
-                                                                                            .target
-                                                                                            .value,
-                                                                                },
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                )}
-                                                            </TableCell>
-                                                            {!readOnly && (
-                                                                <TableCell>
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        aria-label={`Keluarkan baris ${index + 1}`}
-                                                                        onClick={() =>
-                                                                            setRecord(
-                                                                                {
-                                                                                    ...record,
-                                                                                    details:
-                                                                                        record.details.filter(
-                                                                                            (
-                                                                                                _,
-                                                                                                posisi,
-                                                                                            ) =>
-                                                                                                posisi !==
-                                                                                                index,
-                                                                                        ),
-                                                                                },
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        <Trash2 />
-                                                                    </Button>
-                                                                </TableCell>
-                                                            )}
-                                                        </TableRow>
-                                                    );
-                                                },
-                                            )}
-                                        </TableBody>
-                                    </Table>
+                                                                        : null)
+                                                                }
+                                                                placeholder="Pilih group tujuan"
+                                                                searchPlaceholder="Cari group aset"
+                                                                emptyMessage="Group aset tidak ditemukan."
+                                                                ariaLabel={`Group tujuan baris ${index + 1}`}
+                                                                portalContainer={
+                                                                    lookupPortal
+                                                                }
+                                                                onValueChange={(
+                                                                    item,
+                                                                ) =>
+                                                                    ubahBaris(
+                                                                        index,
+                                                                        {
+                                                                            group_aset_tujuan_id:
+                                                                                grup.options.find(
+                                                                                    (
+                                                                                        option,
+                                                                                    ) =>
+                                                                                        optionLabel(
+                                                                                            option,
+                                                                                        ) ===
+                                                                                        item,
+                                                                                )
+                                                                                    ?.id ??
+                                                                                '',
+                                                                        },
+                                                                    )
+                                                                }
+                                                            />
+                                                        )}
+                                                    </>
+                                                ),
+                                            } satisfies DataTableColumn<
+                                                (typeof sdkRows)[number]
+                                            >,
+                                            ...(pecah
+                                                ? [
+                                                      {
+                                                          id: 'column-3',
+                                                          header: 'Persen',
+                                                          align: 'right',
+                                                          cell: ({
+                                                              baris,
+                                                              index,
+                                                          }) => (
+                                                              <div className="text-right">
+                                                                  {readOnly ? (
+                                                                      baris.persen ? (
+                                                                          `${baris.persen}%`
+                                                                      ) : (
+                                                                          '—'
+                                                                      )
+                                                                  ) : (
+                                                                      <Input
+                                                                          aria-label={`Persen baris ${index + 1}`}
+                                                                          type="number"
+                                                                          min="0"
+                                                                          max="100"
+                                                                          step="0.01"
+                                                                          value={
+                                                                              baris.persen
+                                                                          }
+                                                                          disabled={
+                                                                              baris.nilai_perolehan !==
+                                                                              ''
+                                                                          }
+                                                                          onChange={(
+                                                                              event,
+                                                                          ) =>
+                                                                              ubahBaris(
+                                                                                  index,
+                                                                                  {
+                                                                                      persen: event
+                                                                                          .target
+                                                                                          .value,
+                                                                                  },
+                                                                              )
+                                                                          }
+                                                                      />
+                                                                  )}
+                                                              </div>
+                                                          ),
+                                                      } satisfies DataTableColumn<
+                                                          (typeof sdkRows)[number]
+                                                      >,
+                                                  ]
+                                                : []),
+                                            ...(pecah
+                                                ? [
+                                                      {
+                                                          id: 'column-4',
+                                                          header: 'Atau nilai perolehan',
+                                                          align: 'right',
+                                                          cell: ({
+                                                              baris,
+                                                              index,
+                                                          }) => (
+                                                              <div className="text-right">
+                                                                  {readOnly ? (
+                                                                      uang(
+                                                                          baris.nilai_perolehan_dipindah ??
+                                                                              baris.nilai_perolehan,
+                                                                      )
+                                                                  ) : (
+                                                                      <Input
+                                                                          aria-label={`Nilai perolehan baris ${index + 1}`}
+                                                                          type="number"
+                                                                          min="0"
+                                                                          step="0.01"
+                                                                          value={
+                                                                              baris.nilai_perolehan
+                                                                          }
+                                                                          disabled={
+                                                                              baris.persen !==
+                                                                              ''
+                                                                          }
+                                                                          onChange={(
+                                                                              event,
+                                                                          ) =>
+                                                                              ubahBaris(
+                                                                                  index,
+                                                                                  {
+                                                                                      nilai_perolehan:
+                                                                                          event
+                                                                                              .target
+                                                                                              .value,
+                                                                                  },
+                                                                              )
+                                                                          }
+                                                                      />
+                                                                  )}
+                                                              </div>
+                                                          ),
+                                                      } satisfies DataTableColumn<
+                                                          (typeof sdkRows)[number]
+                                                      >,
+                                                  ]
+                                                : []),
+                                            ...(pecah
+                                                ? [
+                                                      {
+                                                          id: 'column-5',
+                                                          header: 'Aset baru',
+                                                          cell: ({
+                                                              baris,
+                                                              index,
+                                                          }) => (
+                                                              <>
+                                                                  {readOnly ? (
+                                                                      (baris.aset_baru_kode ??
+                                                                      (baris.nama_aset_baru ||
+                                                                          '—'))
+                                                                  ) : (
+                                                                      <Input
+                                                                          aria-label={`Nama aset baru baris ${index + 1}`}
+                                                                          placeholder="Sama dengan aset asal"
+                                                                          value={
+                                                                              baris.nama_aset_baru
+                                                                          }
+                                                                          onChange={(
+                                                                              event,
+                                                                          ) =>
+                                                                              ubahBaris(
+                                                                                  index,
+                                                                                  {
+                                                                                      nama_aset_baru:
+                                                                                          event
+                                                                                              .target
+                                                                                              .value,
+                                                                                  },
+                                                                              )
+                                                                          }
+                                                                      />
+                                                                  )}
+                                                              </>
+                                                          ),
+                                                      } satisfies DataTableColumn<
+                                                          (typeof sdkRows)[number]
+                                                      >,
+                                                  ]
+                                                : []),
+                                            {
+                                                id: 'column-6',
+                                                header: 'Keterangan',
+                                                cell: ({ baris, index }) => (
+                                                    <>
+                                                        {readOnly ? (
+                                                            baris.keterangan ||
+                                                            '—'
+                                                        ) : (
+                                                            <Input
+                                                                aria-label={`Keterangan baris ${index + 1}`}
+                                                                value={
+                                                                    baris.keterangan
+                                                                }
+                                                                onChange={(
+                                                                    event,
+                                                                ) =>
+                                                                    ubahBaris(
+                                                                        index,
+                                                                        {
+                                                                            keterangan:
+                                                                                event
+                                                                                    .target
+                                                                                    .value,
+                                                                        },
+                                                                    )
+                                                                }
+                                                            />
+                                                        )}
+                                                    </>
+                                                ),
+                                            } satisfies DataTableColumn<
+                                                (typeof sdkRows)[number]
+                                            >,
+                                            ...(!readOnly
+                                                ? [
+                                                      {
+                                                          id: 'column-7',
+                                                          header: '',
+                                                          width: 48,
+                                                          cell: ({ index }) => (
+                                                              <>
+                                                                  <Button
+                                                                      type="button"
+                                                                      variant="ghost"
+                                                                      size="icon"
+                                                                      aria-label={`Keluarkan baris ${index + 1}`}
+                                                                      onClick={() =>
+                                                                          setRecord(
+                                                                              {
+                                                                                  ...record,
+                                                                                  details:
+                                                                                      record.details.filter(
+                                                                                          (
+                                                                                              _,
+                                                                                              posisi,
+                                                                                          ) =>
+                                                                                              posisi !==
+                                                                                              index,
+                                                                                      ),
+                                                                              },
+                                                                          )
+                                                                      }
+                                                                  >
+                                                                      <Trash2 />
+                                                                  </Button>
+                                                              </>
+                                                          ),
+                                                      } satisfies DataTableColumn<
+                                                          (typeof sdkRows)[number]
+                                                      >,
+                                                  ]
+                                                : []),
+                                        ];
+
+                                        return (
+                                            <DataTable
+                                                scrollMode="inline"
+                                                showRowNumbers={false}
+                                                serverSort
+                                                data={sdkRows}
+                                                columns={sdkColumns}
+                                                getRowKey={({ baris, index }) =>
+                                                    baris.id ?? `baru-${index}`
+                                                }
+                                            />
+                                        );
+                                    })()}
                                     {!readOnly && pecah && (
                                         <p className="text-muted-foreground text-sm">
                                             Isi persen atau nilai perolehan,
@@ -1003,70 +1145,118 @@ export default function ReclassificationDetailPage({
                             <p className="text-sm font-medium">
                                 Pratinjau posting
                             </p>
-                            {pratinjau.moves.length > 0 && (
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Aset</TableHead>
-                                            <TableHead>Buku</TableHead>
-                                            <TableHead className="text-right">
-                                                Harga perolehan
-                                            </TableHead>
-                                            <TableHead className="text-right">
-                                                Akumulasi penyusutan
-                                            </TableHead>
-                                            <TableHead className="text-right">
-                                                Penurunan nilai
-                                            </TableHead>
-                                            <TableHead className="text-right">
-                                                Kenaikan nilai
-                                            </TableHead>
-                                            <TableHead className="text-right">
-                                                Nilai buku dipindah
-                                            </TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {pratinjau.moves.flatMap((pindah) =>
-                                            pindah.books.map((buku) => (
-                                                <TableRow
-                                                    key={`${pindah.line_number}-${buku.book_code}`}
-                                                >
-                                                    <TableCell>
-                                                        {pindah.aset_kode}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {buku.book_code}
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        {uang(
-                                                            buku.nilai_perolehan,
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        {uang(
-                                                            buku.akumulasi_penyusutan,
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        {uang(
-                                                            buku.penurunan_nilai,
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        {uang(
-                                                            buku.kenaikan_nilai,
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        {uang(buku.nilai_buku)}
-                                                    </TableCell>
-                                                </TableRow>
-                                            )),
-                                        )}
-                                    </TableBody>
-                                </Table>
-                            )}
+                            {pratinjau.moves.length > 0 &&
+                                (() => {
+                                    const sdkRows = pratinjau.moves.flatMap(
+                                        (pindah) =>
+                                            pindah.books.map(
+                                                (buku, rowIndex) => {
+                                                    return {
+                                                        pindah,
+                                                        buku,
+                                                        rowIndex,
+                                                    };
+                                                },
+                                            ),
+                                    );
+                                    const sdkColumns: DataTableColumn<
+                                        (typeof sdkRows)[number]
+                                    >[] = [
+                                        {
+                                            id: 'column-0',
+                                            header: 'Aset',
+                                            cell: ({ pindah }) => (
+                                                <>{pindah.aset_kode}</>
+                                            ),
+                                        } satisfies DataTableColumn<
+                                            (typeof sdkRows)[number]
+                                        >,
+                                        {
+                                            id: 'column-1',
+                                            header: 'Buku',
+                                            cell: ({ buku }) => (
+                                                <>{buku.book_code}</>
+                                            ),
+                                        } satisfies DataTableColumn<
+                                            (typeof sdkRows)[number]
+                                        >,
+                                        {
+                                            id: 'column-2',
+                                            header: 'Harga perolehan',
+                                            align: 'right',
+                                            cell: ({ buku }) => (
+                                                <div className="text-right">
+                                                    {uang(buku.nilai_perolehan)}
+                                                </div>
+                                            ),
+                                        } satisfies DataTableColumn<
+                                            (typeof sdkRows)[number]
+                                        >,
+                                        {
+                                            id: 'column-3',
+                                            header: 'Akumulasi penyusutan',
+                                            align: 'right',
+                                            cell: ({ buku }) => (
+                                                <div className="text-right">
+                                                    {uang(
+                                                        buku.akumulasi_penyusutan,
+                                                    )}
+                                                </div>
+                                            ),
+                                        } satisfies DataTableColumn<
+                                            (typeof sdkRows)[number]
+                                        >,
+                                        {
+                                            id: 'column-4',
+                                            header: 'Penurunan nilai',
+                                            align: 'right',
+                                            cell: ({ buku }) => (
+                                                <div className="text-right">
+                                                    {uang(buku.penurunan_nilai)}
+                                                </div>
+                                            ),
+                                        } satisfies DataTableColumn<
+                                            (typeof sdkRows)[number]
+                                        >,
+                                        {
+                                            id: 'column-5',
+                                            header: 'Kenaikan nilai',
+                                            align: 'right',
+                                            cell: ({ buku }) => (
+                                                <div className="text-right">
+                                                    {uang(buku.kenaikan_nilai)}
+                                                </div>
+                                            ),
+                                        } satisfies DataTableColumn<
+                                            (typeof sdkRows)[number]
+                                        >,
+                                        {
+                                            id: 'column-6',
+                                            header: 'Nilai buku dipindah',
+                                            align: 'right',
+                                            cell: ({ buku }) => (
+                                                <div className="text-right">
+                                                    {uang(buku.nilai_buku)}
+                                                </div>
+                                            ),
+                                        } satisfies DataTableColumn<
+                                            (typeof sdkRows)[number]
+                                        >,
+                                    ];
+
+                                    return (
+                                        <DataTable
+                                            scrollMode="inline"
+                                            showRowNumbers={false}
+                                            serverSort
+                                            data={sdkRows}
+                                            columns={sdkColumns}
+                                            getRowKey={({ pindah, buku }) =>
+                                                `${pindah.line_number}-${buku.book_code}`
+                                            }
+                                        />
+                                    );
+                                })()}
                             <PostingPreviewPanel
                                 preview={pratinjau}
                                 currencyCode="IDR"
@@ -1084,7 +1274,7 @@ export default function ReclassificationDetailPage({
                     <AlertDialogHeader>
                         <AlertDialogTitle>
                             {konfirmasi === 'arsip'
-                                ? 'Arsipkan draf ini?'
+                                ? 'Delete draf ini?'
                                 : 'Posting reklasifikasi ini?'}
                         </AlertDialogTitle>
                         <AlertDialogDescription>
@@ -1104,7 +1294,10 @@ export default function ReclassificationDetailPage({
                                     : void posting()
                             }
                         >
-                            {konfirmasi === 'arsip' ? 'Arsipkan' : 'Posting'}
+                            {konfirmasi === 'arsip' && (
+                                <Trash2 aria-hidden="true" />
+                            )}
+                            {konfirmasi === 'arsip' ? 'Delete' : 'Posting'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

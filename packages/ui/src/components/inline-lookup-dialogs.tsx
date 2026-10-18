@@ -8,10 +8,7 @@ import {
     PageDialogAction,
     PageDialogBody,
     PageDialogContent,
-    PageDialogDescription,
     PageDialogFooter,
-    PageDialogHeader,
-    PageDialogTitle,
 } from './page-dialog';
 
 /** PageDialog bawaan lookup memakai data dan kolom yang sudah diberikan pemanggil. */
@@ -71,13 +68,10 @@ export function InlineLookupListDialog<T>({
                 }
             }}
         >
-            <PageDialogContent>
-                <PageDialogHeader>
-                    <PageDialogTitle>Daftar lengkap — {label}</PageDialogTitle>
-                    <PageDialogDescription>
-                        Pilih satu baris, lalu tekan Pilih.
-                    </PageDialogDescription>
-                </PageDialogHeader>
+            <PageDialogContent
+                title={<>Daftar lengkap — {label}</>}
+                description="Pilih satu baris, lalu tekan Pilih."
+            >
                 <PageDialogBody
                     className="flex min-h-0 flex-col"
                     onScrollCapture={onScrollCapture}
@@ -182,13 +176,10 @@ export function InlineLookupDetailsDialog<T>({
                 }
             }}
         >
-            <PageDialogContent>
-                <PageDialogHeader>
-                    <PageDialogTitle>Detail {title}</PageDialogTitle>
-                    <PageDialogDescription>
-                        Melihat detail tidak mengubah pilihan pada field.
-                    </PageDialogDescription>
-                </PageDialogHeader>
+            <PageDialogContent
+                title={<>Detail {title}</>}
+                description="Melihat detail tidak mengubah pilihan pada field."
+            >
                 <PageDialogBody>
                     <dl className="grid gap-4 sm:grid-cols-2">
                         {columns.map((column) => (

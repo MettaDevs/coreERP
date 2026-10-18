@@ -1,4 +1,5 @@
 import { usePage } from '@inertiajs/react';
+import { Info } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { ChangeHistoryPage } from '@/components/change-history';
@@ -13,8 +14,9 @@ import {
     CollapsibleSection,
     CollapsibleSectionGroup,
 } from '@apperp/ui/collapsible-section';
-import { Field, FieldDescription } from '@apperp/ui/field';
+import { FieldHint, Field, FieldDescription } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
+import { usePageDialogRecord } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import { Textarea } from '@apperp/ui/textarea';
@@ -25,6 +27,9 @@ import type { FieldValue } from '../../master/fields';
 import { emptyValue, payloadValue } from '../../master/fields';
 import { useMasterOptions } from '../../master/useMasterOptions';
 import { useRecordOptions } from '../../use-record-list';
+import { RecordCardHeader } from '../_shared/record-card';
+import type { RecordCardControls } from '../_shared/record-card';
+import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
 import AssetDowntimeSection from '../downtime/AssetDowntimeSection';
 import AssetInsuranceSection from '../insurance/AssetInsuranceSection';
 import AssetWarrantySection from '../warranty/AssetWarrantySection';
@@ -43,9 +48,9 @@ import {
     PENERIMAAN_REFERENCES,
     ReferenceFields,
     TANPA_ATRIBUT,
-    bukaAset,
-    bukaAsetUbah,
-    bukaDaftar,
+    bukaAset as navigateView,
+    bukaAsetUbah as navigateEdit,
+    bukaDaftar as navigateClose,
     money,
     referenceDefaults,
     textDefaults,
@@ -72,6 +77,13 @@ export default function AsetDetailPage({
     permissions,
     asetId,
     mode,
+    onClose,
+    onSaved,
+    onRequestView,
+    onRequestEdit,
+    onBusyChange,
+    onDirtyChange,
+    portalContainer,
 }: {
     context: Context;
     canUpdate: boolean;
@@ -79,13 +91,26 @@ export default function AsetDetailPage({
     permissions: string[];
     asetId?: string;
     mode: Mode;
-}) {
+} & RecordCardControls) {
+    const embedded = usePageDialogRecord(undefined);
+
+    const bukaAset = (id: string) => (onRequestView ?? navigateView)(id);
+    const bukaAsetUbah = (id: string) => (onRequestEdit ?? navigateEdit)(id);
+    const bukaDaftar = () => (onClose ?? navigateClose)();
+
     const { workspace } = usePage<{ workspace: Workspace }>().props;
     // Tanggal koreksi nilai perolehan: hari ini menurut zona pengguna, dari jam server (K-34).
     const hariIni = useToday();
     const [detail, setDetail] = useState<RincianAset | null>(null);
     const [memuat, setMemuat] = useState(true);
     const [menyimpan, setMenyimpan] = useState(false);
+    const [mainDirty, setMainDirty] = useState(false);
+    const [auxiliaryDirty, setAuxiliaryDirty] = useState(false);
+    useEffect(() => {
+        onBusyChange?.(menyimpan);
+
+        return () => onBusyChange?.(false);
+    }, [menyimpan, onBusyChange]);
     const [references, setReferences] = useState<Record<string, FieldValue>>(
         () => referenceDefaults(context),
     );
@@ -345,7 +370,7 @@ export default function AsetDetailPage({
                     : sebelumnya,
             );
             toast.success(pesanKoreksi(jawab.data.adjustment));
-            bukaAset(String(asetId));
+            (onSaved ?? bukaAset)(String(asetId));
         } catch (caught) {
             toastSaveError(caught, 'Koreksi belum dapat disimpan.');
         } finally {
@@ -373,6 +398,7 @@ export default function AsetDetailPage({
     const rujukan = (fields: typeof CLASSIFICATION, label: string) => {
         const isi = (
             <ReferenceFields
+                portal={portalContainer}
                 fields={fields}
                 references={references}
                 onChange={ubahReferensi}
@@ -394,6 +420,7 @@ export default function AsetDetailPage({
 
     const attributeFields = attributes.map((definition) => (
         <DynamicField
+            portalContainer={portalContainer}
             key={definition.tipe_atribut_id}
             config={toFieldConfig(definition)}
             value={attributeValues[definition.tipe_atribut_id]}
@@ -405,6 +432,24 @@ export default function AsetDetailPage({
             }
         />
     ));
+
+    useRecordCardDirty({
+        value: { values, references, parentAsetId, alasanKoreksi },
+        ready: !memuat,
+        scopeKey: JSON.stringify([asetId, mode, detail?.version]),
+        onDirtyChange: setMainDirty,
+    });
+    useRecordCardDirty({
+        value: attributeValues,
+        ready: !typeId || attributesMuatan?.typeId === typeId,
+        scopeKey: JSON.stringify([asetId, mode, detail?.version, typeId]),
+        onDirtyChange: setAuxiliaryDirty,
+    });
+    useEffect(() => {
+        onDirtyChange?.(mainDirty || auxiliaryDirty);
+
+        return () => onDirtyChange?.(false);
+    }, [mainDirty, auxiliaryDirty, onDirtyChange]);
 
     if (memuat) {
         return (
@@ -425,22 +470,36 @@ export default function AsetDetailPage({
 
     return (
         <div className="flex h-full min-h-0 flex-col overflow-hidden">
+            <RecordCardHeader
+                recordTitle={
+                    detail ? `${detail.kode} · ${detail.nama}` : 'Baru'
+                }
+                editing={!readOnly}
+                recordUrl={
+                    asetId
+                        ? `/management-aset/inventarisasi-aset/${asetId}`
+                        : undefined
+                }
+                onEdit={
+                    readOnly && canUpdate && !sudahDilepas
+                        ? () => bukaAsetUbah(String(asetId))
+                        : undefined
+                }
+            />
             <RecordActionBar
-                title={judul}
+                title={embedded ? undefined : judul}
                 trailing={
                     status ? (
                         <Badge variant={status.variant}>{status.label}</Badge>
                     ) : undefined
                 }
             >
-                {readOnly && canUpdate && !sudahDilepas && (
+                {readOnly && canUpdate && !sudahDilepas && !embedded && (
                     <ActionButton
                         action="edit"
                         type="button"
                         onClick={() => bukaAsetUbah(String(asetId))}
-                    >
-                        Ubah
-                    </ActionButton>
+                    />
                 )}
                 {readOnly && asetId && (
                     <Button
@@ -452,7 +511,7 @@ export default function AsetDetailPage({
                         Cetak label
                     </Button>
                 )}
-                {readOnly && (
+                {readOnly && !embedded && (
                     <Button
                         type="button"
                         variant="outline"
@@ -463,30 +522,32 @@ export default function AsetDetailPage({
                 )}
                 {!readOnly && (
                     <>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() =>
-                                asetId ? bukaAset(asetId) : bukaDaftar()
-                            }
-                        >
-                            Batal
-                        </Button>
-                        <Button
+                        <ActionButton
+                            action="save"
                             type="button"
                             onClick={() => void simpan()}
                             disabled={
                                 menyimpan ||
                                 (nilaiBerubah && !alasanKoreksi.trim())
                             }
-                        >
-                            {menyimpan ? 'Menyimpan…' : 'Simpan koreksi'}
-                        </Button>
+                            pending={menyimpan}
+                        />
+                        <ActionButton
+                            action="cancel"
+                            disabled={menyimpan}
+                            type="button"
+                            onClick={() =>
+                                asetId ? bukaAset(asetId) : bukaDaftar()
+                            }
+                        />
                     </>
                 )}
             </RecordActionBar>
 
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div
+                data-page-dialog-body
+                className="min-h-0 flex-1 overflow-y-auto"
+            >
                 <RecordFactBox
                     className="p-5"
                     key={asetId}
@@ -635,11 +696,24 @@ export default function AsetDetailPage({
                                             )
                                         }
                                     />
-                                    <FieldDescription>
-                                        Dasar perhitungan awal penyusutan.
-                                        Kosong berarti sama dengan tanggal
-                                        perolehan.
-                                    </FieldDescription>
+                                    <FieldHint
+                                        hint={
+                                            <>
+                                                Dasar perhitungan awal
+                                                penyusutan. Kosong berarti sama
+                                                dengan tanggal perolehan.
+                                            </>
+                                        }
+                                    >
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            aria-label="Bantuan field"
+                                        >
+                                            <Info aria-hidden="true" />
+                                        </Button>
+                                    </FieldHint>
                                 </Field>
                                 <Field>
                                     <Input
@@ -757,6 +831,7 @@ export default function AsetDetailPage({
                             ) : (
                                 <Field>
                                     <Select
+                                        portalContainer={portalContainer}
                                         {...assetSource.selectProps}
                                         label="Aset induk"
                                         items={parentOptions.map(
@@ -781,11 +856,24 @@ export default function AsetDetailPage({
                                             )
                                         }
                                     />
-                                    <FieldDescription>
-                                        Isi bila aset ini bagian dari aset lain,
-                                        misalnya mesin yang terpasang pada satu
-                                        gedung.
-                                    </FieldDescription>
+                                    <FieldHint
+                                        hint={
+                                            <>
+                                                Isi bila aset ini bagian dari
+                                                aset lain, misalnya mesin yang
+                                                terpasang pada satu gedung.
+                                            </>
+                                        }
+                                    >
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            aria-label="Bantuan field"
+                                        >
+                                            <Info aria-hidden="true" />
+                                        </Button>
+                                    </FieldHint>
                                 </Field>
                             )}
                         </CollapsibleSection>

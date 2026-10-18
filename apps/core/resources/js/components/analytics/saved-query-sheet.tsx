@@ -1,4 +1,5 @@
-import { Button } from '@apperp/ui/button';
+import { ActionButton } from '@apperp/ui/action-button';
+
 import {
     Field,
     FieldDescription,
@@ -8,13 +9,12 @@ import {
 } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetFooter,
-    SheetHeader,
-    SheetTitle,
-} from '@apperp/ui/sheet';
+    PageDialog,
+    PageDialogContent,
+    PageDialogToolbar,
+    PageDialogBody,
+} from '@apperp/ui/page-dialog';
+
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
 import { useState } from 'react';
@@ -76,85 +76,106 @@ export function SavedQuerySheet({
     };
 
     return (
-        <Sheet open onOpenChange={(open) => !open && onClose()}>
-            <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-lg">
-                <SheetHeader className="border-b px-6 py-5 pr-12">
-                    <SheetTitle>Simpan analisis</SheetTitle>
-                    <SheetDescription>
-                        Pilihan data, nilai, pengelompokan, saringan, dan
-                        periode disimpan. Angkanya dihitung ulang setiap kali
-                        dibuka.
-                    </SheetDescription>
-                </SheetHeader>
-                <form
-                    id="saved-query-form"
-                    className="min-h-0 flex-1 overflow-y-auto px-6 py-5"
-                    onSubmit={(event) => {
+        <PageDialog
+            open
+            onOpenChange={(open) => {
+                if (!open && !saving) {
+                    onClose();
+                }
+            }}
+        >
+            <PageDialogContent
+                onEscapeKeyDown={(event) => {
+                    if (saving) {
                         event.preventDefault();
-                        void save();
-                    }}
-                >
-                    <FieldGroup>
-                        <Field data-invalid={Boolean(errors.name)}>
-                            <Input
-                                label="Nama"
-                                required
-                                maxLength={120}
-                                value={name}
-                                onChange={(event) =>
-                                    setName(event.target.value)
-                                }
-                                aria-invalid={Boolean(errors.name)}
-                            />
-                            <FieldError>{errors.name?.[0]}</FieldError>
-                        </Field>
-                        <Field data-invalid={Boolean(errors.description)}>
-                            <Textarea
-                                label="Keterangan"
-                                maxLength={1000}
-                                rows={3}
-                                value={description}
-                                onChange={(event) =>
-                                    setDescription(event.target.value)
-                                }
-                            />
-                            <FieldError>{errors.description?.[0]}</FieldError>
-                        </Field>
-                        {abilities.share && (
-                            <Field data-invalid={Boolean(errors.shared)}>
-                                <div className="flex items-center gap-3">
-                                    <Switch
-                                        id="saved-query-shared"
-                                        checked={shared}
-                                        onCheckedChange={setShared}
-                                    />
-                                    <FieldLabel htmlFor="saved-query-shared">
-                                        Bagikan ke anggota lain
-                                    </FieldLabel>
-                                </div>
-                                <FieldDescription>
-                                    {shared
-                                        ? 'Anggota yang boleh melihat dasbor dapat membukanya. Setiap orang melihat angka sesuai aksesnya sendiri.'
-                                        : 'Hanya Anda yang melihat analisis ini.'}
-                                </FieldDescription>
-                                <FieldError>{errors.shared?.[0]}</FieldError>
-                            </Field>
-                        )}
-                    </FieldGroup>
-                </form>
-                <SheetFooter className="border-t px-6 py-4 sm:flex-row sm:justify-end">
-                    <Button variant="outline" type="button" onClick={onClose}>
-                        Batal
-                    </Button>
-                    <Button
+                    }
+                }}
+                title="Analisis tersimpan"
+                recordTitle={name.trim() || 'Analisis baru'}
+                editing
+                description={
+                    'Pilihan data, nilai, pengelompokan, saringan, dan\n                        periode disimpan. Angkanya dihitung ulang setiap kali\n                        dibuka.'
+                }
+                busy={saving}
+            >
+                <PageDialogToolbar>
+                    <ActionButton
+                        action="save"
+                        pending={saving}
                         type="submit"
                         form="saved-query-form"
                         disabled={saving || name.trim() === ''}
+                    />
+                    <ActionButton
+                        action="cancel"
+                        type="button"
+                        disabled={saving}
+                        onClick={onClose}
+                    />
+                </PageDialogToolbar>
+                <PageDialogBody>
+                    <form
+                        id="saved-query-form"
+
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            void save();
+                        }}
                     >
-                        Simpan
-                    </Button>
-                </SheetFooter>
-            </SheetContent>
-        </Sheet>
+                        <FieldGroup>
+                            <Field data-invalid={Boolean(errors.name)}>
+                                <Input
+                                    label="Nama"
+                                    required
+                                    maxLength={120}
+                                    value={name}
+                                    onChange={(event) =>
+                                        setName(event.target.value)
+                                    }
+                                    aria-invalid={Boolean(errors.name)}
+                                />
+                                <FieldError>{errors.name?.[0]}</FieldError>
+                            </Field>
+                            <Field data-invalid={Boolean(errors.description)}>
+                                <Textarea
+                                    label="Keterangan"
+                                    maxLength={1000}
+                                    rows={3}
+                                    value={description}
+                                    onChange={(event) =>
+                                        setDescription(event.target.value)
+                                    }
+                                />
+                                <FieldError>
+                                    {errors.description?.[0]}
+                                </FieldError>
+                            </Field>
+                            {abilities.share && (
+                                <Field data-invalid={Boolean(errors.shared)}>
+                                    <div className="flex items-center gap-3">
+                                        <Switch
+                                            id="saved-query-shared"
+                                            checked={shared}
+                                            onCheckedChange={setShared}
+                                        />
+                                        <FieldLabel htmlFor="saved-query-shared">
+                                            Bagikan ke anggota lain
+                                        </FieldLabel>
+                                    </div>
+                                    <FieldDescription>
+                                        {shared
+                                            ? 'Anggota yang boleh melihat dasbor dapat membukanya. Setiap orang melihat angka sesuai aksesnya sendiri.'
+                                            : 'Hanya Anda yang melihat analisis ini.'}
+                                    </FieldDescription>
+                                    <FieldError>
+                                        {errors.shared?.[0]}
+                                    </FieldError>
+                                </Field>
+                            )}
+                        </FieldGroup>
+                    </form>
+                </PageDialogBody>
+            </PageDialogContent>
+        </PageDialog>
     );
 }

@@ -1,3 +1,4 @@
+import { ActionButton } from '@apperp/ui/action-button';
 import { Alert, AlertDescription } from '@apperp/ui/alert';
 import { Button } from '@apperp/ui/button';
 import {
@@ -17,6 +18,7 @@ import {
     DropdownMenuTrigger,
 } from '@apperp/ui/dropdown-menu';
 import { Textarea } from '@apperp/ui/textarea';
+import { Trash2 } from 'lucide-react';
 import { Ellipsis, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useDateTimeFormat } from '@/hooks/use-date-time';
@@ -202,7 +204,8 @@ export function RecordNotes({
                                     <DropdownMenuItem
                                         onSelect={() => void archive(note)}
                                     >
-                                        Arsipkan
+                                        <Trash2 />
+                                        Delete
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
@@ -254,13 +257,13 @@ export function RecordNotes({
                             </Button>
                         </DialogClose>
                         {page?.meta.can_change && (
-                            <Button
+                            <ActionButton
+                                action="save"
                                 type="button"
                                 disabled={busy || !content.trim()}
                                 onClick={() => void save()}
-                            >
-                                {busy ? 'Menyimpan…' : 'Simpan'}
-                            </Button>
+                                pending={busy}
+                            />
                         )}
                     </DialogFooter>
                 </DialogContent>

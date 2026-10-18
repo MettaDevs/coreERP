@@ -25,7 +25,12 @@ export default function MaintenanceRequestPage({
     const [first, second] = segments;
 
     if (!first) {
-        return <MaintenanceRequestListPage permissions={permissions} />;
+        return (
+            <MaintenanceRequestListPage
+                context={context}
+                permissions={permissions}
+            />
+        );
     }
 
     if (first === 'baru') {

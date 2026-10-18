@@ -11,6 +11,7 @@ Route::get('garansi-aset', [AssetWarrantyController::class, 'index']);
 Route::post('garansi-aset', [AssetWarrantyController::class, 'store']);
 Route::get('garansi-aset/vendor', [AssetWarrantyController::class, 'vendor']);
 Route::get('garansi-aset/akan-berakhir', [AssetWarrantyController::class, 'expiring']);
+Route::get('garansi-aset/{id}', [AssetWarrantyController::class, 'show'])->whereUlid('id');
 Route::patch('garansi-aset/{id}', [AssetWarrantyController::class, 'update']);
 Route::delete('garansi-aset/{id}', [AssetWarrantyController::class, 'destroy']);
 Route::get('pemeliharaan-aset/referensi/garansi', [AssetWarrantyController::class, 'forWorkOrder']);

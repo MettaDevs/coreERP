@@ -1,84 +1,115 @@
-import { ArchiveIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react"
-import * as React from "react"
+import {
+    LoaderCircleIcon,
+    PencilIcon,
+    PlusIcon,
+    SaveIcon,
+    Trash2Icon,
+    XIcon,
+} from 'lucide-react';
+import * as React from 'react';
 
-import { cn } from "../utils"
-import { Button } from "./button"
+import { cn } from '../utils';
+import { Button } from './button';
 
-/**
- * Tombol untuk aksi record yang berulang di seluruh aplikasi: tambah, ubah, arsipkan,
- * hapus. Ikon dan warnanya ditetapkan di sini, sekali, supaya "kuning" pada satu layar
- * tidak pernah berbeda dari "kuning" di layar lain.
- *
- * Ini pembungkus tipis di atas `Button`; tidak ada perilaku baru. Yang distandarkan adalah
- * pemasangan niat aksi dengan ikon dan warnanya, hal yang kalau ditulis ulang per halaman
- * pasti melenceng. Warnanya memakai token tema, bukan warna mentah, sehingga mode gelap
- * ikut benar tanpa usaha tambahan.
- *
- * Warna tidak pernah menjadi satu-satunya penanda: setiap niat membawa ikon dan teks.
- * Pengguna yang tidak dapat membedakan merah dari hijau tetap dapat membaca tombolnya.
- */
+/** Perintah record memakai label, ikon, dan tampilan yang sama pada setiap layar. */
 const ACTION_INTENTS = {
-  /** Menambah record baru. */
-  create: {
-    icon: PlusIcon,
-    variant: "outline",
-    className:
-      "border-success/40 text-success hover:bg-success/10 hover:text-success focus-visible:ring-success/30",
-  },
-  /** Menyunting record yang sedang dibuka. */
-  edit: {
-    icon: PencilIcon,
-    variant: "outline",
-    className:
-      "border-warning/40 text-warning hover:bg-warning/10 hover:text-warning focus-visible:ring-warning/30",
-  },
-  /**
-   * Mengarsipkan: record tetap ada dan tetap dirujuk data lama, hanya hilang dari daftar
-   * pilihan. Karena itu merahnya ditahan — ini tindakan yang dapat dianulir.
-   */
-  archive: {
-    icon: ArchiveIcon,
-    variant: "outline",
-    className:
-      "border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive focus-visible:ring-destructive/30",
-  },
-  /**
-   * Menghapus permanen. Satu-satunya niat yang tampil sebagai tombol berisi penuh, supaya
-   * tidak pernah tertukar dengan arsip yang duduk di sebelahnya.
-   */
-  delete: {
-    icon: Trash2Icon,
-    variant: "destructive",
-    className: "",
-  },
-} as const
+    create: {
+        icon: PlusIcon,
+        label: 'Baru',
+        pendingLabel: 'Membuat…',
+        destructive: false,
+    },
+    add: {
+        icon: PlusIcon,
+        label: 'Tambah',
+        pendingLabel: 'Menambahkan…',
+        destructive: false,
+    },
+    edit: {
+        icon: PencilIcon,
+        label: 'Ubah',
+        pendingLabel: 'Memproses…',
+        destructive: false,
+    },
+    archive: {
+        icon: Trash2Icon,
+        label: 'Delete',
+        pendingLabel: 'Memproses…',
+        destructive: true,
+    },
+    delete: {
+        icon: Trash2Icon,
+        label: 'Delete',
+        pendingLabel: 'Memproses…',
+        destructive: true,
+    },
+    save: {
+        icon: SaveIcon,
+        label: 'Simpan',
+        pendingLabel: 'Menyimpan…',
+        destructive: false,
+    },
+    cancel: {
+        icon: XIcon,
+        label: 'Batal',
+        pendingLabel: 'Memproses…',
+        destructive: false,
+    },
+} as const;
 
-type ActionIntent = keyof typeof ACTION_INTENTS
-type ActionButtonProps = Omit<React.ComponentProps<typeof Button>, "variant"> & {
-  action: ActionIntent
-}
+type ActionIntent = keyof typeof ACTION_INTENTS;
+type ActionButtonBaseProps = Omit<
+    React.ComponentProps<typeof Button>,
+    'variant' | 'children' | 'asChild' | 'type' | 'size'
+> & {
+    pending?: boolean;
+    children?: never;
+};
+
+type ActionButtonProps = ActionButtonBaseProps &
+    (
+        | { action: 'save' | 'add'; type: 'submit' | 'button' }
+        | { action: Exclude<ActionIntent, 'save' | 'add'>; type?: 'button' }
+    );
 
 function ActionButton({
-  action,
-  className,
-  children,
-  ...props
+    action,
+    pending = false,
+    disabled,
+    type = 'button',
+    className,
+    ...props
 }: ActionButtonProps) {
-  const { icon: Icon, variant, className: intentClassName } = ACTION_INTENTS[action]
+    const intent = ACTION_INTENTS[action];
+    const Icon = pending ? LoaderCircleIcon : intent.icon;
 
-  return (
-    <Button
-      data-slot="action-button"
-      data-action={action}
-      variant={variant}
-      className={cn(intentClassName, className)}
-      {...props}
-    >
-      <Icon aria-hidden="true" />
-      {children}
-    </Button>
-  )
+    return (
+        <Button
+            {...props}
+            data-slot="action-button"
+            data-action={action}
+            variant="ghost"
+            asChild={false}
+            type={type}
+            size="command"
+            disabled={disabled || pending}
+            aria-busy={pending || undefined}
+            className={cn(
+                className,
+                'h-7 gap-1.5 rounded-sm border-0 bg-transparent px-2 py-1 text-sm font-normal shadow-none',
+                action === 'cancel' ? 'text-foreground' : 'text-primary',
+                intent.destructive &&
+                    'hover:bg-destructive/10 hover:text-destructive focus-visible:ring-destructive/30',
+            )}
+        >
+            <Icon
+                aria-hidden="true"
+                className={pending ? 'animate-spin' : undefined}
+            />
+            {pending ? intent.pendingLabel : intent.label}
+        </Button>
+    );
 }
 
-export { ActionButton }
-export type { ActionButtonProps, ActionIntent }
+export { ActionButton };
+export type { ActionButtonProps, ActionIntent };

@@ -85,6 +85,66 @@ class PrintIdentityVersionTest extends TestCase
             ->assertOk()->assertJsonCount(1, 'data.logos');
     }
 
+    public function test_organization_and_print_identity_are_saved_together(): void
+    {
+        $id = $this->legalEntity('Nama awal');
+        $version = DB::table('organizations')->where('id', $id)->value('version');
+        $code = DB::table('legal_entities')->where('organization_id', $id)->value('company_code');
+
+        $this->actingAs($this->owner)->patchJson('/api/v1/organizations/'.$id, [
+            'name' => 'Nama baru', 'company_code' => $code, 'country_code' => 'ID', 'version' => $version,
+            'print_identity' => ['version' => 0, 'display_name' => 'Nama pada kop', 'footer_text' => 'Footer baru'],
+        ])->assertOk()->assertJsonPath('data.name', 'Nama baru');
+
+        $this->getJson('/api/v1/organizations/'.$id.'/print-identity')->assertOk()
+            ->assertJsonPath('data.display_name', 'Nama pada kop')->assertJsonPath('data.footer_text', 'Footer baru');
+    }
+
+    public function test_stale_print_identity_rolls_back_organization_changes(): void
+    {
+        $id = $this->legalEntity('Nama awal');
+        $version = DB::table('organizations')->where('id', $id)->value('version');
+        $code = DB::table('legal_entities')->where('organization_id', $id)->value('company_code');
+        $this->actingAs($this->owner)->putJson('/api/v1/organizations/'.$id.'/print-identity', [
+            'version' => 0, 'footer_text' => 'Perubahan tab lain',
+        ])->assertOk();
+
+        $this->patchJson('/api/v1/organizations/'.$id, [
+            'name' => 'Tidak boleh tersimpan', 'company_code' => $code, 'country_code' => 'ID', 'version' => $version,
+            'print_identity' => ['version' => 0, 'footer_text' => 'Versi lama'],
+        ])->assertConflict();
+
+        $this->assertDatabaseHas('organizations', ['id' => $id, 'name' => 'Nama awal', 'version' => $version]);
+        $this->assertDatabaseHas('print_identities', ['organization_id' => $id, 'footer_text' => 'Perubahan tab lain']);
+    }
+
+    public function test_invalid_print_identity_does_not_save_organization(): void
+    {
+        $id = $this->legalEntity('Nama awal');
+        $version = DB::table('organizations')->where('id', $id)->value('version');
+        $code = DB::table('legal_entities')->where('organization_id', $id)->value('company_code');
+
+        $this->actingAs($this->owner)->patchJson('/api/v1/organizations/'.$id, [
+            'name' => 'Tidak boleh tersimpan', 'company_code' => $code, 'country_code' => 'ID', 'version' => $version,
+            'print_identity' => ['version' => 0, 'display_name' => str_repeat('a', 201)],
+        ])->assertUnprocessable()->assertJsonValidationErrors('print_identity.display_name');
+
+        $this->assertDatabaseHas('organizations', ['id' => $id, 'name' => 'Nama awal', 'version' => $version]);
+        $this->assertDatabaseMissing('print_identities', ['organization_id' => $id]);
+    }
+
+    public function test_empty_print_identity_requires_its_version_and_preserves_organization(): void
+    {
+        $id = $this->legalEntity('Unchanged organization');
+        $version = DB::table('organizations')->where('id', $id)->value('version');
+        $code = DB::table('legal_entities')->where('organization_id', $id)->value('company_code');
+        $this->actingAs($this->owner)->patchJson('/api/v1/organizations/'.$id, [
+            'name' => 'Must not change', 'company_code' => $code, 'country_code' => 'ID', 'version' => $version,
+            'print_identity' => [],
+        ])->assertUnprocessable()->assertJsonValidationErrors('print_identity.version');
+        $this->assertDatabaseHas('organizations', ['id' => $id, 'name' => 'Unchanged organization', 'version' => $version]);
+    }
+
     private function legalEntity(string $name): string
     {
         $id = (string) Str::ulid();

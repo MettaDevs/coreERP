@@ -1,3 +1,4 @@
+import { ActionButton } from '@apperp/ui/action-button';
 import { Alert, AlertDescription, AlertTitle } from '@apperp/ui/alert';
 import { Button } from '@apperp/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
@@ -10,7 +11,7 @@ import {
 import { Field } from '@apperp/ui/field';
 import { Select } from '@apperp/ui/select';
 import { Head, router, usePage } from '@inertiajs/react';
-import { LayoutDashboard, Link2, Save, TriangleAlert } from 'lucide-react';
+import { Link2, TriangleAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { QueryEditor } from '@/components/analytics/query-editor';
@@ -214,32 +215,24 @@ export default function AnalyticsExplore({ datasets, abilities }: Props) {
                                                 {abilities.create &&
                                                     !rejected && (
                                                         <>
-                                                            <Button
+                                                            <ActionButton
+                                                                action="save"
                                                                 type="button"
-                                                                size="sm"
-                                                                variant="outline"
                                                                 onClick={() =>
                                                                     setBuilding(
                                                                         true,
                                                                     )
                                                                 }
-                                                            >
-                                                                <LayoutDashboard />
-                                                                Simpan ke dasbor
-                                                            </Button>
-                                                            <Button
+                                                            />
+                                                            <ActionButton
+                                                                action="save"
                                                                 type="button"
-                                                                size="sm"
-                                                                variant="outline"
                                                                 onClick={() =>
                                                                     setSaving(
                                                                         true,
                                                                     )
                                                                 }
-                                                            >
-                                                                <Save />
-                                                                Simpan analisis
-                                                            </Button>
+                                                            />
                                                         </>
                                                     )}
                                                 <Button

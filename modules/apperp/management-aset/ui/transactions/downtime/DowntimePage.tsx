@@ -2,21 +2,13 @@ import { usePage } from '@inertiajs/react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDateTimeFormat } from '@/hooks/use-date-time';
+import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import { Checkbox } from '@apperp/ui/checkbox';
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
-import {
-    Dialog,
-    DialogAction,
-    DialogBody,
-    DialogCancel,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@apperp/ui/dialog';
+
 import {
     Empty,
     EmptyDescription,
@@ -25,12 +17,23 @@ import {
 } from '@apperp/ui/empty';
 import { Field, FieldDescription } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
+import {
+    PageDialog,
+    PageDialogContent,
+    PageDialogToolbar,
+    PageDialogClose,
+    PageDialogBody,
+} from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
+import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
 import { zonedInput } from '../../_shared/format';
 import { ApiError, api, newIdempotencyKey, toastSaveError } from '../../api';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import { useRecordList } from '../../use-record-list';
+import { RecordCardHeader, recordQueryUrl } from '../_shared/record-card';
+import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
+import { useRecordQueryTarget } from '../_shared/use-record-query-target';
 import type { Downtime } from './downtime';
 
 type Draft = {
@@ -63,12 +66,18 @@ export default function DowntimePage({
     const [reload, setReload] = useState(0);
     const [filterAset, setFilterAset] = useState('');
     const [openOnly, setOpenOnly] = useState(false);
-    const assetSource = useMasterOptions('aset');
-    const assets = assetSource.options;
-    const reasons = useMasterOptions('alasan-downtime');
+    const [openedDowntime, setOpenedDowntime] = useState<Downtime | null>(null);
     const [draft, setDraft] = useState<Draft | null>(null);
+    const assetSource = useMasterOptions('aset', '', draft?.aset_id ?? '');
+    const assets = assetSource.options;
+    const reasons = useMasterOptions(
+        'alasan-downtime',
+        '',
+        draft?.alasan_downtime_id ?? '',
+    );
     const [errors, setErrors] = useState<Record<string, string[]>>({});
     const [busy, setBusy] = useState(false);
+    const [draftDirty, setDraftDirty] = useState(false);
     const dialogRef = useRef<HTMLDivElement>(null);
     const message = (field: string) => errors[field]?.[0];
 
@@ -105,6 +114,7 @@ export default function DowntimePage({
                       body: JSON.stringify({ ...body, aset_id: draft.aset_id }),
                   }));
             toast.success('Downtime disimpan.');
+            clearRecordTarget();
             setDraft(null);
             setReload((current) => current + 1);
         } catch (caught) {
@@ -118,16 +128,22 @@ export default function DowntimePage({
         }
     }
 
-    async function archive(row: Downtime) {
+    async function archive(row: Pick<Downtime, 'id' | 'version'>) {
+        setBusy(true);
+
         try {
             await api(`/downtime-aset/${row.id}`, {
                 method: 'DELETE',
                 body: JSON.stringify({ version: row.version }),
             });
             toast.success('Downtime diarsipkan.');
+            clearRecordTarget();
+            setDraft((current) => (current?.id === row.id ? null : current));
             setReload((current) => current + 1);
         } catch (caught) {
             toastSaveError(caught, 'Downtime belum dapat diarsipkan.');
+        } finally {
+            setBusy(false);
         }
     }
 
@@ -196,6 +212,7 @@ export default function DowntimePage({
     ];
 
     const openEdit = (row: Downtime) => {
+        setOpenedDowntime(row);
         setErrors({});
         setDraft({
             id: row.id,
@@ -208,25 +225,75 @@ export default function DowntimePage({
         });
     };
 
+    const editable = draft?.id ? can('update') : can('create');
+    const clearRecordTarget = useRecordQueryTarget({
+        scopeKey: 'downtime-aset',
+        enabled: can('read'),
+        onOpen: async (id, signal) => {
+            const result = await api<{ data: Downtime }>(
+                '/downtime-aset/' + id,
+                { signal },
+            );
+
+            if (!signal.aborted) {
+                openEdit(result.data);
+            }
+        },
+    });
+    const discardDraft = () =>
+        !draftDirty || window.confirm('Buang perubahan yang belum disimpan?');
+    const newDowntime = () => {
+        if (!busy && discardDraft()) {
+            clearRecordTarget();
+            (() => {
+                setErrors({});
+                setDraft({
+                    id: null,
+                    version: 0,
+                    aset_id: filterAset,
+                    mulai: '',
+                    selesai: '',
+                    alasan_downtime_id: '',
+                    keterangan: '',
+                });
+            })();
+        }
+    };
+    const closeDowntime = () => {
+        if (!busy && discardDraft()) {
+            clearRecordTarget();
+            setDraft(null);
+        }
+    };
+    useRecordCardDirty({
+        value: draft,
+        ready: draft !== null,
+        scopeKey: draft?.id ?? 'new',
+        onDirtyChange: setDraftDirty,
+    });
+    const draftNavigation = useRecordNavigation({
+        items: list.items,
+        currentId: draft?.id ?? null,
+        getId: (item) => item.id,
+        onNavigate: (id) => {
+            const row = list.items.find((item) => item.id === id);
+
+            if (row) {
+                openEdit(row);
+            }
+        },
+        scopeKey: JSON.stringify([filterAset, openOnly, list.sort]),
+        hasMore: list.hasMore,
+        loading: list.loading,
+        loadMore: list.loadMore,
+        disabled: busy || draftDirty,
+    });
+
     return (
         <div>
             <RecordActionBar title="Downtime aset">
                 {can('create') && (
-                    <Button
-                        type="button"
-                        onClick={() => {
-                            setErrors({});
-                            setDraft({
-                                id: null,
-                                version: 0,
-                                aset_id: filterAset,
-                                mulai: '',
-                                selesai: '',
-                                alasan_downtime_id: '',
-                                keterangan: '',
-                            });
-                        }}
-                    >
+                    <Button type="button" onClick={newDowntime}>
                         Catat downtime
                     </Button>
                 )}
@@ -293,7 +360,7 @@ export default function DowntimePage({
                             ? [
                                   {
                                       id: 'arsip',
-                                      label: 'Arsipkan',
+                                      label: 'Delete',
                                       destructive: true,
                                   },
                               ]
@@ -305,37 +372,114 @@ export default function DowntimePage({
                 />
             )}
 
-            <Dialog
+            <PageDialog
                 open={draft !== null}
-                onOpenChange={(open) => !open && setDraft(null)}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        closeDowntime();
+                    }
+                }}
             >
-                <DialogContent size="compact" ref={dialogRef}>
-                    <DialogHeader>
-                        <DialogTitle>
-                            {draft?.id ? 'Koreksi downtime' : 'Catat downtime'}
-                        </DialogTitle>
-                    </DialogHeader>
+                <PageDialogContent
+                    ref={dialogRef}
+                    title={'Downtime aset'}
+                    busy={busy}
+                    onNew={draft?.id && can('create') ? newDowntime : undefined}
+                    navigation={draft?.id ? draftNavigation : undefined}
+                >
+                    <RecordCardHeader
+                        recordTitle={
+                            draft?.id
+                                ? [
+                                      openedDowntime?.id === draft.id
+                                          ? openedDowntime.aset_kode
+                                          : assets.find(
+                                                (a) => a.id === draft.aset_id,
+                                            )?.kode,
+                                      formatDateTime(draft.mulai),
+                                  ]
+                                      .filter(Boolean)
+                                      .join(' · ')
+                                : 'Baru'
+                        }
+                        editing={editable}
+                        recordUrl={
+                            draft?.id
+                                ? recordQueryUrl('downtime-aset', draft.id)
+                                : undefined
+                        }
+                        onDelete={
+                            draft?.id && can('archive')
+                                ? () => {
+                                      if (draft?.id) {
+                                          void archive({
+                                              id: draft.id,
+                                              version: draft.version,
+                                          });
+                                      }
+                                  }
+                                : undefined
+                        }
+                    />
+                    {editable && (
+                        <PageDialogToolbar>
+                            <ActionButton
+                                action="save"
+                                type="button"
+                                disabled={
+                                    busy || !draft?.aset_id || !draft?.mulai
+                                }
+                                onClick={() => void save()}
+                                pending={busy}
+                            />
+                            <PageDialogClose asChild>
+                                <ActionButton action="cancel" type="button" />
+                            </PageDialogClose>
+                        </PageDialogToolbar>
+                    )}
                     {draft && (
-                        <DialogBody className="space-y-4">
+                        <PageDialogBody className="space-y-4">
                             <Field>
-                                <Select
-                                    {...assetSource.selectProps}
-                                    label="Aset"
-                                    required
-                                    items={assetChoices}
-                                    value={draft.aset_id || null}
-                                    placeholder="Pilih aset"
-                                    searchPlaceholder="Cari kode atau nama aset"
-                                    ariaLabel="Aset"
-                                    portalContainer={dialogRef}
-                                    onValueChange={(value) =>
-                                        !draft.id &&
-                                        setDraft({
-                                            ...draft,
-                                            aset_id: value ?? '',
-                                        })
-                                    }
-                                />
+                                {editable ? (
+                                    <Select
+                                        {...assetSource.selectProps}
+                                        label="Aset"
+                                        required
+                                        items={assetChoices}
+                                        value={draft.aset_id || null}
+                                        placeholder="Pilih aset"
+                                        searchPlaceholder="Cari kode atau nama aset"
+                                        ariaLabel="Aset"
+                                        portalContainer={dialogRef}
+                                        onValueChange={(value) =>
+                                            !draft.id &&
+                                            setDraft({
+                                                ...draft,
+                                                aset_id: value ?? '',
+                                            })
+                                        }
+                                    />
+                                ) : (
+                                    <Input
+                                        label="Aset"
+                                        readOnly
+                                        value={
+                                            openedDowntime?.aset_id ===
+                                            draft.aset_id
+                                                ? [
+                                                      openedDowntime.aset_kode,
+                                                      openedDowntime.aset_nama,
+                                                  ]
+                                                      .filter(Boolean)
+                                                      .join(' · ')
+                                                : (assets.find(
+                                                      (row) =>
+                                                          row.id ===
+                                                          draft.aset_id,
+                                                  )?.nama ?? '—')
+                                        }
+                                    />
+                                )}
                                 {message('aset_id') && (
                                     <FieldDescription>
                                         {message('aset_id')}
@@ -344,6 +488,7 @@ export default function DowntimePage({
                             </Field>
                             <div className="grid grid-cols-2 gap-3">
                                 <Input
+                                    readOnly={!editable}
                                     label="Mulai berhenti"
                                     type="datetime-local"
                                     required
@@ -357,6 +502,7 @@ export default function DowntimePage({
                                 />
                                 <Field>
                                     <Input
+                                        readOnly={!editable}
                                         label="Kembali beroperasi"
                                         type="datetime-local"
                                         value={draft.selesai}
@@ -378,24 +524,44 @@ export default function DowntimePage({
                                 </p>
                             )}
                             <Field>
-                                <Select
-                                    {...reasons.selectProps}
-                                    label="Alasan"
-                                    items={reasons.options.map((option) => ({
-                                        value: option.id,
-                                        label: optionLabel(option),
-                                    }))}
-                                    value={draft.alasan_downtime_id || null}
-                                    placeholder="Tanpa alasan"
-                                    ariaLabel="Alasan downtime"
-                                    portalContainer={dialogRef}
-                                    onValueChange={(value) =>
-                                        setDraft({
-                                            ...draft,
-                                            alasan_downtime_id: value ?? '',
-                                        })
-                                    }
-                                />
+                                {editable ? (
+                                    <Select
+                                        {...reasons.selectProps}
+                                        label="Alasan"
+                                        items={reasons.options.map(
+                                            (option) => ({
+                                                value: option.id,
+                                                label: optionLabel(option),
+                                            }),
+                                        )}
+                                        value={draft.alasan_downtime_id || null}
+                                        placeholder="Tanpa alasan"
+                                        ariaLabel="Alasan downtime"
+                                        portalContainer={dialogRef}
+                                        onValueChange={(value) =>
+                                            setDraft({
+                                                ...draft,
+                                                alasan_downtime_id: value ?? '',
+                                            })
+                                        }
+                                    />
+                                ) : (
+                                    <Input
+                                        label="Alasan"
+                                        readOnly
+                                        value={
+                                            openedDowntime?.alasan_downtime_id ===
+                                            draft.alasan_downtime_id
+                                                ? (openedDowntime?.alasan_downtime_nama ??
+                                                  'Tanpa alasan')
+                                                : (reasons.options.find(
+                                                      (row) =>
+                                                          row.id ===
+                                                          draft.alasan_downtime_id,
+                                                  )?.nama ?? 'Tanpa alasan')
+                                        }
+                                    />
+                                )}
                                 <FieldDescription>
                                     Downtime tanpa alasan tetap mengurangi
                                     ketersediaan aset pada KPI. Pilih alasan
@@ -404,6 +570,7 @@ export default function DowntimePage({
                                 </FieldDescription>
                             </Field>
                             <Input
+                                readOnly={!editable}
                                 label="Keterangan"
                                 maxLength={2000}
                                 value={draft.keterangan}
@@ -414,20 +581,10 @@ export default function DowntimePage({
                                     })
                                 }
                             />
-                        </DialogBody>
+                        </PageDialogBody>
                     )}
-                    <DialogFooter>
-                        <DialogAction
-                            type="button"
-                            disabled={busy || !draft?.aset_id || !draft?.mulai}
-                            onClick={() => void save()}
-                        >
-                            {busy ? 'Menyimpan…' : 'Simpan'}
-                        </DialogAction>
-                        <DialogCancel type="button">Batal</DialogCancel>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                </PageDialogContent>
+            </PageDialog>
         </div>
     );
 }

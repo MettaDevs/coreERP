@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useWorkDate } from '@/hooks/use-work-date';
+import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
-import { Button } from '@apperp/ui/button';
+
 import { Checkbox } from '@apperp/ui/checkbox';
 import { DataTable } from '@apperp/ui/data-table';
 import type {
@@ -10,10 +11,8 @@ import type {
     DataTableRowAction,
 } from '@apperp/ui/data-table';
 import {
+    DialogClose,
     Dialog,
-    DialogAction,
-    DialogBody,
-    DialogCancel,
     DialogContent,
     DialogDescription,
     DialogFooter,
@@ -28,6 +27,13 @@ import {
 } from '@apperp/ui/empty';
 import { Field, FieldDescription } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
+import {
+    PageDialog,
+    PageDialogContent,
+    PageDialogToolbar,
+    PageDialogClose,
+    PageDialogBody,
+} from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import {
@@ -39,6 +45,7 @@ import {
 } from '../../api';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import { useRecordList } from '../../use-record-list';
+import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
 
 type Reading = {
     id: string;
@@ -132,6 +139,7 @@ export default function CounterReadingPage({
     } | null>(null);
     const [errors, setErrors] = useState<Record<string, string[]>>({});
     const [busy, setBusy] = useState(false);
+    const [draftDirty, setDraftDirty] = useState(false);
     const [archiving, setArchiving] = useState<Reading | null>(null);
     const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -329,16 +337,34 @@ export default function CounterReadingPage({
     ];
 
     const actions: DataTableRowAction[] = canArchive
-        ? [{ id: 'archive', label: 'Arsipkan', destructive: true }]
+        ? [{ id: 'archive', label: 'Delete', destructive: true }]
         : [];
+
+    useRecordCardDirty({
+        value: draft,
+        ready: recording && draft !== null,
+        scopeKey: 'new-reading',
+        onDirtyChange: setDraftDirty,
+    });
+    const closeReading = () => {
+        if (
+            !busy &&
+            (!draftDirty ||
+                window.confirm('Buang perubahan yang belum disimpan?'))
+        ) {
+            setRecording(false);
+        }
+    };
 
     return (
         <div>
             <RecordActionBar title="Pembacaan counter">
                 {canCreate && (
-                    <Button type="button" onClick={openRecord}>
-                        Catat pembacaan
-                    </Button>
+                    <ActionButton
+                        action="create"
+                        type="button"
+                        onClick={openRecord}
+                    />
                 )}
             </RecordActionBar>
 
@@ -413,17 +439,42 @@ export default function CounterReadingPage({
                 />
             )}
 
-            <Dialog open={recording} onOpenChange={setRecording}>
-                <DialogContent size="compact" ref={dialogRef}>
-                    <DialogHeader>
-                        <DialogTitle>Catat pembacaan counter</DialogTitle>
-                        <DialogDescription>
-                            Ketik angka yang tertera di meter. Total pemakaian
-                            dihitung otomatis.
-                        </DialogDescription>
-                    </DialogHeader>
+            <PageDialog
+                open={recording}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        closeReading();
+                    }
+                }}
+            >
+                <PageDialogContent
+                    ref={dialogRef}
+                    title={'Pembacaan counter'}
+                    description={
+                        'Ketik angka yang tertera di meter. Total pemakaian dihitung otomatis.'
+                    }
+                    busy={busy}
+                >
+                    <PageDialogToolbar>
+                        <ActionButton
+                            action="save"
+                            type="button"
+                            disabled={
+                                busy ||
+                                !draft?.aset_id ||
+                                !draft?.jenis_counter_id ||
+                                !draft?.jam ||
+                                draft?.nilai === ''
+                            }
+                            onClick={() => void record()}
+                            pending={busy}
+                        />
+                        <PageDialogClose asChild>
+                            <ActionButton action="cancel" type="button" />
+                        </PageDialogClose>
+                    </PageDialogToolbar>
                     {draft && (
-                        <DialogBody className="space-y-4">
+                        <PageDialogBody className="space-y-4">
                             <Field>
                                 <Select
                                     {...assetSource.selectProps}
@@ -570,26 +621,10 @@ export default function CounterReadingPage({
                                     })
                                 }
                             />
-                        </DialogBody>
+                        </PageDialogBody>
                     )}
-                    <DialogFooter>
-                        <DialogAction
-                            type="button"
-                            disabled={
-                                busy ||
-                                !draft?.aset_id ||
-                                !draft?.jenis_counter_id ||
-                                !draft?.jam ||
-                                draft?.nilai === ''
-                            }
-                            onClick={() => void record()}
-                        >
-                            {busy ? 'Menyimpan…' : 'Catat'}
-                        </DialogAction>
-                        <DialogCancel type="button">Batal</DialogCancel>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                </PageDialogContent>
+            </PageDialog>
 
             <Dialog
                 open={archiving !== null}
@@ -597,7 +632,7 @@ export default function CounterReadingPage({
             >
                 <DialogContent size="compact">
                     <DialogHeader>
-                        <DialogTitle>Arsipkan pembacaan ini?</DialogTitle>
+                        <DialogTitle>Delete pembacaan ini?</DialogTitle>
                         <DialogDescription>
                             Hanya pembacaan terakhir sebuah counter yang dapat
                             diarsipkan, karena total pembacaan sesudahnya
@@ -606,14 +641,14 @@ export default function CounterReadingPage({
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <DialogAction
+                        <ActionButton
+                            action="archive"
                             type="button"
-                            variant="destructive"
                             onClick={() => archiving && void archive(archiving)}
-                        >
-                            Arsipkan
-                        </DialogAction>
-                        <DialogCancel type="button">Batal</DialogCancel>
+                        />
+                        <DialogClose asChild>
+                            <ActionButton action="cancel" type="button" />
+                        </DialogClose>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

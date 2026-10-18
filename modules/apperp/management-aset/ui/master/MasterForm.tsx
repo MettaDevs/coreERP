@@ -1,6 +1,8 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import { Button } from '@apperp/ui/button';
+import { useRecordTransition } from '@/hooks/use-record-transition';
+import { ActionButton } from '@apperp/ui/action-button';
+
 import {
     Field,
     FieldDescription,
@@ -10,21 +12,33 @@ import {
     FieldTitle,
 } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
+import type { PageDialogNavigation } from '@apperp/ui/page-dialog';
 import {
-    Sheet,
-    SheetContent,
-    SheetFooter,
-    SheetHeader,
-    SheetTitle,
-} from '@apperp/ui/sheet';
+    PageDialog,
+    PageDialogContent,
+    PageDialogBody,
+    PageDialogToolbar,
+} from '@apperp/ui/page-dialog';
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
-import { api, errorMessage, newIdempotencyKey } from '../api';
+import type { ApiValidationErrors } from '../api';
+import { api, ApiError, errorMessage, newIdempotencyKey } from '../api';
+import {
+    RecordCardHeader,
+    recordQueryUrl,
+} from '../transactions/_shared/record-card';
+import type { DraftMasterDetailsValue } from './DraftMasterDetails';
+import DraftMasterDetails, { draftMasterPayload } from './DraftMasterDetails';
 import DynamicField from './DynamicField';
 import type { FieldValue } from './fields';
 import { isVisible, payloadValue, valueFrom } from './fields';
 import LokasiAsetFields from './LokasiAsetFields';
-import type { MasterConfig, MasterParentConfig, MasterRecord } from './masters';
+import type {
+    MasterConfig,
+    MasterParentConfig,
+    MasterRecord,
+    Permission,
+} from './masters';
 import { parentIdOf, parentSummaryOf } from './masters';
 import MasterSelect from './MasterSelect';
 import { changeProfileField } from './serviceLife';
@@ -39,13 +53,27 @@ export default function MasterForm({
     onClose,
     onSaved,
     extraSection,
+    onNew,
+    onDelete,
+    navigation,
+    onBusyChange,
+    onDirtyChange,
+    canStageDetails,
+    permissions,
 }: {
     config: MasterConfig;
+    canStageDetails: boolean;
+    permissions: Permission[];
     value: MasterRecord | null;
     onClose: () => void;
     onSaved: (record: MasterRecord, created: boolean) => void;
     /** Bagian tambahan di bawah field, misalnya matriks yang disunting di dalam form ini. */
     extraSection?: ReactNode;
+    onNew?: () => void;
+    onDelete?: () => void;
+    navigation?: PageDialogNavigation;
+    onBusyChange?: (busy: boolean) => void;
+    onDirtyChange?: (dirty: boolean) => void;
 }) {
     const parents = useMemo(() => config.parents ?? [], [config.parents]);
     const [form, setForm] = useState<FormValue>(() => ({
@@ -78,10 +106,32 @@ export default function MasterForm({
             extraFields.map((field) => [field.name, valueFrom(value, field)]),
         ),
     );
+    const [draftDetails, setDraftDetails] = useState<DraftMasterDetailsValue>(
+        {},
+    );
+    const [detailErrors, setDetailErrors] = useState<ApiValidationErrors>({});
+    const [initialSnapshot] = useState(() =>
+        JSON.stringify({ form, parentIds, extra, manualCode }),
+    );
+    const dirty =
+        JSON.stringify({ form, parentIds, extra, manualCode }) !==
+            initialSnapshot ||
+        Object.values(draftDetails).some((rows) => rows && rows.length > 0);
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
     const creationKey = useRef(newIdempotencyKey());
-    const sheetContentRef = useRef<HTMLDivElement>(null);
+    const contentRef = useRef<HTMLDivElement>(null);
+    const transition = useRecordTransition(dirty, saving);
+    useEffect(() => {
+        onBusyChange?.(saving);
+
+        return () => onBusyChange?.(false);
+    }, [saving, onBusyChange]);
+    useEffect(() => {
+        onDirtyChange?.(dirty);
+
+        return () => onDirtyChange?.(false);
+    }, [dirty, onDirtyChange]);
 
     async function submit(event: FormEvent) {
         event.preventDefault();
@@ -106,6 +156,7 @@ export default function MasterForm({
 
         setSaving(true);
         setError('');
+        setDetailErrors({});
 
         try {
             const saved = await api<{ data: MasterRecord }>(
@@ -121,6 +172,15 @@ export default function MasterForm({
                         ...(value ? { version: value.version } : {}),
                         ...(!value && allowManual
                             ? { kode: manualCode.trim() || null }
+                            : {}),
+                        ...(!value
+                            ? {
+                                  details: draftMasterPayload(
+                                      config.resource,
+                                      draftDetails,
+                                      extra,
+                                  ),
+                              }
                             : {}),
                         nama: form.nama,
                         keterangan: form.keterangan,
@@ -146,6 +206,10 @@ export default function MasterForm({
             );
             onSaved(saved.data, !value);
         } catch (caught) {
+            if (caught instanceof ApiError) {
+                setDetailErrors(caught.validationErrors);
+            }
+
             setError(errorMessage(caught, 'Data belum dapat disimpan.'));
         } finally {
             setSaving(false);
@@ -161,7 +225,7 @@ export default function MasterForm({
                     required={parent.required !== false}
                     value={parentIds[parent.field] ?? ''}
                     initialValue={value ? parentSummaryOf(value, parent) : null}
-                    portalContainer={sheetContentRef}
+                    portalContainer={contentRef}
                     emptyLabel={
                         parent.required === false ? 'Tidak dipilih' : undefined
                     }
@@ -177,231 +241,279 @@ export default function MasterForm({
     }
 
     return (
-        <Sheet open onOpenChange={(open) => !open && onClose()}>
-            <SheetContent
-                ref={sheetContentRef}
-                side="right"
-                className="w-full gap-0 p-0 sm:max-w-xl"
+        <>
+            {' '}
+            <PageDialog
+                open
+                onOpenChange={(open) => !open && transition.request(onClose)}
             >
-                <SheetHeader className="border-b px-6 py-5 pr-12">
-                    <SheetTitle>
-                        {value ? 'Ubah' : 'Tambah'} {config.singular}
-                    </SheetTitle>
-                </SheetHeader>
-                <form
-                    className="flex min-h-0 flex-1 flex-col"
-                    onSubmit={submit}
+                <PageDialogContent
+                    ref={contentRef}
+                    aria-describedby={undefined}
+                    title={config.title}
+                    busy={saving}
+                    onNew={onNew ? () => transition.request(onNew) : undefined}
+                    navigation={value ? navigation : undefined}
                 >
-                    <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-                        <FieldGroup>
-                            <Field
-                                data-disabled={Boolean(value) || !allowManual}
-                            >
-                                <Input
-                                    id="code"
-                                    label={config.kodeLabel}
-                                    value={
-                                        value?.kode ??
-                                        (allowManual
-                                            ? manualCode
-                                            : 'Dibuat otomatis saat disimpan')
+                    <RecordCardHeader
+                        recordUrl={
+                            value
+                                ? recordQueryUrl(config.resource, value.id)
+                                : undefined
+                        }
+                        recordTitle={
+                            value
+                                ? `${value.kode} · ${form.nama}`
+                                : form.nama || 'Baru'
+                        }
+                        editing
+                        onDelete={value ? onDelete : undefined}
+                    />
+                    <form
+                        className="flex min-h-0 flex-1 flex-col"
+                        onSubmit={submit}
+                    >
+                        <PageDialogToolbar>
+                            <ActionButton
+                                action="save"
+                                type="submit"
+                                disabled={saving}
+                                pending={saving}
+                            />
+                            <ActionButton
+                                action="cancel"
+                                disabled={saving}
+                                type="button"
+                                onClick={() => transition.request(onClose)}
+                            />
+                        </PageDialogToolbar>
+                        <PageDialogBody
+                            className="space-y-4"
+                            scroll-region="true"
+                        >
+                            <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <Field
+                                    data-disabled={
+                                        Boolean(value) || !allowManual
                                     }
-                                    placeholder={
-                                        allowAutomatic
-                                            ? 'Kosongkan untuk membuat kode otomatis'
-                                            : 'Masukkan kode'
-                                    }
-                                    required={!value && !allowAutomatic}
-                                    maxLength={50}
-                                    disabled={Boolean(value) || !allowManual}
-                                    onChange={(event) =>
-                                        setManualCode(event.target.value)
-                                    }
-                                />
-                                {!value && allowManual && (
-                                    <FieldDescription>
-                                        {allowAutomatic
-                                            ? 'Isi kode sendiri, atau kosongkan untuk membuatnya otomatis.'
-                                            : 'Isi kode yang mudah dikenali.'}
-                                    </FieldDescription>
-                                )}
-                                {numberPolicyError && (
-                                    <FieldError>{numberPolicyError}</FieldError>
-                                )}
-                            </Field>
-
-                            <Field>
-                                <Input
-                                    id="name"
-                                    label={config.namaLabel}
-                                    autoFocus
-                                    required
-                                    maxLength={150}
-                                    value={form.nama}
-                                    onChange={(event) =>
-                                        setForm({
-                                            ...form,
-                                            nama: event.target.value,
-                                        })
-                                    }
-                                />
-                            </Field>
-                            {/* Induk dirender sejajar: tidak ada yang menyaring pilihan yang lain. */}
-                            {parents.map(parentField)}
-                            {isAsetLocation && (
-                                <LokasiAsetFields
-                                    fields={extraFields}
-                                    value={value}
-                                    extra={extra}
-                                    parentId={parentIds.parent_id ?? ''}
-                                    onChange={(name, next) =>
-                                        setExtra((current) => ({
-                                            ...current,
-                                            [name]: next,
-                                        }))
-                                    }
-                                    portalContainer={sheetContentRef}
-                                />
-                            )}
-                            {isAsetLocation && (
-                                <Field>
-                                    <FieldTitle>Dimensi keuangan</FieldTitle>
-                                    <div
-                                        className="bg-muted/40 rounded-md border border-dashed px-3 py-2"
-                                        role="status"
-                                    >
-                                        <p className="text-sm font-medium">
-                                            Belum tersedia
-                                        </p>
-                                    </div>
-                                    <FieldDescription>
-                                        Pengaturan ini menunggu Finance. Lokasi
-                                        fisik tetap dapat disimpan tanpa
-                                        pengaturan ini.
-                                    </FieldDescription>
+                                >
+                                    <Input
+                                        id="code"
+                                        label={config.kodeLabel}
+                                        value={
+                                            value?.kode ??
+                                            (allowManual
+                                                ? manualCode
+                                                : 'Dibuat otomatis saat disimpan')
+                                        }
+                                        placeholder={
+                                            allowAutomatic
+                                                ? 'Kosongkan untuk membuat kode otomatis'
+                                                : 'Masukkan kode'
+                                        }
+                                        required={!value && !allowAutomatic}
+                                        maxLength={50}
+                                        disabled={
+                                            Boolean(value) || !allowManual
+                                        }
+                                        onChange={(event) =>
+                                            setManualCode(event.target.value)
+                                        }
+                                    />
+                                    {!value && allowManual && (
+                                        <FieldDescription>
+                                            {allowAutomatic
+                                                ? 'Isi kode sendiri, atau kosongkan untuk membuatnya otomatis.'
+                                                : 'Isi kode yang mudah dikenali.'}
+                                        </FieldDescription>
+                                    )}
+                                    {numberPolicyError && (
+                                        <FieldError>
+                                            {numberPolicyError}
+                                        </FieldError>
+                                    )}
                                 </Field>
-                            )}
-                            {extraFields
-                                .filter(
-                                    (field) =>
-                                        !isAsetLocation &&
-                                        isVisible(field, extra),
-                                )
-                                .map((field) =>
-                                    config.resource === 'profil-penyusutan' &&
-                                    field.name === 'useful_life_periods' ? (
-                                        <ServiceLifeFields
-                                            key={field.name}
-                                            value={extra[field.name]}
-                                            frequency={extra.frequency}
-                                            required={field.required}
-                                            onChange={(next) =>
-                                                setExtra((current) => ({
-                                                    ...current,
-                                                    [field.name]: next,
-                                                }))
-                                            }
-                                        />
-                                    ) : value?.data_type_locked &&
-                                      field.name === 'data_type' ? (
-                                        <Field
-                                            key={field.name}
-                                            data-disabled="true"
+
+                                <Field>
+                                    <Input
+                                        id="name"
+                                        label={config.namaLabel}
+                                        autoFocus
+                                        required
+                                        maxLength={150}
+                                        value={form.nama}
+                                        onChange={(event) =>
+                                            setForm({
+                                                ...form,
+                                                nama: event.target.value,
+                                            })
+                                        }
+                                    />
+                                </Field>
+                                {/* Induk dirender sejajar: tidak ada yang menyaring pilihan yang lain. */}
+                                {parents.map(parentField)}
+                                {isAsetLocation && (
+                                    <LokasiAsetFields
+                                        fields={extraFields}
+                                        value={value}
+                                        extra={extra}
+                                        parentId={parentIds.parent_id ?? ''}
+                                        onChange={(name, next) =>
+                                            setExtra((current) => ({
+                                                ...current,
+                                                [name]: next,
+                                            }))
+                                        }
+                                        portalContainer={contentRef}
+                                    />
+                                )}
+                                {isAsetLocation && (
+                                    <Field>
+                                        <FieldTitle>
+                                            Dimensi keuangan
+                                        </FieldTitle>
+                                        <div
+                                            className="bg-muted/40 rounded-md border border-dashed px-3 py-2"
+                                            role="status"
                                         >
-                                            <Input
-                                                label="Tipe data"
-                                                value={
-                                                    field.options?.find(
-                                                        (option) =>
-                                                            option.value ===
-                                                            extra[field.name],
-                                                    )?.label ??
-                                                    String(
-                                                        extra[field.name] ?? '',
+                                            <p className="text-sm font-medium">
+                                                Belum tersedia
+                                            </p>
+                                        </div>
+                                        <FieldDescription>
+                                            Pengaturan ini menunggu Finance.
+                                            Lokasi fisik tetap dapat disimpan
+                                            tanpa pengaturan ini.
+                                        </FieldDescription>
+                                    </Field>
+                                )}
+                                {extraFields
+                                    .filter(
+                                        (field) =>
+                                            !isAsetLocation &&
+                                            isVisible(field, extra),
+                                    )
+                                    .map((field) =>
+                                        config.resource ===
+                                            'profil-penyusutan' &&
+                                        field.name === 'useful_life_periods' ? (
+                                            <ServiceLifeFields
+                                                key={field.name}
+                                                value={extra[field.name]}
+                                                frequency={extra.frequency}
+                                                required={field.required}
+                                                onChange={(next) =>
+                                                    setExtra((current) => ({
+                                                        ...current,
+                                                        [field.name]: next,
+                                                    }))
+                                                }
+                                            />
+                                        ) : value?.data_type_locked &&
+                                          field.name === 'data_type' ? (
+                                            <Field
+                                                key={field.name}
+                                                data-disabled="true"
+                                            >
+                                                <Input
+                                                    label="Tipe data"
+                                                    value={
+                                                        field.options?.find(
+                                                            (option) =>
+                                                                option.value ===
+                                                                extra[
+                                                                    field.name
+                                                                ],
+                                                        )?.label ??
+                                                        String(
+                                                            extra[field.name] ??
+                                                                '',
+                                                        )
+                                                    }
+                                                    disabled
+                                                />
+                                                <FieldDescription>
+                                                    Tipe data terkunci karena
+                                                    atribut ini sudah pernah
+                                                    diisi pada aset. Buat
+                                                    komponen atribut aset baru
+                                                    bila bentuk datanya berbeda.
+                                                </FieldDescription>
+                                            </Field>
+                                        ) : (
+                                            <DynamicField
+                                                key={field.name}
+                                                config={field}
+                                                value={extra[field.name]}
+                                                onChange={(next) =>
+                                                    setExtra((current) =>
+                                                        config.resource ===
+                                                        'profil-penyusutan'
+                                                            ? changeProfileField(
+                                                                  current,
+                                                                  field.name,
+                                                                  next,
+                                                              )
+                                                            : {
+                                                                  ...current,
+                                                                  [field.name]:
+                                                                      next,
+                                                              },
                                                     )
                                                 }
-                                                disabled
+                                                portalContainer={contentRef}
                                             />
-                                            <FieldDescription>
-                                                Tipe data terkunci karena
-                                                atribut ini sudah pernah diisi
-                                                pada aset. Buat komponen atribut
-                                                aset baru bila bentuk datanya
-                                                berbeda.
-                                            </FieldDescription>
-                                        </Field>
-                                    ) : (
-                                        <DynamicField
-                                            key={field.name}
-                                            config={field}
-                                            value={extra[field.name]}
-                                            onChange={(next) =>
-                                                setExtra((current) =>
-                                                    config.resource ===
-                                                    'profil-penyusutan'
-                                                        ? changeProfileField(
-                                                              current,
-                                                              field.name,
-                                                              next,
-                                                          )
-                                                        : {
-                                                              ...current,
-                                                              [field.name]:
-                                                                  next,
-                                                          },
-                                                )
-                                            }
-                                            portalContainer={sheetContentRef}
-                                        />
-                                    ),
-                                )}
-                            <Field>
-                                <FieldLabel htmlFor="description">
-                                    Keterangan
-                                </FieldLabel>
-                                <Textarea
-                                    id="description"
-                                    rows={4}
-                                    maxLength={2000}
-                                    value={form.keterangan}
-                                    onChange={(event) =>
-                                        setForm({
-                                            ...form,
-                                            keterangan: event.target.value,
-                                        })
-                                    }
+                                        ),
+                                    )}
+                                <Field>
+                                    <FieldLabel htmlFor="description">
+                                        Keterangan
+                                    </FieldLabel>
+                                    <Textarea
+                                        id="description"
+                                        rows={4}
+                                        maxLength={2000}
+                                        value={form.keterangan}
+                                        onChange={(event) =>
+                                            setForm({
+                                                ...form,
+                                                keterangan: event.target.value,
+                                            })
+                                        }
+                                    />
+                                </Field>
+                                <Field orientation="horizontal">
+                                    <Switch
+                                        id="active"
+                                        checked={form.aktif}
+                                        onCheckedChange={(checked) =>
+                                            setForm({ ...form, aktif: checked })
+                                        }
+                                    />
+                                    <FieldLabel htmlFor="active">
+                                        Data aktif dan dapat dipilih
+                                    </FieldLabel>
+                                </Field>
+                                {error && <FieldError>{error}</FieldError>}
+                            </FieldGroup>
+                            {!value && (
+                                <DraftMasterDetails
+                                    resource={config.resource}
+                                    canEdit={canStageDetails}
+                                    permissions={permissions}
+                                    value={draftDetails}
+                                    onChange={setDraftDetails}
+                                    parentValues={extra}
+                                    errors={detailErrors}
+                                    portalContainer={contentRef}
                                 />
-                            </Field>
-                            <Field orientation="horizontal">
-                                <Switch
-                                    id="active"
-                                    checked={form.aktif}
-                                    onCheckedChange={(checked) =>
-                                        setForm({ ...form, aktif: checked })
-                                    }
-                                />
-                                <FieldLabel htmlFor="active">
-                                    Data aktif dan dapat dipilih
-                                </FieldLabel>
-                            </Field>
-                            {error && <FieldError>{error}</FieldError>}
-                        </FieldGroup>
-                    </div>
-                    {extraSection}
-                    <SheetFooter className="border-t px-6 py-4 sm:flex-row sm:justify-end">
-                        <Button
-                            variant="outline"
-                            type="button"
-                            onClick={onClose}
-                        >
-                            Batal
-                        </Button>
-                        <Button disabled={saving}>
-                            {saving ? 'Menyimpan…' : 'Simpan'}
-                        </Button>
-                    </SheetFooter>
-                </form>
-            </SheetContent>
-        </Sheet>
+                            )}
+                            {extraSection}
+                        </PageDialogBody>
+                    </form>
+                </PageDialogContent>
+            </PageDialog>
+            {transition.confirmation}
+        </>
     );
 }

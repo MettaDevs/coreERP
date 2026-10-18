@@ -16,6 +16,7 @@ import {
     DropdownMenuTrigger,
 } from '@apperp/ui/dropdown-menu';
 import { Skeleton } from '@apperp/ui/skeleton';
+import { Trash2 } from 'lucide-react';
 import {
     ChartColumn,
     CircleSlash,
@@ -131,7 +132,8 @@ export function WidgetFrame({
         ...(onArchive
             ? [
                   {
-                      label: 'Arsipkan',
+                      label: 'Delete',
+                      icon: Trash2,
                       destructive: true,
                       onSelect: () => onArchive(widget),
                   },
@@ -150,7 +152,7 @@ export function WidgetFrame({
                     {widget.title}
                 </CardTitle>
                 {menu.length > 0 && (
-                    <CardAction>
+                    <CardAction align="end">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button

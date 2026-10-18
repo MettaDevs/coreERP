@@ -1,15 +1,15 @@
-import { Button } from '@apperp/ui/button';
+import { ActionButton } from '@apperp/ui/action-button';
+
 import { Field, FieldDescription, FieldError } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
-import { Select } from '@apperp/ui/select';
 import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetFooter,
-    SheetHeader,
-    SheetTitle,
-} from '@apperp/ui/sheet';
+    PageDialog,
+    PageDialogContent,
+    PageDialogToolbar,
+    PageDialogBody,
+} from '@apperp/ui/page-dialog';
+import { Select } from '@apperp/ui/select';
+
 import { Link } from '@inertiajs/react';
 import { useEffect, useRef, useState } from 'react';
 import { QueryEditor, Step } from '@/components/analytics/query-editor';
@@ -46,9 +46,9 @@ import { CoreApiError, toastSaveError } from '@/lib/core-api';
 const PREVIEW_ROWS = 50;
 
 /**
- * Pembangun bagian dasbor (area 8.1): `Sheet` sisi kanan dengan tujuh langkah — Data, Nilai, Kelompokkan menurut,
- * Saring, Periode, Tampilan, Pratinjau — isi bergulir, dan Simpan/Batal tetap di bawah. Setiap `Select` di dalamnya
- * menerima `portalContainer` isi `Sheet`, supaya menunya dapat diklik di atas lapisan ini.
+ * Pembangun bagian dasbor (area 8.1): kartu `PageDialog` dengan tujuh langkah — Data, Nilai, Kelompokkan menurut,
+ * Saring, Periode, Tampilan, Pratinjau — isi bergulir, dan Simpan/Batal tetap di atas. Setiap `Select` di dalamnya
+ * menerima `portalContainer` isi `PageDialog`, supaya menunya dapat diklik di atas lapisan ini.
  *
  * Dipakai untuk menambah dan mengubah bagian di halaman dasbor, dan untuk menyimpan hasil penjelajah ke dasbor
  * (`dashboard` kosong: pengguna memilih dasbor yang boleh ia ubah). Pratinjau menjalankan query yang sama dengan
@@ -164,14 +164,26 @@ export function WidgetBuilder({
     };
 
     return (
-        <Sheet open onOpenChange={(open) => !open && onClose()}>
-            <SheetContent
+        <PageDialog
+            open
+            onOpenChange={(open) => {
+                if (!open && !saving) {
+                    onClose();
+                }
+            }}
+        >
+            <PageDialogContent
                 ref={contentRef}
-                side="right"
-                className="w-full gap-0 p-0 sm:max-w-2xl"
+
                 // Escape di daftar pilihan yang terbuka hanya menutup daftarnya; tanpa ini seluruh pembangun beserta
                 // isiannya ikut tertutup.
                 onEscapeKeyDown={(event) => {
+                    if (saving) {
+                        event.preventDefault();
+
+                        return;
+                    }
+
                     if (
                         event.target instanceof Element &&
                         event.target.closest('[data-slot="combobox-content"]')
@@ -179,150 +191,154 @@ export function WidgetBuilder({
                         event.preventDefault();
                     }
                 }}
+                title="Bagian dasbor"
+                recordTitle={shownTitle.trim() || 'Bagian baru'}
+                editing
+                description={
+                    'Pilih data dan nilai yang dihitung, lalu atur\n                        pengelompokan, saringan, periode, dan tampilannya.\n                        Pratinjau mengikuti setiap perubahan.'
+                }
+                busy={saving}
             >
-                <SheetHeader className="border-b px-6 py-5 pr-12">
-                    <SheetTitle>
-                        {widget === null ? 'Bagian baru' : 'Ubah bagian'}
-                    </SheetTitle>
-                    <SheetDescription>
-                        Pilih data dan nilai yang dihitung, lalu atur
-                        pengelompokan, saringan, periode, dan tampilannya.
-                        Pratinjau mengikuti setiap perubahan.
-                    </SheetDescription>
-                </SheetHeader>
-                <form
-                    id="widget-builder-form"
-                    className="min-h-0 flex-1 overflow-y-auto px-6 py-5"
-                    onSubmit={(event) => {
-                        event.preventDefault();
-                        void save();
-                    }}
-                >
-                    <div className="flex flex-col gap-5">
-                        {dashboard === null && (
-                            <Step title="Dasbor tujuan">
-                                <Field>
-                                    <Select
-                                        label="Dasbor"
-                                        required
-                                        items={targets.dashboards.map(
-                                            (item) => ({
-                                                value: item.id,
-                                                label: item.name,
-                                            }),
-                                        )}
-                                        value={dashboardId}
-                                        onValueChange={setDashboardId}
-                                        placeholder="Pilih dasbor"
-                                        searchPlaceholder="Cari dasbor"
-                                        emptyMessage="Dasbor tidak ditemukan."
-                                        portalContainer={contentRef}
-                                    />
-                                    {targets.failed ? (
-                                        <FieldDescription>
-                                            Daftar dasbor belum dapat dimuat.
-                                            Tutup lalu coba lagi.
-                                        </FieldDescription>
-                                    ) : (
-                                        !targets.loading &&
-                                        targets.dashboards.length === 0 && (
-                                            <FieldDescription>
-                                                Belum ada dasbor yang dapat Anda
-                                                ubah.{' '}
-                                                <Link href="/analytics">
-                                                    Buat dasbor
-                                                </Link>{' '}
-                                                lebih dulu.
-                                            </FieldDescription>
-                                        )
-                                    )}
-                                </Field>
-                            </Step>
-                        )}
-                        {catalog.failed ? (
-                            <p className="text-sm" role="status">
-                                Daftar data belum dapat dimuat. Tutup lalu coba
-                                lagi.
-                            </p>
-                        ) : (
-                            <QueryEditor
-                                numbered
-                                datasets={catalog.datasets}
-                                value={query}
-                                dataset={dataset}
-                                datasetLoading={description.loading}
-                                datasetFailure={description.failure}
-                                errors={placement}
-                                onChange={setQuery}
-                                portalContainer={contentRef}
-                            />
-                        )}
-                        {dataset !== null && (
-                            <Step title="6. Tampilan">
-                                <VisualPicker
-                                    query={stored}
-                                    times={times}
-                                    value={type}
-                                    onChange={setChosenType}
-                                />
-                                <Field data-invalid={Boolean(errors.title)}>
-                                    <Input
-                                        label="Judul"
-                                        required
-                                        maxLength={120}
-                                        value={shownTitle}
-                                        onChange={(event) =>
-                                            setTitle(event.target.value)
-                                        }
-                                        aria-invalid={Boolean(errors.title)}
-                                    />
-                                    <FieldError>{errors.title?.[0]}</FieldError>
-                                </Field>
-                            </Step>
-                        )}
-                        {query.dataset !== '' && (
-                            <Step title="7. Pratinjau">
-                                <QueryResult
-                                    ready={ready}
-                                    loading={preview.loading}
-                                    result={preview.result}
-                                    previous={preview.previous}
-                                    message={placement.message}
-                                    type={type}
-                                    visual={visual}
-                                    title={shownTitle}
-                                    note={
-                                        preview.result !== null &&
-                                        preview.result.rows.length >=
-                                            PREVIEW_ROWS && (
-                                            <span>
-                                                Pratinjau menampilkan paling
-                                                banyak {PREVIEW_ROWS} baris;
-                                                bagian yang disimpan menghitung
-                                                semuanya.
-                                            </span>
-                                        )
-                                    }
-                                    onReload={preview.reload}
-                                />
-                            </Step>
-                        )}
-                    </div>
-                </form>
-                <SheetFooter className="border-t px-6 py-4 sm:flex-row sm:justify-end">
-                    <Button variant="outline" type="button" onClick={onClose}>
-                        Batal
-                    </Button>
-                    <Button
+                <PageDialogToolbar>
+                    <ActionButton
+                        action="save"
+                        pending={saving}
                         type="submit"
                         form="widget-builder-form"
                         disabled={!canSave}
+                    />
+                    <ActionButton
+                        action="cancel"
+                        type="button"
+                        disabled={saving}
+                        onClick={onClose}
+                    />
+                </PageDialogToolbar>
+                <PageDialogBody>
+                    <form
+                        id="widget-builder-form"
+
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            void save();
+                        }}
                     >
-                        {widget === null ? 'Tambahkan ke dasbor' : 'Simpan'}
-                    </Button>
-                </SheetFooter>
-            </SheetContent>
-        </Sheet>
+                        <div className="flex flex-col gap-5">
+                            {dashboard === null && (
+                                <Step title="Dasbor tujuan">
+                                    <Field>
+                                        <Select
+                                            label="Dasbor"
+                                            required
+                                            items={targets.dashboards.map(
+                                                (item) => ({
+                                                    value: item.id,
+                                                    label: item.name,
+                                                }),
+                                            )}
+                                            value={dashboardId}
+                                            onValueChange={setDashboardId}
+                                            placeholder="Pilih dasbor"
+                                            searchPlaceholder="Cari dasbor"
+                                            emptyMessage="Dasbor tidak ditemukan."
+                                            portalContainer={contentRef}
+                                        />
+                                        {targets.failed ? (
+                                            <FieldDescription>
+                                                Daftar dasbor belum dapat
+                                                dimuat. Tutup lalu coba lagi.
+                                            </FieldDescription>
+                                        ) : (
+                                            !targets.loading &&
+                                            targets.dashboards.length === 0 && (
+                                                <FieldDescription>
+                                                    Belum ada dasbor yang dapat
+                                                    Anda ubah.{' '}
+                                                    <Link href="/analytics">
+                                                        Buat dasbor
+                                                    </Link>{' '}
+                                                    lebih dulu.
+                                                </FieldDescription>
+                                            )
+                                        )}
+                                    </Field>
+                                </Step>
+                            )}
+                            {catalog.failed ? (
+                                <p className="text-sm" role="status">
+                                    Daftar data belum dapat dimuat. Tutup lalu
+                                    coba lagi.
+                                </p>
+                            ) : (
+                                <QueryEditor
+                                    numbered
+                                    datasets={catalog.datasets}
+                                    value={query}
+                                    dataset={dataset}
+                                    datasetLoading={description.loading}
+                                    datasetFailure={description.failure}
+                                    errors={placement}
+                                    onChange={setQuery}
+                                    portalContainer={contentRef}
+                                />
+                            )}
+                            {dataset !== null && (
+                                <Step title="6. Tampilan">
+                                    <VisualPicker
+                                        query={stored}
+                                        times={times}
+                                        value={type}
+                                        onChange={setChosenType}
+                                    />
+                                    <Field data-invalid={Boolean(errors.title)}>
+                                        <Input
+                                            label="Judul"
+                                            required
+                                            maxLength={120}
+                                            value={shownTitle}
+                                            onChange={(event) =>
+                                                setTitle(event.target.value)
+                                            }
+                                            aria-invalid={Boolean(errors.title)}
+                                        />
+                                        <FieldError>
+                                            {errors.title?.[0]}
+                                        </FieldError>
+                                    </Field>
+                                </Step>
+                            )}
+                            {query.dataset !== '' && (
+                                <Step title="7. Pratinjau">
+                                    <QueryResult
+                                        ready={ready}
+                                        loading={preview.loading}
+                                        result={preview.result}
+                                        previous={preview.previous}
+                                        message={placement.message}
+                                        type={type}
+                                        visual={visual}
+                                        title={shownTitle}
+                                        note={
+                                            preview.result !== null &&
+                                            preview.result.rows.length >=
+                                                PREVIEW_ROWS && (
+                                                <span>
+                                                    Pratinjau menampilkan paling
+                                                    banyak {PREVIEW_ROWS} baris;
+                                                    bagian yang disimpan
+                                                    menghitung semuanya.
+                                                </span>
+                                            )
+                                        }
+                                        onReload={preview.reload}
+                                    />
+                                </Step>
+                            )}
+                        </div>
+                    </form>
+                </PageDialogBody>
+            </PageDialogContent>
+        </PageDialog>
     );
 }
 

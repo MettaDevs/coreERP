@@ -2,6 +2,7 @@ import { Eye, Send } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useWorkDate } from '@/hooks/use-work-date';
+import { ActionButton } from '@apperp/ui/action-button';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -19,6 +20,7 @@ import {
 } from '@apperp/ui/collapsible-section';
 import { Field, FieldDescription } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
+import { usePageDialogRecord } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import { Textarea } from '@apperp/ui/textarea';
@@ -32,12 +34,15 @@ import {
 import { useRecordOptions } from '../../use-record-list';
 import { PostingPreviewPanel } from '../_shared/PostingPreviewPanel';
 import type { PostingPreview } from '../_shared/PostingPreviewPanel';
+import { RecordCardHeader } from '../_shared/record-card';
+import type { RecordCardControls } from '../_shared/record-card';
+import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
 import type { Disposal, DisposalAmounts, DisposalResource } from './disposal';
 import {
     DISPOSALS,
     StatusBadge,
-    bukaDaftar,
-    bukaDokumen,
+    bukaDaftar as navigateClose,
+    bukaDokumen as navigateView,
     izin,
     postingLabel,
     tanggalTampil,
@@ -80,11 +85,24 @@ export default function DisposalDetailPage({
     resource,
     permissions,
     disposalId,
+    onClose,
+    onSaved,
+    onRequestView,
+    onBusyChange,
+    onDirtyChange,
+    portalContainer,
 }: {
     resource: DisposalResource;
     permissions: string[];
     disposalId?: string;
-}) {
+} & RecordCardControls) {
+    const embedded = usePageDialogRecord(undefined);
+
+    const bukaDokumen = (resource: DisposalResource, id: string) =>
+        onRequestView ? onRequestView(id) : navigateView(resource, id);
+    const bukaDaftar = (resource: DisposalResource) =>
+        onClose ? onClose() : navigateClose(resource);
+
     const jenis = DISPOSALS[resource];
     const can = izin(resource, permissions);
     const { date: workDate } = useWorkDate();
@@ -97,6 +115,11 @@ export default function DisposalDetailPage({
     });
     const [memuat, setMemuat] = useState(Boolean(disposalId));
     const [menyimpan, setMenyimpan] = useState(false);
+    useEffect(() => {
+        onBusyChange?.(menyimpan);
+
+        return () => onBusyChange?.(false);
+    }, [menyimpan, onBusyChange]);
     const [galat, setGalat] = useState<Record<string, string[]>>({});
     const [pratinjau, setPratinjau] = useState<
         | (PostingPreview & {
@@ -181,7 +204,12 @@ export default function DisposalDetailPage({
                     }),
                 });
                 toast.success(`Draf ${hasil.data.kode} disimpan.`);
-                bukaDokumen(resource, hasil.data.id);
+
+                if (onSaved) {
+                    onSaved(hasil.data.id);
+                } else {
+                    bukaDokumen(resource, hasil.data.id);
+                }
 
                 return;
             }
@@ -202,6 +230,7 @@ export default function DisposalDetailPage({
             );
             terima(hasil.data);
             toast.success('Perubahan draf disimpan.');
+            onSaved?.(hasil.data.id);
         } catch (caught) {
             if (caught instanceof ApiError) {
                 setGalat(caught.validationErrors);
@@ -253,6 +282,7 @@ export default function DisposalDetailPage({
                     ? 'Draf dibatalkan.'
                     : `Aset dilepas. Jurnal: ${postingLabel(hasil.data.posting?.status).toLowerCase()}.`,
             );
+            onSaved?.(hasil.data.id);
         } catch (caught) {
             if (caught instanceof ApiError) {
                 setGalat(caught.validationErrors);
@@ -269,6 +299,13 @@ export default function DisposalDetailPage({
         }
     }
 
+    useRecordCardDirty({
+        value: isian,
+        ready: !memuat,
+        scopeKey: JSON.stringify([disposalId, dokumen?.version]),
+        onDirtyChange: onDirtyChange,
+    });
+
     if (memuat) {
         return (
             <div className="text-muted-foreground p-5 text-sm">
@@ -282,31 +319,44 @@ export default function DisposalDetailPage({
 
     return (
         <div className="flex h-full min-h-0 flex-col overflow-hidden">
+            <RecordCardHeader
+                recordTitle={dokumen?.kode ?? 'Baru'}
+                editing={bolehUbah}
+                recordUrl={
+                    disposalId
+                        ? `/management-aset/${resource}/${disposalId}`
+                        : undefined
+                }
+            />
             <RecordActionBar
-                title={baru ? jenis.create : (dokumen?.kode ?? jenis.title)}
+                title={
+                    embedded
+                        ? undefined
+                        : baru
+                          ? jenis.create
+                          : (dokumen?.kode ?? jenis.title)
+                }
                 trailing={
                     dokumen ? (
                         <StatusBadge status={dokumen.status} />
                     ) : undefined
                 }
             >
-                <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => bukaDaftar(resource)}
-                >
-                    {baru ? 'Batal' : 'Kembali'}
-                </Button>
                 {bolehUbah && (
-                    <Button
+                    <ActionButton
+                        action="save"
                         type="button"
-                        variant={baru ? 'default' : 'outline'}
                         onClick={() => void simpan()}
                         disabled={menyimpan}
-                    >
-                        {menyimpan ? 'Menyimpan…' : 'Simpan draf'}
-                    </Button>
+                        pending={menyimpan}
+                    />
                 )}
+                <ActionButton
+                    action="cancel"
+                    disabled={menyimpan}
+                    type="button"
+                    onClick={() => bukaDaftar(resource)}
+                />
                 {!baru && draf && (can('post') || can('create')) && (
                     <Button
                         type="button"
@@ -340,7 +390,11 @@ export default function DisposalDetailPage({
                 )}
             </RecordActionBar>
 
-            <div ref={panelRef} className="min-h-0 flex-1 overflow-y-auto">
+            <div
+                data-page-dialog-body
+                ref={panelRef}
+                className="min-h-0 flex-1 overflow-y-auto"
+            >
                 <div className="space-y-5 p-5">
                     <CollapsibleSectionGroup defaultValue={['general']}>
                         <CollapsibleSection
@@ -366,7 +420,9 @@ export default function DisposalDetailPage({
                                                 searchPlaceholder="Cari kode atau nama aset"
                                                 emptyMessage="Tidak ada aset yang sudah disetujui untuk dekomisioning."
                                                 ariaLabel="Aset"
-                                                portalContainer={panelRef}
+                                                portalContainer={
+                                                    portalContainer ?? panelRef
+                                                }
                                                 onValueChange={(item) =>
                                                     setIsian({
                                                         ...isian,

@@ -39,7 +39,7 @@ class TipeAtributNilaiController extends MasterLinkController
     protected function rowRules(string $tenantId): array
     {
         return [
-            'nilai' => ['required', 'string', 'max:150'],
+            'nilai' => ['required', 'string', 'max:150', 'distinct'],
             'urutan' => ['sometimes', 'integer', 'min:0'],
         ];
     }

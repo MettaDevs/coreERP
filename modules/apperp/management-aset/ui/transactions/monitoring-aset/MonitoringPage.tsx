@@ -28,7 +28,9 @@ export default function MonitoringPage({
     const [pertama, kedua] = segments;
 
     if (!pertama) {
-        return <MonitoringListPage permissions={permissions} />;
+        return (
+            <MonitoringListPage context={context} permissions={permissions} />
+        );
     }
 
     if (pertama === 'baru') {

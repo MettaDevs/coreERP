@@ -1,14 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Button } from '@apperp/ui/button';
+import { ActionButton } from '@apperp/ui/action-button';
+import type { DataTableColumn } from '@apperp/ui/data-table';
+import { DataTable } from '@apperp/ui/data-table';
+
+import { DialogToolbar } from '@apperp/ui/dialog';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
+
 import { TransferList } from '@apperp/ui/transfer-list';
 import type { TransferListItem } from '@apperp/ui/transfer-list';
 import { api, errorMessage } from '../../api';
@@ -135,6 +132,15 @@ export default function JenisAsetModels({
     if (canEdit) {
         return (
             <div className="space-y-4">
+                <DialogToolbar className="px-0">
+                    <ActionButton
+                        action="save"
+                        type="button"
+                        disabled={saving}
+                        onClick={() => void save()}
+                        pending={saving}
+                    />
+                </DialogToolbar>
                 <p className="text-muted-foreground text-sm">
                     Pilih model yang boleh dipakai untuk jenis aset ini. Model
                     dan pabrikan tetap dikelola di master masing-masing.
@@ -164,13 +170,6 @@ export default function JenisAsetModels({
                         Pabrikan dan model tersimpan.
                     </p>
                 )}
-                <Button
-                    type="button"
-                    disabled={saving}
-                    onClick={() => void save()}
-                >
-                    {saving ? 'Menyimpan...' : 'Simpan pabrikan dan model'}
-                </Button>
             </div>
         );
     }
@@ -185,33 +184,46 @@ export default function JenisAsetModels({
         );
     }
 
-    return (
-        <div className="overflow-x-auto rounded-md border">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Pabrikan</TableHead>
-                        <TableHead>Model</TableHead>
-                        <TableHead>Keterangan</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {detail.models.map((item) => (
-                        <TableRow key={item.id}>
-                            <TableCell>{item.manufacturer ?? '-'}</TableCell>
-                            <TableCell>
-                                <div className="font-medium">{item.model}</div>
-                                {item.model_number && (
-                                    <div className="text-muted-foreground text-xs">
-                                        {item.model_number}
-                                    </div>
-                                )}
-                            </TableCell>
-                            <TableCell>{item.description ?? '-'}</TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
-        </div>
-    );
+    return (() => {
+        const sdkRows = detail.models.map((item, rowIndex) => {
+            return { item, rowIndex };
+        });
+        const sdkColumns: DataTableColumn<(typeof sdkRows)[number]>[] = [
+            {
+                id: 'column-0',
+                header: 'Pabrikan',
+                cell: ({ item }) => <>{item.manufacturer ?? '-'}</>,
+            } satisfies DataTableColumn<(typeof sdkRows)[number]>,
+            {
+                id: 'column-1',
+                header: 'Model',
+                cell: ({ item }) => (
+                    <>
+                        <div className="font-medium">{item.model}</div>
+                        {item.model_number && (
+                            <div className="text-muted-foreground text-xs">
+                                {item.model_number}
+                            </div>
+                        )}
+                    </>
+                ),
+            } satisfies DataTableColumn<(typeof sdkRows)[number]>,
+            {
+                id: 'column-2',
+                header: 'Keterangan',
+                cell: ({ item }) => <>{item.description ?? '-'}</>,
+            } satisfies DataTableColumn<(typeof sdkRows)[number]>,
+        ];
+
+        return (
+            <DataTable
+                scrollMode="inline"
+                showRowNumbers={false}
+                serverSort
+                data={sdkRows}
+                columns={sdkColumns}
+                getRowKey={({ item }) => item.id}
+            />
+        );
+    })();
 }

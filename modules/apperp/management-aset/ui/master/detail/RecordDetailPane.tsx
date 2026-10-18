@@ -8,8 +8,16 @@ import {
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
 import { Field, FieldDescription, FieldError } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
+import { usePageDialogRecord } from '@apperp/ui/page-dialog';
 import { RecordEditBoundary } from '@apperp/ui/record-edit-boundary';
-import { api, errorMessage, newIdempotencyKey } from '../../api';
+import type { ApiValidationErrors } from '../../api';
+import { api, ApiError, errorMessage, newIdempotencyKey } from '../../api';
+import { recordQueryUrl } from '../../transactions/_shared/record-card';
+import type {
+    DraftMasterDetailsValue,
+    DraftSectionKey,
+} from '../DraftMasterDetails';
+import DraftMasterDetails, { draftMasterPayload } from '../DraftMasterDetails';
 import DynamicField from '../DynamicField';
 import type { FieldValue } from '../fields';
 import { isVisible, payloadValue, valueFrom } from '../fields';
@@ -89,6 +97,10 @@ export default function RecordDetailPane({
             allFields.map((field) => [field.name, valueFrom(record, field)]),
         ),
     );
+    const [draftDetails, setDraftDetails] = useState<DraftMasterDetailsValue>(
+        {},
+    );
+    const [detailErrors, setDetailErrors] = useState<ApiValidationErrors>({});
     const [error, setError] = useState('');
     const creationKey = useRef(newIdempotencyKey());
     const formRef = useRef<HTMLFormElement>(null);
@@ -267,9 +279,18 @@ export default function RecordDetailPane({
 
         onSavingChange(true);
         setError('');
+        setDetailErrors({});
 
         try {
             const payload: Record<string, unknown> = { nama };
+
+            if (!record) {
+                payload.details = draftMasterPayload(
+                    config.resource,
+                    draftDetails,
+                    values,
+                );
+            }
 
             if (!record && numberPolicy.allowManual) {
                 payload.kode = manualCode.trim() || null;
@@ -307,11 +328,24 @@ export default function RecordDetailPane({
             // state nama lalu terlanjur dimulai kosong walau API sudah mengembalikan nama.
             onSaved(saved.data, !record);
         } catch (caught) {
+            if (caught instanceof ApiError) {
+                setDetailErrors(caught.validationErrors);
+            }
+
             setError(errorMessage(caught, 'Data belum dapat disimpan.'));
         } finally {
             onSavingChange(false);
         }
     }
+
+    usePageDialogRecord({
+        recordUrl: record
+            ? recordQueryUrl(config.resource, record.id)
+            : undefined,
+        recordTitle: record ? `${record.kode} · ${nama}` : nama || 'Baru',
+        editing: !readOnly,
+        onEdit: record && canEdit && readOnly ? onRequestEdit : undefined,
+    });
 
     if (!record && mode !== 'create') {
         return (
@@ -326,6 +360,49 @@ export default function RecordDetailPane({
     }
 
     function sectionBody(section: DetailSection) {
+        if (!record) {
+            const keys: DraftSectionKey[] | null = section.books
+                ? ['books']
+                : section.attributes
+                  ? ['attributes']
+                  : section.models || section.manufacturerModels
+                    ? ['models']
+                    : section.maintenanceJobType
+                      ? ['variants', 'asset_types']
+                      : section.checklistVariableValues
+                        ? ['values']
+                        : section.checklistTemplateLines ||
+                            section.maintenancePlanLines
+                          ? ['lines']
+                          : section.maintenanceJobTypes
+                            ? ['job_types']
+                            : section.assetTypeConditions
+                              ? ['conditions']
+                              : section.assetTypeCounters
+                                ? ['counters']
+                                : section.maintenancePlanTargets
+                                  ? ['targets']
+                                  : null;
+
+            if (keys) {
+                return (
+                    <DraftMasterDetails
+                        resource={config.resource}
+                        canEdit={canEdit}
+                        permissions={permissions}
+                        value={draftDetails}
+                        onChange={(next) => {
+                            markDirty();
+                            setDraftDetails(next);
+                        }}
+                        sectionKeys={keys}
+                        parentValues={values}
+                        errors={detailErrors}
+                    />
+                );
+            }
+        }
+
         if (section.manufacturerDetails) {
             return (
                 <div className="space-y-5">
@@ -388,11 +465,7 @@ export default function RecordDetailPane({
                         setPabrikanAsetDetailVersion((current) => current + 1)
                     }
                 />
-            ) : (
-                <p className="text-muted-foreground text-sm">
-                    Model dapat ditambahkan setelah pabrikan disimpan.
-                </p>
-            );
+            ) : null;
         }
 
         if (section.books) {
@@ -403,12 +476,7 @@ export default function RecordDetailPane({
                     version={record.version}
                     onVersionChange={onVersionChange}
                 />
-            ) : (
-                <p className="text-muted-foreground text-sm">
-                    Buku penyusutan dapat diatur setelah {config.singular}{' '}
-                    disimpan.
-                </p>
-            );
+            ) : null;
         }
 
         if (section.attributes) {
@@ -419,11 +487,7 @@ export default function RecordDetailPane({
                     version={record.version}
                     onVersionChange={onVersionChange}
                 />
-            ) : (
-                <p className="text-muted-foreground text-sm">
-                    Atribut dapat diatur setelah {config.singular} disimpan.
-                </p>
-            );
+            ) : null;
         }
 
         if (section.models) {
@@ -437,11 +501,7 @@ export default function RecordDetailPane({
                     version={record.version}
                     onVersionChange={onVersionChange}
                 />
-            ) : (
-                <p className="text-muted-foreground text-sm">
-                    Model dapat diatur setelah jenis aset disimpan.
-                </p>
-            );
+            ) : null;
         }
 
         if (section.maintenanceJobType) {
@@ -455,12 +515,7 @@ export default function RecordDetailPane({
                     version={record.version}
                     onVersionChange={onVersionChange}
                 />
-            ) : (
-                <p className="text-muted-foreground text-sm">
-                    Rincian maintenance dapat diatur setelah jenis pekerjaan
-                    disimpan.
-                </p>
-            );
+            ) : null;
         }
 
         if (section.checklistVariableValues) {
@@ -471,11 +526,7 @@ export default function RecordDetailPane({
                     version={record.version}
                     onVersionChange={onVersionChange}
                 />
-            ) : (
-                <p className="text-muted-foreground text-sm">
-                    Nilai checklist dapat diatur setelah variabel disimpan.
-                </p>
-            );
+            ) : null;
         }
 
         if (section.checklistTemplateLines) {
@@ -486,11 +537,7 @@ export default function RecordDetailPane({
                     version={record.version}
                     onVersionChange={onVersionChange}
                 />
-            ) : (
-                <p className="text-muted-foreground text-sm">
-                    Baris checklist dapat diatur setelah template disimpan.
-                </p>
-            );
+            ) : null;
         }
 
         if (section.maintenanceJobTypes) {
@@ -504,11 +551,7 @@ export default function RecordDetailPane({
                     version={record.version}
                     onVersionChange={onVersionChange}
                 />
-            ) : (
-                <p className="text-muted-foreground text-sm">
-                    Jenis pekerjaan dapat dikaitkan setelah jenis aset disimpan.
-                </p>
-            );
+            ) : null;
         }
 
         if (section.assetTypeConditions) {
@@ -520,11 +563,7 @@ export default function RecordDetailPane({
                     version={record.version}
                     onVersionChange={onVersionChange}
                 />
-            ) : (
-                <p className="text-muted-foreground text-sm">
-                    Kondisi dapat dipilih setelah jenis aset disimpan.
-                </p>
-            );
+            ) : null;
         }
 
         if (section.assetTypeCounters) {
@@ -536,11 +575,7 @@ export default function RecordDetailPane({
                     version={record.version}
                     onVersionChange={onVersionChange}
                 />
-            ) : (
-                <p className="text-muted-foreground text-sm">
-                    Counter dapat dikaitkan setelah jenis aset disimpan.
-                </p>
-            );
+            ) : null;
         }
 
         if (section.maintenancePlanLines) {
@@ -552,11 +587,7 @@ export default function RecordDetailPane({
                     version={record.version}
                     onVersionChange={onVersionChange}
                 />
-            ) : (
-                <p className="text-muted-foreground text-sm">
-                    Baris rencana dapat diatur setelah rencana disimpan.
-                </p>
-            );
+            ) : null;
         }
 
         if (section.maintenancePlanTargets) {
@@ -568,12 +599,7 @@ export default function RecordDetailPane({
                     version={record.version}
                     onVersionChange={onVersionChange}
                 />
-            ) : (
-                <p className="text-muted-foreground text-sm">
-                    Aset yang dikenai rencana dapat dipilih setelah rencana
-                    disimpan.
-                </p>
-            );
+            ) : null;
         }
 
         if (section.placeholder) {
@@ -714,7 +740,10 @@ export default function RecordDetailPane({
                     </div>
                 </div>
 
-                <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+                <div
+                    data-page-dialog-body
+                    className="min-h-0 flex-1 overflow-y-auto px-6 py-4"
+                >
                     {(config.parents?.length ?? 0) > 0 && (
                         <Field data-invalid="true" className="mb-4">
                             <FieldError>

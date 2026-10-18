@@ -1,3 +1,4 @@
+import { ActionButton } from '@apperp/ui/action-button';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -19,14 +20,13 @@ import {
     CardTitle,
 } from '@apperp/ui/card';
 import { Checkbox } from '@apperp/ui/checkbox';
+import { DialogClose } from '@apperp/ui/dialog';
 import {
+    DialogToolbar,
     Dialog,
-    DialogAction,
     DialogBody,
-    DialogCancel,
     DialogContent,
     DialogDescription,
-    DialogFooter,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
@@ -57,7 +57,6 @@ import {
     Plus,
     Search,
     ShieldCheck,
-    Trash2,
     UserCog,
 } from 'lucide-react';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
@@ -629,6 +628,16 @@ function PrivilegeDialog({
                         );
                     }}
                 >
+                    <DialogToolbar>
+                        <ActionButton
+                            action="save"
+                            type="submit"
+                            disabled={form.processing}
+                        />
+                        <DialogClose asChild>
+                            <ActionButton action="cancel" type="button" />
+                        </DialogClose>
+                    </DialogToolbar>
                     <DialogBody>
                         <FieldGroup>
                             <Field>
@@ -659,13 +668,6 @@ function PrivilegeDialog({
                             </FieldSet>
                         </FieldGroup>
                     </DialogBody>
-                    <DialogFooter>
-                        <DialogAction type="submit" disabled={form.processing}>
-                            <KeyRound className="mr-1.5 size-3.5" /> Simpan
-                            sebagai draf
-                        </DialogAction>
-                        <DialogCancel />
-                    </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
@@ -778,6 +780,16 @@ function DutyDialog({
                         );
                     }}
                 >
+                    <DialogToolbar>
+                        <ActionButton
+                            action="save"
+                            type="submit"
+                            disabled={form.processing}
+                        />
+                        <DialogClose asChild>
+                            <ActionButton action="cancel" type="button" />
+                        </DialogClose>
+                    </DialogToolbar>
                     <DialogBody>
                         <FieldGroup>
                             <Field>
@@ -863,13 +875,6 @@ function DutyDialog({
                             </FieldSet>
                         </FieldGroup>
                     </DialogBody>
-                    <DialogFooter>
-                        <DialogAction type="submit" disabled={form.processing}>
-                            <ShieldCheck className="mr-1.5 size-3.5" /> Simpan
-                            sebagai draf
-                        </DialogAction>
-                        <DialogCancel />
-                    </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
@@ -966,6 +971,16 @@ function RoleDialog({
                         form.post('/settings/access/roles', done);
                     }}
                 >
+                    <DialogToolbar>
+                        <ActionButton
+                            action="save"
+                            type="submit"
+                            disabled={form.processing}
+                        />
+                        <DialogClose asChild>
+                            <ActionButton action="cancel" type="button" />
+                        </DialogClose>
+                    </DialogToolbar>
                     <DialogBody>
                         <FieldGroup>
                             <Field>
@@ -1052,12 +1067,6 @@ function RoleDialog({
                             </FieldSet>
                         </FieldGroup>
                     </DialogBody>
-                    <DialogFooter>
-                        <DialogAction type="submit" disabled={form.processing}>
-                            <UserCog className="mr-1.5 size-3.5" /> Simpan role
-                        </DialogAction>
-                        <DialogCancel />
-                    </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
@@ -1076,10 +1085,7 @@ function DeleteRoleButton({
     return (
         <AlertDialog>
             <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm">
-                    <Trash2 className="mr-1 size-3.5" />
-                    Hapus role
-                </Button>
+                <ActionButton action="delete" />
             </AlertDialogTrigger>
             <AlertDialogContent>
                 <AlertDialogHeader>
@@ -1143,10 +1149,7 @@ function DeleteDraftButton({
     return (
         <AlertDialog>
             <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm">
-                    <Trash2 className="mr-1 size-3.5" />
-                    Hapus
-                </Button>
+                <ActionButton action="delete" />
             </AlertDialogTrigger>
             <AlertDialogContent>
                 <AlertDialogHeader>

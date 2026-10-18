@@ -14,7 +14,7 @@ import {
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import { DataTable, DataTableText } from '@apperp/ui/data-table';
-import { DialogCancel } from '@apperp/ui/dialog';
+import { DialogClose } from '@apperp/ui/dialog';
 
 import {
     Empty,
@@ -33,14 +33,10 @@ import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { MasterDetailLayout } from '@apperp/ui/master-detail-layout';
 import {
+    PageDialogToolbar,
     PageDialog as Dialog,
-    PageDialogAction as DialogAction,
     PageDialogBody as DialogBody,
     PageDialogContent as DialogContent,
-    PageDialogDescription as DialogDescription,
-    PageDialogFooter as DialogFooter,
-    PageDialogHeader as DialogHeader,
-    PageDialogTitle as DialogTitle,
     PageDialogTrigger as DialogTrigger,
 } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
@@ -65,7 +61,7 @@ import {
     Position,
     ReactFlow,
 } from '@xyflow/react';
-import { Check, Network, Plus, Trash2 } from 'lucide-react';
+import { Check, Network, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useToday } from '@/hooks/use-work-date';
 import { apiJson, errorText } from '@/lib/core-api';
@@ -100,16 +96,18 @@ function CreateHierarchyDialog({ purposes }: Pick<Props, 'purposes'>) {
             }}
         >
             <DialogTrigger asChild>
-                <ActionButton action="create">Tambah hierarki</ActionButton>
+                <ActionButton action="create" />
             </DialogTrigger>
-            <DialogContent ref={contentRef}>
-                <DialogHeader>
-                    <DialogTitle>Hierarki organisasi baru</DialogTitle>
-                    <DialogDescription>
-                        Susun organisasi berdasarkan tujuan dan tanggal
-                        berlakunya.
-                    </DialogDescription>
-                </DialogHeader>
+            <DialogContent
+                ref={contentRef}
+                title="Hierarki organisasi"
+                recordTitle={form.data.name.trim() || 'Hierarki baru'}
+                editing
+                busy={form.processing}
+                description={
+                    'Susun organisasi berdasarkan tujuan dan tanggal\n                        berlakunya.'
+                }
+            >
                 <form
                     className="flex min-h-0 flex-1 flex-col"
                     onSubmit={(event) => {
@@ -122,6 +120,16 @@ function CreateHierarchyDialog({ purposes }: Pick<Props, 'purposes'>) {
                         });
                     }}
                 >
+                    <PageDialogToolbar>
+                        <ActionButton
+                            action="save"
+                            type="submit"
+                            disabled={form.processing}
+                        />
+                        <DialogClose asChild>
+                            <ActionButton action="cancel" type="button" />
+                        </DialogClose>
+                    </PageDialogToolbar>
                     <DialogBody className="space-y-4">
                         <FieldGroup>
                             <Field data-invalid={Boolean(form.errors.name)}>
@@ -216,12 +224,6 @@ function CreateHierarchyDialog({ purposes }: Pick<Props, 'purposes'>) {
                             </div>
                         </FieldGroup>
                     </DialogBody>
-                    <DialogFooter>
-                        <DialogAction type="submit" disabled={form.processing}>
-                            Buat draft hierarki
-                        </DialogAction>
-                        <DialogCancel />
-                    </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
@@ -294,15 +296,11 @@ function DraftActions({
                     struktur pohon.
                 </p>
                 <div className="flex gap-2">
-                    <Button
-                        variant="outline"
+                    <ActionButton
+                        action="add"
                         type="submit"
-                        size="sm"
-                        className="font-medium"
                         disabled={!form.data.organization_id || form.processing}
-                    >
-                        <Plus className="mr-1.5 size-3.5" /> Tambah Penempatan
-                    </Button>
+                    />
                     <Button
                         type="button"
                         size="sm"
@@ -637,18 +635,17 @@ function CreateVersionDraftAction({
             }}
         >
             <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="font-medium">
-                    <Plus className="mr-1.5 size-3.5" /> Buat versi baru
-                </Button>
+                <ActionButton action="create" className="font-medium" />
             </DialogTrigger>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Buat draft versi baru</DialogTitle>
-                    <DialogDescription>
-                        Versi yang sudah dipublikasikan tetap menjadi riwayat
-                        resmi.
-                    </DialogDescription>
-                </DialogHeader>
+            <DialogContent
+                title="Hierarki organisasi"
+                recordTitle={`Draf baru dari versi ${version.version_number}`}
+                editing
+                busy={form.processing}
+                description={
+                    'Versi yang sudah dipublikasikan tetap menjadi riwayat\n                        resmi.'
+                }
+            >
                 <form
                     className="flex min-h-0 flex-1 flex-col"
                     onSubmit={(event) => {
@@ -663,6 +660,16 @@ function CreateVersionDraftAction({
                         );
                     }}
                 >
+                    <PageDialogToolbar>
+                        <ActionButton
+                            action="save"
+                            type="submit"
+                            disabled={form.processing}
+                        />
+                        <DialogClose asChild>
+                            <ActionButton action="cancel" type="button" />
+                        </DialogClose>
+                    </PageDialogToolbar>
                     <DialogBody className="space-y-4">
                         <FieldGroup>
                             <Field
@@ -691,12 +698,6 @@ function CreateVersionDraftAction({
                             </Field>
                         </FieldGroup>
                     </DialogBody>
-                    <DialogFooter>
-                        <DialogAction type="submit" disabled={form.processing}>
-                            Buat Draft
-                        </DialogAction>
-                        <DialogCancel />
-                    </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>

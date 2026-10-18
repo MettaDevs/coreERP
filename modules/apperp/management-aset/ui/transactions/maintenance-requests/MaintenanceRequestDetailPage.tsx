@@ -1,3 +1,4 @@
+import { Trash2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -19,10 +20,10 @@ import {
     CollapsibleSectionGroup,
 } from '@apperp/ui/collapsible-section';
 import {
+    DialogClose,
     Dialog,
     DialogAction,
     DialogBody,
-    DialogCancel,
     DialogContent,
     DialogDescription,
     DialogFooter,
@@ -30,6 +31,7 @@ import {
     DialogTitle,
 } from '@apperp/ui/dialog';
 import { Field, FieldDescription } from '@apperp/ui/field';
+import { usePageDialogRecord } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import { Textarea } from '@apperp/ui/textarea';
@@ -42,6 +44,9 @@ import {
 } from '../../api';
 import type { MasterOption } from '../../master/useMasterOptions';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
+import { RecordCardHeader } from '../_shared/record-card';
+import type { RecordCardControls } from '../_shared/record-card';
+import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
 import type {
     Context,
     MaintenanceRequest,
@@ -52,9 +57,9 @@ import {
     StatusBadge,
     codeName,
     emptyForm,
-    openList,
-    openRequest,
-    openRequestEdit,
+    openList as navigateClose,
+    openRequest as navigateView,
+    openRequestEdit as navigateEdit,
     permissionCheck,
     toForm,
     useAssets,
@@ -94,12 +99,25 @@ export default function MaintenanceRequestDetailPage({
     permissions,
     requestId,
     mode,
+    onClose,
+    onSaved,
+    onRequestView,
+    onRequestEdit,
+    onBusyChange,
+    onDirtyChange,
+    portalContainer,
 }: {
     context: Context;
     permissions: string[];
     requestId?: string;
     mode: Mode;
-}) {
+} & RecordCardControls) {
+    const embedded = usePageDialogRecord(undefined);
+
+    const openRequest = (id: string) => (onRequestView ?? navigateView)(id);
+    const openRequestEdit = (id: string) => (onRequestEdit ?? navigateEdit)(id);
+    const openList = () => (onClose ?? navigateClose)();
+
     const can = permissionCheck(permissions);
     const canCreateWorkOrder = permissions.includes(
         'management-aset.pemeliharaan-aset.create',
@@ -112,6 +130,11 @@ export default function MaintenanceRequestDetailPage({
     );
     const [loading, setLoading] = useState(mode !== 'create');
     const [busy, setBusy] = useState(false);
+    useEffect(() => {
+        onBusyChange?.(busy);
+
+        return () => onBusyChange?.(false);
+    }, [busy, onBusyChange]);
     const [errors, setErrors] = useState<Record<string, string[]>>({});
     const [decision, setDecision] = useState<Decision>(null);
     const [rejecting, setRejecting] = useState(false);
@@ -223,7 +246,7 @@ export default function MaintenanceRequestDetailPage({
                 toast.success(
                     `Permintaan ${result.data.kode} disimpan sebagai draf.`,
                 );
-                openRequest(result.data.id);
+                (onSaved ?? openRequest)(result.data.id);
 
                 return;
             }
@@ -233,7 +256,7 @@ export default function MaintenanceRequestDetailPage({
                 body: JSON.stringify({ ...payload, version: saved?.version }),
             });
             toast.success('Perubahan permintaan disimpan.');
-            openRequest(String(requestId));
+            (onSaved ?? openRequest)(String(requestId));
         } catch (caught) {
             if (caught instanceof ApiError) {
                 setErrors(caught.validationErrors);
@@ -283,6 +306,7 @@ export default function MaintenanceRequestDetailPage({
 
     async function archive() {
         setDecision(null);
+        setBusy(true);
 
         try {
             await api(`/permintaan-pemeliharaan/${requestId}`, {
@@ -293,6 +317,8 @@ export default function MaintenanceRequestDetailPage({
             openList();
         } catch (caught) {
             toastSaveError(caught, 'Permintaan belum dapat diarsipkan.');
+        } finally {
+            setBusy(false);
         }
     }
 
@@ -307,6 +333,13 @@ export default function MaintenanceRequestDetailPage({
         setErrors({});
         setOrdering(true);
     }
+
+    useRecordCardDirty({
+        value: form,
+        ready: !loading,
+        scopeKey: JSON.stringify([requestId, mode, saved?.version]),
+        onDirtyChange: onDirtyChange,
+    });
 
     if (loading) {
         return (
@@ -324,19 +357,41 @@ export default function MaintenanceRequestDetailPage({
 
     return (
         <div className="flex h-full min-h-0 flex-col overflow-hidden">
+            <RecordCardHeader
+                recordTitle={saved?.kode ?? 'Baru'}
+                editing={!readOnly}
+                recordUrl={
+                    requestId
+                        ? `/management-aset/permintaan-pemeliharaan/${requestId}`
+                        : undefined
+                }
+                onEdit={
+                    readOnly && status === 'draft' && can('update')
+                        ? () => openRequestEdit(String(requestId))
+                        : undefined
+                }
+                onDelete={
+                    readOnly &&
+                    (status === 'draft' || status === 'ditolak') &&
+                    can('archive')
+                        ? () => setDecision('archive')
+                        : undefined
+                }
+            />
             <RecordActionBar
-                title={title}
+                title={embedded ? undefined : title}
                 trailing={saved ? <StatusBadge status={status} /> : undefined}
             >
-                {readOnly && status === 'draft' && can('update') && (
-                    <ActionButton
-                        action="edit"
-                        type="button"
-                        onClick={() => openRequestEdit(String(requestId))}
-                    >
-                        Ubah
-                    </ActionButton>
-                )}
+                {readOnly &&
+                    status === 'draft' &&
+                    can('update') &&
+                    !embedded && (
+                        <ActionButton
+                            action="edit"
+                            type="button"
+                            onClick={() => openRequestEdit(String(requestId))}
+                        />
+                    )}
                 {readOnly && status === 'draft' && can('submit') && (
                     <Button
                         type="button"
@@ -382,38 +437,40 @@ export default function MaintenanceRequestDetailPage({
                     )}
                 {readOnly &&
                     (status === 'draft' || status === 'ditolak') &&
-                    can('archive') && (
+                    can('archive') &&
+                    !embedded && (
                         <ActionButton
                             action="archive"
                             type="button"
                             onClick={() => setDecision('archive')}
-                        >
-                            Arsipkan
-                        </ActionButton>
+                        />
                     )}
                 {!readOnly && (
                     <>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() =>
-                                requestId ? openRequest(requestId) : openList()
-                            }
-                        >
-                            Batal
-                        </Button>
-                        <Button
+                        <ActionButton
+                            action="save"
                             type="button"
                             disabled={busy}
                             onClick={() => void save()}
-                        >
-                            {busy ? 'Menyimpan…' : 'Simpan draf'}
-                        </Button>
+                            pending={busy}
+                        />
+                        <ActionButton
+                            action="cancel"
+                            disabled={busy}
+                            type="button"
+                            onClick={() =>
+                                requestId ? openRequest(requestId) : openList()
+                            }
+                        />
                     </>
                 )}
             </RecordActionBar>
 
-            <div ref={panelRef} className="min-h-0 flex-1 overflow-y-auto">
+            <div
+                data-page-dialog-body
+                ref={panelRef}
+                className="min-h-0 flex-1 overflow-y-auto"
+            >
                 <div className="space-y-5 p-5">
                     <CollapsibleSectionGroup defaultValue={['general']}>
                         <CollapsibleSection
@@ -521,7 +578,9 @@ export default function MaintenanceRequestDetailPage({
                                                 }
                                                 placeholder="Pilih jenis permintaan"
                                                 ariaLabel="Jenis permintaan"
-                                                portalContainer={panelRef}
+                                                portalContainer={
+                                                    portalContainer ?? panelRef
+                                                }
                                                 onValueChange={(value) =>
                                                     set({
                                                         jenis_permintaan_id:
@@ -550,7 +609,9 @@ export default function MaintenanceRequestDetailPage({
                                                 }
                                                 placeholder="Pilih unit kerja"
                                                 ariaLabel="Unit pelapor"
-                                                portalContainer={panelRef}
+                                                portalContainer={
+                                                    portalContainer ?? panelRef
+                                                }
                                                 onValueChange={(value) =>
                                                     set({
                                                         responsible_org_unit_id:
@@ -584,7 +645,9 @@ export default function MaintenanceRequestDetailPage({
                                                 placeholder="Pilih aset yang rusak"
                                                 searchPlaceholder="Cari kode atau nama aset"
                                                 ariaLabel="Aset"
-                                                portalContainer={panelRef}
+                                                portalContainer={
+                                                    portalContainer ?? panelRef
+                                                }
                                                 onValueChange={(value) =>
                                                     set({
                                                         aset_id: value ?? '',
@@ -617,7 +680,9 @@ export default function MaintenanceRequestDetailPage({
                                                 }
                                                 placeholder="Ikuti lokasi aset"
                                                 ariaLabel="Lokasi"
-                                                portalContainer={panelRef}
+                                                portalContainer={
+                                                    portalContainer ?? panelRef
+                                                }
                                                 onValueChange={(value) =>
                                                     set({
                                                         lokasi_aset_id:
@@ -647,7 +712,9 @@ export default function MaintenanceRequestDetailPage({
                                                 }
                                                 placeholder="Tidak ditentukan"
                                                 ariaLabel="Tingkat layanan"
-                                                portalContainer={panelRef}
+                                                portalContainer={
+                                                    portalContainer ?? panelRef
+                                                }
                                                 onValueChange={(value) =>
                                                     set({
                                                         tingkat_layanan_id:
@@ -673,7 +740,9 @@ export default function MaintenanceRequestDetailPage({
                                                 }
                                                 placeholder="Belum diketahui"
                                                 ariaLabel="Sebab kerusakan"
-                                                portalContainer={panelRef}
+                                                portalContainer={
+                                                    portalContainer ?? panelRef
+                                                }
                                                 onValueChange={(value) =>
                                                     set({
                                                         sebab_kerusakan_id:
@@ -720,7 +789,7 @@ export default function MaintenanceRequestDetailPage({
                                 ? 'Ajukan permintaan ini?'
                                 : decision === 'accept'
                                   ? 'Terima permintaan ini?'
-                                  : 'Arsipkan permintaan ini?'}
+                                  : 'Delete permintaan ini?'}
                         </AlertDialogTitle>
                         <AlertDialogDescription>
                             {decision === 'submit'
@@ -756,11 +825,14 @@ export default function MaintenanceRequestDetailPage({
                                 }
                             }}
                         >
+                            {decision === 'archive' && (
+                                <Trash2 aria-hidden="true" />
+                            )}
                             {decision === 'submit'
                                 ? 'Ajukan'
                                 : decision === 'accept'
                                   ? 'Terima'
-                                  : 'Arsipkan'}
+                                  : 'Delete'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -803,7 +875,13 @@ export default function MaintenanceRequestDetailPage({
                         >
                             Tolak
                         </DialogAction>
-                        <DialogCancel type="button">Batal</DialogCancel>
+                        <DialogClose asChild>
+                            <ActionButton
+                                action="cancel"
+                                disabled={busy}
+                                type="button"
+                            />
+                        </DialogClose>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -947,7 +1025,13 @@ export default function MaintenanceRequestDetailPage({
                         >
                             Buat work order
                         </DialogAction>
-                        <DialogCancel type="button">Batal</DialogCancel>
+                        <DialogClose asChild>
+                            <ActionButton
+                                action="cancel"
+                                disabled={busy}
+                                type="button"
+                            />
+                        </DialogClose>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

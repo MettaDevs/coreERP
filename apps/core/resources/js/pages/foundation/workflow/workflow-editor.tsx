@@ -1,3 +1,4 @@
+import { ActionButton } from '@apperp/ui/action-button';
 import '@xyflow/react/dist/style.css';
 
 import { Badge } from '@apperp/ui/badge';
@@ -7,6 +8,7 @@ import { Checkbox } from '@apperp/ui/checkbox';
 import { Field } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { NativeSelect } from '@apperp/ui/native-select';
+import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@apperp/ui/tooltip';
 import { Head, Link, router } from '@inertiajs/react';
 import type {
@@ -39,7 +41,6 @@ import {
     Info,
     Lock,
     Plus,
-    Save,
     UserCheck,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -476,7 +477,7 @@ export default function WorkflowEditor({
             <Head title={`Workflow — ${workflow.name}`} />
             <main className="mx-auto flex w-full max-w-[1500px] min-w-0 flex-col gap-6 p-6">
                 {/* Top Bar Header */}
-                <div className="flex flex-wrap items-center justify-between gap-4">
+                <RecordActionBar>
                     <div className="flex items-center gap-3">
                         <Button
                             asChild
@@ -491,7 +492,7 @@ export default function WorkflowEditor({
                         </Button>
                         <div>
                             <div className="flex items-center gap-2">
-                                <h1 className="text-lg font-bold tracking-tight text-foreground">
+                                <h1 className="text-sm font-semibold tracking-tight text-foreground">
                                     {workflow.name}
                                 </h1>
                                 <Badge variant="outline">{displayStatus}</Badge>
@@ -517,16 +518,13 @@ export default function WorkflowEditor({
                         )}
                         {version.status === 'draft' && (
                             <>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
+                                <ActionButton
+                                    action="save"
                                     onClick={save}
                                     disabled={readOnly}
                                     className="text-xs font-medium"
-                                >
-                                    <Save className="mr-1.5 size-3.5" /> Simpan
-                                    Alur
-                                </Button>
+                                    type="button"
+                                />
                                 <Button
                                     size="sm"
                                     onClick={publish}
@@ -539,14 +537,14 @@ export default function WorkflowEditor({
                             </>
                         )}
                     </div>
-                </div>
+                </RecordActionBar>
 
                 {/* Canvas Container */}
                 <Card className="overflow-hidden border border-border shadow-xs">
-                    <CardHeader className="border-b border-border bg-card/50 px-6 py-4">
+                    <CardHeader className="border-b border-border bg-card/50">
                         <div className="flex items-center justify-between">
                             <div className="flex flex-row items-center gap-2">
-                                <CardTitle className="text-base font-bold text-foreground">
+                                <CardTitle className="text-foreground">
                                     Canvas Editor Workflow
                                 </CardTitle>
                                 <Tooltip clickToPin>

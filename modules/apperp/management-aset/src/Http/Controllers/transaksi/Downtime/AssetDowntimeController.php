@@ -84,6 +84,15 @@ class AssetDowntimeController extends Controller
         return response()->json($batch);
     }
 
+    public function show(Request $request, string $id): JsonResponse
+    {
+        $this->guard($request, 'read');
+        $row = $this->one($request, $id);
+        abort_if($row === null, 404);
+
+        return response()->json(['data' => $row]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $this->guard($request, 'create');

@@ -652,6 +652,51 @@ paths:
       schema:
         type: string
         format: date
+    get:
+      tags:
+      - Master data
+      operationId: getPostingGroupAset
+      description: |
+        Permission `management-aset.fixed-asset-posting-profiles.read`. Membaca pasangan group dan
+        tanggal berlaku tepat, bukan baris terbaru atau baris yang berlaku hari ini. Group tenant lain,
+        group terarsip, atau tanggal yang tidak tercatat dijawab 404. Tanggal tidak sah dijawab 422.
+        Identitas baris tidak memakai buku. Riwayat group dan rincian akun memakai bentuk matriks.
+      responses:
+        '200':
+          description: Baris posting dan konteks group serta akun
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    type: object
+                    required:
+                    - group
+                    - row
+                    - today
+                    - accounts
+                    - account_details
+                    properties:
+                      group:
+                        $ref: '#/components/schemas/PostingGroupAsetMatrix/properties/data/properties/groups/items'
+                      row:
+                        $ref: '#/components/schemas/PostingGroupAsetRow'
+                      today:
+                        type: string
+                        format: date
+                      accounts:
+                        $ref: '#/components/schemas/PostingGroupAsetMatrix/properties/data/properties/accounts'
+                      account_details:
+                        $ref: '#/components/schemas/PostingGroupAsetMatrix/properties/data/properties/account_details'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
     put:
       tags:
       - Master data
@@ -8023,6 +8068,28 @@ paths:
   /api/v1/downtime-aset/{id}:
     parameters:
     - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Downtime dan KPI
+      operationId: getAssetDowntime
+      description: Membaca catatan tepat menurut ID dengan izin `downtime-aset.read`. Catatan di luar tenant atau jangkauan
+        organisasi aset dijawab 404, tanpa bergantung pada halaman daftar.
+      responses:
+        '200':
+          description: Catatan downtime
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AssetDowntime'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
     patch:
       tags:
       - Downtime dan KPI
@@ -8330,6 +8397,28 @@ paths:
   /api/v1/garansi-aset/{id}:
     parameters:
     - $ref: '#/components/parameters/RecordId'
+    get:
+      tags:
+      - Garansi dan kontrak servis
+      operationId: getAssetWarranty
+      description: Membaca garansi tepat menurut ID dengan izin `garansi-aset.read`. Catatan di luar tenant atau jangkauan
+        organisasi aset dijawab 404, tanpa bergantung pada halaman daftar.
+      responses:
+        '200':
+          description: Garansi aset
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AssetWarranty'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
     patch:
       tags:
       - Garansi dan kontrak servis
@@ -10631,6 +10720,8 @@ components:
       required:
       - nama
       properties:
+        details:
+          $ref: '#/components/schemas/MasterDraftDetails'
         kode:
           type:
           - string
@@ -14394,6 +14485,140 @@ components:
                 type: string
                 nullable: true
                 maxLength: 2000
+    MasterDraftDetails:
+      type: object
+      additionalProperties: false
+      description: |
+        Rincian master baru dikirim bersama POST pemiliknya. Nomor, pemilik, dan seluruh
+        rincian disimpan dalam satu transaksi; satu rincian tidak sah membatalkan semuanya.
+        Kiriman ulang dengan Idempotency-Key yang sama tidak menambahkan baris lagi.
+        Tiap seksi tetap memerlukan izin yang sama dengan endpoint rincian tersendiri.
+        Seksi yang diterima bergantung resource: pabrikan-aset models; jenis-aset attributes,
+        models, conditions, counters, job_types; group-aset books; tipe-atribut values;
+        maintenance-job-types variants dan asset_types; maintenance-checklist-variables values;
+        maintenance-checklist-templates lines; rencana-pemeliharaan lines dan targets.
+        Baris baru tidak memakai id sementara sebagai id database. Versi rincian berasal dari
+        pemilik yang baru dibuat. Rincian ini tidak diterapkan lagi pada replay yang sukses.
+      properties:
+        attributes:
+          $ref: '#/components/schemas/JenisAsetAtributReplace'
+        books:
+          $ref: '#/components/schemas/GroupBukuPenyusutanReplace'
+        values:
+          oneOf:
+          - $ref: '#/components/schemas/TipeAtributNilaiReplace'
+          - $ref: '#/components/schemas/MaintenanceChecklistVariableValueReplace'
+        models:
+          oneOf:
+          - type: object
+            required:
+            - model_ids
+            properties:
+              model_ids:
+                type: array
+                maxItems: 100
+                uniqueItems: true
+                items:
+                  $ref: '#/components/schemas/Ulid'
+          - $ref: '#/components/schemas/MasterDraftChildRows'
+        variants:
+          $ref: '#/components/schemas/MasterDraftChildRows'
+        conditions:
+          type: object
+          required:
+          - condition_ids
+          properties:
+            condition_ids:
+              type: array
+              maxItems: 200
+              uniqueItems: true
+              items:
+                $ref: '#/components/schemas/Ulid'
+        counters:
+          type: object
+          required:
+          - jenis_counter_ids
+          properties:
+            jenis_counter_ids:
+              type: array
+              maxItems: 200
+              uniqueItems: true
+              items:
+                $ref: '#/components/schemas/Ulid'
+        job_types:
+          $ref: '#/components/schemas/MasterDraftAssetTypeIds'
+        asset_types:
+          $ref: '#/components/schemas/MasterDraftAssetTypeIds'
+        lines:
+          oneOf:
+          - $ref: '#/components/schemas/MaintenanceChecklistTemplateLineReplace'
+          - type: object
+            required:
+            - lines
+            properties:
+              lines:
+                type: array
+                maxItems: 50
+                items:
+                  $ref: '#/components/schemas/MaintenancePlanLineWrite'
+        targets:
+          type: object
+          required:
+          - targets
+          properties:
+            targets:
+              type: array
+              maxItems: 500
+              items:
+                $ref: '#/components/schemas/MaintenancePlanTargetWrite'
+    MasterDraftChildRows:
+      type: object
+      required:
+      - rows
+      properties:
+        rows:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            required:
+            - nama
+            properties:
+              kode:
+                type:
+                - string
+                - 'null'
+                maxLength: 50
+              nama:
+                type: string
+                minLength: 1
+                maxLength: 150
+              keterangan:
+                type:
+                - string
+                - 'null'
+                maxLength: 2000
+              aktif:
+                type: boolean
+                default: true
+              jenis_aset_id:
+                type:
+                - string
+                - 'null'
+                format: ulid
+    MasterDraftAssetTypeIds:
+      type: object
+      required:
+      - jenis_aset_ids
+      description: Pada seksi job_types milik jenis-aset, nilai ini adalah id jenis pekerjaan; nama kunci mengikuti endpoint
+        relasi yang sudah ada.
+      properties:
+        jenis_aset_ids:
+          type: array
+          maxItems: 200
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/Ulid'
   responses:
     Unauthenticated:
       description: Sesi aplikasi tidak valid

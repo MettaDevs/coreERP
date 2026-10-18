@@ -3,6 +3,8 @@
 namespace App\Platform\Organization\Actions;
 
 use App\Platform\Access\Support\CoreSecurityCatalog;
+use App\Platform\AddressBook\Actions\SavePartyDetails;
+use App\Platform\AddressBook\Support\OrganizationAddressBook;
 use App\Platform\Organization\Models\LegalEntity;
 use App\Platform\Organization\Models\OperatingUnit;
 use App\Platform\Organization\Models\Organization;
@@ -14,7 +16,12 @@ use Illuminate\Validation\ValidationException;
 
 class CreateOrganization
 {
-    /** @param array{classification:string,name:string,company_code:?string,country_code:?string,timezone?:?string,operating_unit_type:?string,operating_unit_number?:?string} $data */
+    public function __construct(
+        private readonly OrganizationAddressBook $addresses,
+        private readonly SavePartyDetails $details,
+    ) {}
+
+    /** @param array{classification:string,name:string,company_code:?string,country_code:?string,timezone?:?string,operating_unit_type:?string,operating_unit_number?:?string,party_details?:array{locations:list<array<string,mixed>>,contacts:list<array<string,mixed>>}} $data */
     public function handle(TenantMembership $actor, array $data): Organization
     {
         if (! $actor->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE)) {
@@ -52,6 +59,11 @@ class CreateOrganization
                         'type' => $data['operating_unit_type'],
                         'number' => $number,
                     ]);
+                }
+
+                $details = $data['party_details'] ?? ['locations' => [], 'contacts' => []];
+                if ($details['locations'] !== [] || $details['contacts'] !== []) {
+                    $this->details->create($actor, $this->addresses->party($organization), $details);
                 }
 
                 return $organization->load(['legalEntity', 'operatingUnit']);

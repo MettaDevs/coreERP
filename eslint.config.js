@@ -228,6 +228,36 @@ export default [
         },
     },
     {
+        files: ['modules/*/*/ui/**/*.{ts,tsx}'],
+        rules: {
+            'react/forbid-elements': [
+                'error',
+                {
+                    forbid: [
+                        {
+                            element: 'table',
+                            message:
+                                'Gunakan DataTable SDK agar header, kolom, dan scroll tetap konsisten.',
+                        },
+                    ],
+                },
+            ],
+            'no-restricted-imports': [
+                'error',
+                {
+                    paths: [
+                        {
+                            name: '@apperp/ui/table',
+                            importNames: ['Table'],
+                            message:
+                                'Gunakan DataTable dari @apperp/ui/data-table. Baris khusus memakai renderRows, bukan frame tabel terpisah.',
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+    {
         // Skenario k6 berjalan di runtime k6, bukan browser maupun Node. `__ENV` dan
         // kawan-kawannya disediakan runtime itu, jadi tanpa deklarasi ini setiap
         // pembacaan variabel lingkungan dilaporkan sebagai variabel tak dikenal.

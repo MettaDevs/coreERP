@@ -5,6 +5,7 @@ namespace App\Platform\AddressBook\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\AddressBook\Actions\SaveParty;
+use App\Platform\AddressBook\Actions\SavePartyDetails;
 use App\Platform\AddressBook\Contracts\PartyNumbers;
 use App\Platform\AddressBook\Events\PartyNameChanged;
 use App\Platform\AddressBook\Events\PartyTaxNumberChanged;
@@ -16,7 +17,7 @@ use App\Platform\AddressBook\Models\PartyAddressBook;
 use App\Platform\AddressBook\Models\PartyRelationship;
 use App\Platform\AddressBook\Models\PartyType;
 use App\Platform\AddressBook\Support\OrganizationAddressBook;
-use App\Platform\AddressBook\Support\PostalAddressReferences;
+use App\Platform\AddressBook\Support\PartyDetailData;
 use App\Platform\Geography\Models\CountryRegion;
 use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Modules\Contracts\VendorDirectory;
@@ -93,6 +94,9 @@ final class GlobalAddressBookController extends Controller
             'partyTypes' => PartyType::query()->get(['code', 'name']),
             'referenceValues' => DB::table('party_reference_values')->orderBy('name')->get()->groupBy('category'),
             'relationshipTypes' => DB::table('party_relationship_types')->get(),
+            'locationPurposes' => LocationPurpose::query()->orderBy('sort_order')->get(['code', 'name']),
+            'countries' => CountryRegion::query()->orderBy('name')->get(['code', 'name']),
+            'contactTypes' => ElectronicAddress::TYPES,
             'addressBooks' => AddressBook::query()->where('tenant_id', $membership->tenant_id)->orderBy('name')->get(['id', 'name', 'version']),
         ];
     }
@@ -133,14 +137,16 @@ final class GlobalAddressBookController extends Controller
         $membership = $this->currentMembership($request);
         abort_unless($membership->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE), 403);
         $data = $this->validated($request, $membership->tenant_id);
+        $details = PartyDetailData::details($request->input('party_details', []));
         $key = $request->header('Idempotency-Key');
         $key = is_string($key) && preg_match('/^[A-Za-z0-9._:-]{8,120}$/D', $key) ? $key : (string) Str::ulid();
         $key = 'directory:'.$key;
         app(PartyNumbers::class)->prepare($membership->tenant_id);
-        $party = DB::transaction(function () use ($membership, $data, $key): Party {
+        $party = DB::transaction(function () use ($membership, $data, $key, $details): Party {
             $party = $this->saveParty->create($membership->tenant_id, array_diff_key($data, ['address_book_ids' => true]), $key);
             if ($party->wasRecentlyCreated) {
                 $this->syncBooks($party, $data['address_book_ids'] ?? []);
+                app(SavePartyDetails::class)->create($membership, $party, $details);
             }
 
             return $party;
@@ -349,20 +355,7 @@ final class GlobalAddressBookController extends Controller
     public function saveLocation(Request $request, Party $party, ?string $location = null): JsonResponse
     {
         $this->guardParty($request, $party, true);
-        if ($request->filled('country_region_code')) {
-            $request->merge(['country_region_code' => strtoupper((string) $request->input('country_region_code'))]);
-        }
-        $linking = $request->filled('location_id');
-        $data = $request->validate([
-            'location_id' => ['nullable', 'ulid'], 'name' => [$linking ? 'nullable' : 'required', 'string', 'max:120'],
-            'purposes' => ['required', 'array', 'min:1'], 'purposes.*' => ['string', 'distinct', Rule::exists('location_purposes', 'code')],
-            'is_primary' => ['sometimes', 'boolean'],
-            'country_region_code' => [$linking ? 'nullable' : 'required', 'string', 'size:2', Rule::exists('country_regions', 'code')],
-            'province' => ['nullable', 'string', 'max:100'], 'city' => ['nullable', 'string', 'max:100'], 'district' => ['nullable', 'string', 'max:100'],
-            'village' => ['nullable', 'string', 'max:100'], 'rt' => ['nullable', 'string', 'regex:/^[0-9]{1,3}$/D'], 'rw' => ['nullable', 'string', 'regex:/^[0-9]{1,3}$/D'],
-            'street' => ['nullable', 'string', 'max:250'], 'building' => ['nullable', 'string', 'max:120'], 'postbox' => ['nullable', 'string', 'max:60'], 'postal_code' => ['nullable', 'string', 'max:20'],
-            ...PostalAddressReferences::rules(),
-        ]);
+        $data = PartyDetailData::location($request->all());
 
         return response()->json(['data' => $this->addresses->saveLocation($party, $data, $location, $location === null ? 0 : RowVersion::expected($request))], $location === null ? 201 : 200);
     }
@@ -385,11 +378,7 @@ final class GlobalAddressBookController extends Controller
     public function saveContact(Request $request, Party $party, ?string $contact = null): JsonResponse
     {
         $this->guardParty($request, $party, true);
-        $data = $request->validate([
-            'type' => ['required', Rule::in(ElectronicAddress::TYPES)],
-            'value' => ['required', 'string', 'max:250', ...($request->input('type') === 'email' ? ['email'] : [])],
-            'purpose' => ['nullable', 'string', 'max:30'], 'is_primary' => ['sometimes', 'boolean'], 'address_id' => ['sometimes', 'nullable', 'ulid'],
-        ]);
+        $data = PartyDetailData::contact($request->all());
 
         return response()->json(['data' => $this->addresses->saveContact($party, $data, $contact, $contact === null ? 0 : RowVersion::expected($request))], $contact === null ? 201 : 200);
     }

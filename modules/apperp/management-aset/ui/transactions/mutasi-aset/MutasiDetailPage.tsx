@@ -1,4 +1,4 @@
-import { FileText, Plus, Trash2 } from 'lucide-react';
+import { FileText, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useWorkDate } from '@/hooks/use-work-date';
@@ -18,18 +18,14 @@ import {
     CollapsibleSection,
     CollapsibleSectionGroup,
 } from '@apperp/ui/collapsible-section';
+import { DataTable } from '@apperp/ui/data-table';
+import type { DataTableColumn } from '@apperp/ui/data-table';
 import { Field, FieldDescription } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
+import { usePageDialogRecord } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
+
 import { Textarea } from '@apperp/ui/textarea';
 import EditShield from '../../_shared/EditShield';
 import {
@@ -44,6 +40,9 @@ import { defaultDepartmentOf } from '../../master/locationDefaults';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import { requestPrint } from '../../print';
 import { useRecordOptions } from '../../use-record-list';
+import { RecordCardHeader } from '../_shared/record-card';
+import type { RecordCardControls } from '../_shared/record-card';
+import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
 import type { Context, EditableMutasi, Mutasi, MutasiLine } from './mutasi';
 import {
     StatusBadge,
@@ -83,14 +82,18 @@ type Mode = 'create' | 'view' | 'edit';
 export default function MutasiDetailPage({
     context,
     permissions,
+    card,
     mutasiId,
     mode: modeAwal,
 }: {
     context: Context;
     permissions: string[];
+    card?: RecordCardControls;
     mutasiId?: string;
     mode: Mode;
 }) {
+    const embedded = usePageDialogRecord(undefined);
+
     const can = izin(permissions);
     const canMutate = bolehMemindahkan(permissions);
     const { date: workDate } = useWorkDate();
@@ -109,6 +112,37 @@ export default function MutasiDetailPage({
     const unitKerja = useMasterOptions('reference-data/unit-kerja');
     const anggota = useMasterOptions('reference-data/anggota');
     const panelRef = useRef<HTMLDivElement>(null);
+    const lookupPortal = card?.portalContainer ?? panelRef;
+    const onBusyChange = card?.onBusyChange;
+    useEffect(() => {
+        onBusyChange?.(menyimpan);
+
+        return () => onBusyChange?.(false);
+    }, [menyimpan, onBusyChange]);
+    const viewRecord = (id: string) => {
+        if (!menyimpan) {
+            (card?.onRequestView ?? bukaMutasi)(id);
+        }
+    };
+    const editRecord = (id: string) => {
+        if (!menyimpan) {
+            (card?.onRequestEdit ?? bukaMutasiUbah)(id);
+        }
+    };
+    const closeRecord = () => {
+        if (!menyimpan) {
+            (card?.onClose ?? bukaDaftar)();
+        }
+    };
+    const saveCompleted = (id: string) => (card?.onSaved ?? bukaMutasi)(id);
+    const deleteCompleted = () => {
+        if (card?.onClose) {
+            card.onSaved?.(String(mutasiId));
+            card.onClose();
+        } else {
+            bukaDaftar();
+        }
+    };
 
     const mode = modeAwal;
     const readOnly = mode === 'view';
@@ -126,8 +160,11 @@ export default function MutasiDetailPage({
             return;
         }
 
+        const request = new AbortController();
         let dibatalkan = false;
-        api<{ data: Mutasi }>(`/mutasi-aset/${mutasiId}`)
+        api<{ data: Mutasi }>(`/mutasi-aset/${mutasiId}`, {
+            signal: request.signal,
+        })
             .then((result) => {
                 if (dibatalkan) {
                     return;
@@ -150,9 +187,13 @@ export default function MutasiDetailPage({
                     })),
                 });
             })
-            .catch((caught) =>
-                toast.error(errorMessage(caught, 'Mutasi belum dapat dimuat.')),
-            )
+            .catch((caught) => {
+                if (!request.signal.aborted) {
+                    toast.error(
+                        errorMessage(caught, 'Mutasi belum dapat dimuat.'),
+                    );
+                }
+            })
             .finally(() => {
                 if (!dibatalkan) {
                     setMemuat(false);
@@ -161,6 +202,7 @@ export default function MutasiDetailPage({
 
         return () => {
             dibatalkan = true;
+            request.abort();
         };
     }, [mutasiId]);
 
@@ -234,7 +276,7 @@ export default function MutasiDetailPage({
                 toast.success(
                     `Mutasi ${hasil.data.kode} disimpan sebagai draf.`,
                 );
-                bukaMutasi(hasil.data.id);
+                saveCompleted(hasil.data.id);
 
                 return;
             }
@@ -251,7 +293,7 @@ export default function MutasiDetailPage({
             );
             setTersimpan(hasil.data);
             toast.success('Perubahan mutasi disimpan.');
-            bukaMutasi(String(mutasiId));
+            saveCompleted(String(mutasiId));
         } catch (caught) {
             if (caught instanceof ApiError) {
                 setGalat(caught.validationErrors);
@@ -279,7 +321,7 @@ export default function MutasiDetailPage({
             toast.success(
                 'Serah terima diselesaikan. Penempatan aset sudah berpindah.',
             );
-            bukaMutasi(String(mutasiId));
+            saveCompleted(String(mutasiId));
         } catch (caught) {
             if (caught instanceof ApiError) {
                 setGalat(caught.validationErrors);
@@ -294,17 +336,28 @@ export default function MutasiDetailPage({
     async function arsipkan() {
         setKonfirmasiArsip(false);
 
+        setMenyimpan(true);
+
         try {
             await api(`/mutasi-aset/${mutasiId}`, {
                 method: 'DELETE',
                 body: JSON.stringify({ version: tersimpan?.version }),
             });
             toast.success('Draf mutasi diarsipkan.');
-            bukaDaftar();
+            deleteCompleted();
         } catch (caught) {
             toastSaveError(caught, 'Mutasi belum dapat diarsipkan.');
+        } finally {
+            setMenyimpan(false);
         }
     }
+
+    useRecordCardDirty({
+        value: record,
+        ready: !memuat,
+        scopeKey: JSON.stringify([mutasiId, modeAwal, tersimpan?.version]),
+        onDirtyChange: card?.onDirtyChange,
+    });
 
     if (memuat) {
         return (
@@ -321,22 +374,39 @@ export default function MutasiDetailPage({
 
     return (
         <div className="flex h-full min-h-0 flex-col overflow-hidden">
+            <RecordCardHeader
+                recordTitle={tersimpan?.kode ?? 'Baru'}
+                editing={!readOnly}
+                recordUrl={
+                    mutasiId
+                        ? `/management-aset/mutasi-aset/${mutasiId}`
+                        : undefined
+                }
+                onEdit={
+                    mode === 'view' && !selesai && can('update')
+                        ? () => editRecord(String(mutasiId))
+                        : undefined
+                }
+                onDelete={
+                    mode === 'view' && !selesai && can('archive')
+                        ? () => setKonfirmasiArsip(true)
+                        : undefined
+                }
+            />
             <RecordActionBar
-                title={judul}
+                title={embedded ? undefined : judul}
                 trailing={
                     tersimpan ? (
                         <StatusBadge status={tersimpan.status} />
                     ) : undefined
                 }
             >
-                {mode === 'view' && !selesai && can('update') && (
+                {mode === 'view' && !selesai && can('update') && !embedded && (
                     <ActionButton
                         action="edit"
                         type="button"
-                        onClick={() => bukaMutasiUbah(String(mutasiId))}
-                    >
-                        Ubah
-                    </ActionButton>
+                        onClick={() => editRecord(String(mutasiId))}
+                    />
                 )}
                 {mode === 'view' && !selesai && canMutate && (
                     <Button
@@ -363,38 +433,38 @@ export default function MutasiDetailPage({
                         Cetak berita acara
                     </Button>
                 )}
-                {mode === 'view' && !selesai && can('archive') && (
+                {mode === 'view' && !selesai && can('archive') && !embedded && (
                     <ActionButton
                         action="archive"
                         type="button"
                         onClick={() => setKonfirmasiArsip(true)}
-                    >
-                        Arsipkan
-                    </ActionButton>
+                    />
                 )}
                 {mode !== 'view' && (
                     <>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() =>
-                                mutasiId ? bukaMutasi(mutasiId) : bukaDaftar()
-                            }
-                        >
-                            Batal
-                        </Button>
-                        <Button
+                        <ActionButton
+                            action="save"
                             type="button"
                             onClick={() => void simpan()}
                             disabled={menyimpan}
-                        >
-                            {menyimpan ? 'Menyimpan…' : 'Simpan draf'}
-                        </Button>
+                            pending={menyimpan}
+                        />
+                        <ActionButton
+                            action="cancel"
+                            type="button"
+                            onClick={() =>
+                                mutasiId ? viewRecord(mutasiId) : closeRecord()
+                            }
+                        />
                     </>
                 )}
             </RecordActionBar>
 
-            <div ref={panelRef} className="min-h-0 flex-1 overflow-y-auto">
+            <div
+                data-page-dialog-body
+                ref={panelRef}
+                className="min-h-0 flex-1 overflow-y-auto"
+            >
                 <div className="space-y-5 p-5">
                     <p className="text-muted-foreground text-sm">
                         Perusahaan dan unit kerja pembuat dokumen mengikuti
@@ -437,8 +507,7 @@ export default function MutasiDetailPage({
                                             active={readOnly}
                                             label="lokasi tujuan"
                                             onActivate={() =>
-                                                mutasiId &&
-                                                bukaMutasiUbah(mutasiId)
+                                                mutasiId && editRecord(mutasiId)
                                             }
                                         >
                                             <Select
@@ -461,7 +530,7 @@ export default function MutasiDetailPage({
                                                 searchPlaceholder="Cari lokasi aset"
                                                 emptyMessage="Lokasi aset tidak ditemukan."
                                                 ariaLabel="Lokasi tujuan"
-                                                portalContainer={panelRef}
+                                                portalContainer={lookupPortal}
                                                 onValueChange={(item) => {
                                                     const dipilih =
                                                         lokasi.options.find(
@@ -494,8 +563,7 @@ export default function MutasiDetailPage({
                                             active={readOnly}
                                             label="unit kerja tujuan"
                                             onActivate={() =>
-                                                mutasiId &&
-                                                bukaMutasiUbah(mutasiId)
+                                                mutasiId && editRecord(mutasiId)
                                             }
                                         >
                                             <Select
@@ -519,7 +587,7 @@ export default function MutasiDetailPage({
                                                 searchPlaceholder="Cari unit kerja"
                                                 emptyMessage="Unit kerja tidak ditemukan."
                                                 ariaLabel="Unit kerja tujuan"
-                                                portalContainer={panelRef}
+                                                portalContainer={lookupPortal}
                                                 onValueChange={(item) =>
                                                     setRecord({
                                                         ...record,
@@ -568,8 +636,7 @@ export default function MutasiDetailPage({
                                             active={readOnly}
                                             label="yang menyerahkan"
                                             onActivate={() =>
-                                                mutasiId &&
-                                                bukaMutasiUbah(mutasiId)
+                                                mutasiId && editRecord(mutasiId)
                                             }
                                         >
                                             <Select
@@ -592,7 +659,7 @@ export default function MutasiDetailPage({
                                                 searchPlaceholder="Cari nama"
                                                 emptyMessage="Orang tidak ditemukan."
                                                 ariaLabel="Diserahkan oleh"
-                                                portalContainer={panelRef}
+                                                portalContainer={lookupPortal}
                                                 onValueChange={(item) =>
                                                     setRecord({
                                                         ...record,
@@ -618,8 +685,7 @@ export default function MutasiDetailPage({
                                             active={readOnly}
                                             label="yang menerima"
                                             onActivate={() =>
-                                                mutasiId &&
-                                                bukaMutasiUbah(mutasiId)
+                                                mutasiId && editRecord(mutasiId)
                                             }
                                         >
                                             <Select
@@ -642,7 +708,7 @@ export default function MutasiDetailPage({
                                                 searchPlaceholder="Cari nama"
                                                 emptyMessage="Orang tidak ditemukan."
                                                 ariaLabel="Diterima oleh"
-                                                portalContainer={panelRef}
+                                                portalContainer={lookupPortal}
                                                 onValueChange={(item) =>
                                                     setRecord({
                                                         ...record,
@@ -674,10 +740,9 @@ export default function MutasiDetailPage({
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-end">
                                         {!readOnly && (
-                                            <Button
+                                            <ActionButton
+                                                action="add"
                                                 type="button"
-                                                variant="outline"
-                                                size="sm"
                                                 onClick={() =>
                                                     setRecord({
                                                         ...record,
@@ -687,10 +752,7 @@ export default function MutasiDetailPage({
                                                         ],
                                                     })
                                                 }
-                                            >
-                                                <Plus />
-                                                Tambah baris
-                                            </Button>
+                                            />
                                         )}
                                     </div>
                                     {pesan('details') && (
@@ -699,233 +761,274 @@ export default function MutasiDetailPage({
                                         </p>
                                     )}
 
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead className="w-12">
-                                                    No
-                                                </TableHead>
-                                                <TableHead>Aset</TableHead>
-                                                <TableHead>
-                                                    Lokasi asal
-                                                </TableHead>
-                                                <TableHead>Kondisi</TableHead>
-                                                <TableHead>Catatan</TableHead>
-                                                {!readOnly && (
-                                                    <TableHead className="w-12" />
-                                                )}
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {record.details.map(
-                                                (baris, index) => {
-                                                    const dipilih = aset.find(
-                                                        (item) =>
-                                                            item.id ===
-                                                            baris.aset_id,
-                                                    );
+                                    {(() => {
+                                        const sdkRows = record.details.map(
+                                            (baris, index) => {
+                                                const dipilih = aset.find(
+                                                    (item) =>
+                                                        item.id ===
+                                                        baris.aset_id,
+                                                );
 
-                                                    return (
-                                                        <TableRow
-                                                            key={
-                                                                baris.id ??
-                                                                index
-                                                            }
-                                                        >
-                                                            <TableCell>
-                                                                {index + 1}
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                {readOnly ? (
-                                                                    <span className="font-medium">
-                                                                        {baris.aset_kode ??
-                                                                            dipilih?.kode ??
-                                                                            '—'}
-                                                                        <span className="text-muted-foreground ml-2 font-normal">
-                                                                            {baris.aset_nama ??
-                                                                                dipilih?.nama}
-                                                                        </span>
-                                                                    </span>
-                                                                ) : (
-                                                                    <Select
-                                                                        {...assetSource.selectProps}
-                                                                        items={aset.map(
+                                                return {
+                                                    baris,
+                                                    index,
+                                                    dipilih,
+                                                };
+                                            },
+                                        );
+                                        const sdkColumns: DataTableColumn<
+                                            (typeof sdkRows)[number]
+                                        >[] = [
+                                            {
+                                                id: 'column-0',
+                                                header: 'No',
+                                                width: 48,
+                                                cell: ({ index }) => (
+                                                    <>{index + 1}</>
+                                                ),
+                                            } satisfies DataTableColumn<
+                                                (typeof sdkRows)[number]
+                                            >,
+                                            {
+                                                id: 'column-1',
+                                                header: 'Aset',
+                                                cell: ({
+                                                    baris,
+                                                    index,
+                                                    dipilih,
+                                                }) => (
+                                                    <>
+                                                        {readOnly ? (
+                                                            <span className="font-medium">
+                                                                {baris.aset_kode ??
+                                                                    dipilih?.kode ??
+                                                                    '—'}
+                                                                <span className="text-muted-foreground ml-2 font-normal">
+                                                                    {baris.aset_nama ??
+                                                                        dipilih?.nama}
+                                                                </span>
+                                                            </span>
+                                                        ) : (
+                                                            <Select
+                                                                {...assetSource.selectProps}
+                                                                items={aset.map(
+                                                                    (item) => ({
+                                                                        value: item.id,
+                                                                        label: item.nama
+                                                                            ? `${item.nama} — ${item.kode}`
+                                                                            : item.kode,
+                                                                    }),
+                                                                )}
+                                                                value={
+                                                                    dipilih?.id ??
+                                                                    null
+                                                                }
+                                                                placeholder="Pilih aset"
+                                                                searchPlaceholder="Cari nama atau kode aset"
+                                                                emptyMessage="Aset tidak ditemukan."
+                                                                ariaLabel={`Aset baris ${index + 1}`}
+                                                                portalContainer={
+                                                                    lookupPortal
+                                                                }
+                                                                onValueChange={(
+                                                                    item,
+                                                                ) => {
+                                                                    const dipilih =
+                                                                        aset.find(
                                                                             (
+                                                                                calon,
+                                                                            ) =>
+                                                                                calon.id ===
                                                                                 item,
-                                                                            ) => ({
-                                                                                value: item.id,
-                                                                                label: item.nama
-                                                                                    ? `${item.nama} — ${item.kode}`
-                                                                                    : item.kode,
-                                                                            }),
-                                                                        )}
-                                                                        value={
-                                                                            dipilih?.id ??
-                                                                            null
-                                                                        }
-                                                                        placeholder="Pilih aset"
-                                                                        searchPlaceholder="Cari nama atau kode aset"
-                                                                        emptyMessage="Aset tidak ditemukan."
-                                                                        ariaLabel={`Aset baris ${index + 1}`}
-                                                                        portalContainer={
-                                                                            panelRef
-                                                                        }
-                                                                        onValueChange={(
-                                                                            item,
-                                                                        ) => {
-                                                                            const dipilih =
-                                                                                aset.find(
-                                                                                    (
-                                                                                        calon,
-                                                                                    ) =>
-                                                                                        calon.id ===
-                                                                                        item,
-                                                                                );
+                                                                        );
 
-                                                                            // Kondisi ikut terisi dari
-                                                                            // kondisi aset yang tercatat
-                                                                            // sekarang, dan tetap boleh
-                                                                            // diubah: serah terima justru
-                                                                            // momen barangnya diperiksa
-                                                                            // ulang. Membiarkannya kosong
-                                                                            // memaksa orang mengetik ulang
-                                                                            // fakta yang sudah dimiliki
-                                                                            // sistem, dan yang diketik
-                                                                            // ulang bisa berbeda tanpa ada
-                                                                            // yang benar-benar melihat
-                                                                            // barangnya.
-                                                                            ubahBaris(
-                                                                                index,
-                                                                                {
-                                                                                    aset_id:
-                                                                                        dipilih?.id ??
-                                                                                        '',
-                                                                                    kondisi_aset_id:
-                                                                                        dipilih?.kondisi_aset_id ??
-                                                                                        '',
-                                                                                },
-                                                                            );
-                                                                        }}
-                                                                    />
-                                                                )}
-                                                            </TableCell>
-                                                            {/* Diturunkan, tidak pernah diketik. */}
-                                                            <TableCell className="text-muted-foreground">
-                                                                <span className="block">
-                                                                    {baris.asal_lokasi_nama ??
-                                                                        'Belum ditempatkan'}
-                                                                </span>
-                                                                <span className="block text-xs">
-                                                                    {[
-                                                                        baris.asal_org_unit_nama,
-                                                                        baris.asal_custodian_nama,
-                                                                    ]
-                                                                        .filter(
-                                                                            Boolean,
-                                                                        )
-                                                                        .join(
-                                                                            ' · ',
-                                                                        ) ||
-                                                                        'Tanpa unit atau PIC'}
-                                                                </span>
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                {readOnly ? (
-                                                                    (baris.kondisi_aset_nama ??
-                                                                    '—')
-                                                                ) : (
-                                                                    <AssetConditionSelect
-                                                                        assetId={
-                                                                            baris.aset_id
-                                                                        }
-                                                                        value={
-                                                                            baris.kondisi_aset_id
-                                                                        }
-                                                                        label={`Kondisi baris ${index + 1}`}
-                                                                        portalContainer={
-                                                                            panelRef
-                                                                        }
-                                                                        onChange={(
-                                                                            value,
-                                                                        ) =>
-                                                                            ubahBaris(
-                                                                                index,
-                                                                                {
-                                                                                    kondisi_aset_id:
-                                                                                        value,
-                                                                                },
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                )}
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                {readOnly ? (
-                                                                    baris.catatan ||
-                                                                    '—'
-                                                                ) : (
-                                                                    <Input
-                                                                        aria-label={`Catatan baris ${index + 1}`}
-                                                                        value={
-                                                                            baris.catatan ??
-                                                                            ''
-                                                                        }
-                                                                        onChange={(
-                                                                            event,
-                                                                        ) =>
-                                                                            ubahBaris(
-                                                                                index,
-                                                                                {
-                                                                                    catatan:
-                                                                                        event
-                                                                                            .target
-                                                                                            .value,
-                                                                                },
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                )}
-                                                            </TableCell>
-                                                            {!readOnly && (
-                                                                <TableCell>
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        aria-label={`Hapus baris ${index + 1}`}
-                                                                        disabled={
-                                                                            record
-                                                                                .details
-                                                                                .length ===
-                                                                            1
-                                                                        }
-                                                                        onClick={() =>
-                                                                            setRecord(
-                                                                                {
-                                                                                    ...record,
-                                                                                    details:
-                                                                                        record.details.filter(
-                                                                                            (
-                                                                                                _,
-                                                                                                posisi,
-                                                                                            ) =>
-                                                                                                posisi !==
-                                                                                                index,
-                                                                                        ),
-                                                                                },
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        <Trash2 />
-                                                                    </Button>
-                                                                </TableCell>
-                                                            )}
-                                                        </TableRow>
-                                                    );
-                                                },
-                                            )}
-                                        </TableBody>
-                                    </Table>
+                                                                    // Kondisi ikut terisi dari
+                                                                    // kondisi aset yang tercatat
+                                                                    // sekarang, dan tetap boleh
+                                                                    // diubah: serah terima justru
+                                                                    // momen barangnya diperiksa
+                                                                    // ulang. Membiarkannya kosong
+                                                                    // memaksa orang mengetik ulang
+                                                                    // fakta yang sudah dimiliki
+                                                                    // sistem, dan yang diketik
+                                                                    // ulang bisa berbeda tanpa ada
+                                                                    // yang benar-benar melihat
+                                                                    // barangnya.
+                                                                    ubahBaris(
+                                                                        index,
+                                                                        {
+                                                                            aset_id:
+                                                                                dipilih?.id ??
+                                                                                '',
+                                                                            kondisi_aset_id:
+                                                                                dipilih?.kondisi_aset_id ??
+                                                                                '',
+                                                                        },
+                                                                    );
+                                                                }}
+                                                            />
+                                                        )}
+                                                    </>
+                                                ),
+                                            } satisfies DataTableColumn<
+                                                (typeof sdkRows)[number]
+                                            >,
+                                            {
+                                                id: 'column-2',
+                                                header: 'Lokasi asal',
+                                                cell: ({ baris }) => (
+                                                    <div className="text-muted-foreground">
+                                                        <span className="block">
+                                                            {baris.asal_lokasi_nama ??
+                                                                'Belum ditempatkan'}
+                                                        </span>
+                                                        <span className="block text-xs">
+                                                            {[
+                                                                baris.asal_org_unit_nama,
+                                                                baris.asal_custodian_nama,
+                                                            ]
+                                                                .filter(Boolean)
+                                                                .join(' · ') ||
+                                                                'Tanpa unit atau PIC'}
+                                                        </span>
+                                                    </div>
+                                                ),
+                                            } satisfies DataTableColumn<
+                                                (typeof sdkRows)[number]
+                                            >,
+                                            {
+                                                id: 'column-3',
+                                                header: 'Kondisi',
+                                                cell: ({ baris, index }) => (
+                                                    <>
+                                                        {readOnly ? (
+                                                            (baris.kondisi_aset_nama ??
+                                                            '—')
+                                                        ) : (
+                                                            <AssetConditionSelect
+                                                                assetId={
+                                                                    baris.aset_id
+                                                                }
+                                                                value={
+                                                                    baris.kondisi_aset_id
+                                                                }
+                                                                label={`Kondisi baris ${index + 1}`}
+                                                                portalContainer={
+                                                                    lookupPortal
+                                                                }
+                                                                onChange={(
+                                                                    value,
+                                                                ) =>
+                                                                    ubahBaris(
+                                                                        index,
+                                                                        {
+                                                                            kondisi_aset_id:
+                                                                                value,
+                                                                        },
+                                                                    )
+                                                                }
+                                                            />
+                                                        )}
+                                                    </>
+                                                ),
+                                            } satisfies DataTableColumn<
+                                                (typeof sdkRows)[number]
+                                            >,
+                                            {
+                                                id: 'column-4',
+                                                header: 'Catatan',
+                                                cell: ({ baris, index }) => (
+                                                    <>
+                                                        {readOnly ? (
+                                                            baris.catatan || '—'
+                                                        ) : (
+                                                            <Input
+                                                                aria-label={`Catatan baris ${index + 1}`}
+                                                                value={
+                                                                    baris.catatan ??
+                                                                    ''
+                                                                }
+                                                                onChange={(
+                                                                    event,
+                                                                ) =>
+                                                                    ubahBaris(
+                                                                        index,
+                                                                        {
+                                                                            catatan:
+                                                                                event
+                                                                                    .target
+                                                                                    .value,
+                                                                        },
+                                                                    )
+                                                                }
+                                                            />
+                                                        )}
+                                                    </>
+                                                ),
+                                            } satisfies DataTableColumn<
+                                                (typeof sdkRows)[number]
+                                            >,
+                                            ...(!readOnly
+                                                ? [
+                                                      {
+                                                          id: 'column-5',
+                                                          header: '',
+                                                          width: 48,
+                                                          cell: ({ index }) => (
+                                                              <>
+                                                                  <Button
+                                                                      type="button"
+                                                                      variant="ghost"
+                                                                      size="icon"
+                                                                      aria-label={`Hapus baris ${index + 1}`}
+                                                                      disabled={
+                                                                          record
+                                                                              .details
+                                                                              .length ===
+                                                                          1
+                                                                      }
+                                                                      onClick={() =>
+                                                                          setRecord(
+                                                                              {
+                                                                                  ...record,
+                                                                                  details:
+                                                                                      record.details.filter(
+                                                                                          (
+                                                                                              _,
+                                                                                              posisi,
+                                                                                          ) =>
+                                                                                              posisi !==
+                                                                                              index,
+                                                                                      ),
+                                                                              },
+                                                                          )
+                                                                      }
+                                                                  >
+                                                                      <Trash2 />
+                                                                  </Button>
+                                                              </>
+                                                          ),
+                                                      } satisfies DataTableColumn<
+                                                          (typeof sdkRows)[number]
+                                                      >,
+                                                  ]
+                                                : []),
+                                        ];
+
+                                        return (
+                                            <DataTable
+                                                scrollMode="inline"
+                                                showRowNumbers={false}
+                                                serverSort
+                                                data={sdkRows}
+                                                columns={sdkColumns}
+                                                getRowKey={({ baris, index }) =>
+                                                    baris.id ?? index
+                                                }
+                                            />
+                                        );
+                                    })()}
                                 </div>
                             </div>
                         </CollapsibleSection>
@@ -997,7 +1100,7 @@ export default function MutasiDetailPage({
             >
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Arsipkan draf ini?</AlertDialogTitle>
+                        <AlertDialogTitle>Delete draf ini?</AlertDialogTitle>
                         <AlertDialogDescription>
                             Draf disembunyikan dari daftar dan nomornya tidak
                             dipakai ulang. Aset tidak berpindah ke mana pun
@@ -1007,8 +1110,11 @@ export default function MutasiDetailPage({
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Batal</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => void arsipkan()}>
-                            Arsipkan
+                        <AlertDialogAction
+                            onClick={() => void arsipkan()}
+                            asChild
+                        >
+                            <ActionButton action="archive" />
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

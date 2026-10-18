@@ -1,3 +1,5 @@
+import { ActionButton } from '@apperp/ui/action-button';
+import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Button } from '@apperp/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@apperp/ui/card';
 import { FieldHint } from '@apperp/ui/field';
@@ -66,6 +68,14 @@ function DateTimeSettings({ dateTime }: { dateTime: DateTimeProps }) {
                         });
                     }}
                 >
+                    <RecordActionBar>
+                        <ActionButton
+                            action="save"
+                            type="submit"
+                            disabled={form.processing}
+                        />
+                    </RecordActionBar>
+
                     <div className="grid gap-2">
                         <Select
                             label="Zona waktu"
@@ -127,10 +137,6 @@ function DateTimeSettings({ dateTime }: { dateTime: DateTimeProps }) {
                         )}
                         <InputError message={form.errors.work_date} />
                     </div>
-
-                    <Button type="submit" disabled={form.processing}>
-                        Simpan
-                    </Button>
                 </form>
             </CardContent>
         </Card>
@@ -173,6 +179,15 @@ export default function Profile(
                         >
                             {({ processing, errors }) => (
                                 <>
+                                    <RecordActionBar>
+                                        <ActionButton
+                                            action="save"
+                                            disabled={processing}
+                                            data-test="update-profile-button"
+                                            type="submit"
+                                        />
+                                    </RecordActionBar>
+
                                     <div className="grid gap-2">
                                         <Input
                                             id="name"
@@ -236,15 +251,6 @@ export default function Profile(
                                             </div>
                                         )}
                                     {/* @end-chisel-email-verification */}
-
-                                    <div className="flex items-center gap-4">
-                                        <Button
-                                            disabled={processing}
-                                            data-test="update-profile-button"
-                                        >
-                                            Simpan profil
-                                        </Button>
-                                    </div>
                                 </>
                             )}
                         </Form>

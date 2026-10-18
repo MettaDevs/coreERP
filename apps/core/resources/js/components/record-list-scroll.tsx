@@ -1,19 +1,23 @@
 import type { DataTableSort } from '@apperp/ui/data-table';
+import type { InfiniteScrollRef } from '@inertiajs/core';
 import { InfiniteScroll, router, usePage } from '@inertiajs/react';
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 
 /** Adapter Inertia untuk pola scroll yang sama; API JSON memakai useIncrementalList SDK. */
 export function RecordListScroll({
     data,
     children,
     className,
+    listRef,
 }: {
     data: string;
     children: ReactNode;
     className?: string;
+    listRef?: Ref<InfiniteScrollRef>;
 }) {
     return (
         <InfiniteScroll
+            ref={listRef}
             data={data}
             itemsElement="tbody"
             onlyNext

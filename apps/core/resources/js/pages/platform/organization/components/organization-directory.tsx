@@ -1,6 +1,6 @@
 import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
-import { Button } from '@apperp/ui/button';
+
 import {
     CollapsibleSection,
     CollapsibleSectionGroup,
@@ -22,12 +22,10 @@ import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { MasterDetailLayout } from '@apperp/ui/master-detail-layout';
 import {
+    PageDialogToolbar,
     PageDialog,
     PageDialogTrigger,
     PageDialogContent,
-    PageDialogHeader,
-    PageDialogTitle,
-    PageDialogFooter,
 } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { RecordEditBoundary } from '@apperp/ui/record-edit-boundary';
@@ -45,11 +43,13 @@ import { apiJson } from '@/lib/core-api';
 import {
     OrganizationAddressesSection,
     OrganizationContactsSection,
+    usePartyDraftDetails,
 } from './address-book-section';
 import { FinancePostingSection } from './finance-posting-section';
 import { needsNumber, MissingNumberBadge } from './organization-number-status';
 import type { Props, Organization } from './organization-types';
 import { PrintIdentitySection } from './print-identity-section';
+import type { PrintIdentityDraft } from './print-identity-section';
 
 type TimezoneOption = { value: string; label: string };
 
@@ -123,15 +123,14 @@ function organizationFields(
 function CreateOrganizationDialog({
     classification,
     operatingUnitTypes,
-    triggerLabel,
     onCreated,
 }: {
     classification: Organization['classification'];
     operatingUnitTypes: Props['operatingUnitTypes'];
-    triggerLabel: string;
     onCreated: (organization: Organization) => void;
 }) {
     const [open, setOpen] = useState(false);
+    const draftDetails = usePartyDraftDetails(open);
     const contentRef = useRef<HTMLDivElement>(null);
     const { clock } = usePage().props;
     const form = useForm({
@@ -146,29 +145,50 @@ function CreateOrganizationDialog({
         operating_unit_number: '',
     });
     const legalEntity = classification === 'legal_entity';
+    const close = () => {
+        if (form.processing) {
+            return;
+        }
+
+        form.reset();
+        form.clearErrors();
+        draftDetails.onChange({ locations: [], contacts: [] });
+        setOpen(false);
+    };
 
     return (
         <PageDialog
             open={open}
             onOpenChange={(next) => {
                 if (!form.processing) {
-                    setOpen(next);
+                    if (next) {
+                        setOpen(true);
+                    } else {
+                        close();
+                    }
                 }
             }}
         >
             <PageDialogTrigger asChild>
-                <ActionButton action="create" size="sm">
-                    Tambah {triggerLabel.toLocaleLowerCase()}
-                </ActionButton>
+                <ActionButton action="create" />
             </PageDialogTrigger>
-            <PageDialogContent ref={contentRef}>
-                <PageDialogHeader>
-                    <PageDialogTitle>
-                        {legalEntity
-                            ? 'Buat perusahaan'
-                            : 'Buat operating unit'}
-                    </PageDialogTitle>
-                </PageDialogHeader>
+            <PageDialogContent
+                ref={contentRef}
+                title={legalEntity ? 'Perusahaan' : 'Operating unit'}
+                recordTitle={
+                    [
+                        legalEntity
+                            ? form.data.company_code
+                            : form.data.operating_unit_number,
+                        form.data.name,
+                    ]
+                        .filter(Boolean)
+                        .join(' · ') ||
+                    (legalEntity ? 'Perusahaan baru' : 'Operating unit baru')
+                }
+                editing
+                busy={form.processing}
+            >
                 <form
                     className="flex min-h-0 flex-1 flex-col"
                     onSubmit={(event) => {
@@ -177,6 +197,9 @@ function CreateOrganizationDialog({
                             classification: data.classification,
                             name: data.name,
                             ...organizationFields(data, legalEntity),
+                            ...(draftDetails.payload
+                                ? { party_details: draftDetails.payload }
+                                : {}),
                         }));
                         form.post('/settings/organization/organizations', {
                             onSuccess: (page) => {
@@ -188,12 +211,40 @@ function CreateOrganizationDialog({
                                 }
 
                                 form.reset();
+                                draftDetails.onChange({
+                                    locations: [],
+                                    contacts: [],
+                                });
                                 setOpen(false);
                             },
                         });
                     }}
                 >
-                    <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+                    <PageDialogToolbar>
+                        <ActionButton
+                            action="save"
+                            type="submit"
+                            disabled={form.processing}
+                        />
+                        <ActionButton
+                            action="cancel"
+                            type="button"
+                            onClick={close}
+                            disabled={form.processing}
+                        />
+                    </PageDialogToolbar>
+                    <div
+                        data-page-dialog-body=""
+                        className="min-h-0 flex-1 overflow-y-auto px-6 py-4"
+                    >
+                        <FieldError>
+                            {Object.entries(form.errors)
+                                .filter(([key]) =>
+                                    key.startsWith('party_details'),
+                                )
+                                .map(([, message]) => message)
+                                .join(' ')}
+                        </FieldError>
                         <FieldGroup>
                             <Field data-invalid={Boolean(form.errors.name)}>
                                 <Input
@@ -352,20 +403,30 @@ function CreateOrganizationDialog({
                                 </div>
                             )}
                         </FieldGroup>
+                        <CollapsibleSectionGroup className="mt-4">
+                            <CollapsibleSection
+                                value="addresses"
+                                title="Alamat"
+                            >
+                                <OrganizationAddressesSection
+                                    organizationId=""
+                                    countryCode={form.data.country_code || 'ID'}
+                                    canManage={!form.processing}
+                                    draft={draftDetails}
+                                />
+                            </CollapsibleSection>
+                            <CollapsibleSection
+                                value="contacts"
+                                title="Informasi kontak"
+                            >
+                                <OrganizationContactsSection
+                                    organizationId=""
+                                    canManage={!form.processing}
+                                    draft={draftDetails}
+                                />
+                            </CollapsibleSection>
+                        </CollapsibleSectionGroup>
                     </div>
-                    <PageDialogFooter>
-                        <Button type="submit" disabled={form.processing}>
-                            Simpan Organisasi
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setOpen(false)}
-                            disabled={form.processing}
-                        >
-                            Batal
-                        </Button>
-                    </PageDialogFooter>
                 </form>
             </PageDialogContent>
         </PageDialog>
@@ -383,11 +444,19 @@ function OrganizationExtraSectionContent({
     organization,
     canManage,
     canManageFinancePosting,
+    printRevision,
+    onPrintDraftChange,
+    busy,
+    onPrintBusyChange,
 }: {
     section: OrganizationExtraSection;
     organization: Organization;
     canManage: boolean;
     canManageFinancePosting: boolean;
+    printRevision: number;
+    onPrintDraftChange: (draft: PrintIdentityDraft) => void;
+    busy: boolean;
+    onPrintBusyChange: (busy: boolean) => void;
 }) {
     if (section.value === 'addresses') {
         return (
@@ -411,9 +480,13 @@ function OrganizationExtraSectionContent({
     if (section.value === 'print-identity') {
         return (
             <PrintIdentitySection
+                key={printRevision}
                 organizationId={organization.id}
                 organizationName={organization.name}
                 canManage={canManage}
+                busy={busy}
+                onDraftChange={onPrintDraftChange}
+                onBusyChange={onPrintBusyChange}
             />
         );
     }
@@ -445,6 +518,8 @@ function OrganizationDetailPage({
 }) {
     const legalEntity = organization.classification === 'legal_entity';
     const [editing, setEditing] = useState(initialEditing);
+    const [printRevision, setPrintRevision] = useState(0);
+    const [printBusy, setPrintBusy] = useState(false);
     const form = useForm({
         name: organization.name,
         company_code: organization.legal_entity?.company_code ?? '',
@@ -452,6 +527,7 @@ function OrganizationDetailPage({
         timezone: organization.legal_entity?.timezone ?? '',
         operating_unit_type: organization.operating_unit?.type ?? 'department',
         operating_unit_number: organization.operating_unit?.number ?? '',
+        print_identity: null as PrintIdentityDraft | null,
     });
     const unitType =
         operatingUnitTypes[organization.operating_unit?.type ?? ''] ??
@@ -529,7 +605,7 @@ function OrganizationDetailPage({
         <RecordEditBoundary
             editing={editing}
             canEdit={canManage}
-            disabled={form.processing}
+            disabled={form.processing || printBusy}
             onEdit={() => setEditing(true)}
             className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-card text-foreground"
         >
@@ -553,29 +629,27 @@ function OrganizationDetailPage({
                         <ActionButton
                             action="edit"
                             onClick={() => setEditing(true)}
-                        >
-                            Ubah
-                        </ActionButton>
+                        />
                     ) : (
                         <>
-                            <Button
+                            <ActionButton
+                                action="save"
                                 type="submit"
                                 form={`organization-form-${organization.id}`}
-                                disabled={form.processing}
-                            >
-                                Simpan
-                            </Button>
-                            <Button
-                                variant="outline"
+                                disabled={form.processing || printBusy}
+                            />
+                            <ActionButton
+                                action="cancel"
                                 onClick={() => {
                                     form.reset();
                                     form.clearErrors();
+                                    setPrintRevision(
+                                        (revision) => revision + 1,
+                                    );
                                     setEditing(false);
                                 }}
-                                disabled={form.processing}
-                            >
-                                Batal
-                            </Button>
+                                disabled={form.processing || printBusy}
+                            />
                         </>
                     ))}
             </RecordActionBar>
@@ -585,16 +659,28 @@ function OrganizationDetailPage({
                     id={`organization-form-${organization.id}`}
                     onSubmit={(event) => {
                         event.preventDefault();
+
+                        if (printBusy) {
+                            return;
+                        }
+
                         form.transform((data) => ({
                             name: data.name,
                             ...organizationFields(data, legalEntity),
                             version: organization.version,
+                            ...(data.print_identity
+                                ? { print_identity: data.print_identity }
+                                : {}),
                         }));
                         form.patch(
                             `/settings/organization/organizations/${organization.id}`,
                             {
                                 onSuccess: (page) => {
                                     setEditing(false);
+                                    form.setData('print_identity', null);
+                                    setPrintRevision(
+                                        (revision) => revision + 1,
+                                    );
                                     const saved = page.props
                                         .savedOrganization as Organization | null;
 
@@ -606,6 +692,16 @@ function OrganizationDetailPage({
                         );
                     }}
                 >
+                    <FieldError>
+                        {Object.entries(form.errors)
+                            .filter(
+                                ([key]) =>
+                                    key === 'version' ||
+                                    key.startsWith('print_identity'),
+                            )
+                            .map(([, message]) => message)
+                            .join(' ')}
+                    </FieldError>
                     <CollapsibleSectionGroup
                         defaultValue={['general']}
                         className="space-y-3"
@@ -818,6 +914,16 @@ function OrganizationDetailPage({
                                         canManageFinancePosting={
                                             canManageFinancePosting
                                         }
+                                        printRevision={printRevision}
+                                        busy={form.processing || printBusy}
+                                        onPrintBusyChange={setPrintBusy}
+                                        onPrintDraftChange={(draft) => {
+                                            form.setData(
+                                                'print_identity',
+                                                draft,
+                                            );
+                                            setEditing(true);
+                                        }}
                                     />
                                 </CollapsibleSection>
                             );
@@ -897,7 +1003,6 @@ export default function OrganizationDirectory({
                             <CreateOrganizationDialog
                                 classification={classification}
                                 operatingUnitTypes={operatingUnitTypes}
-                                triggerLabel={title}
                                 onCreated={(organization) => {
                                     saved(organization);
                                     setCreatedOrganizationId(organization.id);

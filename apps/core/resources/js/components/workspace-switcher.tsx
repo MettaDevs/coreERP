@@ -1,3 +1,4 @@
+import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
 import {
     Field,
@@ -249,14 +250,12 @@ export function WorkspaceSwitcher() {
                         </fieldset>
                     </div>
                     <SheetFooter className="border-t sm:flex-row sm:justify-end">
-                        <Button
+                        <ActionButton
+                            action="cancel"
                             type="button"
-                            variant="outline"
                             disabled={saving}
                             onClick={() => changeOpen(false)}
-                        >
-                            Batal
-                        </Button>
+                        />
                         <Button
                             type="submit"
                             disabled={saving || !changed || !membershipId}

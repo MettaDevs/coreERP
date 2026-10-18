@@ -1,3 +1,4 @@
+import { ActionButton } from '@apperp/ui/action-button';
 import { Alert, AlertDescription } from '@apperp/ui/alert';
 import {
     AlertDialog,
@@ -22,7 +23,7 @@ import {
 } from '@apperp/ui/dialog';
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@apperp/ui/empty';
 import { Spinner } from '@apperp/ui/spinner';
-import { ChevronLeft, ChevronRight, ImageIcon, Upload } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ImageIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { AttachmentPreview } from '@/components/record-attachments';
@@ -206,18 +207,15 @@ export function RecordPictures({
                                         · {fileSize(picture.size_bytes)}
                                     </p>
                                     {page.meta.can_change && (
-                                        <Button
+                                        <ActionButton
+                                            action="archive"
                                             type="button"
-                                            variant="outline"
-                                            size="sm"
                                             disabled={busy}
-                                            aria-label={`Arsipkan foto: ${picture.file_name}`}
+                                            aria-label={`Delete foto: ${picture.file_name}`}
                                             onClick={() =>
                                                 setArchiving(picture)
                                             }
-                                        >
-                                            Arsipkan
-                                        </Button>
+                                        />
                                     )}
                                 </figure>
                             ))}
@@ -227,16 +225,13 @@ export function RecordPictures({
             )}
             {page?.meta.can_change && (
                 <>
-                    <Button
+                    <ActionButton
+                        action="create"
                         type="button"
-                        variant="outline"
-                        size="sm"
                         disabled={busy || loading}
                         onClick={() => setUploadOpen(true)}
-                    >
-                        <Upload />
-                        {busy ? 'Mengunggah…' : 'Tambah foto'}
-                    </Button>
+                        pending={busy}
+                    />
                     <p className="text-xs text-muted-foreground">
                         Bisa memilih beberapa foto sekaligus.{' '}
                         {page.meta.extensions.join(', ').toUpperCase()} ·
@@ -314,7 +309,7 @@ export function RecordPictures({
             >
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Arsipkan foto ini?</AlertDialogTitle>
+                        <AlertDialogTitle>Delete foto ini?</AlertDialogTitle>
                         <AlertDialogDescription>
                             {archiving?.file_name} akan disembunyikan. Foto
                             lainnya tetap tersedia, dan berkas foto ini tetap
@@ -335,7 +330,7 @@ export function RecordPictures({
                                 }
                             }}
                         >
-                            {busy ? 'Mengarsipkan…' : 'Arsipkan'}
+                            {busy ? 'Mengarsipkan…' : 'Delete'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

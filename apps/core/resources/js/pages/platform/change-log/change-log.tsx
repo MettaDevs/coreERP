@@ -1,5 +1,6 @@
+import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
-import { Button } from '@apperp/ui/button';
+
 import { Checkbox } from '@apperp/ui/checkbox';
 import {
     CollapsibleSection,
@@ -195,9 +196,11 @@ function TableSetup({
 
             {canManage && (
                 <div className="flex justify-end">
-                    <Button type="submit" disabled={form.processing}>
-                        Simpan
-                    </Button>
+                    <ActionButton
+                        action="save"
+                        type="submit"
+                        disabled={form.processing}
+                    />
                 </div>
             )}
         </form>

@@ -1,14 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@apperp/ui/button';
+import type { DataTableColumn } from '@apperp/ui/data-table';
+import { DataTable } from '@apperp/ui/data-table';
 import { Input } from '@apperp/ui/input';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
+import { TableCell, TableRow } from '@apperp/ui/table';
 import { api } from '../../api';
 import type { BarisPenerimaan, BukuGroup, SaldoAwalBuku } from './penerimaan';
 
@@ -108,39 +103,79 @@ export function OpeningBalanceBooks({
                                 buku.
                             </p>
                         ) : (
-                            <div className="overflow-x-auto">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead className="min-w-56">
-                                                Buku
-                                            </TableHead>
-                                            <TableHead className="min-w-40 text-right">
-                                                Akumulasi / unit
-                                            </TableHead>
-                                            <TableHead className="min-w-36 text-right">
-                                                Periode berjalan
-                                            </TableHead>
-                                            {!readOnly && (
-                                                <TableHead className="w-28" />
-                                            )}
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {daftar.map((buku) => (
-                                            <BarisBuku
-                                                key={buku.buku_id}
-                                                baris={baris}
-                                                index={index}
-                                                buku={buku}
-                                                readOnly={readOnly}
-                                                pesan={pesan}
-                                                onChange={onChange}
-                                            />
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
+                            (() => {
+                                const sdkRows = daftar.map((buku, rowIndex) => {
+                                    return { buku, rowIndex };
+                                });
+                                const sdkColumns: DataTableColumn<
+                                    (typeof sdkRows)[number]
+                                >[] = [
+                                    {
+                                        id: 'column-0',
+                                        header: 'Buku',
+                                        minWidth: 224,
+                                        cell: () => null,
+                                    } satisfies DataTableColumn<
+                                        (typeof sdkRows)[number]
+                                    >,
+                                    {
+                                        id: 'column-1',
+                                        header: 'Akumulasi / unit',
+                                        minWidth: 160,
+                                        align: 'right',
+                                        cell: () => null,
+                                    } satisfies DataTableColumn<
+                                        (typeof sdkRows)[number]
+                                    >,
+                                    {
+                                        id: 'column-2',
+                                        header: 'Periode berjalan',
+                                        minWidth: 144,
+                                        align: 'right',
+                                        cell: () => null,
+                                    } satisfies DataTableColumn<
+                                        (typeof sdkRows)[number]
+                                    >,
+                                    ...(!readOnly
+                                        ? [
+                                              {
+                                                  id: 'column-3',
+                                                  header: '',
+                                                  width: 112,
+                                                  cell: () => null,
+                                              } satisfies DataTableColumn<
+                                                  (typeof sdkRows)[number]
+                                              >,
+                                          ]
+                                        : []),
+                                ];
+
+                                return (
+                                    <DataTable
+                                        scrollMode="inline"
+                                        showRowNumbers={false}
+                                        serverSort
+                                        data={sdkRows}
+                                        columns={sdkColumns}
+                                        getRowKey={({ buku }) => buku.buku_id}
+                                        renderRows={() => (
+                                            <>
+                                                {daftar.map((buku) => (
+                                                    <BarisBuku
+                                                        key={buku.buku_id}
+                                                        baris={baris}
+                                                        index={index}
+                                                        buku={buku}
+                                                        readOnly={readOnly}
+                                                        pesan={pesan}
+                                                        onChange={onChange}
+                                                    />
+                                                ))}
+                                            </>
+                                        )}
+                                    />
+                                );
+                            })()
                         )}
                     </div>
                 );

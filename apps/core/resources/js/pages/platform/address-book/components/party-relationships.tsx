@@ -9,19 +9,18 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@apperp/ui/alert-dialog';
-import { Button } from '@apperp/ui/button';
+
 import { DataTable, DataTableText } from '@apperp/ui/data-table';
 import { Input } from '@apperp/ui/input';
 import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
 import {
+    PageDialogToolbar,
     PageDialog as Dialog,
     PageDialogContent as DialogContent,
-    PageDialogDescription as DialogDescription,
-    PageDialogFooter as DialogFooter,
-    PageDialogHeader as DialogHeader,
-    PageDialogTitle as DialogTitle,
 } from '@apperp/ui/page-dialog';
+import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
+import { Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useToday } from '@/hooks/use-work-date';
 import { apiJson, apiRequest, errorText } from '@/lib/core-api';
@@ -30,7 +29,6 @@ import type {
     PartyDetail,
     PartyRelationship,
 } from '../types';
-import { AddressBookHint } from './address-book-hint';
 
 export function PartyRelationships({
     party,
@@ -70,9 +68,13 @@ export function PartyRelationships({
             `/api/v1/parties/options?q=${encodeURIComponent(query)}`,
             { signal: controller.signal },
         )
-            .then((result) =>
-                setOptions(result.data.filter((item) => item.id !== party.id)),
-            )
+            .then((result) => {
+                if (controller.signal.aborted) {
+                    return;
+                }
+
+                setOptions(result.data.filter((item) => item.id !== party.id));
+            })
             .catch((caught) => {
                 if (!controller.signal.aborted) {
                     setError(
@@ -199,18 +201,16 @@ export function PartyRelationships({
 
     return (
         <div className="space-y-3">
-            <div className="flex justify-end">
+            <RecordActionBar>
                 {metadata.canManage && (
                     <>
                         <ActionButton
                             action="create"
                             onClick={() => open('new')}
-                        >
-                            Tambah hubungan
-                        </ActionButton>
+                        />
                     </>
                 )}
-            </div>
+            </RecordActionBar>
             <div className="space-y-3">
                 {error && !editing && (
                     <p role="alert" className="text-sm text-destructive">
@@ -225,7 +225,11 @@ export function PartyRelationships({
                         metadata.canManage
                             ? [
                                   { id: 'edit', label: 'Ubah' },
-                                  { id: 'archive', label: 'Arsipkan' },
+                                  {
+                                      id: 'archive',
+                                      label: 'Delete',
+                                      icon: <Trash2 aria-hidden="true" />,
+                                  },
                               ]
                             : []
                     }
@@ -304,29 +308,47 @@ export function PartyRelationships({
                         }
                     }}
                 >
-                    <DialogContent ref={contentRef}>
-                        <DialogHeader>
-                            <DialogTitle>
-                                <span className="inline-flex items-center gap-2">
-                                    {editing === 'new'
-                                        ? 'Tambah hubungan'
-                                        : 'Ubah hubungan'}
-                                    <AddressBookHint label="hubungan">
-                                        Hubungan mencatat keterkaitan pihak.
-                                        Akun vendor dan peran bisnis dikelola
-                                        pada halaman masing-masing.
-                                    </AddressBookHint>
-                                </span>
-                            </DialogTitle>
-                            <DialogDescription className="sr-only">
-                                Hubungan mencatat keterkaitan pihak. Akun vendor
-                                dan peran bisnis dikelola pada halaman
-                                masing-masing.
-                            </DialogDescription>
-                        </DialogHeader>
+                    <DialogContent
+                        ref={contentRef}
+                        title="Hubungan pihak"
+                        recordTitle={
+                            editing && editing !== 'new'
+                                ? [editing.from_name, editing.to_name].join(
+                                      ' · ',
+                                  )
+                                : [
+                                      party.name,
+                                      options.find(
+                                          (item) => item.id === form.other_id,
+                                      )?.name,
+                                  ]
+                                      .filter(Boolean)
+                                      .join(' · ') || 'Hubungan baru'
+                        }
+                        editing
+                        busy={busy}
+                        description={
+                            'Hubungan mencatat keterkaitan pihak. Akun vendor\n                                dan peran bisnis dikelola pada halaman\n                                masing-masing.'
+                        }
+                    >
+                        <PageDialogToolbar>
+                            <ActionButton
+                                action="save"
+                                type="submit"
+                                form="party-relationship"
+                                disabled={busy}
+                                pending={busy}
+                            />
+                            <ActionButton
+                                action="cancel"
+                                disabled={busy}
+                                onClick={() => setEditing(null)}
+                            />
+                        </PageDialogToolbar>
                         <form
                             id="party-relationship"
                             onSubmit={(event) => void save(event)}
+                            data-page-dialog-body=""
                             className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4"
                         >
                             {error && (
@@ -423,22 +445,6 @@ export function PartyRelationships({
                                 }
                             />
                         </form>
-                        <DialogFooter>
-                            <Button
-                                variant="outline"
-                                disabled={busy}
-                                onClick={() => setEditing(null)}
-                            >
-                                Batal
-                            </Button>
-                            <Button
-                                type="submit"
-                                form="party-relationship"
-                                disabled={busy}
-                            >
-                                {busy ? 'Menyimpan…' : 'Simpan'}
-                            </Button>
-                        </DialogFooter>
                     </DialogContent>
                 </Dialog>
                 <AlertDialog
@@ -452,7 +458,7 @@ export function PartyRelationships({
                     <AlertDialogContent>
                         <AlertDialogHeader>
                             <AlertDialogTitle>
-                                Arsipkan hubungan?
+                                Delete hubungan?
                             </AlertDialogTitle>
                             <AlertDialogDescription>
                                 Hubungan disembunyikan dari daftar. Identitas
@@ -478,7 +484,7 @@ export function PartyRelationships({
                                     void archive();
                                 }}
                             >
-                                Arsipkan
+                                Delete
                             </AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>

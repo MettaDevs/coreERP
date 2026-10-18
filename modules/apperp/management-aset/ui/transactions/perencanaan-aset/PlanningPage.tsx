@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { toast } from 'sonner';
 import { useWorkDate } from '@/hooks/use-work-date';
+import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import {
@@ -13,6 +14,7 @@ import {
     CardTitle,
 } from '@apperp/ui/card';
 import { Checkbox } from '@apperp/ui/checkbox';
+
 import {
     Empty,
     EmptyDescription,
@@ -22,15 +24,16 @@ import {
 import { Field, FieldLabel } from '@apperp/ui/field';
 import { IncrementalListStatus } from '@apperp/ui/incremental-list-status';
 import { Input } from '@apperp/ui/input';
-import { Select } from '@apperp/ui/select';
 import {
-    Sheet,
-    SheetContent,
-    SheetFooter,
-    SheetHeader,
-    SheetTitle,
-} from '@apperp/ui/sheet';
+    PageDialog,
+    PageDialogContent,
+    PageDialogToolbar,
+    PageDialogBody,
+} from '@apperp/ui/page-dialog';
+import { Select } from '@apperp/ui/select';
+
 import { Textarea } from '@apperp/ui/textarea';
+import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
 import {
     api,
     errorMessage,
@@ -40,6 +43,9 @@ import {
 import { useMasterOptions } from '../../master/useMasterOptions';
 import { useRecordList } from '../../use-record-list';
 import { useRecordOptions } from '../../use-record-list';
+import { RecordCardHeader, recordQueryUrl } from '../_shared/record-card';
+import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
+import { useRecordQueryTarget } from '../_shared/use-record-query-target';
 
 type Context = { legal_entity_id: string | null; org_unit_id: string | null };
 type Permission = string;
@@ -118,14 +124,11 @@ function AsetDetailRow({
             <div className="flex justify-between">
                 <span className="text-sm font-medium">Baris {index + 1}</span>
                 {canRemove && (
-                    <Button
+                    <ActionButton
+                        action="delete"
                         type="button"
-                        variant="ghost"
-                        size="sm"
                         onClick={onRemove}
-                    >
-                        Hapus
-                    </Button>
+                    />
                 )}
             </div>
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_10rem_8rem]">
@@ -233,6 +236,8 @@ export default function PlanningPage({
         allow_automatic: boolean;
     } | null>(null);
     const [saving, setSaving] = useState(false);
+    const [cardLoading, setCardLoading] = useState(false);
+    const [planDirty, setPlanDirty] = useState(false);
     const sheetContentRef = useRef<HTMLDivElement>(null);
 
     // Effect adalah satu-satunya pemilik pengambilan daftar rencana. Pemuatan ulang
@@ -245,6 +250,7 @@ export default function PlanningPage({
     });
     const plans = list.items;
     const openCreate = async () => {
+        setCardLoading(true);
         setNumberPolicy(null);
         setManualCode('');
 
@@ -258,12 +264,24 @@ export default function PlanningPage({
             toast.error(
                 errorMessage(caught, 'Pengaturan kode belum dapat dimuat.'),
             );
+        } finally {
+            setCardLoading(false);
         }
     };
 
-    const openDetails = async (id: string) => {
+    const openDetails = async (id: string, signal?: AbortSignal) => {
+        setCardLoading(true);
+
         try {
-            const result = await api<{ data: Plan }>(`/perencanaan-aset/${id}`);
+            const result = await api<{ data: Plan }>(
+                `/perencanaan-aset/${id}`,
+                { signal },
+            );
+
+            if (signal?.aborted) {
+                return;
+            }
+
             setViewing(result.data);
             setSelectedLines(
                 (result.data.details ?? []).flatMap((line) =>
@@ -271,13 +289,25 @@ export default function PlanningPage({
                 ),
             );
         } catch (caught) {
+            if (signal?.aborted) {
+                return;
+            }
+
             toast.error(
                 errorMessage(caught, 'Rincian perencanaan belum dapat dimuat.'),
             );
+        } finally {
+            setCardLoading(false);
         }
     };
 
+    const clearRecordTarget = useRecordQueryTarget({
+        scopeKey: 'perencanaan-aset',
+        onOpen: (id, signal) => openDetails(id, signal),
+    });
     const openEdit = async (id: string) => {
+        setCardLoading(true);
+
         try {
             const result = await api<{ data: Plan & { details: Detail[] } }>(
                 `/perencanaan-aset/${id}`,
@@ -294,22 +324,34 @@ export default function PlanningPage({
             toast.error(
                 errorMessage(caught, 'Rencana aset belum dapat dibuka.'),
             );
+        } finally {
+            setCardLoading(false);
         }
     };
 
-    const archive = async (plan: Plan) => {
-        if (!window.confirm(`Arsipkan rencana ${plan.kode}?`)) {
+    const archive = async (plan: Pick<Plan, 'id' | 'kode' | 'version'>) => {
+        if (!window.confirm(`Delete rencana ${plan.kode}?`)) {
             return;
         }
+
+        setSaving(true);
 
         try {
             await api(`/perencanaan-aset/${plan.id}`, {
                 method: 'DELETE',
                 body: JSON.stringify({ version: plan.version }),
             });
+            setViewing((current) => (current?.id === plan.id ? null : current));
+            setEditing((current) =>
+                current && 'id' in current && current.id === plan.id
+                    ? undefined
+                    : current,
+            );
             muatUlang();
         } catch (caught) {
             toastSaveError(caught, 'Rencana aset belum dapat diarsipkan.');
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -390,6 +432,7 @@ export default function PlanningPage({
                 });
             }
 
+            clearRecordTarget();
             setEditing(undefined);
             muatUlang();
             toast.success('Rencana aset disimpan.');
@@ -400,15 +443,58 @@ export default function PlanningPage({
         }
     };
 
+    const discardPlan = () =>
+        !planDirty || window.confirm('Buang perubahan yang belum disimpan?');
+    const newPlan = () => {
+        if (!saving && !cardLoading && discardPlan()) {
+            clearRecordTarget();
+            void openCreate();
+        }
+    };
+    const closePlan = () => {
+        if (!saving && !cardLoading && discardPlan()) {
+            setEditing(undefined);
+        }
+    };
+    useRecordCardDirty({
+        value: { editing, manualCode },
+        ready: editing !== undefined && editing !== null && !cardLoading,
+        scopeKey: editing && 'id' in editing ? editing.id : 'new',
+        onDirtyChange: setPlanDirty,
+    });
+    const viewNavigation = useRecordNavigation({
+        items: list.items,
+        currentId: viewing?.id ?? null,
+        getId: (item) => item.id,
+        onNavigate: (id) => void openDetails(id),
+        scopeKey: JSON.stringify([versiMuat, list.sort]),
+        hasMore: list.hasMore,
+        loading: list.loading,
+        loadMore: list.loadMore,
+        disabled: saving || cardLoading || planDirty,
+    });
+    const editNavigation = useRecordNavigation({
+        items: list.items,
+        currentId: editing && 'id' in editing ? editing.id : null,
+        getId: (item) => item.id,
+        onNavigate: (id) => void openEdit(id),
+        scopeKey: JSON.stringify([versiMuat, list.sort]),
+        hasMore: list.hasMore,
+        loading: list.loading,
+        loadMore: list.loadMore,
+        disabled: saving || cardLoading || planDirty,
+    });
+
     return (
         <Card className="min-h-full rounded-none border-0 shadow-none">
-            <CardHeader className="border-b px-5 py-3">
+            <CardHeader className="border-b">
                 <CardTitle>Perencanaan aset</CardTitle>
                 {can('create') && (
                     <CardAction>
-                        <Button onClick={() => void openCreate()}>
-                            Tambah rencana
-                        </Button>
+                        <ActionButton
+                            action="create"
+                            onClick={() => void openCreate()}
+                        />
                     </CardAction>
                 )}
             </CardHeader>
@@ -465,24 +551,18 @@ export default function PlanningPage({
                                         Buka rincian
                                     </Button>
                                     {can('update') && (
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
+                                        <ActionButton
+                                            action="edit"
                                             onClick={() =>
                                                 void openEdit(plan.id)
                                             }
-                                        >
-                                            Ubah
-                                        </Button>
+                                        />
                                     )}
                                     {can('archive') && (
-                                        <Button
-                                            variant="destructive"
-                                            size="sm"
+                                        <ActionButton
+                                            action="archive"
                                             onClick={() => void archive(plan)}
-                                        >
-                                            Arsipkan
-                                        </Button>
+                                        />
                                     )}
                                 </div>
                             </div>
@@ -492,300 +572,355 @@ export default function PlanningPage({
                 <IncrementalListStatus state={list} />
             </CardContent>
 
-            <Sheet
+            <PageDialog
                 open={viewing !== null}
-                onOpenChange={(open) => !open && setViewing(null)}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        clearRecordTarget();
+                        setViewing(null);
+                    }
+                }}
             >
-                <SheetContent
-                    side="right"
-                    className="overflow-y-auto sm:max-w-3xl"
+                <PageDialogContent
+                    title={'Perencanaan aset'}
+                    busy={saving || cardLoading}
+                    onNew={can('create') ? newPlan : undefined}
+                    navigation={viewNavigation}
                 >
-                    <SheetHeader>
-                        <SheetTitle
-                            className="truncate"
-                            title={`${viewing?.kode ?? ''} - ${viewing?.description || 'Tanpa tujuan'}`}
-                        >
-                            {viewing?.kode} ·{' '}
-                            {viewing?.description || 'Tanpa tujuan'}
-                        </SheetTitle>
-                    </SheetHeader>
-                    <div className="space-y-4 p-4">
-                        <p className="text-muted-foreground text-sm">
-                            {viewing?.planned_on.slice(0, 10)} · Pilih baris
-                            yang akan dibuatkan permintaan.
-                        </p>
-                        {viewing?.details?.map((line, index) => (
-                            <label
-                                key={line.id ?? index}
-                                className="flex items-start gap-3 rounded-lg border p-3"
-                            >
-                                <Checkbox
-                                    aria-label={`Pilih baris ${index + 1}`}
-                                    checked={selectedLines.includes(
-                                        line.id ?? '',
-                                    )}
-                                    onCheckedChange={(checked) => {
-                                        if (line.id) {
-                                            setSelectedLines((current) =>
-                                                checked
-                                                    ? [...current, line.id!]
-                                                    : current.filter(
-                                                          (id) =>
-                                                              id !== line.id,
-                                                      ),
+                    <div className="flex min-h-0 flex-1 flex-col">
+                        <RecordCardHeader
+                            recordTitle={viewing?.kode}
+                            recordUrl={
+                                viewing
+                                    ? recordQueryUrl(
+                                          'perencanaan-aset',
+                                          viewing.id,
+                                      )
+                                    : undefined
+                            }
+                            onEdit={
+                                viewing && can('update')
+                                    ? () => void openEdit(viewing.id)
+                                    : undefined
+                            }
+                            onDelete={
+                                viewing && can('archive')
+                                    ? () => void archive(viewing)
+                                    : undefined
+                            }
+                        />
+                        {permissions.includes(
+                            'management-aset.permintaan-pembelian-aset.create',
+                        ) && (
+                            <PageDialogToolbar>
+                                {permissions.includes(
+                                    'management-aset.permintaan-pembelian-aset.create',
+                                ) && (
+                                    <Button
+                                        disabled={selectedLines.length === 0}
+                                        onClick={() => {
+                                            if (!viewing) {
+                                                return;
+                                            }
+
+                                            const query = new URLSearchParams({
+                                                planning: viewing.id,
+                                                lines: selectedLines.join(','),
+                                            });
+                                            router.visit(
+                                                `/management-aset/permintaan-pembelian-aset?${query.toString()}`,
                                             );
-                                        }
-                                    }}
-                                />
-                                <span className="space-y-1">
-                                    <span className="block font-medium">
-                                        {line.nama_aset}
-                                    </span>
-                                    <span className="block text-sm">
-                                        {line.quantity} {line.unit} ·{' '}
-                                        {line.requested_specification}
-                                    </span>
-                                </span>
-                            </label>
-                        ))}
-                        <SheetFooter>
-                            {permissions.includes(
-                                'management-aset.permintaan-pembelian-aset.create',
-                            ) && (
-                                <Button
-                                    disabled={selectedLines.length === 0}
-                                    onClick={() => {
-                                        if (!viewing) {
-                                            return;
-                                        }
-
-                                        const query = new URLSearchParams({
-                                            planning: viewing.id,
-                                            lines: selectedLines.join(','),
-                                        });
-                                        router.visit(
-                                            `/management-aset/permintaan-pembelian-aset?${query.toString()}`,
-                                        );
-                                    }}
-                                >
-                                    Buat permintaan
-                                </Button>
-                            )}
-                            <Button
-                                variant="outline"
-                                onClick={() => setViewing(null)}
-                            >
-                                Tutup
-                            </Button>
-                        </SheetFooter>
-                    </div>
-                </SheetContent>
-            </Sheet>
-
-            <Sheet
-                open={editing !== undefined}
-                onOpenChange={(open) => !open && setEditing(undefined)}
-            >
-                <SheetContent
-                    ref={sheetContentRef}
-                    side="right"
-                    className="overflow-y-auto sm:max-w-5xl"
-                >
-                    <SheetHeader>
-                        <SheetTitle>
-                            {editing && 'id' in editing
-                                ? 'Ubah perencanaan aset'
-                                : 'Buat perencanaan aset'}
-                        </SheetTitle>
-                    </SheetHeader>
-                    {editing && (
-                        <div className="space-y-4 p-4">
+                                        }}
+                                    >
+                                        Buat permintaan
+                                    </Button>
+                                )}
+                            </PageDialogToolbar>
+                        )}
+                        <PageDialogBody
+                            className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4"
+                            inert={cardLoading || saving}
+                        >
                             <p className="text-muted-foreground text-sm">
-                                Unit perencanaan dan penanggung jawab mengikuti
-                                konteks aktif Anda.
+                                {viewing?.planned_on.slice(0, 10)} · Pilih baris
+                                yang akan dibuatkan permintaan.
                             </p>
-                            <Input
-                                label="Kode perencanaan"
-                                value={
-                                    'id' in editing
+                            {viewing?.details?.map((line, index) => (
+                                <label
+                                    key={line.id ?? index}
+                                    className="flex items-start gap-3 rounded-lg border p-3"
+                                >
+                                    <Checkbox
+                                        aria-label={`Pilih baris ${index + 1}`}
+                                        checked={selectedLines.includes(
+                                            line.id ?? '',
+                                        )}
+                                        onCheckedChange={(checked) => {
+                                            if (line.id) {
+                                                setSelectedLines((current) =>
+                                                    checked
+                                                        ? [...current, line.id!]
+                                                        : current.filter(
+                                                              (id) =>
+                                                                  id !==
+                                                                  line.id,
+                                                          ),
+                                                );
+                                            }
+                                        }}
+                                    />
+                                    <span className="space-y-1">
+                                        <span className="block font-medium">
+                                            {line.nama_aset}
+                                        </span>
+                                        <span className="block text-sm">
+                                            {line.quantity} {line.unit} ·{' '}
+                                            {line.requested_specification}
+                                        </span>
+                                    </span>
+                                </label>
+                            ))}
+                        </PageDialogBody>
+                    </div>
+                </PageDialogContent>
+            </PageDialog>
+
+            <PageDialog
+                open={editing !== undefined}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        closePlan();
+                    }
+                }}
+            >
+                <PageDialogContent
+                    ref={sheetContentRef}
+                    title={'Perencanaan aset'}
+                    busy={saving || cardLoading}
+                    onNew={
+                        editing && 'id' in editing && can('create')
+                            ? newPlan
+                            : undefined
+                    }
+                    navigation={
+                        editing && 'id' in editing ? editNavigation : undefined
+                    }
+                >
+                    {editing && (
+                        <div className="flex min-h-0 flex-1 flex-col">
+                            <RecordCardHeader
+                                recordTitle={
+                                    'kode' in editing
                                         ? editing.kode
-                                        : numberPolicy?.allow_manual
-                                          ? manualCode
-                                          : 'Dibuat otomatis saat disimpan'
+                                        : manualCode || 'Baru'
                                 }
-                                disabled={
-                                    'id' in editing ||
-                                    !numberPolicy?.allow_manual
+                                editing
+                                onDelete={
+                                    'id' in editing && can('archive')
+                                        ? () => void archive(editing)
+                                        : undefined
                                 }
-                                required={
-                                    !('id' in editing) &&
-                                    !numberPolicy?.allow_automatic
-                                }
-                                placeholder={
-                                    numberPolicy?.allow_automatic
-                                        ? 'Kosongkan untuk membuat kode otomatis'
-                                        : 'Masukkan kode'
-                                }
-                                onChange={(event) =>
-                                    setManualCode(event.target.value)
+                                recordUrl={
+                                    'id' in editing
+                                        ? recordQueryUrl(
+                                              'perencanaan-aset',
+                                              editing.id,
+                                          )
+                                        : undefined
                                 }
                             />
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <Field>
-                                    <Input
-                                        label="Tanggal perencanaan"
-                                        type="date"
-                                        value={editing.planned_on}
-                                        onChange={(event) =>
-                                            setEditing({
-                                                ...editing,
-                                                planned_on: event.target.value,
-                                                planning_year: Number(
-                                                    event.target.value.slice(
-                                                        0,
-                                                        4,
-                                                    ),
-                                                ),
-                                            })
-                                        }
-                                        required
-                                    />
-                                </Field>
-                                <Field>
-                                    <Input
-                                        label="Tahun perencanaan"
-                                        type="number"
-                                        value={editing.planning_year}
-                                        onChange={(event) =>
-                                            setEditing({
-                                                ...editing,
-                                                planning_year: Number(
-                                                    event.target.value,
-                                                ),
-                                            })
-                                        }
-                                        required
-                                    />
-                                </Field>
-                                <Field>
-                                    <Select
-                                        label="Jenis perencanaan"
-                                        required
-                                        items={['Reguler', 'Tambahan']}
-                                        value={
-                                            editing.planning_type === 'regular'
-                                                ? 'Reguler'
-                                                : 'Tambahan'
-                                        }
-                                        searchPlaceholder="Cari jenis perencanaan"
-                                        ariaLabel="Jenis perencanaan"
-                                        portalContainer={sheetContentRef}
-                                        onValueChange={(value) =>
-                                            setEditing({
-                                                ...editing,
-                                                planning_type:
-                                                    value === 'Tambahan'
-                                                        ? 'additional'
-                                                        : 'regular',
-                                            })
-                                        }
-                                    />
-                                </Field>
-                                <Field>
-                                    <Input
-                                        label="Sumber dana"
-                                        value={editing.funding_source ?? ''}
-                                        onChange={(event) =>
-                                            setEditing({
-                                                ...editing,
-                                                funding_source:
-                                                    event.target.value,
-                                            })
-                                        }
-                                    />
-                                </Field>
-                            </div>
-                            <Field>
-                                <FieldLabel htmlFor="planning-description">
-                                    Tujuan perencanaan
-                                </FieldLabel>
-                                <Textarea
-                                    id="planning-description"
-                                    rows={6}
-                                    className="min-h-36 resize-y"
-                                    value={editing.description ?? ''}
-                                    onChange={(event) =>
-                                        setEditing({
-                                            ...editing,
-                                            description: event.target.value,
-                                        })
-                                    }
-                                />
-                            </Field>
-                            <div className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <h3 className="font-medium">
-                                        Rincian aset
-                                    </h3>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() =>
-                                            setEditing({
-                                                ...editing,
-                                                details: [
-                                                    ...editing.details,
-                                                    emptyDetail(),
-                                                ],
-                                            })
-                                        }
-                                    >
-                                        Tambah baris
-                                    </Button>
-                                </div>
-                                {editing.details.map((detail, index) => (
-                                    <AsetDetailRow
-                                        key={index}
-                                        detail={detail}
-                                        index={index}
-                                        canRemove={editing.details.length > 1}
-                                        portalContainer={sheetContentRef}
-                                        onChange={(change) =>
-                                            updateDetail(index, change)
-                                        }
-                                        onRemove={() =>
-                                            setEditing({
-                                                ...editing,
-                                                details: editing.details.filter(
-                                                    (_, position) =>
-                                                        position !== index,
-                                                ),
-                                            })
-                                        }
-                                    />
-                                ))}
-                            </div>
-                            <SheetFooter>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => setEditing(undefined)}
-                                >
-                                    Batal
-                                </Button>
-                                <Button
+                            <PageDialogToolbar>
+                                <ActionButton
+                                    action="save"
                                     type="button"
                                     disabled={saving}
                                     onClick={() => void save()}
-                                >
-                                    {saving ? 'Menyimpan…' : 'Simpan'}
-                                </Button>
-                            </SheetFooter>
+                                    pending={saving}
+                                />
+                                <ActionButton
+                                    action="cancel"
+                                    type="button"
+                                    onClick={closePlan}
+                                />
+                            </PageDialogToolbar>
+                            <PageDialogBody
+                                className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4"
+                                inert={cardLoading || saving}
+                            >
+                                <p className="text-muted-foreground text-sm">
+                                    Unit perencanaan dan penanggung jawab
+                                    mengikuti konteks aktif Anda.
+                                </p>
+                                <Input
+                                    label="Kode perencanaan"
+                                    value={
+                                        'id' in editing
+                                            ? editing.kode
+                                            : numberPolicy?.allow_manual
+                                              ? manualCode
+                                              : 'Dibuat otomatis saat disimpan'
+                                    }
+                                    disabled={
+                                        'id' in editing ||
+                                        !numberPolicy?.allow_manual
+                                    }
+                                    required={
+                                        !('id' in editing) &&
+                                        !numberPolicy?.allow_automatic
+                                    }
+                                    placeholder={
+                                        numberPolicy?.allow_automatic
+                                            ? 'Kosongkan untuk membuat kode otomatis'
+                                            : 'Masukkan kode'
+                                    }
+                                    onChange={(event) =>
+                                        setManualCode(event.target.value)
+                                    }
+                                />
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <Field>
+                                        <Input
+                                            label="Tanggal perencanaan"
+                                            type="date"
+                                            value={editing.planned_on}
+                                            onChange={(event) =>
+                                                setEditing({
+                                                    ...editing,
+                                                    planned_on:
+                                                        event.target.value,
+                                                    planning_year: Number(
+                                                        event.target.value.slice(
+                                                            0,
+                                                            4,
+                                                        ),
+                                                    ),
+                                                })
+                                            }
+                                            required
+                                        />
+                                    </Field>
+                                    <Field>
+                                        <Input
+                                            label="Tahun perencanaan"
+                                            type="number"
+                                            value={editing.planning_year}
+                                            onChange={(event) =>
+                                                setEditing({
+                                                    ...editing,
+                                                    planning_year: Number(
+                                                        event.target.value,
+                                                    ),
+                                                })
+                                            }
+                                            required
+                                        />
+                                    </Field>
+                                    <Field>
+                                        <Select
+                                            label="Jenis perencanaan"
+                                            required
+                                            items={['Reguler', 'Tambahan']}
+                                            value={
+                                                editing.planning_type ===
+                                                'regular'
+                                                    ? 'Reguler'
+                                                    : 'Tambahan'
+                                            }
+                                            searchPlaceholder="Cari jenis perencanaan"
+                                            ariaLabel="Jenis perencanaan"
+                                            portalContainer={sheetContentRef}
+                                            onValueChange={(value) =>
+                                                setEditing({
+                                                    ...editing,
+                                                    planning_type:
+                                                        value === 'Tambahan'
+                                                            ? 'additional'
+                                                            : 'regular',
+                                                })
+                                            }
+                                        />
+                                    </Field>
+                                    <Field>
+                                        <Input
+                                            label="Sumber dana"
+                                            value={editing.funding_source ?? ''}
+                                            onChange={(event) =>
+                                                setEditing({
+                                                    ...editing,
+                                                    funding_source:
+                                                        event.target.value,
+                                                })
+                                            }
+                                        />
+                                    </Field>
+                                </div>
+                                <Field>
+                                    <FieldLabel htmlFor="planning-description">
+                                        Tujuan perencanaan
+                                    </FieldLabel>
+                                    <Textarea
+                                        id="planning-description"
+                                        rows={6}
+                                        className="min-h-36 resize-y"
+                                        value={editing.description ?? ''}
+                                        onChange={(event) =>
+                                            setEditing({
+                                                ...editing,
+                                                description: event.target.value,
+                                            })
+                                        }
+                                    />
+                                </Field>
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="font-medium">
+                                            Rincian aset
+                                        </h3>
+                                        <ActionButton
+                                            action="add"
+                                            type="button"
+                                            onClick={() =>
+                                                setEditing({
+                                                    ...editing,
+                                                    details: [
+                                                        ...editing.details,
+                                                        emptyDetail(),
+                                                    ],
+                                                })
+                                            }
+                                        />
+                                    </div>
+                                    {editing.details.map((detail, index) => (
+                                        <AsetDetailRow
+                                            key={index}
+                                            detail={detail}
+                                            index={index}
+                                            canRemove={
+                                                editing.details.length > 1
+                                            }
+                                            portalContainer={sheetContentRef}
+                                            onChange={(change) =>
+                                                updateDetail(index, change)
+                                            }
+                                            onRemove={() =>
+                                                setEditing({
+                                                    ...editing,
+                                                    details:
+                                                        editing.details.filter(
+                                                            (_, position) =>
+                                                                position !==
+                                                                index,
+                                                        ),
+                                                })
+                                            }
+                                        />
+                                    ))}
+                                </div>
+                            </PageDialogBody>
                         </div>
                     )}
-                </SheetContent>
-            </Sheet>
+                </PageDialogContent>
+            </PageDialog>
         </Card>
     );
 }

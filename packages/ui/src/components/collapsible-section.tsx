@@ -51,7 +51,7 @@ function CollapsibleSectionGroup({
                     onValueChange?.(next);
                 }}
                 data-slot="collapsible-section-group"
-                className={cn('flex w-full min-w-0 flex-col gap-3', className)}
+                className={cn('flex w-full min-w-0 flex-col gap-2', className)}
             >
                 {children}
             </Accordion>
@@ -85,13 +85,10 @@ function CollapsibleSection({
         <AccordionItem
             value={value}
             data-slot="collapsible-section"
-            className={cn(
-                'bg-card w-full min-w-0 rounded-lg border last:border-b',
-                className,
-            )}
+            className={cn('w-full min-w-0 border-b last:border-b', className)}
         >
             <AccordionTrigger
-                className="w-full min-w-0 items-center px-4 py-3 hover:no-underline"
+                className="min-h-8 w-full min-w-0 items-center rounded-none px-3 py-1 hover:no-underline"
                 onClick={(event) => {
                     if (!event.defaultPrevented) {
                         activation?.activate(event.currentTarget);
@@ -99,7 +96,7 @@ function CollapsibleSection({
                 }}
             >
                 <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <span className="min-w-0 max-w-full text-base font-medium [overflow-wrap:anywhere]">
+                    <span className="min-w-0 max-w-full text-lg font-semibold leading-6 [overflow-wrap:anywhere]">
                         {title}
                     </span>
                     {!isOpen && summary != null && (
@@ -119,7 +116,7 @@ function CollapsibleSection({
         was clipped for any field placed first inside a section. This padding is what gives
         it room; it is not decorative spacing.
       */}
-            <AccordionContent className="min-w-0 border-t px-4 pb-4 pt-3">
+            <AccordionContent className="min-w-0 px-3 pb-3 pt-3">
                 {children}
             </AccordionContent>
         </AccordionItem>

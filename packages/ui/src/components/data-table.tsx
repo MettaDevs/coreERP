@@ -53,6 +53,7 @@ type DataTableColumn<T> = {
 type DataTableRowAction = {
     id: string;
     label: string;
+    icon?: React.ReactNode;
     destructive?: boolean;
     separatorBefore?: boolean;
 };
@@ -184,7 +185,7 @@ function DataTable<T>({
     rowActivation = 'double-click',
     onRowClick,
     onAddRow,
-    addRowLabel = 'Tambah baris',
+    addRowLabel = 'Tambah',
     sort: controlledSort,
     onSortChange,
     incremental,
@@ -403,6 +404,7 @@ function DataTable<T>({
                             }
                             onSelect={() => onRowAction?.(action.id, row)}
                         >
+                            {action.icon}
                             {action.label}
                         </DropdownMenuItem>
                     </React.Fragment>
@@ -678,7 +680,7 @@ function DataTable<T>({
                                                 : undefined
                                         }
                                         className={cn(
-                                            'bg-muted/70 group relative h-9 select-none overflow-visible whitespace-normal border-b px-3 py-2 align-bottom text-[13px] font-medium last:border-r-0',
+                                            'bg-muted/70 group relative h-9 select-none overflow-visible whitespace-normal border-b px-3 py-2 align-bottom text-xs font-normal last:border-r-0',
                                             allowColumnFreeze &&
                                                 columns.indexOf(column) <
                                                     frozenCount &&

@@ -1,5 +1,6 @@
+import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
-import { Button } from '@apperp/ui/button';
+
 import {
     Empty,
     EmptyDescription,
@@ -13,6 +14,7 @@ import {
     FieldLabel,
 } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
+import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Switch } from '@apperp/ui/switch';
 import {
     Table,
@@ -72,7 +74,7 @@ function PolicyRow({
 
     return (
         <form
-            className="flex flex-col gap-4 rounded-lg border p-4 sm:flex-row sm:items-start sm:justify-between"
+            className="flex flex-col gap-4 rounded-lg border p-4"
             onSubmit={(event) => {
                 event.preventDefault();
                 // Versi dari props saat dikirim: isian useForm tidak ikut diperbarui sesudah simpan.
@@ -85,61 +87,66 @@ function PolicyRow({
                 });
             }}
         >
-            <div className="flex min-w-0 flex-col gap-1">
-                <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">{policy.caption}</span>
-                    {policy.customized && (
-                        <Badge variant="outline">Diubah</Badge>
+            <RecordActionBar>
+                {canManage && (
+                    <ActionButton
+                        action="save"
+                        type="submit"
+                        disabled={form.processing}
+                    />
+                )}
+            </RecordActionBar>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex min-w-0 flex-col gap-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{policy.caption}</span>
+                        {policy.customized && (
+                            <Badge variant="outline">Diubah</Badge>
+                        )}
+                    </div>
+                    {policy.optional && (
+                        <Field orientation="horizontal">
+                            <Switch
+                                id={`${inputId}-enabled`}
+                                checked={form.data.enabled}
+                                disabled={!canManage}
+                                onCheckedChange={(on) =>
+                                    form.setData('enabled', on)
+                                }
+                            />
+                            <FieldLabel htmlFor={`${inputId}-enabled`}>
+                                Hapus otomatis data yang sudah lama
+                            </FieldLabel>
+                        </Field>
                     )}
                 </div>
-                {policy.optional && (
-                    <Field orientation="horizontal">
-                        <Switch
-                            id={`${inputId}-enabled`}
-                            checked={form.data.enabled}
-                            disabled={!canManage}
-                            onCheckedChange={(on) =>
-                                form.setData('enabled', on)
+
+                <div className="flex items-start gap-3">
+                    <Field data-invalid={Boolean(form.errors.retention_days)}>
+                        <FieldLabel htmlFor={inputId}>
+                            Disimpan selama (hari)
+                        </FieldLabel>
+                        <Input
+                            id={inputId}
+                            type="number"
+                            inputMode="numeric"
+                            min={policy.minimum_days}
+                            className="w-32"
+                            value={form.data.retention_days}
+                            disabled={!editable}
+                            onChange={(event) =>
+                                form.setData(
+                                    'retention_days',
+                                    event.target.value,
+                                )
                             }
                         />
-                        <FieldLabel htmlFor={`${inputId}-enabled`}>
-                            Hapus otomatis data yang sudah lama
-                        </FieldLabel>
+                        <FieldDescription>
+                            Paling sedikit {policy.minimum_days} hari.
+                        </FieldDescription>
+                        <FieldError>{form.errors.retention_days}</FieldError>
                     </Field>
-                )}
-            </div>
-
-            <div className="flex items-start gap-3">
-                <Field data-invalid={Boolean(form.errors.retention_days)}>
-                    <FieldLabel htmlFor={inputId}>
-                        Disimpan selama (hari)
-                    </FieldLabel>
-                    <Input
-                        id={inputId}
-                        type="number"
-                        inputMode="numeric"
-                        min={policy.minimum_days}
-                        className="w-32"
-                        value={form.data.retention_days}
-                        disabled={!editable}
-                        onChange={(event) =>
-                            form.setData('retention_days', event.target.value)
-                        }
-                    />
-                    <FieldDescription>
-                        Paling sedikit {policy.minimum_days} hari.
-                    </FieldDescription>
-                    <FieldError>{form.errors.retention_days}</FieldError>
-                </Field>
-                {canManage && (
-                    <Button
-                        type="submit"
-                        className="mt-6"
-                        disabled={form.processing}
-                    >
-                        Simpan
-                    </Button>
-                )}
+                </div>
             </div>
         </form>
     );

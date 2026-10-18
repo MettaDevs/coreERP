@@ -1,3 +1,4 @@
+import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
 import {
     DropdownMenu,
@@ -142,17 +143,16 @@ export function AnalysisViewTabs({
                         maxLength={80}
                         onChange={(event) => setName(event.target.value)}
                     />
-                    <Button size="sm" type="submit" disabled={!name.trim()}>
-                        Simpan nama
-                    </Button>
-                    <Button
-                        size="sm"
-                        variant="ghost"
+                    <ActionButton
+                        action="save"
+                        type="submit"
+                        disabled={!name.trim()}
+                    />
+                    <ActionButton
+                        action="cancel"
                         type="button"
                         onClick={() => setEditing(null)}
-                    >
-                        Batal
-                    </Button>
+                    />
                 </form>
             )}
         </div>

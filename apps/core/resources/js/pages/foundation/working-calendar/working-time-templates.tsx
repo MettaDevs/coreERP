@@ -29,14 +29,11 @@ import { Label } from '@apperp/ui/label';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { MasterDetailLayout } from '@apperp/ui/master-detail-layout';
 import {
+    PageDialogToolbar,
     PageDialog,
     PageDialogAction,
     PageDialogBody,
     PageDialogContent,
-    PageDialogDescription,
-    PageDialogFooter,
-    PageDialogHeader,
-    PageDialogTitle,
 } from '@apperp/ui/page-dialog';
 import { RadioGroup, RadioGroupItem } from '@apperp/ui/radio-group';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
@@ -53,7 +50,7 @@ import {
 import { useIncrementalList } from '@apperp/ui/use-incremental-list';
 import type { ListLoader } from '@apperp/ui/use-incremental-list';
 import { Head } from '@inertiajs/react';
-import { Copy, Info, Plus, Save, Search, Trash2, X } from 'lucide-react';
+import { Copy, Info, Search, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiJson, errorText } from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
@@ -637,75 +634,57 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
                     <RecordActionBar title="Pola jam kerja">
                         {isEditing ? (
                             <>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
+                                <ActionButton
+                                    action="save"
                                     type="button"
                                     onClick={handleSaveAll}
                                     disabled={isSaving || !activeTemplate}
                                     className="border-success/40 text-success hover:bg-success/10 hover:text-success focus-visible:ring-success/30"
-                                >
-                                    <Save className="size-4" />
-                                    <span>
-                                        {isSaving ? 'Menyimpan…' : 'Simpan'}
-                                    </span>
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
+                                    pending={isSaving}
+                                />
+                                <ActionButton
+                                    action="cancel"
                                     type="button"
                                     onClick={handleCancelEdit}
                                     disabled={isSaving}
-                                >
-                                    <X className="size-4" />
-                                    <span>Batal</span>
-                                </Button>
+                                />
                             </>
                         ) : (
                             <>
                                 {canManage && (
                                     <ActionButton
                                         action="edit"
-                                        size="sm"
                                         type="button"
                                         disabled={!activeTemplate}
                                         onClick={() => {
                                             setIsEditing(true);
                                             setShowDetail(true);
                                         }}
-                                    >
-                                        Ubah
-                                    </ActionButton>
+                                    />
                                 )}
 
                                 {canManage && (
                                     <ActionButton
                                         action="create"
-                                        size="sm"
                                         type="button"
                                         disabled={isLoadingDetail}
                                         onClick={() => {
                                             setModalError('');
                                             setIsCreateOpen(true);
                                         }}
-                                    >
-                                        Tambah pola
-                                    </ActionButton>
+                                    />
                                 )}
 
                                 {canManage && (
                                     <ActionButton
                                         action="archive"
-                                        size="sm"
                                         type="button"
                                         disabled={!activeTemplate}
                                         onClick={() => {
                                             setModalError('');
                                             setIsArchiveOpen(true);
                                         }}
-                                    >
-                                        Arsipkan
-                                    </ActionButton>
+                                    />
                                 )}
 
                                 {canManage && (
@@ -872,28 +851,22 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
                                                     {/* Day Toolbar: Tambah, Hapus, Salin hari — clean flat actions */}
                                                     <div className="flex items-center gap-1 pb-2">
                                                         {canManage && (
-                                                            <Button
+                                                            <ActionButton
+                                                                action="create"
                                                                 type="button"
-                                                                variant="ghost"
-                                                                size="xs"
                                                                 onClick={() =>
                                                                     handleAddLine(
                                                                         day.index,
                                                                     )
                                                                 }
-
                                                                 className="gap-1.5 font-medium text-primary hover:bg-primary/10 hover:text-primary"
-                                                            >
-                                                                <Plus className="size-3.5" />
-                                                                Tambah
-                                                            </Button>
+                                                            />
                                                         )}
 
                                                         {canManage && (
-                                                            <Button
+                                                            <ActionButton
+                                                                action="delete"
                                                                 type="button"
-                                                                variant="ghost"
-                                                                size="xs"
                                                                 onClick={() =>
                                                                     handleRemoveLine(
                                                                         day.index,
@@ -904,10 +877,7 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
                                                                     0
                                                                 }
                                                                 className="gap-1.5 font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                                            >
-                                                                <Trash2 className="size-3.5" />
-                                                                Hapus
-                                                            </Button>
+                                                            />
                                                         )}
 
                                                         {canManage && (
@@ -1013,7 +983,7 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
                                                                                 hari
                                                                                 ini.
                                                                                 {isEditing &&
-                                                                                    ' Klik "Tambah" di atas untuk menambahkan.'}
+                                                                                    ' Klik "Baru" di atas untuk menambahkan.'}
                                                                             </TableCell>
                                                                         </TableRow>
                                                                     ) : (
@@ -1463,13 +1433,34 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
                     }
                 }}
             >
-                <PageDialogContent>
-                    <PageDialogHeader>
-                        <PageDialogTitle>Pola jam kerja baru</PageDialogTitle>
-                        <PageDialogDescription>
-                            Buat pola, lalu isi jam kerja setiap harinya.
-                        </PageDialogDescription>
-                    </PageDialogHeader>
+                <PageDialogContent
+                    title="Pola jam kerja"
+                    recordTitle={
+                        [newCode, newName].filter(Boolean).join(' · ') ||
+                        'Pola baru'
+                    }
+                    editing
+                    busy={isCreating}
+                    description={
+                        'Buat pola, lalu isi jam kerja setiap harinya.'
+                    }
+                >
+                    <PageDialogToolbar>
+                        <ActionButton
+                            action="save"
+                            onClick={handleCreateTemplate}
+                            disabled={
+                                isCreating || !newCode.trim() || !newName.trim()
+                            }
+                            pending={isCreating}
+                            type="button"
+                        />
+                        <ActionButton
+                            action="cancel"
+                            onClick={() => setIsCreateOpen(false)}
+                            disabled={isCreating}
+                        />
+                    </PageDialogToolbar>
                     <PageDialogBody className="space-y-4">
                         {modalError && (
                             <p role="alert" className="text-destructive">
@@ -1496,23 +1487,6 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
                             readOnly={isCreating}
                         />
                     </PageDialogBody>
-                    <PageDialogFooter>
-                        <PageDialogAction
-                            onClick={handleCreateTemplate}
-                            disabled={
-                                isCreating || !newCode.trim() || !newName.trim()
-                            }
-                        >
-                            {isCreating ? 'Menyimpan...' : 'Buat pola'}
-                        </PageDialogAction>
-                        <Button
-                            variant="outline"
-                            onClick={() => setIsCreateOpen(false)}
-                            disabled={isCreating}
-                        >
-                            Batal
-                        </Button>
-                    </PageDialogFooter>
                 </PageDialogContent>
             </PageDialog>
 
@@ -1524,14 +1498,39 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
                     }
                 }}
             >
-                <PageDialogContent>
-                    <PageDialogHeader>
-                        <PageDialogTitle>Salin pola jam kerja</PageDialogTitle>
-                        <PageDialogDescription>
+                <PageDialogContent
+                    title="Pola jam kerja"
+                    recordTitle={
+                        [copyNewCode, copyNewName]
+                            .filter(Boolean)
+                            .join(' · ') || 'Salinan pola'
+                    }
+                    editing
+                    busy={isCopying}
+                    description={
+                        <>
                             Salin {activeTemplate?.code} beserta seluruh jam
                             kerja hariannya ke pola baru.
-                        </PageDialogDescription>
-                    </PageDialogHeader>
+                        </>
+                    }
+                >
+                    <PageDialogToolbar>
+                        <PageDialogAction
+                            onClick={handleExecuteCopyTemplate}
+                            disabled={
+                                isCopying ||
+                                !copyNewCode.trim() ||
+                                !copyNewName.trim()
+                            }
+                        >
+                            {isCopying ? 'Menyalin...' : 'Salin pola'}
+                        </PageDialogAction>
+                        <ActionButton
+                            action="cancel"
+                            onClick={() => setIsCopyTemplateOpen(false)}
+                            disabled={isCopying}
+                        />
+                    </PageDialogToolbar>
                     <PageDialogBody className="space-y-4">
                         {modalError && (
                             <p role="alert" className="text-destructive">
@@ -1560,44 +1559,38 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
                             readOnly={isCopying}
                         />
                     </PageDialogBody>
-                    <PageDialogFooter>
-                        <PageDialogAction
-                            onClick={handleExecuteCopyTemplate}
-                            disabled={
-                                isCopying ||
-                                !copyNewCode.trim() ||
-                                !copyNewName.trim()
-                            }
-                        >
-                            {isCopying ? 'Menyalin...' : 'Salin pola'}
-                        </PageDialogAction>
-                        <Button
-                            variant="outline"
-                            onClick={() => setIsCopyTemplateOpen(false)}
-                            disabled={isCopying}
-                        >
-                            Batal
-                        </Button>
-                    </PageDialogFooter>
                 </PageDialogContent>
             </PageDialog>
 
             <PageDialog open={isCopyDayOpen} onOpenChange={setIsCopyDayOpen}>
-                <PageDialogContent>
-                    <PageDialogHeader>
-                        <PageDialogTitle>
+                <PageDialogContent
+                    title="Pola jam kerja"
+                    recordTitle={
+                        <>
                             Salin jam kerja{' '}
                             {
                                 DAYS.find((day) => day.index === copyFromDay)
                                     ?.name
                             }
-                        </PageDialogTitle>
-                        <PageDialogDescription>
-                            Jam kerja pada hari tujuan akan diganti. Perubahan
-                            baru tersimpan setelah menekan Simpan pada pola jam
-                            kerja.
-                        </PageDialogDescription>
-                    </PageDialogHeader>
+                        </>
+                    }
+                    editing
+                    description={
+                        'Jam kerja pada hari tujuan akan diganti. Perubahan\n                            baru tersimpan setelah menekan Simpan pada pola jam\n                            kerja.'
+                    }
+                >
+                    <PageDialogToolbar>
+                        <PageDialogAction
+                            disabled={!copyToDays.length}
+                            onClick={handleExecuteCopyDay}
+                        >
+                            Salin ke {copyToDays.length} hari
+                        </PageDialogAction>
+                        <ActionButton
+                            action="cancel"
+                            onClick={() => setIsCopyDayOpen(false)}
+                        />
+                    </PageDialogToolbar>
                     <PageDialogBody className="space-y-4">
                         <div className="flex flex-wrap gap-2">
                             <Button
@@ -1659,20 +1652,6 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
                             ))}
                         </div>
                     </PageDialogBody>
-                    <PageDialogFooter>
-                        <PageDialogAction
-                            disabled={!copyToDays.length}
-                            onClick={handleExecuteCopyDay}
-                        >
-                            Salin ke {copyToDays.length} hari
-                        </PageDialogAction>
-                        <Button
-                            variant="outline"
-                            onClick={() => setIsCopyDayOpen(false)}
-                        >
-                            Batal
-                        </Button>
-                    </PageDialogFooter>
                 </PageDialogContent>
             </PageDialog>
 
@@ -1687,7 +1666,7 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>
-                            Arsipkan pola jam kerja?
+                            Delete pola jam kerja?
                         </AlertDialogTitle>
                         <AlertDialogDescription>
                             {activeTemplate?.code} - {activeTemplate?.name} akan
@@ -1711,7 +1690,7 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
                                 void handleDeleteTemplate();
                             }}
                         >
-                            {isArchiving ? 'Mengarsipkan...' : 'Arsipkan'}
+                            {isArchiving ? 'Mengarsipkan...' : 'Delete'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

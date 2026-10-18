@@ -100,6 +100,12 @@ abstract class MasterLinkController extends Controller
 
     public function replace(Request $request, string $ownerId): JsonResponse
     {
+        return $this->replacePayload($request, $ownerId, $request->all());
+    }
+
+    /** @param array<string, mixed> $payload */
+    public function replacePayload(Request $request, string $ownerId, array $payload, ?int $expectedVersion = null): JsonResponse
+    {
         $this->requirePermission($request, 'update');
         $tenantId = $this->tenantId($request);
         $this->findOwner($ownerId);
@@ -108,8 +114,8 @@ abstract class MasterLinkController extends Controller
         foreach ($this->rowRules($tenantId) as $column => $rule) {
             $rules['rows.*.'.$column] = $rule;
         }
-        $data = $request->validate($rules);
-        $expected = RowVersion::expected($request);
+        $data = validator($payload, $rules)->validate();
+        $expected = ($expectedVersion ?? RowVersion::expected($request));
         DB::transaction(function () use ($tenantId, $ownerId, $data, $expected): void {
             // Klaim versi pemilik lebih dahulu. Selain menolak himpunan yang disusun dari data
             // basi, klaim itu memegang kunci baris pemilik sampai transaksi selesai, sehingga

@@ -27,13 +27,17 @@ export default function DisposalPage({
 
     if (!pertama) {
         return (
-            <DisposalListPage resource={resource} permissions={permissions} />
+            <DisposalListPage
+                key={resource}
+                resource={resource}
+                permissions={permissions}
+            />
         );
     }
 
     return (
         <DisposalDetailPage
-            key={pertama}
+            key={`${resource}:${pertama}`}
             resource={resource}
             permissions={permissions}
             disposalId={pertama === 'baru' ? undefined : pertama}

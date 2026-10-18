@@ -40,7 +40,7 @@ class JenisAsetAtributController extends MasterLinkController
     {
         return [
             'tipe_atribut_id' => [
-                'required', 'ulid',
+                'required', 'ulid', 'distinct',
                 Rule::exists('aset_m_tipe_atribut', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at'),
             ],
             'wajib' => ['sometimes', 'boolean'],

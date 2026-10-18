@@ -1,3 +1,4 @@
+import { ActionButton } from '@apperp/ui/action-button';
 import { Alert, AlertDescription } from '@apperp/ui/alert';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
@@ -5,6 +6,7 @@ import { Field, FieldError } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
+import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import {
     Table,
     TableBody,
@@ -237,7 +239,7 @@ export default function ComposeWorkingTimesPage({
             <Head title="Jadwal dari pola" />
 
             <ListPageLayout>
-                <div className="sticky top-0 z-20 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-card px-6 py-3">
+                <RecordActionBar>
                     <div className="flex items-center gap-3">
                         <Link
                             href="/settings/working-time-calendar-times"
@@ -266,7 +268,7 @@ export default function ComposeWorkingTimesPage({
                             Daftar pola
                         </Link>
                     </div>
-                </div>
+                </RecordActionBar>
 
                 <div className="min-h-0 flex-1 overflow-auto p-4 lg:p-6">
                     <div className="w-full space-y-6">
@@ -290,6 +292,31 @@ export default function ComposeWorkingTimesPage({
                                 onSubmit={handleSubmit}
                                 className="space-y-6 rounded-lg border border-border bg-card p-6 lg:col-span-7"
                             >
+                                <RecordActionBar>
+                                    <Button
+                                        type="submit"
+                                        disabled={
+                                            calendars.length === 0 ||
+                                            templates.length === 0 ||
+                                            isSubmitting
+                                        }
+                                    >
+                                        <Play className="fill-current" />
+                                        {isSubmitting
+                                            ? 'Menyusun jadwal…'
+                                            : 'Susun jadwal'}
+                                    </Button>
+                                    <ActionButton
+                                        action="cancel"
+                                        type="button"
+                                        onClick={() =>
+                                            router.visit(
+                                                '/settings/working-time-calendar-times',
+                                            )
+                                        }
+                                    />
+                                </RecordActionBar>
+
                                 <h2 className="border-b border-border pb-3 text-sm font-semibold text-foreground">
                                     Susun jadwal
                                 </h2>
@@ -456,27 +483,6 @@ export default function ComposeWorkingTimesPage({
                                         yang dipilih. Rentang paling panjang 3
                                         tahun.
                                     </p>
-                                </div>
-
-                                <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
-                                    <Button variant="outline" asChild>
-                                        <Link href="/settings/working-time-calendar-times">
-                                            Batal
-                                        </Link>
-                                    </Button>
-                                    <Button
-                                        type="submit"
-                                        disabled={
-                                            calendars.length === 0 ||
-                                            templates.length === 0 ||
-                                            isSubmitting
-                                        }
-                                    >
-                                        <Play className="fill-current" />
-                                        {isSubmitting
-                                            ? 'Menyusun jadwal…'
-                                            : 'Susun jadwal'}
-                                    </Button>
                                 </div>
                             </form>
 

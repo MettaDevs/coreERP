@@ -1,3 +1,4 @@
+import { ActionButton } from '@apperp/ui/action-button';
 import { Alert, AlertDescription, AlertTitle } from '@apperp/ui/alert';
 import {
     AlertDialog,
@@ -24,7 +25,9 @@ import {
 import { Checkbox } from '@apperp/ui/checkbox';
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
+import { DialogClose } from '@apperp/ui/dialog';
 import {
+    DialogToolbar,
     Dialog,
     DialogAction,
     DialogBody,
@@ -64,13 +67,13 @@ import {
 } from '@apperp/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@apperp/ui/tabs';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { Trash2 } from 'lucide-react';
 import {
     Ban,
     Check,
     ChevronRight,
     Copy,
     Pencil,
-    Save,
     ShieldCheck,
     UserCog,
     UserPlus,
@@ -561,10 +564,9 @@ function PolicyScopePanel({
                                                         '—'}
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    <Button
+                                                    <ActionButton
+                                                        action="delete"
                                                         type="button"
-                                                        size="sm"
-                                                        variant="ghost"
                                                         onClick={() =>
                                                             onChange(
                                                                 grants.filter(
@@ -578,9 +580,7 @@ function PolicyScopePanel({
                                                                 ),
                                                             )
                                                         }
-                                                    >
-                                                        Hapus
-                                                    </Button>
+                                                    />
                                                 </TableCell>
                                             </TableRow>
                                         );
@@ -1502,19 +1502,16 @@ function InviteForm({
                 }
 
                 const button = (
-                    <Button
+                    <ActionButton
+                        action="save"
                         type="button"
-                        size="sm"
-                        variant="outline"
                         disabled={saving === code.key}
                         onClick={
                             code.issued.redeemed > 0
                                 ? undefined
                                 : () => save(code)
                         }
-                    >
-                        Simpan perubahan
-                    </Button>
+                    />
                 );
 
                 if (code.issued.redeemed === 0) {
@@ -1565,13 +1562,10 @@ function InviteForm({
             }}
         >
             <DialogTrigger asChild>
-                <Button
-                    variant="default"
+                <ActionButton
+                    action="create"
                     className="text-xs font-medium shadow-xs"
-                >
-                    <UserPlus className="mr-1.5 size-3.5" />
-                    Buat undangan
-                </Button>
+                />
             </DialogTrigger>
             <DialogContent ref={contentRef} size="full">
                 <DialogHeader>
@@ -1612,6 +1606,21 @@ function InviteForm({
                         });
                     }}
                 >
+                    <DialogToolbar>
+                        <DialogAction
+                            type="submit"
+                            disabled={
+                                form.processing || form.data.codes.length === 0
+                            }
+                            className="px-5 font-medium shadow-xs"
+                        >
+                            <UserPlus className="mr-1.5 size-3.5" /> Buat{' '}
+                            {form.data.codes.length} kode
+                        </DialogAction>
+                        <DialogClose asChild>
+                            <ActionButton action="cancel" type="button" />
+                        </DialogClose>
+                    </DialogToolbar>
                     <DialogBody className="space-y-4 py-4">
                         <DataTable
                             columns={columns}
@@ -1625,7 +1634,8 @@ function InviteForm({
                                 { id: 'duplicate', label: 'Duplikat baris' },
                                 {
                                     id: 'delete',
-                                    label: 'Hapus baris',
+                                    label: 'Delete',
+                                    icon: <Trash2 aria-hidden="true" />,
                                     destructive: true,
                                     separatorBefore: true,
                                 },
@@ -1665,7 +1675,7 @@ function InviteForm({
                                     blankCode(),
                                 ])
                             }
-                            addRowLabel="Tambah kode undangan"
+                            addRowLabel="Tambah"
                             emptyMessage="Belum ada baris."
                         />
                         <div className="rounded-md border border-border/60 bg-muted/20 p-3 text-xs leading-relaxed text-muted-foreground">
@@ -1691,19 +1701,6 @@ function InviteForm({
                             untuk mengatur badan hukum dan unit kerja per role.
                         </div>
                     </DialogBody>
-                    <DialogFooter>
-                        <DialogAction
-                            type="submit"
-                            disabled={
-                                form.processing || form.data.codes.length === 0
-                            }
-                            className="px-5 font-medium shadow-xs"
-                        >
-                            <UserPlus className="mr-1.5 size-3.5" /> Buat{' '}
-                            {form.data.codes.length} kode
-                        </DialogAction>
-                        <DialogCancel />
-                    </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
@@ -1809,6 +1806,16 @@ function MemberAccessDialog({
                         }
                     }}
                 >
+                    <DialogToolbar>
+                        <ActionButton
+                            action="save"
+                            type="submit"
+                            disabled={form.processing}
+                        />
+                        <DialogClose asChild>
+                            <ActionButton action="cancel" type="button" />
+                        </DialogClose>
+                    </DialogToolbar>
                     <DialogBody>
                         <FieldGroup>
                             <AssignmentPicker
@@ -1951,12 +1958,6 @@ function MemberAccessDialog({
                             </FieldSet>
                         </FieldGroup>
                     </DialogBody>
-                    <DialogFooter>
-                        <DialogAction type="submit" disabled={form.processing}>
-                            <Save className="mr-1.5 size-3.5" /> Simpan akses
-                        </DialogAction>
-                        <DialogCancel />
-                    </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
