@@ -539,11 +539,11 @@ function PostingGroupSheet({
         }
     };
     const cardNavigation = useRecordNavigation({
-        items: matrix.groups,
+        items: list.items,
         currentId: group.id,
         getId: (item) => item.id,
         onNavigate: (id) => {
-            const item = matrix.groups.find((item) => item.id === id);
+            const item = list.items.find((item) => item.id === id);
 
             if (item) {
                 onNavigate(item);
