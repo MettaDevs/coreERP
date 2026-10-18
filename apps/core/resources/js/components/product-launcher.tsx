@@ -34,7 +34,7 @@ function ProductLink({
     return (
         <Button
             variant="ghost"
-            className="h-auto min-w-0 flex-col gap-2 px-2 py-3"
+            className="h-auto min-w-0 flex-col justify-start gap-2 px-2 py-3 text-center font-normal whitespace-normal"
             disabled={!launchable}
             asChild={launchable}
         >
@@ -48,7 +48,7 @@ function ProductLink({
                         <span className="flex size-10 items-center justify-center rounded-lg bg-muted text-foreground">
                             <Icon />
                         </span>
-                        <span className="w-full truncate text-xs">
+                        <span className="w-full text-sm leading-snug break-words">
                             {product.name}
                         </span>
                     </Link>
@@ -61,17 +61,20 @@ function ProductLink({
                         <span className="flex size-10 items-center justify-center rounded-lg bg-muted text-foreground">
                             <Icon />
                         </span>
-                        <span className="w-full truncate text-xs">
+                        <span className="w-full text-sm leading-snug break-words">
                             {product.name}
                         </span>
                     </a>
                 )
             ) : (
-                <span title="Produk belum memiliki akses untuk akun ini">
+                <span
+                    className="flex w-full min-w-0 flex-col items-center gap-2"
+                    title="Aplikasi ini belum bisa dibuka."
+                >
                     <span className="flex size-10 items-center justify-center rounded-lg bg-muted text-foreground">
                         <Icon />
                     </span>
-                    <span className="w-full truncate text-xs">
+                    <span className="w-full text-sm leading-snug break-words">
                         {product.name}
                     </span>
                 </span>
@@ -88,7 +91,7 @@ export function ProductLauncher() {
         {
             id: 'core',
             name: 'Core',
-            description: 'CoreERP workspace and settings.',
+            description: 'Ruang kerja dan pengaturan CoreERP.',
             href: '/dashboard',
         },
         ...entitledProducts,
@@ -129,11 +132,9 @@ export function ProductLauncher() {
                 className="w-[min(30rem,calc(100vw-1rem))] p-3"
             >
                 <PopoverHeader className="p-2">
-                    <PopoverTitle>Aplikasi</PopoverTitle>
+                    <PopoverTitle>Katalog aplikasi</PopoverTitle>
                     <PopoverDescription>
-                        {launchableProducts.length} produk bisnis siap dibuka.
-                        {entitledProducts.length > launchableProducts.length &&
-                            ` ${entitledProducts.length - launchableProducts.length} lainnya masih dipasang atau belum diberikan kepada akun Anda.`}
+                        Buka aplikasi yang tersedia untuk akun Anda.
                     </PopoverDescription>
                 </PopoverHeader>
                 <Input
@@ -143,7 +144,7 @@ export function ProductLauncher() {
                     onChange={(event) => setSearch(event.target.value)}
                 />
                 <ScrollArea className="max-h-96">
-                    <div className="grid grid-cols-3 gap-1 py-3 sm:grid-cols-4">
+                    <div className="grid grid-cols-2 items-stretch gap-2 py-3 sm:grid-cols-3">
                         {filteredProducts.map((product) => (
                             <ProductLink
                                 key={product.id}

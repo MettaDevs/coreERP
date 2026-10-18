@@ -17,8 +17,8 @@ import {
     SheetTrigger,
 } from '@apperp/ui/sheet';
 import { usePage } from '@inertiajs/react';
+import { Building2 } from 'lucide-react';
 import { useRef, useState } from 'react';
-import AppLogoIcon from '@/components/app-logo-icon';
 import { apiRequest, errorText } from '@/lib/core-api';
 import type { Workspace } from '@/types';
 
@@ -106,10 +106,7 @@ export function WorkspaceSwitcher() {
                     aria-label={`Pilih tempat kerja: ${contextLabel}`}
                     title={contextLabel}
                 >
-                    <AppLogoIcon
-                        className="size-5 fill-current"
-                        aria-hidden="true"
-                    />
+                    <Building2 aria-hidden="true" />
                 </Button>
             </SheetTrigger>
             <SheetContent

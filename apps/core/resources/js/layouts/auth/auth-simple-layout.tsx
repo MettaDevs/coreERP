@@ -1,3 +1,4 @@
+import { Card, CardContent, CardHeader } from '@apperp/ui/card';
 import { Link, usePage } from '@inertiajs/react';
 import AppLogoIcon from '@/components/app-logo-icon';
 import { cn } from '@/lib/utils';
@@ -13,35 +14,34 @@ export default function AuthSimpleLayout({
     const isOnboarding = component === 'auth/register';
 
     return (
-        <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6 md:p-10">
+        <main className="flex min-h-svh items-center justify-center bg-background px-4 py-8 sm:px-6">
             <div
                 className={cn(
-                    'w-full',
-                    isOnboarding ? 'max-w-3xl' : 'max-w-sm',
+                    'flex w-full flex-col gap-6',
+                    isOnboarding ? 'max-w-3xl' : 'max-w-md',
                 )}
             >
-                <div className="flex flex-col gap-8">
-                    <div className="flex flex-col items-center gap-4">
-                        <Link
-                            href={home()}
-                            className="flex flex-col items-center gap-2 font-medium"
-                        >
-                            <div className="mb-1 flex h-9 w-9 items-center justify-center rounded-md">
-                                <AppLogoIcon className="size-9 fill-current text-[var(--foreground)] dark:text-white" />
-                            </div>
-                            <span className="sr-only">{title}</span>
-                        </Link>
-
-                        <div className="flex flex-col gap-2 text-center">
-                            <h1 className="text-xl font-medium">{title}</h1>
-                            <p className="text-center text-sm text-muted-foreground">
-                                {description}
-                            </p>
+                <Link
+                    href={home()}
+                    aria-label="Halaman utama"
+                    className="self-center rounded-xl bg-white p-3 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                    <AppLogoIcon className="size-14" />
+                </Link>
+                <Card>
+                    <CardHeader>
+                        <div className="col-span-full flex flex-col gap-2 text-center">
+                            <h1 className="text-xl font-semibold">{title}</h1>
+                            {description && (
+                                <p className="text-sm text-balance text-muted-foreground">
+                                    {description}
+                                </p>
+                            )}
                         </div>
-                    </div>
-                    {children}
-                </div>
+                    </CardHeader>
+                    <CardContent>{children}</CardContent>
+                </Card>
             </div>
-        </div>
+        </main>
     );
 }

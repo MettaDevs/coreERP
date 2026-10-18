@@ -925,6 +925,8 @@ laporan (`timezone`), dan waktu di dataset dikirim dalam UTC bertipe `datetime`;
 
 ## Layout master–detail
 
+Entitas kompleks dengan banyak field, FastTab, rincian, atau relasi, seperti aset, memakai DataTable dan kartu popup SDK `PageDialog` untuk Tambah, Detail, dan Ubah. Daftar beserta filter, sort, dan posisi scroll dipertahankan di belakang kartu. Split view dipilih ketika pekerjaan memang membutuhkan konfigurasi/detail berdampingan, bukan semata karena record kompleks.
+
 Halaman record dengan daftar di kiri dan detail di kanan memakai `MasterDetailLayout` dari
 `@apperp/ui/master-detail-layout`. Berikan daftar lewat `list`, isi detail lewat `children`, dan
 kendalikan `detailOpen` beserta `onDetailOpenChange`. Setelah memilih, membuat, atau meminta Ubah pada

@@ -1,537 +1,372 @@
+import { ActionButton } from '@apperp/ui/action-button';
+import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
-import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-} from '@apperp/ui/collapsible';
-import {
-    CollapsibleSection,
-    CollapsibleSectionGroup,
-} from '@apperp/ui/collapsible-section';
+import { DataTable } from '@apperp/ui/data-table';
+import type { DataTableColumn } from '@apperp/ui/data-table';
 import { Input } from '@apperp/ui/input';
-import { NativeSelect } from '@apperp/ui/native-select';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@apperp/ui/tooltip';
-import { Head, router } from '@inertiajs/react';
-import { ChevronDown, CircleHelp, Plus, Save } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { ListPageLayout } from '@apperp/ui/list-page-layout';
+import { Select } from '@apperp/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@apperp/ui/tabs';
+import { useIncrementalList } from '@apperp/ui/use-incremental-list';
+import { Head } from '@inertiajs/react';
+import { Settings2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { BreadcrumbItem } from '@/types/navigation';
+import { CatalogForm } from './catalog-form';
+import { catalogLoader, labels } from './types';
+import type { Catalog, Choice, Conversion, Draft, Unit } from './types';
 
-type Choice = { id: string; code: string; name: string; active: boolean };
-type Unit = Choice & {
-    symbol: string | null;
-    decimal_places: number;
-    uom_class_id: string;
-    uom_system_id: string | null;
-    deleted_at: string | null;
+const identityColumns: DataTableColumn<Choice>[] = [
+    {
+        id: 'code',
+        header: 'Kode',
+        cell: (row) => row.code,
+        sortValue: (row) => row.code,
+        width: 150,
+    },
+    {
+        id: 'name',
+        header: 'Nama',
+        cell: (row) => row.name,
+        sortValue: (row) => row.name,
+        width: 260,
+    },
+];
+const statusColumn: DataTableColumn<Choice> = {
+    id: 'active',
+    header: 'Status',
+    cell: (row) => (
+        <Badge variant="outline">{row.active ? 'Aktif' : 'Nonaktif'}</Badge>
+    ),
+    sortValue: (row) => Number(row.active),
+    width: 120,
 };
-type Conversion = {
-    id: string;
-    from_unit_id: string;
-    to_unit_id: string;
-    factor: string | number;
-    offset: string | number;
-    rounding_scale: number | null;
-};
-type Props = {
+const unitColumns: DataTableColumn<Unit>[] = [
+    ...identityColumns,
+    {
+        id: 'class_name',
+        header: 'Kelas',
+        cell: (row) => row.class_name,
+        sortValue: (row) => row.class_name,
+        width: 200,
+    },
+    {
+        id: 'system_name',
+        header: 'Sistem',
+        cell: (row) => row.system_name ?? '-',
+        sortValue: (row) => row.system_name ?? '',
+        width: 180,
+    },
+    {
+        id: 'symbol',
+        header: 'Simbol',
+        cell: (row) => row.symbol ?? '-',
+        sortValue: (row) => row.symbol ?? '',
+        width: 110,
+    },
+    {
+        id: 'decimal_places',
+        header: 'Angka desimal',
+        cell: (row) => row.decimal_places,
+        sortValue: (row) => row.decimal_places,
+        width: 150,
+    },
+    statusColumn,
+];
+const conversionColumns: DataTableColumn<Conversion>[] = [
+    {
+        id: 'from_code',
+        header: 'Kode asal',
+        cell: (row) => row.from_code,
+        sortValue: (row) => row.from_code,
+        width: 140,
+    },
+    {
+        id: 'from_name',
+        header: 'Dari satuan',
+        cell: (row) => row.from_name,
+        sortValue: (row) => row.from_name,
+        width: 220,
+    },
+    {
+        id: 'to_code',
+        header: 'Kode tujuan',
+        cell: (row) => row.to_code,
+        sortValue: (row) => row.to_code,
+        width: 140,
+    },
+    {
+        id: 'to_name',
+        header: 'Ke satuan',
+        cell: (row) => row.to_name,
+        sortValue: (row) => row.to_name,
+        width: 220,
+    },
+    {
+        id: 'factor',
+        header: 'Faktor',
+        cell: (row) => row.factor,
+        sortValue: (row) => Number(row.factor),
+        width: 130,
+    },
+    {
+        id: 'offset',
+        header: 'Pergeseran',
+        cell: (row) => row.offset,
+        sortValue: (row) => Number(row.offset),
+        width: 130,
+    },
+    {
+        id: 'rounding_scale',
+        header: 'Pembulatan desimal',
+        cell: (row) => row.rounding_scale ?? 'Tanpa pembulatan',
+        sortValue: (row) => row.rounding_scale ?? -1,
+        width: 200,
+    },
+];
+
+export default function UnitsOfMeasure(props: {
     canManage: boolean;
-    classes: Choice[];
-    systems: Choice[];
-    units: Unit[];
-    conversions: Conversion[];
-};
-
-export default function UnitsOfMeasure({
-    canManage,
-    classes,
-    systems,
-    units,
-    conversions,
-}: Props) {
-    const [isUnitsListOpen, setIsUnitsListOpen] = useState(true);
-    const [classCode, setClassCode] = useState('');
-    const [className, setClassName] = useState('');
-    const [systemCode, setSystemCode] = useState('');
-    const [systemName, setSystemName] = useState('');
-    const [unit, setUnit] = useState({
-        code: '',
-        name: '',
-        symbol: '',
-        decimal_places: '2',
-        uom_class_id: classes[0]?.id ?? '',
-        uom_system_id: '',
-    });
-    const [conversion, setConversion] = useState({
-        from_unit_id: units[0]?.id ?? '',
-        to_unit_id: units[1]?.id ?? '',
-        factor: '',
-        offset: '0',
-        rounding_scale: '',
-    });
-    const classNameById = useMemo(
-        () => new Map(classes.map((item) => [item.id, item.name])),
-        [classes],
+    scopeKey: string;
+}) {
+    return <UnitsPage key={props.scopeKey} canManage={props.canManage} />;
+}
+function UnitsPage({ canManage }: { canManage: boolean }) {
+    const [catalog, setCatalog] = useState<Catalog>('units');
+    const [visited, setVisited] = useState<Set<Catalog>>(new Set(['units']));
+    const [draft, setDraft] = useState<Draft | null>(null);
+    const [saved, setSaved] = useState<{
+        kind: Catalog;
+        record: Unit | Choice | Conversion;
+    } | null>(null);
+    const startCreate = () =>
+        setDraft(
+            catalog === 'units'
+                ? { kind: 'units', record: null }
+                : { kind: catalog },
+        );
+    const tabs = (
+        <Tabs
+            value={catalog}
+            onValueChange={(value) => {
+                if (
+                    value === 'units' ||
+                    value === 'classes' ||
+                    value === 'systems' ||
+                    value === 'conversions'
+                ) {
+                    setCatalog(value);
+                    setVisited((current) => new Set([...current, value]));
+                }
+            }}
+        >
+            <TabsList className="min-h-9 max-w-full flex-wrap justify-start group-data-[orientation=horizontal]/tabs:h-auto">
+                {Object.entries(labels).map(([key, label]) => (
+                    <TabsTrigger key={key} value={key}>
+                        {label}
+                    </TabsTrigger>
+                ))}
+            </TabsList>
+        </Tabs>
     );
-    const unitNameById = useMemo(
-        () =>
-            new Map(
-                units.map((item) => [item.id, `${item.name} (${item.code})`]),
-            ),
-        [units],
-    );
-    const post = (url: string, data: Record<string, string | number | null>) =>
-        router.post(url, data);
 
     return (
         <>
             <Head title="Satuan" />
-            <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6">
-                <div>
-                    <h1 className="text-2xl font-semibold">Satuan</h1>
-                    <p className="text-muted-foreground">
-                        Atur satuan dan konversi yang dapat dipakai semua
-                        aplikasi.
-                    </p>
-                </div>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Kelas dan sistem satuan</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid gap-4 lg:grid-cols-2">
-                        <form
-                            className="flex flex-wrap gap-2"
-                            onSubmit={(event) => {
-                                event.preventDefault();
-                                post('/settings/units-of-measure/classes', {
-                                    code: classCode,
-                                    name: className,
-                                });
-                            }}
-                        >
-                            <Input
-                                label="Kode kelas"
-                                value={classCode}
-                                onChange={(e) => setClassCode(e.target.value)}
-                                required
-                                disabled={!canManage}
-                            />
-                            <Input
-                                label="Nama kelas"
-                                value={className}
-                                onChange={(e) => setClassName(e.target.value)}
-                                required
-                                disabled={!canManage}
-                            />
-                            <Button type="submit" disabled={!canManage}>
-                                <Plus /> Tambah kelas
-                            </Button>
-                        </form>
-                        <form
-                            className="flex flex-wrap gap-2"
-                            onSubmit={(event) => {
-                                event.preventDefault();
-                                post('/settings/units-of-measure/systems', {
-                                    code: systemCode,
-                                    name: systemName,
-                                });
-                            }}
-                        >
-                            <Input
-                                label="Kode sistem"
-                                value={systemCode}
-                                onChange={(e) => setSystemCode(e.target.value)}
-                                required
-                                disabled={!canManage}
-                            />
-                            <Input
-                                label="Nama sistem"
-                                value={systemName}
-                                onChange={(e) => setSystemName(e.target.value)}
-                                required
-                                disabled={!canManage}
-                            />
-                            <Button type="submit" disabled={!canManage}>
-                                <Plus /> Tambah sistem
-                            </Button>
-                        </form>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Tambah satuan</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <form
-                            className="grid gap-3 md:grid-cols-3"
-                            onSubmit={(event) => {
-                                event.preventDefault();
-                                post('/settings/units-of-measure', {
-                                    ...unit,
-                                    uom_system_id: unit.uom_system_id || null,
-                                });
-                            }}
-                        >
-                            <Input
-                                label="Kode"
-                                value={unit.code}
-                                onChange={(e) =>
-                                    setUnit({ ...unit, code: e.target.value })
-                                }
-                                required
-                                disabled={!canManage}
-                            />
-                            <Input
-                                label="Nama"
-                                value={unit.name}
-                                onChange={(e) =>
-                                    setUnit({ ...unit, name: e.target.value })
-                                }
-                                required
-                                disabled={!canManage}
-                            />
-                            <Input
-                                label="Simbol"
-                                value={unit.symbol}
-                                onChange={(e) =>
-                                    setUnit({ ...unit, symbol: e.target.value })
-                                }
-                                disabled={!canManage}
-                            />
-                            <NativeSelect
-                                label="Kelas"
-                                value={unit.uom_class_id}
-                                onChange={(e) =>
-                                    setUnit({
-                                        ...unit,
-                                        uom_class_id: e.target.value,
-                                    })
-                                }
-                                disabled={!canManage}
-                            >
-                                {classes.map((item) => (
-                                    <option key={item.id} value={item.id}>
-                                        {item.name}
-                                    </option>
-                                ))}
-                            </NativeSelect>
-                            <NativeSelect
-                                label="Sistem"
-                                value={unit.uom_system_id}
-                                onChange={(e) =>
-                                    setUnit({
-                                        ...unit,
-                                        uom_system_id: e.target.value,
-                                    })
-                                }
-                                disabled={!canManage}
-                            >
-                                <option value="">Tidak ditentukan</option>
-                                {systems.map((item) => (
-                                    <option key={item.id} value={item.id}>
-                                        {item.name}
-                                    </option>
-                                ))}
-                            </NativeSelect>
-                            <Input
-                                label="Jumlah angka desimal"
-                                type="number"
-                                min="0"
-                                max="12"
-                                value={unit.decimal_places}
-                                onChange={(e) =>
-                                    setUnit({
-                                        ...unit,
-                                        decimal_places: e.target.value,
-                                    })
-                                }
-                                disabled={!canManage}
-                            />
-                            <Button type="submit" disabled={!canManage}>
-                                <Save /> Simpan satuan
-                            </Button>
-                        </form>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Konversi umum</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <form
-                            className="grid gap-3 md:grid-cols-3"
-                            onSubmit={(event) => {
-                                event.preventDefault();
-                                post('/settings/units-of-measure/conversions', {
-                                    ...conversion,
-                                    rounding_scale:
-                                        conversion.rounding_scale || null,
-                                });
-                            }}
-                        >
-                            <NativeSelect
-                                label="Dari satuan"
-                                value={conversion.from_unit_id}
-                                onChange={(e) =>
-                                    setConversion({
-                                        ...conversion,
-                                        from_unit_id: e.target.value,
-                                    })
-                                }
-                                disabled={!canManage}
-                            >
-                                {units
-                                    .filter((item) => item.active)
-                                    .map((item) => (
-                                        <option key={item.id} value={item.id}>
-                                            {item.name} ({item.code})
-                                        </option>
-                                    ))}
-                            </NativeSelect>
-                            <NativeSelect
-                                label="Ke satuan"
-                                value={conversion.to_unit_id}
-                                onChange={(e) =>
-                                    setConversion({
-                                        ...conversion,
-                                        to_unit_id: e.target.value,
-                                    })
-                                }
-                                disabled={!canManage}
-                            >
-                                {units
-                                    .filter((item) => item.active)
-                                    .map((item) => (
-                                        <option key={item.id} value={item.id}>
-                                            {item.name} ({item.code})
-                                        </option>
-                                    ))}
-                            </NativeSelect>
-                            <Input
-                                label="Faktor konversi"
-                                type="number"
-                                min="0.000000000001"
-                                step="any"
-                                value={conversion.factor}
-                                onChange={(e) =>
-                                    setConversion({
-                                        ...conversion,
-                                        factor: e.target.value,
-                                    })
-                                }
-                                required
-                                disabled={!canManage}
-                            />
-                            <Input
-                                label="Pergeseran"
-                                type="number"
-                                step="any"
-                                value={conversion.offset}
-                                onChange={(e) =>
-                                    setConversion({
-                                        ...conversion,
-                                        offset: e.target.value,
-                                    })
-                                }
-                                disabled={!canManage}
-                            />
-                            <Input
-                                label="Pembulatan desimal"
-                                type="number"
-                                min="0"
-                                max="12"
-                                value={conversion.rounding_scale}
-                                onChange={(e) =>
-                                    setConversion({
-                                        ...conversion,
-                                        rounding_scale: e.target.value,
-                                    })
-                                }
-                                disabled={!canManage}
-                            />
-                            <Button
-                                type="submit"
-                                disabled={!canManage || units.length < 2}
-                            >
-                                <Save /> Simpan konversi
-                            </Button>
-                        </form>
-                        <p className="mt-3 text-sm text-muted-foreground">
-                            Konversi khusus produk, seperti satu dus berisi
-                            beberapa barang, akan diatur oleh PIM/Inventory saat
-                            tersedia.
-                        </p>
-
-                        <CollapsibleSectionGroup
-                            defaultValue={[]}
-                            className="mt-6"
-                        >
-                            <CollapsibleSection
-                                value="conversions"
-                                title="Konversi yang tersedia"
-                                summary={`${conversions.length} konversi`}
-                            >
-                                {conversions.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">
-                                        Belum ada konversi umum.
-                                    </p>
-                                ) : (
-                                    <div className="overflow-x-auto">
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead>
-                                                        Dari satuan
-                                                    </TableHead>
-                                                    <TableHead>
-                                                        Ke satuan
-                                                    </TableHead>
-                                                    <TableHead>
-                                                        <Tooltip clickToPin>
-                                                            <TooltipTrigger
-                                                                asChild
-                                                            >
-                                                                <button
-                                                                    type="button"
-                                                                    className="inline-flex items-center gap-1"
-                                                                    aria-label="Penjelasan faktor konversi"
-                                                                >
-                                                                    Faktor
-                                                                    konversi{' '}
-                                                                    <CircleHelp className="size-3.5" />
-                                                                </button>
-                                                            </TooltipTrigger>
-                                                            <TooltipContent className="max-w-72">
-                                                                <p>
-                                                                    Rumus: hasil
-                                                                    = nilai asal
-                                                                    × faktor
-                                                                    konversi +
-                                                                    pergeseran.
-                                                                </p>
-                                                                <p className="mt-1">
-                                                                    Contoh: 2 kg
-                                                                    × 1000 =
-                                                                    2000 g.
-                                                                </p>
-                                                            </TooltipContent>
-                                                        </Tooltip>
-                                                    </TableHead>
-                                                    <TableHead>
-                                                        Pergeseran
-                                                    </TableHead>
-                                                    <TableHead>
-                                                        Pembulatan
-                                                    </TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {conversions.map((item) => (
-                                                    <TableRow key={item.id}>
-                                                        <TableCell>
-                                                            {unitNameById.get(
-                                                                item.from_unit_id,
-                                                            ) ??
-                                                                'Satuan tidak tersedia'}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {unitNameById.get(
-                                                                item.to_unit_id,
-                                                            ) ??
-                                                                'Satuan tidak tersedia'}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {item.factor}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {item.offset}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {item.rounding_scale ??
-                                                                'Tidak dibulatkan'}
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                )}
-                            </CollapsibleSection>
-                        </CollapsibleSectionGroup>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <Collapsible
-                        open={isUnitsListOpen}
-                        onOpenChange={setIsUnitsListOpen}
-                        className="group"
-                    >
-                        <CardHeader className="flex flex-row items-center justify-between">
-                            <CardTitle>Daftar satuan</CardTitle>
-                            <CollapsibleTrigger asChild>
-                                <button
-                                    type="button"
-                                    aria-label="Buka atau tutup daftar satuan"
-                                    className="cursor-pointer rounded-md p-1 hover:bg-muted"
+            <ListPageLayout
+                header={
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+                        <h1 className="text-xl font-semibold">Satuan</h1>
+                        {canManage &&
+                            (catalog === 'conversions' ? (
+                                <Button variant="outline" onClick={startCreate}>
+                                    <Settings2 />
+                                    Atur konversi
+                                </Button>
+                            ) : (
+                                <ActionButton
+                                    action="create"
+                                    onClick={startCreate}
                                 >
-                                    <ChevronDown className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-                                </button>
-                            </CollapsibleTrigger>
-                        </CardHeader>
-                        <CollapsibleContent>
-                            <CardContent>
-                                <div className="overflow-x-auto">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Kode</TableHead>
-                                                <TableHead>Nama</TableHead>
-                                                <TableHead>Kelas</TableHead>
-                                                <TableHead>Simbol</TableHead>
-                                                <TableHead>Desimal</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {units.map((item) => (
-                                                <TableRow key={item.id}>
-                                                    <TableCell>
-                                                        {item.code}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {item.name}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {classNameById.get(
-                                                            item.uom_class_id,
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {item.symbol ?? '—'}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {item.decimal_places}
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                            </CardContent>
-                        </CollapsibleContent>
-                    </Collapsible>
-                </Card>
-            </main>
+                                    Tambah {labels[catalog].toLowerCase()}
+                                </ActionButton>
+                            ))}
+                    </div>
+                }
+            >
+                {visited.has('units') && (
+                    <CatalogTable<Unit>
+                        catalog="units"
+                        active={catalog === 'units'}
+                        tabs={tabs}
+                        columns={unitColumns}
+                        saved={
+                            saved?.kind === 'units' && 'version' in saved.record
+                                ? saved.record
+                                : null
+                        }
+                        onEdit={
+                            canManage
+                                ? (record) =>
+                                      setDraft({ kind: 'units', record })
+                                : undefined
+                        }
+                    />
+                )}
+                {visited.has('classes') && (
+                    <CatalogTable<Choice>
+                        catalog="classes"
+                        active={catalog === 'classes'}
+                        tabs={tabs}
+                        columns={[...identityColumns, statusColumn]}
+                        saved={
+                            saved?.kind === 'classes' && 'code' in saved.record
+                                ? saved.record
+                                : null
+                        }
+                    />
+                )}
+                {visited.has('systems') && (
+                    <CatalogTable<Choice>
+                        catalog="systems"
+                        active={catalog === 'systems'}
+                        tabs={tabs}
+                        columns={[...identityColumns, statusColumn]}
+                        saved={
+                            saved?.kind === 'systems' && 'code' in saved.record
+                                ? saved.record
+                                : null
+                        }
+                    />
+                )}
+                {visited.has('conversions') && (
+                    <CatalogTable<Conversion>
+                        catalog="conversions"
+                        active={catalog === 'conversions'}
+                        tabs={tabs}
+                        columns={conversionColumns}
+                        saved={
+                            saved?.kind === 'conversions' &&
+                            'factor' in saved.record
+                                ? saved.record
+                                : null
+                        }
+                    />
+                )}
+            </ListPageLayout>
+            {draft && (
+                <CatalogForm
+                    draft={draft}
+                    onClose={() => setDraft(null)}
+                    onSaved={(record) => {
+                        setSaved({ kind: draft.kind, record });
+                        setDraft(null);
+                    }}
+                />
+            )}
         </>
     );
 }
+function CatalogTable<T extends { id: string }>({
+    catalog,
+    active,
+    tabs,
+    columns,
+    onEdit,
+    saved,
+}: {
+    catalog: Catalog;
+    active: boolean;
+    tabs: ReactNode;
+    columns: DataTableColumn<T>[];
+    onEdit?: (record: T) => void;
+    saved: T | null;
+}) {
+    const [query, setQuery] = useState('');
+    const [status, setStatus] = useState('all');
+    const loadItems = useMemo(
+        () =>
+            catalogLoader<T>(
+                catalog,
+                status === 'all' || catalog === 'conversions'
+                    ? {}
+                    : { active: status === 'active' ? '1' : '0' },
+            ),
+        [catalog, status],
+    );
+    const list = useIncrementalList({
+        loadItems,
+        query,
+        active,
+        getKey: (row) => row.id,
+    });
+    const appliedRecord = useRef<T | null>(null);
+    useEffect(() => {
+        if (saved && appliedRecord.current !== saved) {
+            appliedRecord.current = saved;
+            list.setItems((rows) => [
+                saved,
+                ...rows.filter((row) => row.id !== saved.id),
+            ]);
+            list.reload();
+        }
+    }, [saved, list]);
 
+    return (
+        <div
+            className={
+                active
+                    ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
+                    : 'hidden'
+            }
+        >
+            <div className="shrink-0 space-y-3 border-b p-4">
+                {tabs}
+                <div className="flex flex-col gap-3 sm:flex-row">
+                    <div className="w-full sm:max-w-sm">
+                        <Input
+                            aria-label={`Cari ${labels[catalog].toLowerCase()}`}
+                            placeholder="Cari kode atau nama..."
+                            value={query}
+                            onChange={(event) => setQuery(event.target.value)}
+                        />
+                    </div>
+                    {catalog !== 'conversions' && (
+                        <div className="w-full sm:w-44">
+                            <Select
+                                label="Status"
+                                value={status}
+                                onValueChange={(value) =>
+                                    setStatus(value ?? 'all')
+                                }
+                                items={[
+                                    { value: 'all', label: 'Semua' },
+                                    { value: 'active', label: 'Aktif' },
+                                    { value: 'inactive', label: 'Nonaktif' },
+                                ]}
+                            />
+                        </div>
+                    )}
+                </div>
+            </div>
+            <DataTable
+                columns={columns}
+                data={list.items}
+                getRowKey={(row) => row.id}
+                incremental={list}
+                serverSort
+                sort={list.sort}
+                onSortChange={list.onSortChange}
+                actions={onEdit ? [{ id: 'edit', label: 'Ubah' }] : []}
+                actionsPlacement="inline"
+                onRowAction={(_, record) => onEdit?.(record)}
+                onRowClick={onEdit}
+                emptyMessage={`Belum ada ${labels[catalog].toLowerCase()} yang cocok.`}
+            />
+        </div>
+    );
+}
 UnitsOfMeasure.layout = {
     breadcrumbs: [
         { title: 'Satuan', href: '/settings/units-of-measure' },

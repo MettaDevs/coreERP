@@ -21,7 +21,6 @@ import {
     Plug,
     Ruler,
     Package,
-    Palette,
     ShieldCheck,
     Truck,
     UserRound,
@@ -312,7 +311,7 @@ export function useShellNavigation() {
             },
         ]),
         {
-            label: 'Profile',
+            label: 'Profil',
             icon: UserRound,
             href: '/settings/profile',
             children: [
@@ -324,7 +323,7 @@ export function useShellNavigation() {
             ],
         },
         {
-            label: 'Security',
+            label: 'Keamanan',
             icon: ShieldCheck,
             href: '/settings/security',
             children: [
@@ -332,18 +331,6 @@ export function useShellNavigation() {
                     label: 'Keamanan akun',
                     icon: ShieldCheck,
                     href: '/settings/security',
-                },
-            ],
-        },
-        {
-            label: 'Appearance',
-            icon: Palette,
-            href: '/settings/appearance',
-            children: [
-                {
-                    label: 'Tampilan',
-                    icon: Palette,
-                    href: '/settings/appearance',
                 },
             ],
         },
