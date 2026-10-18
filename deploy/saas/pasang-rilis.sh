@@ -136,6 +136,7 @@ compose() {
 langkah 'Data'
 compose --profile data up -d
 compose --profile data wait core-rustfs-init
+compose --profile data up -d --wait --wait-timeout 120 core-valkey
 
 langkah 'Migrasi'
 # `--force-recreate` supaya ia benar-benar berjalan setiap pemasangan: rilis yang image-nya sama dengan yang

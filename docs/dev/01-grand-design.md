@@ -309,13 +309,13 @@ yatim**, tidak dihapus. Menghapusnya berarti migration yang membuang data di ser
 pelanggan, dan aturan repo ini adalah semua penghapusan bersifat lunak. Tidak ada kode yang
 menulisnya lagi, dan tidak ada kode yang membacanya sebagai penentu kesiapan.
 
-### Keputusan yang belum diambil: cara mengalamati tenant
+### Alamat tenant dan lingkungan
 
-Hari ini seluruh tenant berbagi satu host shell dan dibedakan lewat path. Apakah
-nanti kita memakai subdomain per tenant, custom domain milik pelanggan, atau tetap
-seperti sekarang, **belum diputuskan**. Jalur halaman module bersifat relatif, jadi ia mewarisi
-host mana pun tempat shell disajikan dan ketiga pilihan itu tetap terbuka tanpa perubahan skema
-maupun migrasi data.
+SaaS memakai subdomain tenant; demo dan sandbox membawa label lingkungan sendiri. `EnvironmentAddress` menguraikan
+alamat, lalu `ResolveEnvironment` mencocokkannya dengan registry lingkungan aktif sebelum sesi dibuka. Alamat
+bukan bukti hak: membership tenant dan scope data tetap diverifikasi. Cookie sesi dipisahkan per host. Jalur halaman
+module bersifat relatif sehingga mewarisi host lingkungan. Penempatan tanpa `COREERP_BASE_DOMAIN`, termasuk on-prem,
+tetap memakai satu alamat. Lihat [SSO](32-sso.md) dan [cache/session](36-cache-and-sessions.md).
 
 ## Silo dan customisasi
 

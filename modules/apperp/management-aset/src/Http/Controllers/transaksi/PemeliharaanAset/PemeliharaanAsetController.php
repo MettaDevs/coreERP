@@ -68,7 +68,7 @@ class PemeliharaanAsetController extends Controller
             'id' => 'id', 'created_at' => 'created_at', 'kode' => 'kode', 'jenis' => 'tipe_work_order_nama',
             'keterangan' => 'keterangan', 'layanan' => 'tingkat_layanan_nama',
             'status' => 'status', 'jadwal' => 'dijadwalkan_mulai', 'baris' => 'jumlah_baris',
-        ], ['kode', 'tipe_work_order_nama', 'keterangan', 'tingkat_layanan_nama', 'status'], 'created_at', ['jumlah_baris'], 'desc'));
+        ], ['kode', 'tipe_work_order_nama', 'keterangan', 'tingkat_layanan_nama', 'status'], 'created_at', ['jumlah_baris'], 'desc', nativeSortColumns: ['created_at' => 'date', 'id' => 'string']));
     }
 
     public function jobTypesForAset(Request $request): JsonResponse

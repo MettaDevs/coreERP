@@ -109,7 +109,7 @@ class PembuatAset
             $receiptCode = $receiptId === null ? null : PenerimaanAset::query()->whereKey($receiptId)->value('kode');
             FixedAssetLedgerContext::set(isset($data['opening_balance']) ? 'opening_balance' : 'acquisition', substr((string) $data['acquired_on'], 0, 10), $receiptId === null ? 'asset' : 'penerimaan-aset', (string) ($receiptId ?? $aset->id), (string) ($receiptCode ?? $kode), 'Perolehan aset');
         }
-        $this->buatBuku($aset, $data, $tenantId);
+        $this->buatBuku($aset, $data, $tenantId, $defaults?->capitalization_threshold);
         $this->simpanAtribut($aset, $data, $tenantId);
 
         return $aset;
@@ -384,7 +384,7 @@ class PembuatAset
     {
         return GroupAset::withTrashed()
             ->where('id', $groupAsetId)
-            ->select('kelompok_harta_fiskal_id', 'lokasi_aset_id')
+            ->select('kelompok_harta_fiskal_id', 'lokasi_aset_id', 'capitalization_threshold')
             ->toBase()->first();
     }
 
@@ -399,12 +399,11 @@ class PembuatAset
      *
      * @param  array<string, mixed>  $data
      */
-    private function buatBuku(Aset $aset, array $data, string $tenantId): void
+    private function buatBuku(Aset $aset, array $data, string $tenantId, ?string $threshold): void
     {
         // `withTrashed()` di sini dan pada `bawaanGroup()` mempertahankan perilaku lama:
         // group yang sudah diarsipkan tetap terbaca, karena aset yang sedang diterima
         // memang sudah lolos validasi yang menuntut group masih hidup.
-        $threshold = $this->ambangKapitalisasi((string) $data['group_aset_id']);
         // Perolehan di bawah ambang kapitalisasi tetap dicatat sebagai aset, tetapi
         // bukunya tidak menyusut. Ini perilaku yang sama dengan F&O. Perbandingannya
         // per aset, bukan per dokumen: dua puluh kursi lima ratus ribu tidak melewati

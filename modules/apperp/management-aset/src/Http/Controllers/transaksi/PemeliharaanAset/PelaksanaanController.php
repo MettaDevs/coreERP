@@ -168,7 +168,7 @@ class PelaksanaanController extends Controller
     public function checklist(Request $request, string $id, string $jobId): JsonResponse
     {
         $this->guard($request, 'read');
-        $this->jobLine($request, $id, $jobId);
+        $this->jobLine($this->workOrder($request, $id), $jobId);
 
         return response()->json(['data' => $this->barisChecklist($jobId)]);
     }
@@ -191,7 +191,7 @@ class PelaksanaanController extends Controller
             'Checklist hanya dapat disusun sebelum pekerjaan dimulai.',
         );
         app(OrganizationScope::class)->require($request, $workOrder->legal_entity_id, $workOrder->responsible_org_unit_id);
-        $this->jobLine($request, $id, $jobId);
+        $this->jobLine($workOrder, $jobId);
 
         $templateId = $request->validate([
             'template_id' => ['required', 'ulid', Rule::exists('aset_m_maintenance_checklist_template', 'id')
@@ -226,7 +226,7 @@ class PelaksanaanController extends Controller
             'Checklist hanya dapat diisi ketika pekerjaan sedang dikerjakan.',
         );
         app(OrganizationScope::class)->require($request, $workOrder->legal_entity_id, $workOrder->responsible_org_unit_id);
-        $this->jobLine($request, $id, $jobId);
+        $this->jobLine($workOrder, $jobId);
 
         $data = $request->validate([
             'baris' => ['present', 'array', 'max:200'],
@@ -283,7 +283,7 @@ class PelaksanaanController extends Controller
             'Hasil pelaksanaan hanya dapat diubah saat pekerjaan sedang dikerjakan atau sudah selesai.',
         );
         app(OrganizationScope::class)->require($request, $workOrder->legal_entity_id, $workOrder->responsible_org_unit_id);
-        $this->jobLine($request, $id, $jobId);
+        $this->jobLine($workOrder, $jobId);
 
         $data = $request->validate([
             'aktual_jam' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
@@ -551,12 +551,10 @@ class PelaksanaanController extends Controller
         });
     }
 
-    private function jobLine(Request $request, string $workOrderId, string $jobId): stdClass
+    private function jobLine(stdClass $workOrder, string $jobId): stdClass
     {
-        $this->workOrder($request, $workOrderId);
-
         return PemeliharaanAsetDetail::query()->where([
-            'id' => $jobId, 'pemeliharaan_aset_id' => $workOrderId,
+            'id' => $jobId, 'pemeliharaan_aset_id' => $workOrder->id,
         ])->toBase()->firstOrFail();
     }
 
