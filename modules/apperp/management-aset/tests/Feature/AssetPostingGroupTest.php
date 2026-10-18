@@ -49,6 +49,27 @@ class AssetPostingGroupTest extends TestCase
         }
     }
 
+    public function test_exact_dated_record_read_never_substitutes_current_or_latest_and_is_tenant_scoped(): void
+    {
+        $group = $this->group('EXACT');
+        $this->simpan($group, '2026-01-01', $this->wajib())->assertCreated();
+        $this->simpan($group, '2026-07-01', [...$this->wajib(), 'payable_account_id' => $this->akun['hutang_lain']])->assertCreated();
+        $this->pengguna(['read'])->getJson(self::API.'/'.$group.'/2026-01-01?q=not-a-match')->assertOk()
+            ->assertJsonPath('data.group.id', $group)->assertJsonCount(2, 'data.group.rows')
+            ->assertJsonPath('data.row.effective_from', '2026-01-01')
+            ->assertJsonPath('data.row.payable_account_id', $this->akun['hutang'])
+            ->assertJsonPath('data.account_details.'.$this->akun['hutang'].'.code', '2-1100')
+            ->assertJsonPath('data.accounts.0.column', 'acquisition_account_id');
+        $this->pengguna(['read'])->getJson(self::API.'/'.$group.'/2026-03-01')->assertNotFound();
+        $this->pengguna(['read'])->getJson(self::API.'/'.Str::ulid().'/2026-01-01')->assertNotFound();
+        $this->pengguna(['read'])->getJson(self::API.'/'.$group.'/2026-02-30')->assertUnprocessable();
+        $this->pengguna([])->getJson(self::API.'/'.$group.'/2026-01-01')->assertForbidden();
+        $this->sebagaiPenggunaBernama('Other tenant', $this->buatTenantUji(), [self::PERMISSION.'read'])
+            ->getJson(self::API.'/'.$group.'/2026-01-01')->assertNotFound();
+        $this->arsipkan($group, '2026-01-01', ['archive'])->assertNoContent();
+        $this->pengguna(['read'])->getJson(self::API.'/'.$group.'/2026-01-01')->assertNotFound();
+    }
+
     public function test_accounts_are_mapped_per_effective_date_and_the_matrix_shows_the_row_in_force(): void
     {
         $kendaraan = $this->group('KENDARAAN');

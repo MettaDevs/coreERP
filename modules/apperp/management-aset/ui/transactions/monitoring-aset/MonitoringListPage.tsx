@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { ActionButton } from '@apperp/ui/action-button';
 import { DataTable } from '@apperp/ui/data-table';
@@ -14,19 +14,16 @@ import {
 } from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
+import { PageDialog, PageDialogContent } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
+import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
 import { useRecordList } from '../../use-record-list';
+import type { RecordCardState } from '../_shared/record-card';
+import type { Context } from './monitoring';
 import type { Monitoring } from './monitoring';
-import {
-    STATUS,
-    StatusBadge,
-    bukaMonitoring,
-    bukaMonitoringBaru,
-    bukaMonitoringUbah,
-    izin,
-    tanggalTampil,
-} from './monitoring';
+import { STATUS, StatusBadge, izin, tanggalTampil } from './monitoring';
+import MonitoringDetailPage from './MonitoringDetailPage';
 
 /** Nilai filter status; `''` berarti semua. */
 const PILIHAN_STATUS = [
@@ -40,11 +37,42 @@ const PILIHAN_STATUS = [
  * menyelesaikan pemeriksaan adalah urusan halaman rincian yang punya alamat sendiri.
  */
 export default function MonitoringListPage({
+    context,
     permissions,
 }: {
+    context: Context;
     permissions: string[];
 }) {
     const can = izin(permissions);
+    const [card, setCard] = useState<RecordCardState>(null);
+    const [cardBusy, setCardBusy] = useState(false);
+    const [cardDirty, setCardDirty] = useState(false);
+    const discardChanges = () =>
+        !cardDirty || window.confirm('Buang perubahan yang belum disimpan?');
+    const openNewCard = () => {
+        if (!cardBusy && discardChanges()) {
+            setCardDirty(false);
+            setCard({ mode: 'create' });
+        }
+    };
+    const closeCard = () => {
+        if (!cardBusy && discardChanges()) {
+            setCard(null);
+            setCardDirty(false);
+            list.reload();
+        }
+    };
+    const cardRef = useRef<HTMLDivElement>(null);
+    const openView = (id: string) => {
+        if (!cardBusy && discardChanges()) {
+            setCard({ mode: 'view', id });
+        }
+    };
+    const openEdit = (id: string) => {
+        if (!cardBusy && discardChanges()) {
+            setCard({ mode: 'edit', id });
+        }
+    };
     const [status, setStatus] = useState('');
     const [dari, setDari] = useState('');
     const [sampai, setSampai] = useState('');
@@ -143,113 +171,202 @@ export default function MonitoringListPage({
         actions.push({ id: 'edit', label: 'Ubah' });
     }
 
+    const currentCardId = card && 'id' in card ? card.id : null;
+    const cardNavigation = useRecordNavigation({
+        items: list.items,
+        currentId: currentCardId,
+        getId: (item) => item.id,
+        onNavigate: (id) => setCard({ mode: 'view', id }),
+        scopeKey: JSON.stringify([
+            '/monitoring-aset',
+            search,
+            Object.fromEntries(
+                Object.entries({ status, dari, sampai }).filter(
+                    ([, value]) => value !== '',
+                ),
+            ),
+            list.sort,
+        ]),
+        hasMore: list.hasMore,
+        loading: list.loading,
+        loadMore: list.loadMore,
+        disabled: cardBusy || cardDirty,
+    });
+
     return (
-        <ListPageLayout
-            header={
-                <RecordActionBar title="Monitoring aset">
-                    {can('create') && (
-                        <ActionButton
-                            action="create"
-                            type="button"
-                            onClick={bukaMonitoringBaru}
-                        >
-                            Buat monitoring
-                        </ActionButton>
-                    )}
-                </RecordActionBar>
-            }
-            filters={
-                <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
-                    <div className="w-full sm:w-72">
-                        <Input
-                            label="Cari"
-                            type="search"
-                            placeholder="Nomor bukti, lokasi, atau orang"
-                            value={search}
-                            onChange={(event) => setSearch(event.target.value)}
-                        />
-                    </div>
-                    <div className="w-full sm:w-44">
-                        <Input
-                            label="Dari tanggal"
-                            type="date"
-                            value={dari}
-                            onChange={(event) => setDari(event.target.value)}
-                        />
-                    </div>
-                    <div className="w-full sm:w-44">
-                        <Input
-                            label="Sampai tanggal"
-                            type="date"
-                            value={sampai}
-                            onChange={(event) => setSampai(event.target.value)}
-                        />
-                    </div>
-                    <div className="w-full sm:w-48">
-                        <Select
-                            label="Status"
-                            items={PILIHAN_STATUS.map(
-                                (pilihan) => pilihan.label,
-                            )}
-                            value={
-                                PILIHAN_STATUS.find(
-                                    (pilihan) => pilihan.value === status,
-                                )?.label ?? null
-                            }
-                            ariaLabel="Saring berdasarkan status"
-                            onValueChange={(value) =>
-                                setStatus(
+        <>
+            <ListPageLayout
+                header={
+                    <RecordActionBar title="Monitoring aset">
+                        {can('create') && (
+                            <ActionButton
+                                action="create"
+                                type="button"
+                                onClick={() => {
+                                    if (!cardBusy && discardChanges()) {
+                                        setCard({ mode: 'create' });
+                                    }
+                                }}
+                            />
+                        )}
+                    </RecordActionBar>
+                }
+                filters={
+                    <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
+                        <div className="w-full sm:w-72">
+                            <Input
+                                label="Cari"
+                                type="search"
+                                placeholder="Nomor bukti, lokasi, atau orang"
+                                value={search}
+                                onChange={(event) =>
+                                    setSearch(event.target.value)
+                                }
+                            />
+                        </div>
+                        <div className="w-full sm:w-44">
+                            <Input
+                                label="Dari tanggal"
+                                type="date"
+                                value={dari}
+                                onChange={(event) =>
+                                    setDari(event.target.value)
+                                }
+                            />
+                        </div>
+                        <div className="w-full sm:w-44">
+                            <Input
+                                label="Sampai tanggal"
+                                type="date"
+                                value={sampai}
+                                onChange={(event) =>
+                                    setSampai(event.target.value)
+                                }
+                            />
+                        </div>
+                        <div className="w-full sm:w-48">
+                            <Select
+                                label="Status"
+                                items={PILIHAN_STATUS.map(
+                                    (pilihan) => pilihan.label,
+                                )}
+                                value={
                                     PILIHAN_STATUS.find(
-                                        (pilihan) => pilihan.label === value,
-                                    )?.value ?? '',
-                                )
-                            }
-                        />
+                                        (pilihan) => pilihan.value === status,
+                                    )?.label ?? null
+                                }
+                                ariaLabel="Saring berdasarkan status"
+                                onValueChange={(value) =>
+                                    setStatus(
+                                        PILIHAN_STATUS.find(
+                                            (pilihan) =>
+                                                pilihan.label === value,
+                                        )?.value ?? '',
+                                    )
+                                }
+                            />
+                        </div>
                     </div>
-                </div>
-            }
-        >
-            {!memuat && !terlihat.length ? (
-                <Empty>
-                    <EmptyHeader>
-                        <EmptyTitle>Belum ada monitoring aset</EmptyTitle>
-                        <EmptyDescription>
-                            Monitoring mencatat hasil pemeriksaan fisik aset di
-                            satu lokasi: mana yang ada, mana yang tidak, dan
-                            mana yang tidak cocok dengan catatan aset.
-                        </EmptyDescription>
-                    </EmptyHeader>
-                </Empty>
-            ) : (
-                <DataTable
-                    columns={columns}
-                    incremental={list}
-                    sort={list.sort}
-                    onSortChange={list.onSortChange}
-                    data={terlihat}
-                    getRowKey={(baris) => baris.id}
-                    getRowLabel={(baris) => baris.kode}
-                    actions={actions}
-                    onRowClick={(baris) => bukaMonitoring(baris.id)}
-                    onRowAction={(action, baris) => {
-                        if (action === 'detail') {
-                            bukaMonitoring(baris.id);
-                        }
-
-                        if (action === 'edit') {
-                            if (baris.status !== 'draft') {
-                                toast.error(
-                                    'Monitoring yang sudah selesai tidak dapat diubah. Buat monitoring baru bila temuannya perlu dikoreksi.',
-                                );
-
-                                return;
+                }
+            >
+                {!memuat && !terlihat.length ? (
+                    <Empty>
+                        <EmptyHeader>
+                            <EmptyTitle>Belum ada monitoring aset</EmptyTitle>
+                            <EmptyDescription>
+                                Monitoring mencatat hasil pemeriksaan fisik aset
+                                di satu lokasi: mana yang ada, mana yang tidak,
+                                dan mana yang tidak cocok dengan catatan aset.
+                            </EmptyDescription>
+                        </EmptyHeader>
+                    </Empty>
+                ) : (
+                    <DataTable
+                        columns={columns}
+                        incremental={list}
+                        sort={list.sort}
+                        onSortChange={list.onSortChange}
+                        data={terlihat}
+                        getRowKey={(baris) => baris.id}
+                        getRowLabel={(baris) => baris.kode}
+                        actions={actions}
+                        onRowClick={(baris) => openView(baris.id)}
+                        onRowAction={(action, baris) => {
+                            if (action === 'detail') {
+                                openView(baris.id);
                             }
 
-                            bukaMonitoringUbah(baris.id);
+                            if (action === 'edit') {
+                                if (baris.status !== 'draft') {
+                                    toast.error(
+                                        'Monitoring yang sudah selesai tidak dapat diubah. Buat monitoring baru bila temuannya perlu dikoreksi.',
+                                    );
+
+                                    return;
+                                }
+
+                                openEdit(baris.id);
+                            }
+                        }}
+                    />
+                )}
+            </ListPageLayout>
+            {card && (
+                <PageDialog
+                    open
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            closeCard();
                         }
                     }}
-                />
+                >
+                    <PageDialogContent
+                        ref={cardRef}
+                        aria-describedby={undefined}
+                        onEscapeKeyDown={(event) => {
+                            if (cardBusy) {
+                                event.preventDefault();
+                            }
+                        }}
+                        title={'Monitoring aset'}
+                        busy={cardBusy}
+                        onNew={
+                            !(card?.mode === 'create') && can('create')
+                                ? openNewCard
+                                : undefined
+                        }
+                        navigation={currentCardId ? cardNavigation : undefined}
+                    >
+                        <MonitoringDetailPage
+                            key={
+                                card.mode === 'create'
+                                    ? 'create'
+                                    : card.mode + ':' + card.id
+                            }
+                            context={context}
+                            permissions={permissions}
+                            monitoringId={
+                                card.mode === 'create' ? undefined : card.id
+                            }
+                            mode={card.mode}
+                            card={{
+                                onDirtyChange: setCardDirty,
+                                portalContainer: cardRef,
+                                onBusyChange: setCardBusy,
+                                onClose: closeCard,
+                                onSaved: (id) => {
+                                    setCardDirty(false);
+                                    setCard({ mode: 'view', id });
+                                    setCardDirty(false);
+                                    list.reload();
+                                },
+                                onRequestView: openView,
+                                onRequestEdit: openEdit,
+                            }}
+                        />
+                    </PageDialogContent>
+                </PageDialog>
             )}
-        </ListPageLayout>
+        </>
     );
 }

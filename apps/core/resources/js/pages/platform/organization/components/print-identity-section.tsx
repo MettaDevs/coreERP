@@ -9,7 +9,7 @@ import {
 import { Input } from '@apperp/ui/input';
 import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
 import { Textarea } from '@apperp/ui/textarea';
-import { Save, Trash2, Upload } from 'lucide-react';
+import { Trash2, Upload } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { apiJson, apiRequest, errorText, toastSaveError } from '@/lib/core-api';
@@ -49,6 +49,8 @@ type Form = {
     footer_text: string;
 };
 
+export type PrintIdentityDraft = Form & { version: number };
+
 const POSITION_LABEL: Record<Logo['position'], string> = {
     kiri: 'Kiri',
     tengah: 'Tengah',
@@ -82,20 +84,26 @@ export function PrintIdentitySection({
     organizationId,
     organizationName,
     canManage,
+    busy,
+    onDraftChange,
+    onBusyChange,
 }: {
     organizationId: string;
     organizationName: string;
     canManage: boolean;
+    busy: boolean;
+    onDraftChange: (draft: PrintIdentityDraft) => void;
+    onBusyChange: (busy: boolean) => void;
 }) {
     const base = `/api/v1/organizations/${organizationId}/print-identity`;
     const [identity, setIdentity] = useState<Identity | null>(null);
     const [form, setForm] = useState<Form>(toForm(null));
     const [dirty, setDirty] = useState(false);
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [position, setPosition] = useState<Logo['position']>('kiri');
     const fileInput = useRef<HTMLInputElement>(null);
+    const writingLogo = useRef(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -131,36 +139,27 @@ export function PrintIdentitySection({
     }, [base]);
 
     const update = <K extends keyof Form>(key: K, value: Form[K]) => {
-        setForm((current) => ({ ...current, [key]: value }));
+        const next = { ...form, [key]: value };
+        setForm(next);
         setDirty(true);
+        onDraftChange({ ...next, version: identity?.version ?? 0 });
     };
 
-    const save = async () => {
-        setSaving(true);
+    const acceptIdentity = (next: Identity) => {
+        setIdentity(next);
 
-        try {
-            const result = await apiJson<{ data: Identity }>(base, {
-                method: 'PUT',
-                body: JSON.stringify({
-                    ...form,
-                    version: identity?.version ?? 0,
-                }),
-            });
-            setIdentity(result.data);
-            setForm(toForm(result.data));
-            setDirty(false);
-            toast.success('Identitas cetak disimpan.');
-        } catch (caught) {
-            toastSaveError(caught, 'Identitas cetak belum dapat disimpan.');
-        } finally {
-            setSaving(false);
+        if (dirty) {
+            onDraftChange({ ...form, version: next.version });
         }
     };
 
     const uploadLogo = async (file: File | undefined) => {
-        if (!file) {
+        if (!file || busy || writingLogo.current) {
             return;
         }
+
+        writingLogo.current = true;
+        onBusyChange(true);
 
         const body = new FormData();
         body.append('file', file);
@@ -172,11 +171,14 @@ export function PrintIdentitySection({
                 method: 'POST',
                 body,
             });
-            setIdentity(result.data);
+            acceptIdentity(result.data);
             toast.success('Logo ditambahkan.');
         } catch (caught) {
             toastSaveError(caught, 'Logo belum dapat diunggah.');
         } finally {
+            writingLogo.current = false;
+            onBusyChange(false);
+
             if (fileInput.current) {
                 fileInput.current.value = '';
             }
@@ -187,6 +189,13 @@ export function PrintIdentitySection({
         logo: Logo,
         patch: Partial<Pick<Logo, 'position' | 'width_mm'>>,
     ) => {
+        if (busy || writingLogo.current) {
+            return;
+        }
+
+        writingLogo.current = true;
+        onBusyChange(true);
+
         try {
             const result = await apiJson<{ data: Identity }>(
                 `${base}/logos/${logo.id}`,
@@ -198,23 +207,36 @@ export function PrintIdentitySection({
                     }),
                 },
             );
-            setIdentity(result.data);
+            acceptIdentity(result.data);
         } catch (caught) {
             toastSaveError(caught, 'Logo belum dapat diubah.');
+        } finally {
+            writingLogo.current = false;
+            onBusyChange(false);
         }
     };
 
     const removeLogo = async (logo: Logo) => {
+        if (busy || writingLogo.current) {
+            return;
+        }
+
+        writingLogo.current = true;
+        onBusyChange(true);
+
         try {
             const response = await apiRequest(`${base}/logos/${logo.id}`, {
                 method: 'DELETE',
                 headers: { 'If-Match': `W/"${identity?.version ?? 0}"` },
             });
             const result = (await response.json()) as { data: Identity };
-            setIdentity(result.data);
+            acceptIdentity(result.data);
             toast.success('Logo dihapus.');
         } catch (caught) {
             toastSaveError(caught, 'Logo belum dapat dihapus.');
+        } finally {
+            writingLogo.current = false;
+            onBusyChange(false);
         }
     };
 
@@ -233,7 +255,7 @@ export function PrintIdentitySection({
                 label={label}
                 placeholder={placeholder}
                 value={form[key] as string}
-                readOnly={!canManage}
+                readOnly={!canManage || busy}
                 onChange={(event) =>
                     update(key, event.target.value as Form[typeof key])
                 }
@@ -245,10 +267,8 @@ export function PrintIdentitySection({
         <div className="space-y-6">
             {error && <p className="text-sm text-destructive">{error}</p>}
             <p className="text-sm text-muted-foreground">
-                Yang tampil di kop dan footer setiap dokumen yang dicetak atas
-                nama {organizationName}. Layout laporan membacanya lewat
-                placeholder <code>{'${kop.*}'}</code>; mengubah di sini berlaku
-                untuk semua layout.
+                Isi ini dipakai pada kop dan footer dokumen yang dicetak atas
+                nama {organizationName}.
             </p>
 
             <FieldGroup className="grid gap-4 md:grid-cols-2">
@@ -256,9 +276,9 @@ export function PrintIdentitySection({
                 <Field>
                     <Input
                         label="Baris induk 1"
-                        placeholder="PEMERINTAH KABUPATEN BADUNG"
+                        placeholder="Nama instansi induk"
                         value={form.parent_lines[0]}
-                        readOnly={!canManage}
+                        readOnly={!canManage || busy}
                         onChange={(event) =>
                             update('parent_lines', [
                                 event.target.value,
@@ -275,9 +295,9 @@ export function PrintIdentitySection({
                 <Field>
                     <Input
                         label="Baris induk 2"
-                        placeholder="DINAS KESEHATAN"
+                        placeholder="Nama unit induk"
                         value={form.parent_lines[1]}
-                        readOnly={!canManage}
+                        readOnly={!canManage || busy}
                         onChange={(event) =>
                             update('parent_lines', [
                                 form.parent_lines[0],
@@ -339,7 +359,7 @@ export function PrintIdentitySection({
                     label="Teks footer"
                     placeholder="Dokumen ini sah tanpa tanda tangan basah."
                     value={form.footer_text}
-                    readOnly={!canManage}
+                    readOnly={!canManage || busy}
                     onChange={(event) =>
                         update('footer_text', event.target.value)
                     }
@@ -349,20 +369,6 @@ export function PrintIdentitySection({
                     placeholder footer.
                 </FieldDescription>
             </Field>
-
-            {canManage && (
-                <div className="flex justify-end">
-                    <Button
-                        type="button"
-                        size="sm"
-                        disabled={!dirty || saving}
-                        onClick={() => void save()}
-                    >
-                        <Save className="mr-1.5 size-3.5" />
-                        {saving ? 'Menyimpan…' : 'Simpan identitas cetak'}
-                    </Button>
-                </div>
-            )}
 
             <div className="space-y-3">
                 <FieldLabel>Logo</FieldLabel>

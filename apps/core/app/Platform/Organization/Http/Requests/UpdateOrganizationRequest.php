@@ -5,6 +5,7 @@ namespace App\Platform\Organization\Http\Requests;
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Organization\Models\OperatingUnit;
 use App\Platform\Organization\Models\Organization;
+use App\Platform\Organization\Support\PrintIdentityData;
 use DateTimeZone;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -30,6 +31,9 @@ class UpdateOrganizationRequest extends FormRequest
         $organization = $this->route('organization');
 
         return [
+            'print_identity' => ['sometimes', 'array:version,display_name,parent_lines,tax_id,registration_id,footer_text'],
+            'print_identity.version' => [Rule::requiredIf($this->has('print_identity')), 'integer', 'min:0'],
+            ...PrintIdentityData::rules('print_identity.'),
             'name' => ['required', 'string', 'max:150'],
             'company_code' => [
                 Rule::requiredIf($organization->classification === 'legal_entity'),
@@ -80,7 +84,7 @@ class UpdateOrganizationRequest extends FormRequest
      * nama — tidak boleh menghapus nomor yang sudah ada. Nomor itu sudah tertanam di tabel
      * penerjemah aplikasi finance; mengosongkannya diam-diam membuat posting berikutnya tertahan.
      *
-     * @return array{name:string,company_code:?string,country_code:?string,timezone:?string,operating_unit_type:?string,operating_unit_number?:?string}
+     * @return array{name:string,company_code:?string,country_code:?string,timezone:?string,operating_unit_type:?string,operating_unit_number?:?string,print_identity?:array{version:int,display_name?:?string,parent_lines?:?list<?string>,tax_id?:?string,registration_id?:?string,footer_text?:?string}}
      */
     public function payload(): array
     {
@@ -94,6 +98,10 @@ class UpdateOrganizationRequest extends FormRequest
 
         if ($this->has('operating_unit_number')) {
             $payload['operating_unit_number'] = $this->string('operating_unit_number')->toString() ?: null;
+        }
+
+        if ($this->has('print_identity')) {
+            $payload['print_identity'] = $this->validated('print_identity');
         }
 
         return $payload;

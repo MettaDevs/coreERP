@@ -71,7 +71,7 @@ export function ReportPageLayout<T extends Record<string, unknown>>({
 
     return (
         <Card className="flex h-full min-h-0 flex-col overflow-hidden rounded-none border-0 shadow-none">
-            <CardHeader className="min-h-0 shrink-0 border-b px-5 py-3">
+            <CardHeader className="min-h-0 shrink-0 border-b">
                 <CardTitle>{title}</CardTitle>
                 {description && (
                     <CardDescription>{description}</CardDescription>

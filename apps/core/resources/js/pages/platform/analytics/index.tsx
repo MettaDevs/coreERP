@@ -120,11 +120,8 @@ export default function AnalyticsDashboards({ dashboards, abilities }: Props) {
                             <CardAction>
                                 <ActionButton
                                     action="create"
-                                    size="sm"
                                     onClick={() => setCreating(true)}
-                                >
-                                    Buat dasbor
-                                </ActionButton>
+                                />
                             </CardAction>
                         )}
                     </CardHeader>

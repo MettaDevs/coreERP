@@ -5,6 +5,7 @@ import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
 import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
+import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@apperp/ui/tabs';
 import { useIncrementalList } from '@apperp/ui/use-incremental-list';
@@ -176,8 +177,8 @@ function UnitsPage({ canManage }: { canManage: boolean }) {
             <Head title="Satuan" />
             <ListPageLayout
                 header={
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
-                        <h1 className="text-xl font-semibold">Satuan</h1>
+                    <RecordActionBar>
+                        <h1 className="text-sm font-semibold">Satuan</h1>
                         {canManage &&
                             (catalog === 'conversions' ? (
                                 <Button variant="outline" onClick={startCreate}>
@@ -188,11 +189,9 @@ function UnitsPage({ canManage }: { canManage: boolean }) {
                                 <ActionButton
                                     action="create"
                                     onClick={startCreate}
-                                >
-                                    Tambah {labels[catalog].toLowerCase()}
-                                </ActionButton>
+                                />
                             ))}
-                    </div>
+                    </RecordActionBar>
                 }
             >
                 {visited.has('units') && (

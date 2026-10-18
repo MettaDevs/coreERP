@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Organization\Models\Organization;
+use App\Platform\Organization\Support\PrintIdentityData;
 use App\Platform\Reporting\Support\PrintIdentityStore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -42,16 +43,7 @@ class PrintIdentityController extends Controller
     public function update(Request $request, Organization $organization): JsonResponse
     {
         $this->guardOrganization($request, $organization, manage: true);
-        $data = $request->validate([
-            'display_name' => ['nullable', 'string', 'max:200'],
-            'parent_lines' => ['nullable', 'array', 'max:3'],
-            'parent_lines.*' => ['nullable', 'string', 'max:200'],
-            // Alamat dan kontak tidak diterima di sini; ubah lewat bagian Alamat dan
-            // Informasi kontak organisasi.
-            'tax_id' => ['nullable', 'string', 'max:60'],
-            'registration_id' => ['nullable', 'string', 'max:60'],
-            'footer_text' => ['nullable', 'string', 'max:1000'],
-        ]);
+        $data = $request->validate(PrintIdentityData::rules());
 
         return $this->respond($organization, DB::transaction(function () use ($request, $organization, $data): array {
             $this->claim($request, $organization);

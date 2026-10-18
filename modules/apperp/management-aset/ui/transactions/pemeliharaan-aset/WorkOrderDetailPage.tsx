@@ -9,6 +9,7 @@ import {
 } from '@apperp/ui/collapsible-section';
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
+import { DialogToolbar } from '@apperp/ui/dialog';
 import {
     Empty,
     EmptyDescription,
@@ -17,6 +18,7 @@ import {
 } from '@apperp/ui/empty';
 import { Field, FieldDescription, FieldLabel } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
+import { usePageDialogRecord } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
@@ -30,6 +32,9 @@ import {
 } from '../../api';
 import { requestPrint } from '../../print';
 import { useRecordOptions } from '../../use-record-list';
+import { RecordCardHeader } from '../_shared/record-card';
+import type { RecordCardControls } from '../_shared/record-card';
+import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
 import WarrantyNotice from '../warranty/WarrantyNotice';
 import type {
     ChecklistRow,
@@ -42,10 +47,10 @@ import type {
 import {
     StatusBadge,
     TRANSISI,
-    bukaDaftar,
-    bukaWorkOrder,
-    bukaWorkOrderUbah,
-    bukaChecklistJob,
+    bukaDaftar as navigateClose,
+    bukaWorkOrder as navigateView,
+    bukaWorkOrderUbah as navigateEdit,
+    bukaChecklistJob as navigateChecklist,
     emptyJob,
     emptyWorkOrder,
     idDari,
@@ -63,6 +68,7 @@ function JobRow({
     canRemove,
     readOnly,
     onRequestEdit,
+    portalContainer,
     onChange,
     onRemove,
 }: {
@@ -73,6 +79,7 @@ function JobRow({
     readOnly: boolean;
     /** Dipanggil saat pengguna menyentuh baris ini selagi mode baca. */
     onRequestEdit: () => void;
+    portalContainer?: RecordCardControls['portalContainer'];
     /** Daftar penuh; dipakai untuk menampilkan aset yang sedang terpilih walau tersaring keluar. */
     /** Daftar yang lolos pencarian; hanya mengisi pilihan dropdown. */
     onChange: (change: Partial<JobLine>) => void;
@@ -120,14 +127,11 @@ function JobRow({
             <div className="flex justify-between">
                 <span className="text-sm font-medium">Baris {index + 1}</span>
                 {canRemove && !readOnly && (
-                    <Button
+                    <ActionButton
+                        action="delete"
                         type="button"
-                        variant="ghost"
-                        size="sm"
                         onClick={onRemove}
-                    >
-                        Hapus
-                    </Button>
+                    />
                 )}
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -138,6 +142,7 @@ function JobRow({
                         onActivate={onRequestEdit}
                     >
                         <Select
+                            portalContainer={portalContainer}
                             label="Aset"
                             required
                             {...assetSource.selectProps}
@@ -165,6 +170,7 @@ function JobRow({
                         onActivate={onRequestEdit}
                     >
                         <Select
+                            portalContainer={portalContainer}
                             label="Jenis pekerjaan"
                             required
                             {...jobSource.selectProps}
@@ -196,6 +202,7 @@ function JobRow({
                         onActivate={onRequestEdit}
                     >
                         <Select
+                            portalContainer={portalContainer}
                             label="Varian pekerjaan"
                             {...variantSource.selectProps}
                             items={variants.map(
@@ -224,6 +231,7 @@ function JobRow({
                         onActivate={onRequestEdit}
                     >
                         <Select
+                            portalContainer={portalContainer}
                             label="Bidang keahlian"
                             {...tradeSource.selectProps}
                             items={trades.map(
@@ -316,6 +324,7 @@ function ChecklistPanel({
     saving,
     onClose,
     onSave,
+    portalContainer,
     onChange,
 }: {
     rows: ChecklistRow[];
@@ -323,6 +332,7 @@ function ChecklistPanel({
     saving: boolean;
     onClose: () => void;
     onSave: () => void;
+    portalContainer?: RecordCardControls['portalContainer'];
     onChange: (id: string, change: Partial<ChecklistRow>) => void;
 }) {
     return (
@@ -337,10 +347,21 @@ function ChecklistPanel({
                         dinyatakan selesai.
                     </p>
                 </div>
+            </div>
+            <DialogToolbar className="px-0">
+                {editable && rows.length > 0 && (
+                    <ActionButton
+                        action="save"
+                        type="button"
+                        disabled={saving}
+                        onClick={onSave}
+                        pending={saving}
+                    />
+                )}
                 <Button type="button" variant="outline" onClick={onClose}>
                     Tutup checklist
                 </Button>
-            </div>
+            </DialogToolbar>
             <div className="mt-4 space-y-4">
                 {!rows.length ? (
                     <Empty>
@@ -426,6 +447,7 @@ function ChecklistPanel({
                             ) : row.tipe === 'variable' ? (
                                 editable ? (
                                     <Select
+                                        portalContainer={portalContainer}
                                         label="Jawaban"
                                         items={row.pilihan.map(
                                             (choice) => choice.value,
@@ -503,13 +525,6 @@ function ChecklistPanel({
                     ))
                 )}
             </div>
-            <div className="mt-4 flex justify-end gap-2 border-t pt-4">
-                {editable && rows.length > 0 && (
-                    <Button type="button" disabled={saving} onClick={onSave}>
-                        {saving ? 'Menyimpan…' : 'Simpan hasil'}
-                    </Button>
-                )}
-            </div>
         </div>
     );
 }
@@ -527,7 +542,14 @@ export default function WorkOrderDetailPage({
     permissions,
     workOrderId,
     mode,
-    checklistJobId,
+    checklistJobId: routedChecklistJobId,
+    onClose,
+    onSaved,
+    onRequestView,
+    onRequestEdit,
+    onBusyChange,
+    onDirtyChange,
+    portalContainer,
 }: {
     context: Context;
     permissions: string[];
@@ -535,7 +557,28 @@ export default function WorkOrderDetailPage({
     workOrderId?: string;
     mode: Mode;
     checklistJobId?: string;
-}) {
+} & RecordCardControls) {
+    const embedded = usePageDialogRecord(undefined);
+
+    const [localChecklistJobId, setLocalChecklistJobId] = useState<
+        string | null
+    >(null);
+    const checklistJobId = localChecklistJobId ?? routedChecklistJobId;
+    const bukaChecklistJob = (id: string, jobId: string) => {
+        if (onRequestView) {
+            setLocalChecklistJobId(jobId);
+        } else {
+            navigateChecklist(id, jobId);
+        }
+    };
+    const bukaWorkOrder = (id: string) => {
+        setLocalChecklistJobId(null);
+        (onRequestView ?? navigateView)(id);
+    };
+    const bukaWorkOrderUbah = (id: string) =>
+        (onRequestEdit ?? navigateEdit)(id);
+    const bukaDaftar = () => (onClose ?? navigateClose)();
+
     const can = useMemo(() => izin(permissions), [permissions]);
     /**
      * Referensi hanya diperlukan bila pengguna memang dapat menyusun work order.
@@ -582,6 +625,13 @@ export default function WorkOrderDetailPage({
         rows: ChecklistRow[];
     } | null>(null);
     const [saving, setSaving] = useState(false);
+    const [mainDirty, setMainDirty] = useState(false);
+    const [auxiliaryDirty, setAuxiliaryDirty] = useState(false);
+    useEffect(() => {
+        onBusyChange?.(saving);
+
+        return () => onBusyChange?.(false);
+    }, [saving, onBusyChange]);
 
     // Effect di bawah adalah satu-satunya pembaca work order dari server. Setelah pindah
     // status atau simpan hasil pekerjaan, pembacaan ulang dinyatakan dengan menaikkan
@@ -696,6 +746,28 @@ export default function WorkOrderDetailPage({
             ? checklistMuatan.rows
             : undefined;
 
+    useRecordCardDirty({
+        value: record,
+        ready: Boolean(record),
+        scopeKey: JSON.stringify([workOrderId, mode, record?.version]),
+        onDirtyChange: setMainDirty,
+    });
+    useRecordCardDirty({
+        value: checklist,
+        ready: checklist !== undefined,
+        scopeKey: JSON.stringify([
+            workOrderId,
+            checklistJobId,
+            record?.version,
+        ]),
+        onDirtyChange: setAuxiliaryDirty,
+    });
+    useEffect(() => {
+        onDirtyChange?.(mainDirty || auxiliaryDirty);
+
+        return () => onDirtyChange?.(false);
+    }, [mainDirty, auxiliaryDirty, onDirtyChange]);
+
     const pindahStatus = async (ke: string, label: string) => {
         if (!record?.id || !record.kode) {
             return;
@@ -709,6 +781,8 @@ export default function WorkOrderDetailPage({
         if (ke === 'dibatalkan' && !alasan?.trim()) {
             return;
         }
+
+        setSaving(true);
 
         try {
             await api(`/pemeliharaan-aset/${record.id}/status`, {
@@ -726,6 +800,8 @@ export default function WorkOrderDetailPage({
                 caught,
                 `${record.kode} belum dapat dipindahkan statusnya.`,
             );
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -753,7 +829,7 @@ export default function WorkOrderDetailPage({
                 },
             );
             toast.success('Hasil pemeriksaan tersimpan.');
-            bukaWorkOrder(workOrderId);
+            (onSaved ?? bukaWorkOrder)(workOrderId);
         } catch (caught) {
             toastSaveError(caught, 'Hasil pemeriksaan belum dapat disimpan.');
         } finally {
@@ -853,7 +929,7 @@ export default function WorkOrderDetailPage({
                     body: JSON.stringify({ ...body, version: record.version }),
                 });
                 toast.success('Work order disimpan.');
-                bukaWorkOrder(record.id);
+                (onSaved ?? bukaWorkOrder)(record.id);
             } else {
                 const dibuat = await api<{ data: WorkOrder }>(
                     '/pemeliharaan-aset',
@@ -864,7 +940,7 @@ export default function WorkOrderDetailPage({
                     },
                 );
                 toast.success('Work order disimpan.');
-                bukaWorkOrder(dibuat.data.id);
+                (onSaved ?? bukaWorkOrder)(dibuat.data.id);
             }
         } catch (caught) {
             toastSaveError(caught, 'Work order belum dapat disimpan.');
@@ -999,6 +1075,7 @@ export default function WorkOrderDetailPage({
                 return canEditExecution ? (
                     <div className="flex flex-col gap-2">
                         <Select
+                            portalContainer={portalContainer}
                             {...faultSource.selectProps}
                             items={faultCauses.map(
                                 (option) => labelDari(option) ?? '',
@@ -1058,6 +1135,7 @@ export default function WorkOrderDetailPage({
                 return canEditExecution ? (
                     <div className="flex flex-col gap-2">
                         <Select
+                            portalContainer={portalContainer}
                             {...repairSource.selectProps}
                             items={repairActions.map(
                                 (option) => labelDari(option) ?? '',
@@ -1113,14 +1191,12 @@ export default function WorkOrderDetailPage({
                 <div className="flex items-center gap-2">
                     <span>{job.hasil ?? 'Belum dihitung'}</span>
                     {canEditExecution && (
-                        <Button
+                        <ActionButton
+                            action="save"
                             type="button"
-                            size="sm"
                             disabled={saving}
                             onClick={() => void simpanPelaksanaan(job)}
-                        >
-                            Simpan
-                        </Button>
+                        />
                     )}
                 </div>
             ),
@@ -1130,43 +1206,58 @@ export default function WorkOrderDetailPage({
 
     return (
         <div className="flex h-full min-h-0 flex-col overflow-hidden">
+            <RecordCardHeader
+                recordTitle={record.kode ?? 'Baru'}
+                editing={editing}
+                recordUrl={
+                    workOrderId
+                        ? `/management-aset/pemeliharaan-aset/${workOrderId}`
+                        : undefined
+                }
+                onEdit={
+                    dapatDisunting && record.id && !editing
+                        ? mintaSunting
+                        : undefined
+                }
+            />
             <RecordActionBar
                 title={
-                    record.id ? `Work order ${record.kode}` : 'Work order baru'
+                    embedded
+                        ? undefined
+                        : record.id
+                          ? `Work order ${record.kode}`
+                          : 'Work order baru'
                 }
                 trailing={status ? <StatusBadge status={status} /> : undefined}
             >
                 {editing ? (
                     <>
-                        <Button
+                        <ActionButton
+                            action="save"
                             type="button"
                             disabled={saving}
                             onClick={() => void save()}
-                        >
-                            {saving ? 'Menyimpan…' : 'Simpan'}
-                        </Button>
-                        <Button
+                            pending={saving}
+                        />
+                        <ActionButton
+                            action="cancel"
+                            disabled={saving}
                             type="button"
-                            variant="outline"
                             onClick={() =>
                                 record.id
                                     ? bukaWorkOrder(record.id)
                                     : bukaDaftar()
                             }
-                        >
-                            Batal
-                        </Button>
+                        />
                     </>
                 ) : (
                     <>
-                        {dapatDisunting && record.id && (
+                        {dapatDisunting && record.id && !embedded && (
                             <ActionButton
                                 action="edit"
                                 type="button"
                                 onClick={mintaSunting}
-                            >
-                                Ubah
-                            </ActionButton>
+                            />
                         )}
                         {record.id &&
                             status &&
@@ -1207,18 +1298,23 @@ export default function WorkOrderDetailPage({
                                 Cetak
                             </Button>
                         )}
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={bukaDaftar}
-                        >
-                            Kembali ke daftar
-                        </Button>
+                        {!embedded && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={bukaDaftar}
+                            >
+                                Kembali ke daftar
+                            </Button>
+                        )}
                     </>
                 )}
             </RecordActionBar>
 
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div
+                data-page-dialog-body
+                className="min-h-0 flex-1 overflow-y-auto"
+            >
                 <div className="space-y-4 p-5">
                     <p className="text-muted-foreground text-sm">
                         Perusahaan dan unit penanggung jawab mengikuti konteks
@@ -1248,6 +1344,9 @@ export default function WorkOrderDetailPage({
                                             onActivate={mintaSunting}
                                         >
                                             <Select
+                                                portalContainer={
+                                                    portalContainer
+                                                }
                                                 label="Tipe work order"
                                                 required
                                                 {...typeSource.selectProps}
@@ -1287,6 +1386,9 @@ export default function WorkOrderDetailPage({
                                             onActivate={mintaSunting}
                                         >
                                             <Select
+                                                portalContainer={
+                                                    portalContainer
+                                                }
                                                 label="Tingkat layanan"
                                                 {...serviceSource.selectProps}
                                                 items={layanan.map(
@@ -1453,10 +1555,9 @@ export default function WorkOrderDetailPage({
                                     />
                                     <div className="flex items-center justify-end">
                                         {draft && editing && (
-                                            <Button
+                                            <ActionButton
+                                                action="add"
                                                 type="button"
-                                                variant="outline"
-                                                size="sm"
                                                 onClick={() =>
                                                     setRecord({
                                                         ...record,
@@ -1466,9 +1567,7 @@ export default function WorkOrderDetailPage({
                                                         ],
                                                     })
                                                 }
-                                            >
-                                                Tambah baris
-                                            </Button>
+                                            />
                                         )}
                                     </div>
                                     {!draft ? (
@@ -1501,6 +1600,9 @@ export default function WorkOrderDetailPage({
                                     ) : (
                                         record.details.map((job, index) => (
                                             <JobRow
+                                                portalContainer={
+                                                    portalContainer
+                                                }
                                                 key={index}
                                                 job={job}
                                                 index={index}
@@ -1580,6 +1682,7 @@ export default function WorkOrderDetailPage({
 
                 {checklist && (
                     <ChecklistPanel
+                        portalContainer={portalContainer}
                         rows={checklist}
                         editable={status === 'dikerjakan'}
                         saving={saving}

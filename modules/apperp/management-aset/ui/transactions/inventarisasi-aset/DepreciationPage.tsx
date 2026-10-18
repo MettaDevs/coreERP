@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import {
@@ -253,7 +254,7 @@ export default function DepreciationPage({
     return (
         <div className="space-y-4">
             <Card className="rounded-none border-x-0 shadow-none">
-                <CardHeader className="border-b px-5 py-3">
+                <CardHeader className="border-b">
                     <CardTitle>Buku aset aktif</CardTitle>
                     <CardDescription>
                         Hitung usulan, periksa nilainya, lalu post ke buku aset.
@@ -339,7 +340,7 @@ export default function DepreciationPage({
                 </CardContent>
             </Card>
             <Card className="rounded-none border-x-0 shadow-none">
-                <CardHeader className="border-b px-5 py-3">
+                <CardHeader className="border-b">
                     <CardTitle>Periode penyusutan</CardTitle>
                     <CardAction>
                         {canPost && (
@@ -480,13 +481,11 @@ export default function DepreciationPage({
                                 />
                             </Field>
                             <SheetFooter>
-                                <Button
+                                <ActionButton
+                                    action="cancel"
                                     type="button"
-                                    variant="outline"
                                     onClick={() => setBulkOpen(false)}
-                                >
-                                    Batal
-                                </Button>
+                                />
                                 <Button type="submit" disabled={saving}>
                                     {saving ? 'Menghitung…' : 'Jalankan'}
                                 </Button>
@@ -543,13 +542,11 @@ export default function DepreciationPage({
                                 </Field>
                             )}
                             <SheetFooter>
-                                <Button
+                                <ActionButton
+                                    action="cancel"
                                     type="button"
-                                    variant="outline"
                                     onClick={() => setSelected(null)}
-                                >
-                                    Batal
-                                </Button>
+                                />
                                 <Button type="submit" disabled={saving}>
                                     {saving ? 'Menghitung…' : 'Buat proposal'}
                                 </Button>

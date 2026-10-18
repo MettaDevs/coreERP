@@ -151,40 +151,29 @@ function DashboardScreen({ dashboard, abilities }: Props) {
                 {canEdit &&
                     (editing ? (
                         <>
-                            <Button
+                            <ActionButton
+                                action="save"
                                 type="button"
-                                size="sm"
                                 disabled={savingLayout}
                                 onClick={() => void saveLayout()}
-                            >
-                                Simpan tata letak
-                            </Button>
-                            <Button
+                            />
+                            <ActionButton
+                                action="cancel"
                                 type="button"
-                                size="sm"
-                                variant="outline"
                                 disabled={savingLayout}
                                 onClick={() => setDraft(null)}
-                            >
-                                Batal
-                            </Button>
+                            />
                         </>
                     ) : (
                         <>
                             <ActionButton
                                 action="create"
-                                size="sm"
                                 onClick={() => setBuilding({ widget: null })}
-                            >
-                                Tambah bagian
-                            </ActionButton>
+                            />
                             <ActionButton
                                 action="edit"
-                                size="sm"
                                 onClick={() => setEditingDashboard(true)}
-                            >
-                                Ubah dasbor
-                            </ActionButton>
+                            />
                             {dashboard.widgets.length > 0 && (
                                 <Button
                                     type="button"
@@ -200,11 +189,8 @@ function DashboardScreen({ dashboard, abilities }: Props) {
                             )}
                             <ActionButton
                                 action="archive"
-                                size="sm"
                                 onClick={() => setArchivingDashboard(true)}
-                            >
-                                Arsipkan
-                            </ActionButton>
+                            />
                         </>
                     ))}
             </RecordActionBar>
@@ -249,13 +235,10 @@ function DashboardScreen({ dashboard, abilities }: Props) {
                                     <EmptyContent>
                                         <ActionButton
                                             action="create"
-                                            size="sm"
                                             onClick={() =>
                                                 setBuilding({ widget: null })
                                             }
-                                        >
-                                            Tambah bagian
-                                        </ActionButton>
+                                        />
                                     </EmptyContent>
                                 )}
                             </Empty>
@@ -344,7 +327,7 @@ function DashboardScreen({ dashboard, abilities }: Props) {
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>
-                            Arsipkan dasbor "{dashboard.name}"?
+                            Delete dasbor "{dashboard.name}"?
                         </AlertDialogTitle>
                         <AlertDialogDescription>
                             {dashboard.shared
@@ -357,7 +340,7 @@ function DashboardScreen({ dashboard, abilities }: Props) {
                         <AlertDialogAction
                             onClick={() => void confirmArchiveDashboard()}
                         >
-                            Arsipkan
+                            Delete
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -369,7 +352,7 @@ function DashboardScreen({ dashboard, abilities }: Props) {
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>
-                            Arsipkan "{archivingWidget?.title}"?
+                            Delete "{archivingWidget?.title}"?
                         </AlertDialogTitle>
                         <AlertDialogDescription>
                             Bagian ini hilang dari dasbor untuk semua yang
@@ -384,7 +367,7 @@ function DashboardScreen({ dashboard, abilities }: Props) {
                                 void confirmArchiveWidget(archivingWidget)
                             }
                         >
-                            Arsipkan
+                            Delete
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

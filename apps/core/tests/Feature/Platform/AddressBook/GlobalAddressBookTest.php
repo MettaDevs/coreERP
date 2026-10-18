@@ -192,6 +192,45 @@ class GlobalAddressBookTest extends TestCase
         $this->assertDatabaseCount('party_locations', 1);
     }
 
+    public function test_new_party_saves_addresses_and_linked_contacts_atomically_and_replay_adds_nothing(): void
+    {
+        $details = [
+            'locations' => [['key' => 'office', 'name' => 'Office', 'country_region_code' => 'id', 'street' => 'Office street', 'purposes' => ['business']]],
+            'contacts' => [['type' => 'email', 'value' => 'office@example.test', 'address_key' => 'office']],
+        ];
+        $created = $this->createParty(['party_details' => $details], 'party-aggregate-1')->assertCreated()->json('data');
+        $link = DB::table('party_locations')->where('party_id', $created['id'])->first();
+        $this->assertNotNull($link);
+        $this->assertDatabaseHas('postal_addresses', ['location_id' => $link->location_id, 'country_region_code' => 'ID', 'street' => 'Office street']);
+        $this->assertDatabaseHas('electronic_addresses', ['location_id' => $link->location_id, 'value' => 'office@example.test']);
+        $this->createParty(['party_details' => $details], 'party-aggregate-1')->assertOk()->assertJsonPath('data.id', $created['id']);
+        $this->assertSame(1, DB::table('party_locations')->where('party_id', $created['id'])->count());
+        $this->assertSame(1, DB::table('electronic_addresses')->where('location_id', $link->location_id)->count());
+        $this->getJson('/api/v1/parties/metadata')->assertOk()->assertJsonStructure(['data' => ['locationPurposes', 'countries', 'contactTypes']]);
+    }
+
+    public function test_invalid_staged_region_rolls_back_party_addresses_and_number(): void
+    {
+        $before = DB::table('parties')->count();
+        $this->createParty(['party_details' => ['locations' => [
+            ['name' => 'First valid office', 'country_region_code' => 'ID', 'purposes' => ['business']],
+            ['name' => 'Invalid region', 'country_region_code' => 'ID', 'purposes' => ['business'], 'province_id' => (string) str()->ulid()],
+        ]]], 'party-aggregate-retry')->assertUnprocessable()->assertJsonValidationErrors('party_details.locations.1.province_id');
+        $this->assertSame($before, DB::table('parties')->count());
+        $this->assertDatabaseMissing('locations', ['name' => 'First valid office']);
+        $this->createParty([], 'party-aggregate-retry')->assertCreated()->assertJsonPath('data.number', 'PIHK00001');
+    }
+
+    public function test_staged_contact_requires_a_known_draft_address_and_valid_value(): void
+    {
+        $before = DB::table('parties')->count();
+        $this->createParty(['party_details' => ['contacts' => [['type' => 'email', 'value' => 'invalid']]]])
+            ->assertUnprocessable()->assertJsonValidationErrors('party_details.contacts.0.value');
+        $this->createParty(['party_details' => ['contacts' => [['type' => 'phone', 'value' => '123', 'address_key' => 'missing']]]])
+            ->assertUnprocessable()->assertJsonValidationErrors('party_details.contacts.0.address_key');
+        $this->assertSame($before, DB::table('parties')->count());
+    }
+
     /** @param array<string, mixed> $changes */
     private function createParty(array $changes = [], ?string $key = null): TestResponse
     {

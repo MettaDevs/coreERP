@@ -22,6 +22,7 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
+import { usePageDialogRecord } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
@@ -45,10 +46,16 @@ export function PartyCard({
     partyId,
     metadata,
     onBack,
+    onBusyChange,
+    onDirtyChange,
+    requestTransition,
 }: {
     partyId: string;
     metadata: DirectoryMetadata;
     onBack: () => void;
+    onBusyChange?: (busy: boolean) => void;
+    onDirtyChange?: (dirty: boolean) => void;
+    requestTransition?: (action: () => void) => void;
 }) {
     const { url } = usePage();
     const section =
@@ -59,6 +66,11 @@ export function PartyCard({
     const [confirmArchive, setConfirmArchive] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
+    useEffect(() => {
+        onBusyChange?.(busy);
+
+        return () => onBusyChange?.(false);
+    }, [busy, onBusyChange]);
     const [reload, setReload] = useState(0);
     useEffect(() => {
         const controller = new AbortController();
@@ -66,8 +78,10 @@ export function PartyCard({
             signal: controller.signal,
         })
             .then((result) => {
-                setParty(result.data);
-                setError('');
+                if (!controller.signal.aborted) {
+                    setParty(result.data);
+                    setError('');
+                }
             })
             .catch((caught) => {
                 if (!controller.signal.aborted) {
@@ -108,12 +122,37 @@ export function PartyCard({
         }
     }
 
+    const embedded = usePageDialogRecord(
+        !party || editing
+            ? undefined
+            : {
+                  recordTitle: [party.number, party.name]
+                      .filter(Boolean)
+                      .join(' · '),
+                  onEdit: metadata.canManage
+                      ? () => setEditing(true)
+                      : undefined,
+                  onDelete: metadata.canManage
+                      ? () => setConfirmArchive(true)
+                      : undefined,
+                  editing: false,
+                  recordUrl:
+                      '/settings/global-address-book?' +
+                      new URLSearchParams({
+                          party: party.id,
+                          section,
+                      }).toString(),
+              },
+    );
+
     if (!party) {
         return (
             <div className="space-y-3 p-4">
-                <Button variant="outline" onClick={onBack}>
-                    Kembali ke daftar
-                </Button>
+                {!embedded && (
+                    <Button variant="outline" onClick={onBack}>
+                        Kembali ke daftar
+                    </Button>
+                )}
                 <p
                     role={error ? 'alert' : 'status'}
                     className={
@@ -140,8 +179,14 @@ export function PartyCard({
         return (
             <PartyForm
                 party={party}
+                onBusyChange={onBusyChange}
+                onDirtyChange={onDirtyChange}
                 metadata={metadata}
-                onClose={() => setEditing(false)}
+                onClose={() =>
+                    requestTransition
+                        ? requestTransition(() => setEditing(false))
+                        : setEditing(false)
+                }
                 onSaved={() => {
                     setEditing(false);
                     setReload((key) => key + 1);
@@ -178,33 +223,26 @@ export function PartyCard({
 
     return (
         <div className="flex h-full min-h-0 flex-col">
-            <RecordActionBar
-                title={`${party.number ?? 'Party'} · ${party.name}`}
-                trailing={
-                    <>
-                        <Button variant="outline" onClick={onBack}>
-                            Kembali ke daftar
-                        </Button>
-                        {metadata.canManage && (
-                            <>
-                                <ActionButton
-                                    action="edit"
-                                    onClick={() => setEditing(true)}
-                                >
-                                    Ubah pihak
-                                </ActionButton>
-                                <ActionButton
-                                    action="archive"
-                                    disabled={busy}
-                                    onClick={() => setConfirmArchive(true)}
-                                >
-                                    Arsipkan
-                                </ActionButton>
-                            </>
-                        )}
-                    </>
-                }
-            />
+            {!embedded && (
+                <RecordActionBar>
+                    <Button variant="outline" onClick={onBack}>
+                        Kembali ke daftar
+                    </Button>
+                    {metadata.canManage && (
+                        <>
+                            <ActionButton
+                                action="edit"
+                                onClick={() => setEditing(true)}
+                            />
+                            <ActionButton
+                                action="archive"
+                                disabled={busy}
+                                onClick={() => setConfirmArchive(true)}
+                            />
+                        </>
+                    )}
+                </RecordActionBar>
+            )}
             <main className="min-h-0 flex-1 overflow-y-auto p-4">
                 {error && (
                     <p role="alert" className="text-sm text-destructive">
@@ -469,16 +507,14 @@ export function PartyCard({
                                     ]}
                                 />
                                 {metadata.canManageVendors && (
-                                    <Button
-                                        variant="outline"
+                                    <ActionButton
+                                        action="create"
                                         onClick={() =>
                                             router.get('/settings/vendors', {
                                                 party: party.id,
                                             })
                                         }
-                                    >
-                                        Buat akun vendor dari pihak ini
-                                    </Button>
+                                    />
                                 )}
                             </div>
                         </CollapsibleSection>
@@ -489,7 +525,7 @@ export function PartyCard({
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>
-                            Arsipkan {party.name}?
+                            Delete {party.name}?
                         </AlertDialogTitle>
                         <AlertDialogDescription>
                             Pihak akan disembunyikan dari daftar aktif. Pihak
@@ -505,7 +541,7 @@ export function PartyCard({
                             disabled={busy}
                             onClick={() => void archive()}
                         >
-                            Arsipkan
+                            Delete
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

@@ -7,14 +7,13 @@ import {
     CardHeader,
     CardTitle,
 } from '@apperp/ui/card';
+import { DialogClose } from '@apperp/ui/dialog';
 import {
+    DialogToolbar,
     Dialog,
-    DialogAction,
     DialogBody,
-    DialogCancel,
     DialogContent,
     DialogDescription,
-    DialogFooter,
     DialogHeader,
     DialogTitle,
 } from '@apperp/ui/dialog';
@@ -100,6 +99,16 @@ function EditPrecisionDialog({
                         });
                     }}
                 >
+                    <DialogToolbar>
+                        <ActionButton
+                            action="save"
+                            type="submit"
+                            disabled={form.processing}
+                        />
+                        <DialogClose asChild>
+                            <ActionButton action="cancel" type="button" />
+                        </DialogClose>
+                    </DialogToolbar>
                     <DialogBody className="grid gap-4 py-3 md:grid-cols-2">
                         <Field
                             data-invalid={Boolean(form.errors.amount_decimals)}
@@ -159,12 +168,6 @@ function EditPrecisionDialog({
                             </FieldError>
                         </Field>
                     </DialogBody>
-                    <DialogFooter>
-                        <DialogAction type="submit" disabled={form.processing}>
-                            Simpan presisi
-                        </DialogAction>
-                        <DialogCancel />
-                    </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
@@ -246,13 +249,10 @@ export default function Currencies({ canManage, limits, currencies }: Props) {
                                                     <ActionButton
                                                         action="edit"
                                                         type="button"
-                                                        size="sm"
                                                         onClick={() =>
                                                             setEditing(currency)
                                                         }
-                                                    >
-                                                        Ubah
-                                                    </ActionButton>
+                                                    />
                                                 </TableCell>
                                             )}
                                         </TableRow>

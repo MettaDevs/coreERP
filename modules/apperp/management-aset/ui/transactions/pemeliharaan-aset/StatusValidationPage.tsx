@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Button } from '@apperp/ui/button';
+import { ActionButton } from '@apperp/ui/action-button';
+
 import {
     Card,
     CardAction,
@@ -8,6 +9,8 @@ import {
     CardHeader,
     CardTitle,
 } from '@apperp/ui/card';
+import { DataTable } from '@apperp/ui/data-table';
+import type { DataTableColumn } from '@apperp/ui/data-table';
 import {
     Empty,
     EmptyDescription,
@@ -16,14 +19,7 @@ import {
 } from '@apperp/ui/empty';
 import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
+
 import { api, errorMessage } from '../../api';
 
 type Aturan = {
@@ -150,13 +146,17 @@ export default function StatusValidationPage({
 
     return (
         <Card className="min-h-full rounded-none border-0 shadow-none">
-            <CardHeader className="border-b px-5 py-3">
+            <CardHeader className="border-b">
                 <CardTitle>Validasi status work order</CardTitle>
                 {canUpdate && (
                     <CardAction>
-                        <Button disabled={saving} onClick={() => void simpan()}>
-                            {saving ? 'Menyimpan…' : 'Simpan'}
-                        </Button>
+                        <ActionButton
+                            action="save"
+                            type="button"
+                            disabled={saving}
+                            onClick={() => void simpan()}
+                            pending={saving}
+                        />
                     </CardAction>
                 )}
             </CardHeader>
@@ -183,100 +183,120 @@ export default function StatusValidationPage({
                             <h3 className="font-semibold">
                                 Sebelum berpindah ke {STATUS[kelompok.status]}
                             </h3>
-                            <div className="overflow-x-auto rounded-md border">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>
-                                                Yang diperiksa
-                                            </TableHead>
-                                            <TableHead className="w-32">
-                                                Diperiksa
-                                            </TableHead>
-                                            <TableHead className="w-72">
-                                                Bila belum terpenuhi
-                                            </TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {kelompok.baris.map((baris) => (
-                                            <TableRow key={baris.id}>
-                                                <TableCell>
-                                                    {ATURAN[baris.aturan] ??
-                                                        baris.aturan}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Switch
-                                                        aria-label={`Periksa ${ATURAN[baris.aturan]} saat ${STATUS[kelompok.status]}`}
-                                                        checked={baris.aktif}
-                                                        disabled={!canUpdate}
-                                                        onCheckedChange={(
-                                                            checked,
-                                                        ) =>
-                                                            ubah(baris.id, {
-                                                                aktif: checked,
-                                                            })
-                                                        }
-                                                    />
-                                                </TableCell>
-                                                <TableCell>
-                                                    {!baris.aktif ? (
-                                                        <span className="text-muted-foreground text-sm">
-                                                            Tidak diperiksa
-                                                        </span>
-                                                    ) : canUpdate ? (
-                                                        <Select
-                                                            items={KEPARAHAN.map(
-                                                                (item) =>
-                                                                    item.label,
-                                                            )}
-                                                            value={
-                                                                KEPARAHAN.find(
-                                                                    (item) =>
-                                                                        item.kode ===
-                                                                        baris.keparahan,
-                                                                )?.label ?? null
-                                                            }
-                                                            ariaLabel={`Keparahan ${ATURAN[baris.aturan]} saat ${STATUS[kelompok.status]}`}
-                                                            onValueChange={(
-                                                                value,
-                                                            ) => {
-                                                                const dipilih =
-                                                                    KEPARAHAN.find(
-                                                                        (
-                                                                            item,
-                                                                        ) =>
-                                                                            item.label ===
-                                                                            value,
-                                                                    );
-
-                                                                if (dipilih) {
-                                                                    ubah(
-                                                                        baris.id,
-                                                                        {
-                                                                            keparahan:
-                                                                                dipilih.kode,
-                                                                        },
-                                                                    );
-                                                                }
-                                                            }}
-                                                        />
-                                                    ) : (
-                                                        <span className="text-sm">
-                                                            {KEPARAHAN.find(
+                            {(() => {
+                                const sdkRows = kelompok.baris.map(
+                                    (baris, rowIndex) => {
+                                        return { baris, rowIndex };
+                                    },
+                                );
+                                const sdkColumns: DataTableColumn<
+                                    (typeof sdkRows)[number]
+                                >[] = [
+                                    {
+                                        id: 'column-0',
+                                        header: 'Yang diperiksa',
+                                        cell: ({ baris }) => (
+                                            <>
+                                                {ATURAN[baris.aturan] ??
+                                                    baris.aturan}
+                                            </>
+                                        ),
+                                    } satisfies DataTableColumn<
+                                        (typeof sdkRows)[number]
+                                    >,
+                                    {
+                                        id: 'column-1',
+                                        header: 'Diperiksa',
+                                        width: 128,
+                                        cell: ({ baris }) => (
+                                            <>
+                                                <Switch
+                                                    aria-label={`Periksa ${ATURAN[baris.aturan]} saat ${STATUS[kelompok.status]}`}
+                                                    checked={baris.aktif}
+                                                    disabled={!canUpdate}
+                                                    onCheckedChange={(
+                                                        checked,
+                                                    ) =>
+                                                        ubah(baris.id, {
+                                                            aktif: checked,
+                                                        })
+                                                    }
+                                                />
+                                            </>
+                                        ),
+                                    } satisfies DataTableColumn<
+                                        (typeof sdkRows)[number]
+                                    >,
+                                    {
+                                        id: 'column-2',
+                                        header: 'Bila belum terpenuhi',
+                                        width: 288,
+                                        cell: ({ baris }) => (
+                                            <>
+                                                {!baris.aktif ? (
+                                                    <span className="text-muted-foreground text-sm">
+                                                        Tidak diperiksa
+                                                    </span>
+                                                ) : canUpdate ? (
+                                                    <Select
+                                                        items={KEPARAHAN.map(
+                                                            (item) =>
+                                                                item.label,
+                                                        )}
+                                                        value={
+                                                            KEPARAHAN.find(
                                                                 (item) =>
                                                                     item.kode ===
                                                                     baris.keparahan,
-                                                            )?.label ??
-                                                                baris.keparahan}
-                                                        </span>
-                                                    )}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
+                                                            )?.label ?? null
+                                                        }
+                                                        ariaLabel={`Keparahan ${ATURAN[baris.aturan]} saat ${STATUS[kelompok.status]}`}
+                                                        onValueChange={(
+                                                            value,
+                                                        ) => {
+                                                            const dipilih =
+                                                                KEPARAHAN.find(
+                                                                    (item) =>
+                                                                        item.label ===
+                                                                        value,
+                                                                );
+
+                                                            if (dipilih) {
+                                                                ubah(baris.id, {
+                                                                    keparahan:
+                                                                        dipilih.kode,
+                                                                });
+                                                            }
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <span className="text-sm">
+                                                        {KEPARAHAN.find(
+                                                            (item) =>
+                                                                item.kode ===
+                                                                baris.keparahan,
+                                                        )?.label ??
+                                                            baris.keparahan}
+                                                    </span>
+                                                )}
+                                            </>
+                                        ),
+                                    } satisfies DataTableColumn<
+                                        (typeof sdkRows)[number]
+                                    >,
+                                ];
+
+                                return (
+                                    <DataTable
+                                        scrollMode="inline"
+                                        showRowNumbers={false}
+                                        serverSort
+                                        data={sdkRows}
+                                        columns={sdkColumns}
+                                        getRowKey={({ baris }) => baris.id}
+                                    />
+                                );
+                            })()}
                         </section>
                     ))
                 )}

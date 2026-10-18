@@ -1,20 +1,20 @@
+import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
 import { Checkbox } from '@apperp/ui/checkbox';
-import { DialogCancel } from '@apperp/ui/dialog';
+import { DialogClose } from '@apperp/ui/dialog';
+
 import { Field, FieldError } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
 import {
+    PageDialogToolbar,
     PageDialog as Dialog,
     PageDialogAction as DialogAction,
     PageDialogBody as DialogBody,
     PageDialogContent as DialogContent,
-    PageDialogDescription as DialogDescription,
-    PageDialogFooter as DialogFooter,
-    PageDialogHeader as DialogHeader,
-    PageDialogTitle as DialogTitle,
 } from '@apperp/ui/page-dialog';
+import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import {
     Table,
     TableBody,
@@ -225,7 +225,7 @@ export default function WorkingTimeCalendarTimes({
 
             <ListPageLayout>
                 {/* Command Bar / Action Ribbon */}
-                <div className="sticky top-0 z-20 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-card px-4 py-2">
+                <RecordActionBar>
                     <div className="flex flex-wrap items-center gap-2">
                         <Link
                             href="/settings/working-time-calendars"
@@ -335,7 +335,7 @@ export default function WorkingTimeCalendarTimes({
                             </Button>
                         </div>
                     )}
-                </div>
+                </RecordActionBar>
 
                 {!calendar ? (
                     <div className="flex flex-1 items-center justify-center p-8">
@@ -653,14 +653,41 @@ export default function WorkingTimeCalendarTimes({
 
             {/* Dialog penyusunan jadwal dari pola jam kerja */}
             <Dialog open={isComposeOpen} onOpenChange={setIsComposeOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Buat jadwal dari pola</DialogTitle>
-                        <DialogDescription>
-                            Susun hari dan jam kerja kalender ini untuk rentang
-                            tanggal tertentu dari pola jam kerja yang dipilih.
-                        </DialogDescription>
-                    </DialogHeader>
+                <DialogContent
+                    title="Jadwal kerja"
+                    recordTitle={
+                        calendar
+                            ? [calendar.code, calendar.name]
+                                  .filter(Boolean)
+                                  .join(' · ')
+                            : 'Jadwal dari pola'
+                    }
+                    editing
+                    busy={isComposing}
+                    description={
+                        'Susun hari dan jam kerja kalender ini untuk rentang\n                            tanggal tertentu dari pola jam kerja yang dipilih.'
+                    }
+                >
+                    <PageDialogToolbar>
+                        <DialogAction
+                            onClick={handleExecuteCompose}
+                            disabled={
+                                isComposing ||
+                                !composeTemplateId ||
+                                !composeFromDate ||
+                                !composeToDate
+                            }
+                        >
+                            {isComposing ? 'Menyusun jadwal…' : 'Susun jadwal'}
+                        </DialogAction>
+                        <DialogClose asChild>
+                            <ActionButton
+                                action="cancel"
+                                onClick={() => setIsComposeOpen(false)}
+                                type="button"
+                            />
+                        </DialogClose>
+                    </PageDialogToolbar>
 
                     <DialogBody className="space-y-4 py-2">
                         <Input
@@ -760,21 +787,6 @@ export default function WorkingTimeCalendarTimes({
                             </p>
                         </div>
                     </DialogBody>
-
-                    <DialogFooter>
-                        <DialogAction
-                            onClick={handleExecuteCompose}
-                            disabled={
-                                isComposing ||
-                                !composeTemplateId ||
-                                !composeFromDate ||
-                                !composeToDate
-                            }
-                        >
-                            {isComposing ? 'Menyusun jadwal…' : 'Susun jadwal'}
-                        </DialogAction>
-                        <DialogCancel onClick={() => setIsComposeOpen(false)} />
-                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </>

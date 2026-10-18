@@ -1,5 +1,5 @@
 import { usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { Workspace } from '@/types';
 import { ActionButton } from '@apperp/ui/action-button';
@@ -17,21 +17,17 @@ import {
 } from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
+import { PageDialog, PageDialogContent } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
+import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
 import { useRecordList } from '../../use-record-list';
+import type { RecordCardState } from '../_shared/record-card';
 import { bukaDaftar } from './aset';
 import { ImporSaldoAwal } from './ImporSaldoAwal';
 import type { Context, Penerimaan } from './penerimaan';
-import {
-    STATUS,
-    StatusBadge,
-    bukaPenerimaan,
-    bukaPenerimaanBaru,
-    bukaPenerimaanUbah,
-    izin,
-    tanggalTampil,
-} from './penerimaan';
+import { STATUS, StatusBadge, izin, tanggalTampil } from './penerimaan';
+import PenerimaanDetailPage from './PenerimaanDetailPage';
 
 /** Nilai filter status; `''` berarti semua. */
 const PILIHAN_STATUS = [
@@ -54,6 +50,30 @@ export default function PenerimaanListPage({
     context: Context;
     permissions: string[];
 }) {
+    const [card, setCard] = useState<RecordCardState>(null);
+    const [cardBusy, setCardBusy] = useState(false);
+    const [cardDirty, setCardDirty] = useState(false);
+    const discardChanges = () =>
+        !cardDirty || window.confirm('Buang perubahan yang belum disimpan?');
+    const openNewCard = () => {
+        if (!cardBusy && discardChanges()) {
+            setCardDirty(false);
+            setCard({ mode: 'create' });
+        }
+    };
+    const closeCard = () => {
+        if (!cardBusy && discardChanges()) {
+            setCard(null);
+            setCardDirty(false);
+            list.reload();
+        }
+    };
+    const [cardRevision, setCardRevision] = useState(0);
+    const cardContentRef = useRef<HTMLDivElement>(null);
+    const bukaPenerimaanBaru = () => setCard({ mode: 'create' });
+    const bukaPenerimaan = (id: string) => setCard({ mode: 'view', id });
+    const bukaPenerimaanUbah = (id: string) => setCard({ mode: 'edit', id });
+
     const can = izin(permissions);
     const { workspace } = usePage<{ workspace: Workspace }>().props;
     const legalEntityNames = new Map(
@@ -159,6 +179,27 @@ export default function PenerimaanListPage({
         actions.push({ id: 'edit', label: 'Ubah' });
     }
 
+    const currentCardId = card && 'id' in card ? card.id : null;
+    const cardNavigation = useRecordNavigation({
+        items: list.items,
+        currentId: currentCardId,
+        getId: (item) => item.id,
+        onNavigate: (id) => setCard({ mode: 'view', id }),
+        scopeKey: JSON.stringify([
+            '/penerimaan-aset',
+            search,
+            {
+                ...(status ? { status } : {}),
+                refresh: String(putaran),
+            },
+            list.sort,
+        ]),
+        hasMore: list.hasMore,
+        loading: list.loading,
+        loadMore: list.loadMore,
+        disabled: cardBusy || cardDirty,
+    });
+
     return (
         <>
             <ListPageLayout
@@ -169,9 +210,7 @@ export default function PenerimaanListPage({
                                 action="create"
                                 type="button"
                                 onClick={bukaPenerimaanBaru}
-                            >
-                                Catat penerimaan
-                            </ActionButton>
+                            />
                         )}
                         {can('create') && (
                             <Button
@@ -273,6 +312,61 @@ export default function PenerimaanListPage({
                     />
                 )}
             </ListPageLayout>
+            {card && (
+                <PageDialog
+                    open
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            closeCard();
+                        }
+                    }}
+                >
+                    <PageDialogContent
+                        ref={cardContentRef}
+                        onEscapeKeyDown={(event) => {
+                            if (cardBusy) {
+                                event.preventDefault();
+                            }
+                        }}
+                        title={'Penerimaan aset'}
+                        busy={cardBusy}
+                        onNew={
+                            !(card?.mode === 'create') && can('create')
+                                ? openNewCard
+                                : undefined
+                        }
+                        navigation={currentCardId ? cardNavigation : undefined}
+                    >
+                        <PenerimaanDetailPage
+                            key={`${card.mode}-${'id' in card ? card.id : 'new'}-${cardRevision}`}
+                            context={context}
+                            permissions={permissions}
+                            penerimaanId={'id' in card ? card.id : undefined}
+                            mode={card.mode}
+                            portalContainer={cardContentRef}
+                            onBusyChange={setCardBusy}
+                            onClose={closeCard}
+                            onSaved={(id) => {
+                                setCard({ mode: 'view', id });
+                                setCardRevision((version) => version + 1);
+                                list.reload();
+                            }}
+                            onRequestView={(id) => {
+                                if (!cardBusy && discardChanges()) {
+                                    setCard({ mode: 'view', id });
+                                }
+                            }}
+                            onRequestEdit={(id) => {
+                                if (!cardBusy && discardChanges()) {
+                                    setCard({ mode: 'edit', id });
+                                }
+                            }}
+                            onDirtyChange={setCardDirty}
+                        />
+                    </PageDialogContent>
+                </PageDialog>
+            )}
+
             {impor && (
                 <ImporSaldoAwal
                     context={context}

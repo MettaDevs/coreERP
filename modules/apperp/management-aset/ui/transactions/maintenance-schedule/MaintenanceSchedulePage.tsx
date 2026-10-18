@@ -2,6 +2,7 @@ import type { Key } from 'react';
 import { useCallback, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useToday } from '@/hooks/use-work-date';
+import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import { DataTable } from '@apperp/ui/data-table';
@@ -10,10 +11,10 @@ import type {
     DataTableRowAction,
 } from '@apperp/ui/data-table';
 import {
+    DialogClose,
     Dialog,
     DialogAction,
     DialogBody,
-    DialogCancel,
     DialogContent,
     DialogDescription,
     DialogFooter,
@@ -441,7 +442,9 @@ export default function MaintenanceSchedulePage({
                         >
                             {busy ? 'Menghitung…' : 'Hitung'}
                         </DialogAction>
-                        <DialogCancel type="button">Batal</DialogCancel>
+                        <DialogClose asChild>
+                            <ActionButton action="cancel" type="button" />
+                        </DialogClose>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -485,7 +488,9 @@ export default function MaintenanceSchedulePage({
                         >
                             {busy ? 'Membuat…' : 'Buat work order'}
                         </DialogAction>
-                        <DialogCancel type="button">Batal</DialogCancel>
+                        <DialogClose asChild>
+                            <ActionButton action="cancel" type="button" />
+                        </DialogClose>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -512,7 +517,9 @@ export default function MaintenanceSchedulePage({
                         >
                             Abaikan
                         </DialogAction>
-                        <DialogCancel type="button">Batal</DialogCancel>
+                        <DialogClose asChild>
+                            <ActionButton action="cancel" type="button" />
+                        </DialogClose>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

@@ -1,6 +1,7 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Button } from '@apperp/ui/button';
+import { ActionButton } from '@apperp/ui/action-button';
+
 import {
     Field,
     FieldDescription,
@@ -9,17 +10,23 @@ import {
     FieldLabel,
 } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
-import { Select } from '@apperp/ui/select';
+import type { PageDialogNavigation } from '@apperp/ui/page-dialog';
 import {
-    Sheet,
-    SheetContent,
-    SheetFooter,
-    SheetHeader,
-    SheetTitle,
-} from '@apperp/ui/sheet';
+    PageDialog,
+    PageDialogContent,
+    PageDialogToolbar,
+    PageDialogBody,
+} from '@apperp/ui/page-dialog';
+import { Select } from '@apperp/ui/select';
+
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
 import { api, errorMessage, newIdempotencyKey } from '../../api';
+import {
+    RecordCardHeader,
+    recordQueryUrl,
+} from '../../transactions/_shared/record-card';
+import { useRecordCardDirty } from '../../transactions/_shared/use-record-card-dirty';
 import type { MasterRecord, ParentSummary } from '../masters';
 import { useMasterOptions } from '../useMasterOptions';
 import type { PabrikanModelRecord } from './pabrikanAsetDetail';
@@ -34,12 +41,22 @@ export default function ModelAsetFormSheet({
     canReadJenis,
     onClose,
     onSaved,
+    onNew,
+    onDelete,
+    navigation,
+    onDirtyChange,
+    onBusyChange,
 }: {
     manufacturer: MasterRecord;
     value: PabrikanModelRecord | null;
     canReadJenis: boolean;
     onClose: () => void;
     onSaved: () => void | Promise<void>;
+    onNew?: () => void;
+    onDelete?: () => void;
+    navigation?: PageDialogNavigation;
+    onDirtyChange?: (dirty: boolean) => void;
+    onBusyChange?: (busy: boolean) => void;
 }) {
     const [nama, setNama] = useState(value?.nama ?? '');
     const [keterangan, setKeterangan] = useState(value?.keterangan ?? '');
@@ -54,6 +71,11 @@ export default function ModelAsetFormSheet({
     const jenisError = jenisSource.error;
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
+    useEffect(() => {
+        onBusyChange?.(saving);
+
+        return () => onBusyChange?.(false);
+    }, [saving, onBusyChange]);
     const sheetContentRef = useRef<HTMLDivElement>(null);
     const creationKey = useRef(newIdempotencyKey());
 
@@ -93,23 +115,53 @@ export default function ModelAsetFormSheet({
         }
     }
 
+    useRecordCardDirty({
+        value: { nama, keterangan, aktif, jenisAsetId },
+        ready: true,
+        scopeKey: value?.id ?? 'new',
+        onDirtyChange,
+    });
+
     return (
-        <Sheet open onOpenChange={(open) => !open && onClose()}>
-            <SheetContent
+        <PageDialog open onOpenChange={(open) => !open && onClose()}>
+            <PageDialogContent
                 ref={sheetContentRef}
-                side="right"
-                className="w-full gap-0 p-0 sm:max-w-xl"
+                title={'Model aset'}
+                busy={saving}
+                onNew={value ? onNew : undefined}
+                navigation={value ? navigation : undefined}
             >
-                <SheetHeader className="border-b px-6 py-5 pr-12">
-                    <SheetTitle>
-                        {value ? 'Ubah model' : 'Tambah model'}
-                    </SheetTitle>
-                </SheetHeader>
+                <RecordCardHeader
+                    recordUrl={
+                        value
+                            ? recordQueryUrl('model-aset', value.id)
+                            : undefined
+                    }
+                    recordTitle={
+                        value ? `${value.kode} · ${nama}` : nama || 'Baru'
+                    }
+                    editing
+                    onDelete={value ? onDelete : undefined}
+                />
                 <form
                     className="flex min-h-0 flex-1 flex-col"
                     onSubmit={submit}
                 >
-                    <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+                    <PageDialogToolbar>
+                        <ActionButton
+                            action="save"
+                            type="submit"
+                            disabled={saving}
+                            pending={saving}
+                        />
+                        <ActionButton
+                            action="cancel"
+                            disabled={saving}
+                            type="button"
+                            onClick={onClose}
+                        />
+                    </PageDialogToolbar>
+                    <PageDialogBody className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
                         <FieldGroup>
                             <Field>
                                 <Input
@@ -199,21 +251,9 @@ export default function ModelAsetFormSheet({
                             </Field>
                             {error && <FieldError>{error}</FieldError>}
                         </FieldGroup>
-                    </div>
-                    <SheetFooter className="border-t px-6 py-4 sm:flex-row sm:justify-end">
-                        <Button
-                            variant="outline"
-                            type="button"
-                            onClick={onClose}
-                        >
-                            Batal
-                        </Button>
-                        <Button disabled={saving}>
-                            {saving ? 'Menyimpan…' : 'Simpan'}
-                        </Button>
-                    </SheetFooter>
+                    </PageDialogBody>
                 </form>
-            </SheetContent>
-        </Sheet>
+            </PageDialogContent>
+        </PageDialog>
     );
 }

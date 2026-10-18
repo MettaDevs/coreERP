@@ -38,12 +38,43 @@ class AssetPostingGroupController extends Controller
     public function index(Request $request): JsonResponse
     {
         $this->requirePermission($request, 'read');
+
+        return response()->json($this->matrix($request));
+    }
+
+    public function show(Request $request, string $groupAsetId, string $effectiveFrom): JsonResponse
+    {
+        $this->requirePermission($request, 'read');
+        validator(['effective_from' => $effectiveFrom], ['effective_from' => ['required', 'date_format:Y-m-d']])->validate();
+        $row = $this->find($groupAsetId, $effectiveFrom);
+        abort_if($row === null, 404);
+        $matrix = $this->matrix($request, $groupAsetId)['data'];
+
+        return response()->json(['data' => [
+            'group' => $matrix['groups'][0],
+            'row' => $this->present($row),
+            'today' => $matrix['today'],
+            'accounts' => $matrix['accounts'],
+            'account_details' => $matrix['account_details'],
+        ]]);
+    }
+
+    /** @return array<string, mixed> */
+    private function matrix(Request $request, ?string $groupAsetId = null): array
+    {
         $tenantId = $this->tenantId($request);
         $today = now()->toDateString();
 
-        $batch = IncrementalList::query($request, GroupAset::query()->select(['id', 'kode', 'nama', 'aktif'])->toBase(),
-            ['id' => 'id', 'kode' => 'kode', 'nama' => 'nama'], ['kode', 'nama'], 'kode');
-        $groupRows = GroupAset::hydrate($batch['data']->map(fn ($row) => (array) $row)->all());
+        if ($groupAsetId !== null) {
+            $groupRows = GroupAset::query()->whereKey($groupAsetId)->get(['id', 'kode', 'nama', 'aktif']);
+            abort_if($groupRows->isEmpty(), 404);
+            $nextCursor = null;
+        } else {
+            $batch = IncrementalList::query($request, GroupAset::query()->select(['id', 'kode', 'nama', 'aktif'])->toBase(),
+                ['id' => 'id', 'kode' => 'kode', 'nama' => 'nama'], ['kode', 'nama'], 'kode');
+            $groupRows = GroupAset::hydrate($batch['data']->map(fn ($row) => (array) $row)->all());
+            $nextCursor = $batch['next_cursor'];
+        }
         $all = AssetPostingGroup::query()->whereIn('group_aset_id', $groupRows->modelKeys())->orderByDesc('effective_from')->get();
         $rows = $all->groupBy('group_aset_id');
 
@@ -89,7 +120,7 @@ class AssetPostingGroupController extends Controller
             ];
         }
 
-        return response()->json(['data' => [
+        return ['data' => [
             'today' => $today,
             'accounts' => array_map(
                 static fn (string $column, string $label): array => [
@@ -103,7 +134,7 @@ class AssetPostingGroupController extends Controller
             'groups' => $groups,
             'groups_needing_attention' => $needingAttention,
             'account_details' => (object) $details,
-        ], 'next_cursor' => $batch['next_cursor']]);
+        ], 'next_cursor' => $nextCursor];
     }
 
     /** Akun aktif yang berlaku untuk semua entitas legal, untuk pemilih akun di layar. */

@@ -1,9 +1,11 @@
 import { CircleAlert } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
+import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import { Checkbox } from '@apperp/ui/checkbox';
+import { DialogToolbar } from '@apperp/ui/dialog';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
 import { Field, FieldHint, FieldLabel } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
@@ -350,6 +352,23 @@ export default function MaintenancePlanLines({
 
     return (
         <div className="space-y-4">
+            <DialogToolbar className="px-0">
+                <ActionButton
+                    action="save"
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void save()}
+                    pending={saving}
+                />
+                <ActionButton
+                    action="add"
+                    type="button"
+                    onClick={() => {
+                        setSaved(false);
+                        setLines((current) => [...current, emptyLine()]);
+                    }}
+                />
+            </DialogToolbar>
             {lines.length === 0 && (
                 <Empty>
                     <EmptyDescription>
@@ -595,25 +614,7 @@ export default function MaintenancePlanLines({
                     </div>
                 </div>
             ))}
-            <div className="flex gap-2">
-                <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                        setSaved(false);
-                        setLines((current) => [...current, emptyLine()]);
-                    }}
-                >
-                    Tambah baris
-                </Button>
-                <Button
-                    type="button"
-                    disabled={saving}
-                    onClick={() => void save()}
-                >
-                    {saving ? 'Menyimpan…' : 'Simpan baris rencana'}
-                </Button>
-            </div>
+
             {[jobTypes, counters, tipe].map(
                 (source) =>
                     source.error && (

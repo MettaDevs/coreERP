@@ -46,10 +46,16 @@ final class MaintenancePlanDetailController extends Controller
 
     public function replaceLines(Request $request, string $id): JsonResponse
     {
+        return $this->replaceLinesPayload($request, $id, $request->all());
+    }
+
+    /** @param array<string, mixed> $payload */
+    public function replaceLinesPayload(Request $request, string $id, array $payload, ?int $expectedVersion = null): JsonResponse
+    {
         $this->permission($request, 'update');
         $tenant = $this->tenant($request);
         MaintenancePlan::query()->findOrFail($id);
-        $data = $request->validate([
+        $data = validator($payload, [
             'lines' => ['present', 'array', 'max:50'],
             'lines.*.id' => ['nullable', 'ulid'],
             'lines.*.dasar' => ['required', Rule::in(MaintenancePlanBasis::ALL)],
@@ -66,10 +72,10 @@ final class MaintenancePlanDetailController extends Controller
             'lines.*.selesai_dalam_hari' => ['nullable', 'integer', 'min:0', 'max:3650'],
             'lines.*.deskripsi' => ['nullable', 'string', 'max:2000'],
             'lines.*.aktif' => ['sometimes', 'boolean'],
-        ]);
+        ])->validate();
         $lines = array_values($data['lines']);
         $this->validateLines($lines);
-        $expected = RowVersion::expected($request);
+        $expected = ($expectedVersion ?? RowVersion::expected($request));
 
         DB::transaction(function () use ($id, $lines, $expected, $tenant): void {
             RowVersion::claim(MaintenancePlan::query()->findOrFail($id), $expected);
@@ -109,10 +115,16 @@ final class MaintenancePlanDetailController extends Controller
 
     public function replaceTargets(Request $request, string $id): JsonResponse
     {
+        return $this->replaceTargetsPayload($request, $id, $request->all());
+    }
+
+    /** @param array<string, mixed> $payload */
+    public function replaceTargetsPayload(Request $request, string $id, array $payload, ?int $expectedVersion = null): JsonResponse
+    {
         $this->permission($request, 'update');
         $tenant = $this->tenant($request);
         MaintenancePlan::query()->findOrFail($id);
-        $data = $request->validate([
+        $data = validator($payload, [
             'targets' => ['present', 'array', 'max:500'],
             'targets.*.id' => ['nullable', 'ulid'],
             'targets.*.aset_id' => ['nullable', 'ulid', 'distinct',
@@ -124,14 +136,14 @@ final class MaintenancePlanDetailController extends Controller
         ], [
             'targets.*.aset_id.distinct' => 'Aset yang sama tercantum dua kali.',
             'targets.*.jenis_aset_id.distinct' => 'Jenis aset yang sama tercantum dua kali.',
-        ]);
+        ])->validate();
         $targets = array_values($data['targets']);
         foreach ($targets as $index => $target) {
             if ((($target['aset_id'] ?? null) === null) === (($target['jenis_aset_id'] ?? null) === null)) {
                 throw ValidationException::withMessages(['targets.'.$index.'.aset_id' => 'Setiap baris berlaku untuk satu aset atau satu jenis aset, bukan keduanya.']);
             }
         }
-        $expected = RowVersion::expected($request);
+        $expected = ($expectedVersion ?? RowVersion::expected($request));
 
         DB::transaction(function () use ($id, $targets, $expected, $tenant): void {
             RowVersion::claim(MaintenancePlan::query()->findOrFail($id), $expected);

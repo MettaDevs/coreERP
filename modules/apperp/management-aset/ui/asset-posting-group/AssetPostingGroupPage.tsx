@@ -1,7 +1,9 @@
 import { CircleAlert } from 'lucide-react';
+import { useEffect } from 'react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import { toast } from 'sonner';
+import { ActionButton } from '@apperp/ui/action-button';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -17,6 +19,7 @@ import { Button } from '@apperp/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
 import { DataTable, DataTableText } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
+import { DialogToolbar } from '@apperp/ui/dialog';
 import {
     Empty,
     EmptyDescription,
@@ -32,17 +35,17 @@ import {
 } from '@apperp/ui/field';
 import { IncrementalListStatus } from '@apperp/ui/incremental-list-status';
 import { Input } from '@apperp/ui/input';
+import { usePageDialogRecord } from '@apperp/ui/page-dialog';
+import { PageDialog, PageDialogContent } from '@apperp/ui/page-dialog';
 import { Select } from '@apperp/ui/select';
-import {
-    Sheet,
-    SheetContent,
-    SheetFooter,
-    SheetHeader,
-    SheetTitle,
-} from '@apperp/ui/sheet';
+
 import type { ListLoader } from '@apperp/ui/use-incremental-list';
 import { useIncrementalList } from '@apperp/ui/use-incremental-list';
+import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
 import { api, ApiError, toastSaveError } from '../api';
+import { recordQueryUrl } from '../transactions/_shared/record-card';
+import { useRecordCardDirty } from '../transactions/_shared/use-record-card-dirty';
+import { useRecordQueryTarget } from '../transactions/_shared/use-record-query-target';
 import { recordListParams, useRecordOptions } from '../use-record-list';
 
 type AccountColumn = { column: string; label: string; required: boolean };
@@ -128,6 +131,8 @@ export default function AssetPostingGroupPage({
             `management-aset.fixed-asset-posting-profiles.${action}`,
         );
     const [metadata, setMetadata] = useState<Matrix | null>(null);
+    const [openedMatrix, setOpenedMatrix] = useState<Matrix | null>(null);
+    const [initialDate, setInitialDate] = useState<string | undefined>();
     const [search, setSearch] = useState('');
     const [editing, setEditing] = useState<Group | null>(null);
     const loadItems = useCallback<ListLoader<Group>>(async (request) => {
@@ -171,9 +176,62 @@ export default function AssetPostingGroupPage({
           }
         : null;
 
+    const clearRecordTarget = useRecordQueryTarget({
+        scopeKey: 'fixed-aset-posting-profiles',
+        enabled: can('read'),
+        requireDate: true,
+        onOpen: async (id, signal, _kind, date) => {
+            if (!date) {
+                return;
+            }
+
+            const result = await api<{
+                data: {
+                    group: Group;
+                    row: PostingRow;
+                    today: string;
+                    accounts: AccountColumn[];
+                    account_details: Record<string, Account>;
+                };
+            }>('/posting-group-aset/' + id + '/' + date, { signal });
+
+            if (signal.aborted) {
+                return;
+            }
+
+            const exact = result.data;
+            setOpenedMatrix({
+                today: exact.today,
+                accounts: exact.accounts,
+                account_details: exact.account_details,
+                groups: [exact.group],
+                groups_needing_attention:
+                    exact.group.missing.length ||
+                    exact.group.unusable_accounts.length
+                        ? 1
+                        : 0,
+            });
+            setInitialDate(exact.row.effective_from);
+            setEditing(exact.group);
+        },
+    });
+    const openGroup = (group: Group) => {
+        clearRecordTarget();
+        setOpenedMatrix(null);
+        setInitialDate(undefined);
+        setEditing(group);
+    };
+    const closeGroup = () => {
+        clearRecordTarget();
+        setEditing(null);
+        setOpenedMatrix(null);
+        setInitialDate(undefined);
+    };
+    const cardMatrix = openedMatrix ?? matrix;
+
     return (
         <Card className="flex h-full min-h-0 flex-col overflow-hidden rounded-none border-0 shadow-none">
-            <CardHeader className="shrink-0 border-b px-5 py-4">
+            <CardHeader className="shrink-0 border-b">
                 <CardTitle>Setup Akun/COA Aset</CardTitle>
                 <Input
                     aria-label="Cari group aset"
@@ -222,19 +280,25 @@ export default function AssetPostingGroupPage({
                                 matrix={matrix}
                                 list={list}
                                 canEdit={can('create') || can('update')}
-                                onOpen={setEditing}
+                                onOpen={openGroup}
                             />
                         </>
                     )}
             </CardContent>
-            {editing && matrix && (
+            {editing && cardMatrix && (
                 <PostingGroupSheet
+                    key={editing.id + ':' + (initialDate ?? 'default')}
+                    list={list}
+                    scopeKey={JSON.stringify([search, list.sort])}
+                    onNavigate={openGroup}
                     group={editing}
-                    matrix={matrix}
+                    matrix={cardMatrix}
+                    initialDate={initialDate}
+                    onDateChange={clearRecordTarget}
                     canCreate={can('create')}
                     canUpdate={can('update')}
                     canArchive={can('archive')}
-                    onClose={() => setEditing(null)}
+                    onClose={closeGroup}
                     onSaved={list.reload}
                 />
             )}
@@ -423,40 +487,95 @@ function AccountCell({
 function PostingGroupSheet({
     group,
     matrix,
+    initialDate,
+    onDateChange,
     canCreate,
     canUpdate,
     canArchive,
     onClose,
     onSaved,
+    list,
+    scopeKey,
+    onNavigate,
 }: {
     group: Group;
     matrix: Matrix;
+    initialDate?: string;
+    onDateChange: () => void;
     canCreate: boolean;
     canUpdate: boolean;
     canArchive: boolean;
     onClose: () => void;
     onSaved: () => void;
+    list: ReturnType<typeof useIncrementalList<Group>>;
+    scopeKey: string;
+    onNavigate: (group: Group) => void;
 }) {
     const sheetRef = useRef<HTMLDivElement>(null);
+    const [cardBusy, setCardBusy] = useState(false);
+    const [cardDirty, setCardDirty] = useState(false);
     // `null` berarti menyusun baris untuk tanggal berlaku baru.
     const [selected, setSelected] = useState<string | null>(
-        group.current?.effective_from ?? group.rows[0]?.effective_from ?? null,
+        initialDate ??
+            group.current?.effective_from ??
+            group.rows[0]?.effective_from ??
+            null,
     );
     const row =
         group.rows.find((baris) => baris.effective_from === selected) ?? null;
 
+    const discardCard = () =>
+        !cardDirty || window.confirm('Buang perubahan yang belum disimpan?');
+    const closeCard = () => {
+        if (!cardBusy && discardCard()) {
+            onClose();
+        }
+    };
+    const selectDate = (date: string | null) => {
+        if (!cardBusy && discardCard()) {
+            onDateChange();
+            setSelected(date);
+            setCardDirty(false);
+        }
+    };
+    const cardNavigation = useRecordNavigation({
+        items: matrix.groups,
+        currentId: group.id,
+        getId: (item) => item.id,
+        onNavigate: (id) => {
+            const item = matrix.groups.find((item) => item.id === id);
+
+            if (item) {
+                onNavigate(item);
+            }
+        },
+        scopeKey,
+        hasMore: list.hasMore,
+        loading: list.loading,
+        loadMore: list.loadMore,
+        disabled: cardBusy || cardDirty,
+    });
+
     return (
-        <Sheet open onOpenChange={(open) => !open && onClose()}>
-            <SheetContent
+        <PageDialog
+            open
+            onOpenChange={(open) => {
+                if (!open) {
+                    closeCard();
+                }
+            }}
+        >
+            <PageDialogContent
                 ref={sheetRef}
-                side="right"
-                className="w-full gap-0 p-0 sm:max-w-xl"
+                title={'Setup akun/COA aset'}
+                busy={cardBusy}
+                onNew={
+                    canCreate && selected !== null
+                        ? () => selectDate(null)
+                        : undefined
+                }
+                navigation={row ? cardNavigation : undefined}
             >
-                <SheetHeader className="border-b px-6 py-5 pr-12">
-                    <SheetTitle>
-                        Setup akun/COA aset {group.kode} · {group.nama}
-                    </SheetTitle>
-                </SheetHeader>
                 {/* Ber-key per tanggal: berpindah tanggal memulai form baru dari barisnya sendiri. */}
                 <RowEditor
                     key={selected ?? 'baru'}
@@ -472,14 +591,17 @@ function PostingGroupSheet({
                             selected={selected}
                             today={matrix.today}
                             canCreate={canCreate}
-                            onSelect={setSelected}
+                            onSelect={selectDate}
                         />
                     }
                     onClose={onClose}
                     onSaved={onSaved}
+                    onBusyChange={setCardBusy}
+                    onDirtyChange={setCardDirty}
+                    onCancel={closeCard}
                 />
-            </SheetContent>
-        </Sheet>
+            </PageDialogContent>
+        </PageDialog>
     );
 }
 
@@ -493,6 +615,9 @@ function RowEditor({
     tabs,
     onClose,
     onSaved,
+    onBusyChange,
+    onDirtyChange,
+    onCancel,
 }: {
     group: Group;
     matrix: Matrix;
@@ -503,6 +628,9 @@ function RowEditor({
     tabs: ReactNode;
     onClose: () => void;
     onSaved: () => void;
+    onBusyChange: (busy: boolean) => void;
+    onDirtyChange: (dirty: boolean) => void;
+    onCancel: () => void;
 }) {
     const [effectiveFrom, setEffectiveFrom] = useState(matrix.today);
     const [values, setValues] = useState<Record<string, string | null>>(() =>
@@ -525,6 +653,11 @@ function RowEditor({
     };
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [saving, setSaving] = useState(false);
+    useEffect(() => {
+        onBusyChange(saving);
+
+        return () => onBusyChange(false);
+    }, [saving, onBusyChange]);
     const [archiving, setArchiving] = useState(false);
     async function save() {
         const date = row ? row.effective_from : effectiveFrom;
@@ -576,6 +709,8 @@ function RowEditor({
             return;
         }
 
+        setSaving(true);
+
         try {
             await api(`/posting-group-aset/${group.id}/${row.effective_from}`, {
                 method: 'DELETE',
@@ -590,14 +725,71 @@ function RowEditor({
             toastSaveError(caught, 'Baris belum diarsipkan.');
         } finally {
             setArchiving(false);
+            setSaving(false);
         }
     }
 
+    useRecordCardDirty({
+        value: { effectiveFrom, values },
+        ready: true,
+        scopeKey: JSON.stringify([group.id, row?.effective_from]),
+        onDirtyChange,
+    });
+
+    const embedded = usePageDialogRecord({
+        recordTitle:
+            group.kode +
+            ' · ' +
+            group.nama +
+            (row ? ' · ' + formatDate(row.effective_from) : ''),
+        recordUrl: row
+            ? recordQueryUrl(
+                  'fixed-aset-posting-profiles',
+                  group.id,
+                  undefined,
+                  row.effective_from,
+              )
+            : undefined,
+        editing: editable,
+        onDelete: row && canArchive ? () => setArchiving(true) : undefined,
+        secondaryNavigation: tabs,
+    });
+
     return (
         <>
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+            {(editable || (!embedded && row && canArchive)) && (
+                <DialogToolbar>
+                    {editable && (
+                        <ActionButton
+                            action="save"
+                            type="button"
+                            disabled={saving}
+                            onClick={() => void save()}
+                            pending={saving}
+                        />
+                    )}
+
+                    {!embedded && row && canArchive && (
+                        <ActionButton
+                            action="archive"
+                            type="button"
+                            onClick={() => setArchiving(true)}
+                        />
+                    )}
+                    {editable && (
+                        <ActionButton
+                            action="cancel"
+                            onClick={onCancel}
+                            disabled={saving}
+                        />
+                    )}
+                </DialogToolbar>
+            )}
+            <div
+                data-page-dialog-body
+                className="min-h-0 flex-1 overflow-y-auto px-6 py-5"
+            >
                 <FieldGroup>
-                    {tabs}
                     {row === null && (
                         <Field data-invalid={Boolean(errors.effective_from)}>
                             <Input
@@ -645,33 +837,7 @@ function RowEditor({
                     )}
                 </FieldGroup>
             </div>
-            <SheetFooter className="border-t px-6 py-4 sm:flex-row sm:justify-between">
-                <div>
-                    {row && canArchive && (
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setArchiving(true)}
-                        >
-                            Arsipkan baris
-                        </Button>
-                    )}
-                </div>
-                <div className="flex gap-2">
-                    <Button type="button" variant="outline" onClick={onClose}>
-                        Tutup
-                    </Button>
-                    {editable && (
-                        <Button
-                            type="button"
-                            disabled={saving}
-                            onClick={() => void save()}
-                        >
-                            {saving ? 'Menyimpan…' : 'Simpan'}
-                        </Button>
-                    )}
-                </div>
-            </SheetFooter>
+
             <AlertDialog
                 open={archiving}
                 onOpenChange={(open) => !open && setArchiving(false)}
@@ -679,7 +845,7 @@ function RowEditor({
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>
-                            Arsipkan baris{' '}
+                            Delete baris{' '}
                             {row ? formatDate(row.effective_from) : ''}?
                         </AlertDialogTitle>
                         <AlertDialogDescription>
@@ -691,8 +857,11 @@ function RowEditor({
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Batal</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => void archive()}>
-                            Arsipkan
+                        <AlertDialogAction
+                            onClick={() => void archive()}
+                            asChild
+                        >
+                            <ActionButton action="archive" />
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -737,14 +906,11 @@ function DateTabs({
                 </Button>
             ))}
             {canCreate && (
-                <Button
+                <ActionButton
+                    action="add"
                     type="button"
-                    size="sm"
-                    variant={selected === null ? 'default' : 'outline'}
                     onClick={() => onSelect(null)}
-                >
-                    Tanggal berlaku baru
-                </Button>
+                />
             )}
         </div>
     );

@@ -6,12 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\AddressBook\Models\ElectronicAddress;
 use App\Platform\AddressBook\Support\OrganizationAddressBook;
+use App\Platform\AddressBook\Support\PartyDetailData;
 use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Organization\Models\Organization;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Validation\Rule;
 
 /**
  * Informasi kontak satu organisasi (padanan Contact information Dynamics 365): email,
@@ -59,13 +59,7 @@ class OrganizationContactController extends Controller
     /** @return array<string, mixed> */
     private function validated(Request $request): array
     {
-        return $request->validate([
-            'type' => ['required', Rule::in(ElectronicAddress::TYPES)],
-            'value' => ['required', 'string', 'max:250', ...($request->input('type') === 'email' ? ['email'] : [])],
-            'purpose' => ['nullable', 'string', 'max:30'],
-            'is_primary' => ['sometimes', 'boolean'],
-            'address_id' => ['sometimes', 'nullable', 'string', 'size:26'],
-        ]);
+        return PartyDetailData::contact($request->all());
     }
 
     private function guardOrganization(Request $request, Organization $organization, bool $manage = false): void

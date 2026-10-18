@@ -1,18 +1,15 @@
 import { useEffect, useState } from 'react';
+import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import { Checkbox } from '@apperp/ui/checkbox';
+import { DataTable } from '@apperp/ui/data-table';
+import type { DataTableColumn } from '@apperp/ui/data-table';
+import { DialogToolbar } from '@apperp/ui/dialog';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
+
 import { api, errorMessage } from '../../api';
 import { useRecordOptions } from '../../use-record-list';
 import type { MasterOption } from '../useMasterOptions';
@@ -221,130 +218,17 @@ export default function MaintenancePlanTargets({
 
     return (
         <div className="space-y-3">
-            {targets.length === 0 ? (
-                <Empty>
-                    <EmptyDescription>
-                        Pilih aset tertentu, atau satu jenis aset supaya seluruh
-                        aset jenis itu ikut dijadwalkan.
-                    </EmptyDescription>
-                </Empty>
-            ) : (
-                <div className="overflow-x-auto rounded-md border">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Berlaku untuk</TableHead>
-                                <TableHead>Aset atau jenis aset</TableHead>
-                                <TableHead>Tanggal mulai</TableHead>
-                                <TableHead>Aktif</TableHead>
-                                <TableHead />
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {targets.map((target, index) => (
-                                <TableRow key={target.id ?? `baru-${index}`}>
-                                    <TableCell className="min-w-48">
-                                        <Select
-                                            items={KINDS}
-                                            value={target.kind}
-                                            ariaLabel={`Jenis objek baris ${index + 1}`}
-                                            onValueChange={(value) =>
-                                                value &&
-                                                update(index, {
-                                                    kind: value as Kind,
-                                                    aset_id: '',
-                                                    jenis_aset_id: '',
-                                                })
-                                            }
-                                        />
-                                    </TableCell>
-                                    <TableCell className="min-w-64">
-                                        {target.kind === 'aset' ? (
-                                            <Select
-                                                {...assetSource.selectProps}
-                                                items={items(assets)}
-                                                value={target.aset_id || null}
-                                                placeholder="Pilih aset"
-                                                ariaLabel={`Aset baris ${index + 1}`}
-                                                onValueChange={(value) =>
-                                                    update(index, {
-                                                        aset_id: value ?? '',
-                                                    })
-                                                }
-                                            />
-                                        ) : (
-                                            <Select
-                                                {...jenis.selectProps}
-                                                items={items(jenis.options)}
-                                                value={
-                                                    target.jenis_aset_id || null
-                                                }
-                                                placeholder="Pilih jenis aset"
-                                                ariaLabel={`Jenis aset baris ${index + 1}`}
-                                                onValueChange={(value) =>
-                                                    update(index, {
-                                                        jenis_aset_id:
-                                                            value ?? '',
-                                                    })
-                                                }
-                                            />
-                                        )}
-                                    </TableCell>
-                                    <TableCell>
-                                        <Input
-                                            type="date"
-                                            aria-label={`Tanggal mulai baris ${index + 1}`}
-                                            value={target.tanggal_mulai}
-                                            onChange={(event) =>
-                                                update(index, {
-                                                    tanggal_mulai:
-                                                        event.target.value,
-                                                })
-                                            }
-                                        />
-                                    </TableCell>
-                                    <TableCell>
-                                        <Checkbox
-                                            aria-label={`Aktif baris ${index + 1}`}
-                                            checked={target.aktif}
-                                            onCheckedChange={(checked) =>
-                                                update(index, {
-                                                    aktif: checked === true,
-                                                })
-                                            }
-                                        />
-                                    </TableCell>
-                                    <TableCell>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => {
-                                                setSaved(false);
-                                                setTargets((current) =>
-                                                    current.filter(
-                                                        (_, position) =>
-                                                            position !== index,
-                                                    ),
-                                                );
-                                            }}
-                                        >
-                                            Keluarkan
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </div>
-            )}
-            <p className="text-muted-foreground text-sm">
-                Tanggal mulai yang kosong memakai tanggal mulai rencana.
-            </p>
-            <div className="flex gap-2">
-                <Button
+            <DialogToolbar className="px-0">
+                <ActionButton
+                    action="save"
                     type="button"
-                    variant="outline"
+                    disabled={saving}
+                    onClick={() => void save()}
+                    pending={saving}
+                />
+                <ActionButton
+                    action="add"
+                    type="button"
                     onClick={() => {
                         setSaved(false);
                         setTargets((current) => [
@@ -359,17 +243,159 @@ export default function MaintenancePlanTargets({
                             },
                         ]);
                     }}
-                >
-                    Tambah
-                </Button>
-                <Button
-                    type="button"
-                    disabled={saving}
-                    onClick={() => void save()}
-                >
-                    {saving ? 'Menyimpan…' : 'Simpan objek rencana'}
-                </Button>
-            </div>
+                />
+            </DialogToolbar>
+            {targets.length === 0 ? (
+                <Empty>
+                    <EmptyDescription>
+                        Pilih aset tertentu, atau satu jenis aset supaya seluruh
+                        aset jenis itu ikut dijadwalkan.
+                    </EmptyDescription>
+                </Empty>
+            ) : (
+                (() => {
+                    const sdkRows = targets.map((target, index) => {
+                        return { target, index };
+                    });
+                    const sdkColumns: DataTableColumn<
+                        (typeof sdkRows)[number]
+                    >[] = [
+                        {
+                            id: 'column-0',
+                            header: 'Berlaku untuk',
+                            cell: ({ target, index }) => (
+                                <div className="min-w-48">
+                                    <Select
+                                        items={KINDS}
+                                        value={target.kind}
+                                        ariaLabel={`Jenis objek baris ${index + 1}`}
+                                        onValueChange={(value) =>
+                                            value &&
+                                            update(index, {
+                                                kind: value as Kind,
+                                                aset_id: '',
+                                                jenis_aset_id: '',
+                                            })
+                                        }
+                                    />
+                                </div>
+                            ),
+                        } satisfies DataTableColumn<(typeof sdkRows)[number]>,
+                        {
+                            id: 'column-1',
+                            header: 'Aset atau jenis aset',
+                            cell: ({ target, index }) => (
+                                <div className="min-w-64">
+                                    {target.kind === 'aset' ? (
+                                        <Select
+                                            {...assetSource.selectProps}
+                                            items={items(assets)}
+                                            value={target.aset_id || null}
+                                            placeholder="Pilih aset"
+                                            ariaLabel={`Aset baris ${index + 1}`}
+                                            onValueChange={(value) =>
+                                                update(index, {
+                                                    aset_id: value ?? '',
+                                                })
+                                            }
+                                        />
+                                    ) : (
+                                        <Select
+                                            {...jenis.selectProps}
+                                            items={items(jenis.options)}
+                                            value={target.jenis_aset_id || null}
+                                            placeholder="Pilih jenis aset"
+                                            ariaLabel={`Jenis aset baris ${index + 1}`}
+                                            onValueChange={(value) =>
+                                                update(index, {
+                                                    jenis_aset_id: value ?? '',
+                                                })
+                                            }
+                                        />
+                                    )}
+                                </div>
+                            ),
+                        } satisfies DataTableColumn<(typeof sdkRows)[number]>,
+                        {
+                            id: 'column-2',
+                            header: 'Tanggal mulai',
+                            cell: ({ target, index }) => (
+                                <>
+                                    <Input
+                                        type="date"
+                                        aria-label={`Tanggal mulai baris ${index + 1}`}
+                                        value={target.tanggal_mulai}
+                                        onChange={(event) =>
+                                            update(index, {
+                                                tanggal_mulai:
+                                                    event.target.value,
+                                            })
+                                        }
+                                    />
+                                </>
+                            ),
+                        } satisfies DataTableColumn<(typeof sdkRows)[number]>,
+                        {
+                            id: 'column-3',
+                            header: 'Aktif',
+                            cell: ({ target, index }) => (
+                                <>
+                                    <Checkbox
+                                        aria-label={`Aktif baris ${index + 1}`}
+                                        checked={target.aktif}
+                                        onCheckedChange={(checked) =>
+                                            update(index, {
+                                                aktif: checked === true,
+                                            })
+                                        }
+                                    />
+                                </>
+                            ),
+                        } satisfies DataTableColumn<(typeof sdkRows)[number]>,
+                        {
+                            id: 'column-4',
+                            header: '',
+                            cell: ({ index }) => (
+                                <>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                            setSaved(false);
+                                            setTargets((current) =>
+                                                current.filter(
+                                                    (_, position) =>
+                                                        position !== index,
+                                                ),
+                                            );
+                                        }}
+                                    >
+                                        Keluarkan
+                                    </Button>
+                                </>
+                            ),
+                        } satisfies DataTableColumn<(typeof sdkRows)[number]>,
+                    ];
+
+                    return (
+                        <DataTable
+                            scrollMode="inline"
+                            showRowNumbers={false}
+                            serverSort
+                            data={sdkRows}
+                            columns={sdkColumns}
+                            getRowKey={({ target, index }) =>
+                                target.id ?? `baru-${index}`
+                            }
+                        />
+                    );
+                })()
+            )}
+            <p className="text-muted-foreground text-sm">
+                Tanggal mulai yang kosong memakai tanggal mulai rencana.
+            </p>
+
             {assetError && (
                 <p className="text-muted-foreground text-sm">{assetError}</p>
             )}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Button } from '@apperp/ui/button';
+import { ActionButton } from '@apperp/ui/action-button';
+
 import { Field, FieldLabel } from '@apperp/ui/field';
 import { Switch } from '@apperp/ui/switch';
 import { TransferList } from '@apperp/ui/transfer-list';
@@ -232,13 +233,13 @@ export default function JenisAsetAtribut({
             )}
 
             {canEdit && (
-                <Button
+                <ActionButton
+                    action="save"
                     type="button"
                     disabled={saving}
                     onClick={() => void save()}
-                >
-                    {saving ? 'Menyimpan…' : 'Simpan atribut'}
-                </Button>
+                    pending={saving}
+                />
             )}
         </div>
     );

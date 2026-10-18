@@ -5,6 +5,7 @@ namespace Tests\Feature\Foundation\Vendor;
 use App\Foundation\NumberSequence\Models\TenantNumberSequence;
 use App\Foundation\NumberSequence\Support\CoreNumberSequences;
 use App\Foundation\Vendor\Models\Vendor;
+use App\Platform\AddressBook\Models\Party;
 use App\Platform\Identity\Models\User;
 use App\Platform\Modules\Contracts\VendorDirectory;
 use App\Platform\Tenant\Actions\RegisterBusiness;
@@ -14,6 +15,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia;
 use Tests\Concerns\GrantsCoreRoles;
@@ -42,6 +44,57 @@ class VendorTest extends TestCase
         $this->owner = $this->pemilik('owner@metta.test', 'PT Metta');
         $this->membership = $this->owner->activeMembership();
         $this->le = $this->legalEntity('PT Metta Sehat', 'META');
+    }
+
+    public function test_vendor_card_query_opens_exact_record_outside_first_batch_in_read_only_mode(): void
+    {
+        $target = $this->buat(['party_name' => 'Requested vendor'])->assertCreated()->json('data');
+        for ($index = 1; $index <= 50; $index++) {
+            $party = Party::query()->create([
+                'tenant_id' => $this->membership->tenant_id, 'type' => 'organization',
+                'name' => 'Batch vendor '.$index, 'search_name' => 'batch vendor '.$index, 'status' => 'active',
+            ]);
+            Vendor::query()->create([
+                'tenant_id' => $this->membership->tenant_id, 'legal_entity_id' => $this->le,
+                'party_id' => $party->id, 'number' => sprintf('AAA-%03d', $index),
+                'status' => Vendor::ACTIVE, 'created_by_user_id' => $this->owner->id,
+            ]);
+        }
+        $reader = User::factory()->create();
+        $membership = TenantMembership::query()->create([
+            'tenant_id' => $this->membership->tenant_id, 'user_id' => $reader->id, 'status' => 'active',
+        ]);
+        $this->grantDuties($membership, ['core.vendor.inquire']);
+
+        $response = $this->actingAs($reader)->get('/settings/vendors?vendor='.$target['id'].'&party='.$target['party_id']);
+        $response->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('foundation/vendor/vendors')
+            ->where('canManage', false)
+            ->where('initialVendor.id', $target['id'])
+            ->where('initialVendor.number', $target['number'])
+            ->where('initialVendor.name', 'Requested vendor')
+            ->where('initialParty', null)
+            ->has('vendors.data', 50)
+            ->where('vendors.data', fn ($rows): bool => ! collect($rows)->contains('id', $target['id']))
+        );
+    }
+
+    public function test_vendor_card_query_hides_foreign_and_missing_records_and_requires_read_permission(): void
+    {
+        $target = $this->buat(['party_name' => 'Own vendor'])->assertCreated()->json('data');
+        $other = $this->pemilik('vendor-card-other@example.test', 'Other tenant');
+        $company = $this->legalEntity('Other company', 'OTHR', $other);
+        $foreign = $this->actingAs($other)->postJson('/api/v1/vendors', [
+            'legal_entity_id' => $company, 'party_name' => 'Foreign vendor',
+        ])->assertCreated()->json('data');
+        $this->actingAs($this->owner)->get('/settings/vendors?vendor='.$foreign['id'])->assertNotFound();
+        $this->get('/settings/vendors?vendor='.(string) Str::ulid())->assertNotFound();
+
+        $denied = User::factory()->create();
+        TenantMembership::query()->create([
+            'tenant_id' => $this->membership->tenant_id, 'user_id' => $denied->id, 'status' => 'active',
+        ]);
+        $this->actingAs($denied)->get('/settings/vendors?vendor='.$target['id'])->assertForbidden();
     }
 
     public function test_vendor_baru_bernomor_dari_urutan_core_dan_terdaftar_sebagai_peran_vendor(): void
@@ -480,6 +533,88 @@ class VendorTest extends TestCase
         $this->buat(['legal_entity_id' => $otherCompany, 'party_id' => $created['party_id'], 'party_name' => null])
             ->assertUnprocessable()->assertJsonValidationErrors('party_id');
         $this->assertSame(1, Vendor::query()->where('party_id', $created['party_id'])->count());
+    }
+
+    public function test_vendor_creation_saves_party_address_and_contact_once(): void
+    {
+        $details = [
+            'locations' => [['key' => 'office', 'name' => 'Vendor office', 'country_region_code' => 'ID', 'purposes' => ['business']]],
+            'contacts' => [['type' => 'email', 'value' => 'vendor@example.test', 'address_key' => 'office']],
+        ];
+        $created = $this->buat(['party_details' => $details], 'vendor-aggregate-1')->assertCreated()->json('data');
+        $link = DB::table('party_locations')->where('party_id', $created['party_id'])->first();
+        $this->assertNotNull($link);
+        $this->assertDatabaseHas('electronic_addresses', ['location_id' => $link->location_id, 'value' => 'vendor@example.test']);
+        $this->buat(['party_details' => $details], 'vendor-aggregate-1')->assertOk()->assertJsonPath('data.id', $created['id']);
+        $this->assertSame(1, DB::table('party_locations')->where('party_id', $created['party_id'])->count());
+        $this->assertSame(1, DB::table('electronic_addresses')->where('location_id', $link->location_id)->count());
+    }
+
+    public function test_invalid_vendor_details_roll_back_party_account_role_and_number(): void
+    {
+        $before = DB::table('parties')->count();
+        $this->buat(['party_details' => ['locations' => [
+            ['name' => 'Rolled back office', 'country_region_code' => 'ID', 'purposes' => ['business']],
+            ['name' => 'Invalid office', 'country_region_code' => 'ID', 'purposes' => ['business'], 'province_id' => (string) str()->ulid()],
+        ]]], 'vendor-aggregate-rollback')->assertUnprocessable()->assertJsonValidationErrors('party_details.locations.1.province_id');
+        $this->assertSame($before, DB::table('parties')->count());
+        $this->assertDatabaseCount('vendors', 0);
+        $this->assertDatabaseMissing('locations', ['name' => 'Rolled back office']);
+        $this->assertDatabaseMissing('party_role_registrations', ['role_code' => 'vendor']);
+        $this->buat([], 'vendor-aggregate-rollback')->assertCreated()->assertJsonPath('data.number', 'VND-000001');
+    }
+
+    public function test_new_account_adds_staged_details_to_the_selected_party(): void
+    {
+        $created = $this->buat()->assertCreated()->json('data');
+        $company = $this->legalEntity('Second aggregate company', 'SEC');
+        $before = DB::table('parties')->count();
+        $this->buat(['legal_entity_id' => $company, 'party_id' => $created['party_id'], 'party_name' => null,
+            'party_details' => ['contacts' => [['type' => 'phone', 'value' => '021123456']]]])->assertCreated()->assertJsonPath('data.party_id', $created['party_id']);
+        $this->assertSame($before, DB::table('parties')->count());
+        $this->getJson('/api/v1/parties/'.$created['party_id'].'/contacts')->assertOk()->assertJsonPath('data.0.value', '021123456');
+    }
+
+    public function test_foreign_shared_location_rolls_back_the_entire_vendor_aggregate(): void
+    {
+        $foreign = $this->pemilik('foreign-draft@example.test', 'Foreign draft tenant');
+        $party = $this->actingAs($foreign)->postJson('/api/v1/parties', ['type' => 'organization', 'name' => 'Foreign party', 'status' => 'active'])->assertCreated()->json('data');
+        $location = $this->postJson('/api/v1/parties/'.$party['id'].'/locations', ['name' => 'Foreign office', 'country_region_code' => 'ID', 'purposes' => ['business']])->assertCreated()->json('data');
+        $before = DB::table('parties')->count();
+        $this->buat(['party_details' => ['locations' => [
+            ['name' => 'Must roll back', 'country_region_code' => 'ID', 'purposes' => ['business']],
+            ['location_id' => $location['location_id'], 'purposes' => ['business']],
+        ]]])->assertNotFound();
+        $this->assertSame($before, DB::table('parties')->count());
+        $this->assertDatabaseCount('vendors', 0);
+        $this->assertDatabaseMissing('locations', ['name' => 'Must roll back']);
+    }
+
+    public function test_shared_location_owner_rules_apply_to_staged_vendor_contacts(): void
+    {
+        $holder = $this->actingAs($this->owner)->postJson('/api/v1/parties', ['type' => 'organization', 'name' => 'Location holder', 'status' => 'active'])->assertCreated()->json('data');
+        $location = $this->postJson('/api/v1/parties/'.$holder['id'].'/locations', ['name' => 'Shared office', 'country_region_code' => 'ID', 'purposes' => ['business']])->assertCreated()->json('data');
+        $target = $this->postJson('/api/v1/parties', ['type' => 'organization', 'name' => 'Location user', 'status' => 'active'])->assertCreated()->json('data');
+        $this->buat(['party_id' => $target['id'], 'party_name' => null, 'party_details' => [
+            'locations' => [['key' => 'shared', 'location_id' => $location['location_id'], 'purposes' => ['business']]],
+            'contacts' => [['type' => 'phone', 'value' => '9999', 'address_key' => 'shared']],
+        ]])->assertUnprocessable()->assertJsonValidationErrors('party_details.contacts.0.address_id');
+        $this->assertDatabaseCount('vendors', 0);
+        $this->assertSame(0, DB::table('party_locations')->where('party_id', $target['id'])->count());
+        $this->assertDatabaseMissing('electronic_addresses', ['value' => '9999']);
+    }
+
+    public function test_vendor_permission_does_not_grant_permission_to_write_party_details(): void
+    {
+        $user = User::factory()->create();
+        $membership = TenantMembership::query()->create(['tenant_id' => $this->membership->tenant_id, 'user_id' => $user->id, 'status' => 'active']);
+        $this->grantDuties($membership, ['core.vendor.manage']);
+        $before = DB::table('parties')->count();
+        $this->actingAs($user)->postJson('/api/v1/vendors', ['legal_entity_id' => $this->le, 'party_name' => 'Permission test', 'party_details' => [
+            'contacts' => [['type' => 'phone', 'value' => '123456']],
+        ]])->assertForbidden();
+        $this->assertSame($before, DB::table('parties')->count());
+        $this->assertDatabaseCount('vendors', 0);
     }
 
     /** @param array<string, mixed> $ubah */

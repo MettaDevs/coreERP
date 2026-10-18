@@ -424,6 +424,35 @@
     schema:
       type: string
       format: date
+  get:
+    tags: [Master data]
+    operationId: getPostingGroupAset
+    description: |
+      Permission `management-aset.fixed-asset-posting-profiles.read`. Membaca pasangan group dan
+      tanggal berlaku tepat, bukan baris terbaru atau baris yang berlaku hari ini. Group tenant lain,
+      group terarsip, atau tanggal yang tidak tercatat dijawab 404. Tanggal tidak sah dijawab 422.
+      Identitas baris tidak memakai buku. Riwayat group dan rincian akun memakai bentuk matriks.
+    responses:
+      '200':
+        description: Baris posting dan konteks group serta akun
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: object
+                  required: [group, row, today, accounts, account_details]
+                  properties:
+                    group: {$ref: '#/components/schemas/PostingGroupAsetMatrix/properties/data/properties/groups/items'}
+                    row: {$ref: '#/components/schemas/PostingGroupAsetRow'}
+                    today: {type: string, format: date}
+                    accounts: {$ref: '#/components/schemas/PostingGroupAsetMatrix/properties/data/properties/accounts'}
+                    account_details: {$ref: '#/components/schemas/PostingGroupAsetMatrix/properties/data/properties/account_details'}
+      '403': {$ref: '#/components/responses/Forbidden'}
+      '404': {$ref: '#/components/responses/NotFound'}
+      '422': {$ref: '#/components/responses/ValidationError'}
   put:
     tags:
     - Master data

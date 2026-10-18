@@ -30,6 +30,7 @@ import {
     EmptyTitle,
 } from '@apperp/ui/empty';
 import { Spinner } from '@apperp/ui/spinner';
+import { Trash2 } from 'lucide-react';
 import { Download, FileText, Paperclip, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -362,7 +363,10 @@ export function RecordAttachments({
                                         ? [
                                               {
                                                   id: 'archive',
-                                                  label: 'Arsipkan',
+                                                  label: 'Delete',
+                                                  icon: (
+                                                      <Trash2 aria-hidden="true" />
+                                                  ),
                                                   destructive: true,
                                                   separatorBefore: true,
                                               },
@@ -469,7 +473,7 @@ export function RecordAttachments({
             >
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Arsipkan lampiran?</AlertDialogTitle>
+                        <AlertDialogTitle>Delete lampiran?</AlertDialogTitle>
                         <AlertDialogDescription>
                             {archiving?.file_name} akan disembunyikan dari
                             daftar lampiran ini. Berkasnya tetap tersimpan.
@@ -489,7 +493,7 @@ export function RecordAttachments({
                                 }
                             }}
                         >
-                            {busy ? 'Mengarsipkan…' : 'Arsipkan'}
+                            {busy ? 'Mengarsipkan…' : 'Delete'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

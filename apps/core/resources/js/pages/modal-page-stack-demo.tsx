@@ -1,3 +1,4 @@
+import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
@@ -11,12 +12,11 @@ import { Input } from '@apperp/ui/input';
 import {
     PageDialog,
     PageDialogContent,
-    PageDialogHeader,
-    PageDialogTitle,
+    PageDialogToolbar,
 } from '@apperp/ui/page-dialog';
 import { Select } from '@apperp/ui/select';
 import { Textarea } from '@apperp/ui/textarea';
-import { Check, ChevronDown, PanelRight, Pencil } from 'lucide-react';
+import { Check, ChevronDown, PanelRight } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import './modal-page-stack-demo.css';
 
@@ -249,101 +249,94 @@ function PageSurface({
                 onExpandedChange={(expanded) => onUpdate({ expanded })}
                 data-kind={page.kind}
                 data-details={detailsTab}
-            >
-                <PageDialogTitle className="sr-only">{caption}</PageDialogTitle>
-                <PageDialogHeader
-                    actions={
-                        <>
-                            {page.kind !== 'entries' && (
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    aria-pressed={editing}
-                                    onClick={() => {
-                                        setEditing((current) => !current);
-                                        setSaved(true);
-                                    }}
-                                >
-                                    <Pencil />
-                                    {editing ? 'Selesai' : 'Ubah'}
+                title={caption}
+                recordTitle={
+                    page.kind === 'entries'
+                        ? undefined
+                        : [page.code, name].join(' · ')
+                }
+                editing={editing}
+                onEdit={
+                    page.kind === 'entries'
+                        ? undefined
+                        : () => {
+                              setEditing(true);
+                              setSaved(true);
+                          }
+                }
+                mainNavigation={
+                    <>
+                        {page.kind === 'entries' && (
+                            <strong>Baris dokumen</strong>
+                        )}
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                                setDetailsTab(false);
+                            }}
+                        >
+                            Beranda
+                        </Button>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                    Terkait
+                                    <ChevronDown />
                                 </Button>
-                            )}
-                            <span className="modal-rnd-status flex items-center gap-1 text-sm whitespace-nowrap text-muted-foreground">
-                                <Check size={14} />
-                                {editing
-                                    ? 'Sedang diubah'
-                                    : saved
-                                      ? 'Tersimpan'
-                                      : 'Contoh'}
-                            </span>
-                        </>
-                    }
-                >
-                    <span className="truncate text-sm text-muted-foreground">
-                        {caption}
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start">
+                                <DropdownMenuItem
+                                    onSelect={() =>
+                                        onOpen('entries', page.code)
+                                    }
+                                >
+                                    Baris dokumen
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onSelect={() =>
+                                        onOpen('item', rows[0].code)
+                                    }
+                                >
+                                    Kartu item
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onOpen('entries', page.code)}
+                        >
+                            Lihat baris
+                        </Button>
+                        <Button
+                            className="modal-rnd-factbox-toggle"
+                            variant="ghost"
+                            size="icon"
+                            aria-label={
+                                page.factBox
+                                    ? 'Sembunyikan panel rincian'
+                                    : 'Tampilkan panel rincian'
+                            }
+                            aria-pressed={page.factBox}
+                            onClick={() => onUpdate({ factBox: !page.factBox })}
+                        >
+                            <PanelRight />
+                        </Button>
+                    </>
+                }
+
+                headerActions={
+                    <span className="modal-rnd-status flex items-center gap-1 text-sm whitespace-nowrap text-muted-foreground">
+                        <Check size={14} />
+                        {editing
+                            ? 'Sedang diubah'
+                            : saved
+                              ? 'Tersimpan'
+                              : 'Contoh'}
                     </span>
-                </PageDialogHeader>
-                {page.kind !== 'entries' && (
-                    <h2 className="modal-rnd-title text-2xl font-semibold tracking-tight">
-                        {page.code} · {name}
-                    </h2>
-                )}
-                <nav
-                    className="modal-rnd-actions"
-                    aria-label="Tindakan halaman"
-                >
-                    {page.kind === 'entries' && <strong>Baris dokumen</strong>}
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                            setDetailsTab(false);
-                        }}
-                    >
-                        Beranda
-                    </Button>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                                Terkait
-                                <ChevronDown />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start">
-                            <DropdownMenuItem
-                                onSelect={() => onOpen('entries', page.code)}
-                            >
-                                Baris dokumen
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                                onSelect={() => onOpen('item', rows[0].code)}
-                            >
-                                Kartu item
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onOpen('entries', page.code)}
-                    >
-                        Lihat baris
-                    </Button>
-                    <Button
-                        className="modal-rnd-factbox-toggle"
-                        variant="ghost"
-                        size="icon"
-                        aria-label={
-                            page.factBox
-                                ? 'Sembunyikan panel rincian'
-                                : 'Tampilkan panel rincian'
-                        }
-                        aria-pressed={page.factBox}
-                        onClick={() => onUpdate({ factBox: !page.factBox })}
-                    >
-                        <PanelRight />
-                    </Button>
-                </nav>
+                }
+            >
                 <div
                     className="modal-rnd-mobile-tabs"
                     role="tablist"
@@ -369,11 +362,28 @@ function PageSurface({
                         Rincian
                     </Button>
                 </div>
+                {editing && page.kind !== 'entries' && (
+                    <PageDialogToolbar>
+                        <ActionButton
+                            action="save"
+                            type="button"
+                            onClick={() => {
+                                setEditing(false);
+                                setSaved(true);
+                            }}
+                        />
+                    </PageDialogToolbar>
+                )}
+
                 <div
                     className="modal-rnd-workspace"
                     data-factbox={page.factBox}
                 >
-                    <div className="modal-rnd-body" scroll-region="">
+                    <div
+                        data-page-dialog-body=""
+                        className="modal-rnd-body"
+                        scroll-region=""
+                    >
                         {page.kind !== 'entries' && (
                             <>
                                 <section className="modal-rnd-section">

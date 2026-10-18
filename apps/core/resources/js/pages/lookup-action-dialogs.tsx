@@ -5,14 +5,12 @@ import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn, DataTableSort } from '@apperp/ui/data-table';
 import { Input } from '@apperp/ui/input';
 import {
+    PageDialogToolbar,
     PageDialog,
     PageDialogAction,
     PageDialogBody,
     PageDialogContent,
-    PageDialogDescription,
     PageDialogFooter,
-    PageDialogHeader,
-    PageDialogTitle,
 } from '@apperp/ui/page-dialog';
 import {
     lookupComparator,
@@ -143,15 +141,12 @@ export function LookupListDialog({
                 }
             }}
         >
-            <PageDialogContent>
-                <PageDialogHeader>
-                    <PageDialogTitle>
-                        Pilih kelompok pencatatan produk
-                    </PageDialogTitle>
-                    <PageDialogDescription>
-                        Pilih satu baris, lalu tekan Pilih untuk mengisi field.
-                    </PageDialogDescription>
-                </PageDialogHeader>
+            <PageDialogContent
+                title={'Pilih kelompok pencatatan produk'}
+                description={
+                    'Pilih satu baris, lalu tekan Pilih untuk mengisi field.'
+                }
+            >
                 <PageDialogBody
                     className="flex min-h-0 flex-col"
                     onScrollCapture={data.onScrollCapture}
@@ -159,13 +154,7 @@ export function LookupListDialog({
                     <div className="flex min-h-0 flex-1 flex-col gap-4">
                         <div className="flex flex-wrap gap-2">
                             {actions.create && !draft && (
-                                <ActionButton
-                                    action="create"
-                                    size="sm"
-                                    onClick={onNew}
-                                >
-                                    Baru
-                                </ActionButton>
+                                <ActionButton action="create" onClick={onNew} />
                             )}
                             {actions.details && !draft && (
                                 <Button
@@ -184,19 +173,17 @@ export function LookupListDialog({
                             {actions.editList && !draft && (
                                 <ActionButton
                                     action="edit"
-                                    size="sm"
                                     onClick={() =>
                                         setDraft(
                                             items.map((item) => ({ ...item })),
                                         )
                                     }
-                                >
-                                    Ubah daftar
-                                </ActionButton>
+                                />
                             )}
                             {draft && (
                                 <>
-                                    <Button
+                                    <ActionButton
+                                        action="save"
                                         onClick={() => {
                                             if (!actions.edit) {
                                                 return;
@@ -228,18 +215,15 @@ export function LookupListDialog({
                                             setDraft(null);
                                             setError('');
                                         }}
-                                    >
-                                        Simpan perubahan
-                                    </Button>
-                                    <Button
-                                        variant="outline"
+                                        type="button"
+                                    />
+                                    <ActionButton
+                                        action="cancel"
                                         onClick={() => {
                                             setDraft(null);
                                             setError('');
                                         }}
-                                    >
-                                        Batal ubah
-                                    </Button>
+                                    />
                                 </>
                             )}
                         </div>
@@ -281,9 +265,7 @@ export function LookupListDialog({
                     >
                         Pilih
                     </PageDialogAction>
-                    <Button variant="outline" onClick={onClose}>
-                        Batal
-                    </Button>
+                    <ActionButton action="cancel" onClick={onClose} />
                 </PageDialogFooter>
             </PageDialogContent>
         </PageDialog>
@@ -315,7 +297,17 @@ export function LookupDetailsDialog({
                 }
             }}
         >
-            <PageDialogContent>
+            <PageDialogContent
+                title="Kelompok pencatatan produk"
+                recordTitle={[item.code, description]
+                    .filter(Boolean)
+                    .join(' · ')}
+                editing={editing}
+                onEdit={canEdit ? () => setEditing(true) : undefined}
+                description={
+                    'Perubahan tersimpan sementara di playground. Kode\n                            tetap menjadi identitas data.'
+                }
+            >
                 <form
                     className="flex min-h-0 flex-1 flex-col"
                     onSubmit={(event) => {
@@ -340,26 +332,33 @@ export function LookupDetailsDialog({
                         setError('');
                     }}
                 >
-                    <PageDialogHeader>
-                        <PageDialogTitle>
-                            Detail {item.description}
-                        </PageDialogTitle>
-                        <PageDialogDescription>
-                            Perubahan tersimpan sementara di playground. Kode
-                            tetap menjadi identitas data.
-                        </PageDialogDescription>
-                    </PageDialogHeader>
+                    <PageDialogToolbar>
+                        {editing ? (
+                            <>
+                                <ActionButton action="save" type="submit" />
+                                <ActionButton
+                                    action="cancel"
+                                    type="button"
+                                    onClick={() => {
+                                        setDescription(item.description);
+                                        setCategory(item.category);
+                                        setError('');
+                                        setEditing(false);
+                                    }}
+                                />
+                            </>
+                        ) : (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={onClose}
+                            >
+                                Tutup
+                            </Button>
+                        )}
+                    </PageDialogToolbar>
                     <PageDialogBody>
                         <div className="space-y-4">
-                            {canEdit && !editing && (
-                                <ActionButton
-                                    type="button"
-                                    action="edit"
-                                    onClick={() => setEditing(true)}
-                                >
-                                    Ubah
-                                </ActionButton>
-                            )}
                             {error && (
                                 <Alert variant="destructive">
                                     <AlertDescription>{error}</AlertDescription>
@@ -393,35 +392,6 @@ export function LookupDetailsDialog({
                             </div>
                         </div>
                     </PageDialogBody>
-                    <PageDialogFooter>
-                        {editing ? (
-                            <>
-                                <PageDialogAction type="submit">
-                                    Simpan
-                                </PageDialogAction>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => {
-                                        setDescription(item.description);
-                                        setCategory(item.category);
-                                        setError('');
-                                        setEditing(false);
-                                    }}
-                                >
-                                    Batal
-                                </Button>
-                            </>
-                        ) : (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={onClose}
-                            >
-                                Tutup
-                            </Button>
-                        )}
-                    </PageDialogFooter>
                 </form>
             </PageDialogContent>
         </PageDialog>
@@ -451,7 +421,14 @@ export function LookupCreateDialog({
                 }
             }}
         >
-            <PageDialogContent>
+            <PageDialogContent
+                title="Kelompok pencatatan produk"
+                recordTitle={description.trim() || 'Kelompok baru'}
+                editing
+                description={
+                    'Data contoh tersimpan sementara di playground dan\n                            langsung dipilih setelah disimpan.'
+                }
+            >
                 <form
                     className="flex min-h-0 flex-1 flex-col"
                     onSubmit={(event) => {
@@ -485,13 +462,14 @@ export function LookupCreateDialog({
                         onSave(next);
                     }}
                 >
-                    <PageDialogHeader>
-                        <PageDialogTitle>Kelompok baru</PageDialogTitle>
-                        <PageDialogDescription>
-                            Data contoh tersimpan sementara di playground dan
-                            langsung dipilih setelah disimpan.
-                        </PageDialogDescription>
-                    </PageDialogHeader>
+                    <PageDialogToolbar>
+                        <ActionButton action="save" type="submit" />
+                        <ActionButton
+                            action="cancel"
+                            type="button"
+                            onClick={onClose}
+                        />
+                    </PageDialogToolbar>
                     <PageDialogBody>
                         <div className="space-y-4">
                             {error && (
@@ -524,18 +502,6 @@ export function LookupCreateDialog({
                             />
                         </div>
                     </PageDialogBody>
-                    <PageDialogFooter>
-                        <PageDialogAction type="submit">
-                            Simpan dan pilih
-                        </PageDialogAction>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={onClose}
-                        >
-                            Batal
-                        </Button>
-                    </PageDialogFooter>
                 </form>
             </PageDialogContent>
         </PageDialog>

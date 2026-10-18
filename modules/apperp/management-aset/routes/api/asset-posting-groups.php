@@ -7,6 +7,8 @@ use Modules\Apperp\ManagementAset\Http\Controllers\master\AssetPostingGroupContr
 // PUT ke alamat pasangan itu sehingga pengulangan permintaan tidak menambah baris.
 Route::get('posting-group-aset', [AssetPostingGroupController::class, 'index']);
 Route::get('posting-group-aset/akun', [AssetPostingGroupController::class, 'accounts']);
+Route::get('posting-group-aset/{groupAset}/{effectiveFrom}', [AssetPostingGroupController::class, 'show'])
+    ->whereUlid('groupAset')->where('effectiveFrom', '\d{4}-\d{2}-\d{2}');
 Route::put('posting-group-aset/{groupAset}/{effectiveFrom}', [AssetPostingGroupController::class, 'upsert'])
     ->where('effectiveFrom', '\d{4}-\d{2}-\d{2}');
 Route::delete('posting-group-aset/{groupAset}/{effectiveFrom}', [AssetPostingGroupController::class, 'archive'])

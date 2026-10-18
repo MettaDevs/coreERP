@@ -19,15 +19,19 @@ import type { LookupLoader } from '@apperp/ui/inline-lookup';
 import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
+import { usePageDialogRecord } from '@apperp/ui/page-dialog';
+import { PageDialog, PageDialogContent } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Switch } from '@apperp/ui/switch';
+import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
+import type { InfiniteScrollRef } from '@inertiajs/core';
 import { Head, router } from '@inertiajs/react';
 import { Search } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
-import type { ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { toast } from 'sonner';
-import Heading from '@/components/heading';
 import { RecordListScroll } from '@/components/record-list-scroll';
+import { useRecordTransition } from '@/hooks/use-record-transition';
 import {
     apiJson,
     CoreApiError,
@@ -39,8 +43,8 @@ import type { BreadcrumbItem } from '@/types/navigation';
 import {
     OrganizationAddressesSection,
     OrganizationContactsSection,
+    usePartyDraftDetails,
 } from '../../platform/organization/components/address-book-section';
-import { CreateVendorPartyDialog } from './create-vendor-party-dialog';
 import SupplierImport from './supplier-import';
 import { VendorContextPanel, VendorHint } from './vendor-fact-box';
 
@@ -89,6 +93,7 @@ type Props = {
     vendors: Paginated<Vendor>;
     automaticNumbers: boolean;
     initialParty: PartyOption | null;
+    initialVendor: Vendor | null;
     canReadAddressBook: boolean;
     canManageAddressBook: boolean;
 };
@@ -220,7 +225,11 @@ function VendorCard({
     canReadAddressBook,
     canManageAddressBook,
     onCreated,
+    onSaved,
     onOpenExisting,
+    portalContainer,
+    onBusyChange,
+    onDirtyChange,
 }: {
     vendor: Vendor | null;
     legalEntities: LegalEntity[];
@@ -230,7 +239,11 @@ function VendorCard({
     canReadAddressBook: boolean;
     canManageAddressBook: boolean;
     onCreated: (vendor: Vendor) => void;
+    onSaved: () => void;
     onOpenExisting: (vendor: Vendor) => void;
+    portalContainer: RefObject<HTMLDivElement | null>;
+    onBusyChange: (busy: boolean) => void;
+    onDirtyChange: (dirty: boolean) => void;
 }) {
     // Satu kunci per form yang dibuka: klik ganda atau kiriman ulang tidak membuat vendor kedua.
     const [idempotencyKey] = useState(newKey);
@@ -244,14 +257,37 @@ function VendorCard({
               }
             : {}),
     }));
+    const draftDetails = usePartyDraftDetails(
+        !vendor && canManageAddressBook,
+        !vendor && form.party_source === 'existing' ? form.party_id : null,
+    );
+    const [initialForm] = useState(form);
+    const dirty =
+        JSON.stringify(form) !== JSON.stringify(initialForm) ||
+        draftDetails.value.locations.length > 0 ||
+        draftDetails.value.contacts.length > 0;
+    useEffect(() => {
+        onDirtyChange(dirty);
+
+        return () => onDirtyChange(false);
+    }, [dirty, onDirtyChange]);
     const [errors, setErrors] = useState<Record<string, string[]>>({});
     const [saving, setSaving] = useState(false);
+    const detailTransition = useRecordTransition(
+        draftDetails.value.locations.length > 0 ||
+            draftDetails.value.contacts.length > 0,
+        saving,
+    );
+    const changeParty = (next: Partial<Form>) =>
+        detailTransition.request(() => {
+            draftDetails.onChange({ locations: [], contacts: [] });
+            setForm((current) => ({ ...current, ...next }));
+        });
     const [saveError, setSaveError] = useState('');
     const [parties, setParties] = useState<PartyOption[]>(
         initialParty ? [initialParty] : [],
     );
     const [partyError, setPartyError] = useState('');
-    const [creatingParty, setCreatingParty] = useState(false);
     const existingLookupKey =
         vendor ||
         form.party_source !== 'existing' ||
@@ -264,6 +300,11 @@ function VendorCard({
     );
     const resolvingExisting =
         existingLookupKey !== null && resolvedLookupKey !== existingLookupKey;
+    useEffect(() => {
+        onBusyChange(saving || resolvingExisting);
+
+        return () => onBusyChange(false);
+    }, [saving, resolvingExisting, onBusyChange]);
     const loadCompanies = useCallback<LookupLoader<LegalEntity>>(
         (request) =>
             loadLookupItems('/api/v1/vendors/company-options', request),
@@ -316,6 +357,10 @@ function VendorCard({
                 { signal: controller.signal },
             )
                 .then((result) => {
+                    if (controller.signal.aborted) {
+                        return;
+                    }
+
                     setParties(
                         initialParty &&
                             !result.data.some(
@@ -409,6 +454,7 @@ function VendorCard({
                           headers: { 'Idempotency-Key': idempotencyKey },
                           body: JSON.stringify({
                               legal_entity_id: form.legal_entity_id,
+                              party_details: draftDetails.payload,
                               party_id:
                                   form.party_source === 'existing'
                                       ? form.party_id
@@ -433,10 +479,9 @@ function VendorCard({
                     ? `Vendor ${result.data.number} disimpan.`
                     : `Vendor ${result.data.number} dibuat untuk ${legalEntityName}.`,
             );
-            router.reload({ only: ['vendors'] });
 
             if (vendor) {
-                onClose();
+                onSaved();
             } else {
                 onCreated(result.data);
             }
@@ -453,6 +498,15 @@ function VendorCard({
         }
     };
 
+    usePageDialogRecord({
+        recordTitle: vendor
+            ? [vendor.number, form.name].filter(Boolean).join(' · ')
+            : form.party_name || 'Vendor baru',
+        editing: true,
+        recordUrl: vendor
+            ? `/settings/vendors?vendor=${encodeURIComponent(vendor.id)}`
+            : undefined,
+    });
     const existingParty =
         parties.find((party) => party.id === form.party_id) ??
         (initialParty?.id === form.party_id ? initialParty : null);
@@ -467,34 +521,21 @@ function VendorCard({
 
     return (
         <div className="flex h-full min-h-0 flex-col">
-            <RecordActionBar
-                title={
-                    vendor ? `${vendor.number} · ${vendor.name}` : 'Vendor baru'
-                }
-                trailing={
-                    <>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            disabled={saving || resolvingExisting}
-                            onClick={onClose}
-                        >
-                            Batal
-                        </Button>
-                        <Button
-                            type="submit"
-                            form="vendor-form"
-                            disabled={saving || resolvingExisting}
-                        >
-                            {saving
-                                ? 'Menyimpan…'
-                                : vendor
-                                  ? 'Simpan'
-                                  : 'Buat vendor'}
-                        </Button>
-                    </>
-                }
-            />
+            <RecordActionBar>
+                <ActionButton
+                    action="save"
+                    type="submit"
+                    form="vendor-form"
+                    disabled={saving || resolvingExisting}
+                    pending={saving}
+                />
+                <ActionButton
+                    action="cancel"
+                    type="button"
+                    disabled={saving || resolvingExisting}
+                    onClick={onClose}
+                />
+            </RecordActionBar>
             <VendorContextPanel
                 key={vendor?.id ?? 'new'}
                 vendor={vendor}
@@ -571,6 +612,9 @@ function VendorCard({
                                             />
                                         ) : (
                                             <InlineLookup
+                                                portalContainer={
+                                                    portalContainer
+                                                }
                                                 label="Perusahaan"
                                                 required
                                                 loadItems={loadCompanies}
@@ -626,16 +670,19 @@ function VendorCard({
                                             <NativeSelect
                                                 label="Identitas vendor"
                                                 value={form.party_source}
-                                                onChange={(event) =>
-                                                    setForm((current) => ({
-                                                        ...current,
-                                                        party_source: event
-                                                            .target
-                                                            .value as Form['party_source'],
+                                                onChange={(event) => {
+                                                    const source =
+                                                        event.target.value;
+                                                    changeParty({
+                                                        party_source:
+                                                            source ===
+                                                            'existing'
+                                                                ? 'existing'
+                                                                : 'new',
                                                         party_id: null,
                                                         party_name: '',
-                                                    }))
-                                                }
+                                                    });
+                                                }}
                                             >
                                                 <NativeSelectOption value="new">
                                                     Buat identitas baru
@@ -654,12 +701,20 @@ function VendorCard({
                                             error={error('party_id')}
                                         >
                                             <InlineLookup
+                                                portalContainer={
+                                                    portalContainer
+                                                }
                                                 onCreate={
                                                     canManageAddressBook
                                                         ? () =>
-                                                              setCreatingParty(
-                                                                  true,
-                                                              )
+                                                              changeParty({
+                                                                  party_source:
+                                                                      'new',
+                                                                  party_id:
+                                                                      null,
+                                                                  party_name:
+                                                                      '',
+                                                              })
                                                         : undefined
                                                 }
                                                 label="Nama vendor"
@@ -723,12 +778,11 @@ function VendorCard({
                                                     },
                                                 ]}
                                                 onValueChange={(party) =>
-                                                    setForm((current) => ({
-                                                        ...current,
+                                                    changeParty({
                                                         party_id: party.id,
                                                         party_name: party.name,
                                                         party_type: party.type,
-                                                    }))
+                                                    })
                                                 }
                                             />
                                             {partyError && (
@@ -845,9 +899,23 @@ function VendorCard({
                                 </FieldGroup>
                             </CollapsibleSection>
                             {/* Prioritas pembayaran disembunyikan sampai ada integrasi/proses pembayaran yang memakainya. */}
-                            {vendor && (
+                            {(vendor ||
+                                (form.party_source === 'new' &&
+                                    canManageAddressBook) ||
+                                (form.party_source === 'existing' &&
+                                    form.party_id)) && (
                                 <VendorAddressTabs
                                     vendor={vendor}
+                                    partyId={
+                                        form.party_source === 'existing'
+                                            ? (form.party_id ?? undefined)
+                                            : undefined
+                                    }
+                                    draft={
+                                        !vendor && canManageAddressBook
+                                            ? draftDetails
+                                            : undefined
+                                    }
                                     canRead={canReadAddressBook}
                                     canManage={canManageAddressBook}
                                 />
@@ -856,45 +924,7 @@ function VendorCard({
                     </form>
                 </main>
             </VendorContextPanel>
-            {creatingParty && (
-                <CreateVendorPartyDialog
-                    onClose={() => setCreatingParty(false)}
-                    onCreated={(party) => {
-                        setCreatingParty(false);
-
-                        if (party.status !== 'active') {
-                            toast.message(
-                                'Pihak tersimpan sebagai nonaktif. Aktifkan di buku alamat sebelum dipilih sebagai vendor.',
-                            );
-
-                            return;
-                        }
-
-                        const option: PartyOption = {
-                            id: party.id,
-                            name: party.name,
-                            type:
-                                party.type === 'person'
-                                    ? 'person'
-                                    : 'organization',
-                        };
-                        setParties((current) => [
-                            option,
-                            ...current.filter(
-                                (existing) => existing.id !== option.id,
-                            ),
-                        ]);
-                        setForm((current) => ({
-                            ...current,
-                            party_source: 'existing',
-                            party_id: option.id,
-                            party_name: option.name,
-                            party_type: option.type,
-                        }));
-                        setPartyError('');
-                    }}
-                />
-            )}
+            {detailTransition.confirmation}
         </div>
     );
 }
@@ -923,14 +953,18 @@ function VendorField({
 
 function VendorAddressTabs({
     vendor,
+    partyId,
+    draft,
     canRead,
     canManage = false,
 }: {
-    vendor: Vendor;
+    vendor?: Vendor | null;
+    partyId?: string;
+    draft?: ReturnType<typeof usePartyDraftDetails>;
     canRead: boolean;
     canManage?: boolean;
 }) {
-    if (!canRead) {
+    if (!canRead && !draft) {
         return null;
     }
 
@@ -951,8 +985,42 @@ function VendorAddressTabs({
                             memakai pihak tersebut.
                         </VendorHint>
                     </div>
+                    {draft?.existing && draft.existing.locations.length > 0 && (
+                        <>
+                            <h4 className="text-sm font-medium">
+                                Alamat tersimpan
+                            </h4>
+                            <OrganizationAddressesSection
+                                organizationId={partyId ?? ''}
+                                resource="parties"
+                                countryCode="ID"
+                                canManage={false}
+                                readOnlyData={{
+                                    items: draft.existing.locations.map(
+                                        (row) => ({
+                                            ...row,
+                                            is_primary:
+                                                row.is_primary &&
+                                                !draft.value.locations.some(
+                                                    (location) =>
+                                                        location.is_primary,
+                                                ),
+                                        }),
+                                    ),
+                                    meta: {
+                                        purposes:
+                                            draft.metadata?.locationPurposes ??
+                                            [],
+                                        countries:
+                                            draft.metadata?.countries ?? [],
+                                    },
+                                }}
+                            />
+                        </>
+                    )}
                     <OrganizationAddressesSection
-                        organizationId={vendor.party_id}
+                        organizationId={vendor?.party_id ?? partyId ?? ''}
+                        draft={draft}
                         resource="parties"
                         countryCode="ID"
                         canManage={canManage}
@@ -961,8 +1029,42 @@ function VendorAddressTabs({
                         <h3 className="mb-3 text-sm font-medium">
                             Informasi kontak
                         </h3>
+                        {draft?.existing &&
+                            draft.existing.contacts.length > 0 && (
+                                <>
+                                    <h4 className="text-sm font-medium">
+                                        Kontak tersimpan
+                                    </h4>
+                                    <OrganizationContactsSection
+                                        organizationId={partyId ?? ''}
+                                        resource="parties"
+                                        canManage={false}
+                                        readOnlyData={{
+                                            items: draft.existing.contacts.map(
+                                                (row) => ({
+                                                    ...row,
+                                                    is_primary:
+                                                        row.is_primary &&
+                                                        !draft.value.contacts.some(
+                                                            (contact) =>
+                                                                contact.type ===
+                                                                    row.type &&
+                                                                contact.is_primary,
+                                                        ),
+                                                }),
+                                            ),
+                                            meta: {
+                                                types:
+                                                    draft.metadata
+                                                        ?.contactTypes ?? [],
+                                            },
+                                        }}
+                                    />
+                                </>
+                            )}
                         <OrganizationContactsSection
-                            organizationId={vendor.party_id}
+                            organizationId={vendor?.party_id ?? partyId ?? ''}
+                            draft={draft}
                             resource="parties"
                             canManage={canManage}
                         />
@@ -988,23 +1090,23 @@ function VendorReadCard({
     onClose: () => void;
     onEdit?: () => void;
 }) {
+    const embedded = usePageDialogRecord({
+        recordTitle: [vendor.number, vendor.name].filter(Boolean).join(' · '),
+        onEdit,
+        editing: false,
+        recordUrl: `/settings/vendors?vendor=${encodeURIComponent(vendor.id)}`,
+    });
+
     return (
         <div className="flex h-full min-h-0 flex-col">
-            <RecordActionBar
-                title={`${vendor.number} · ${vendor.name}`}
-                trailing={
-                    <>
-                        <Button variant="outline" onClick={onClose}>
-                            Kembali ke daftar
-                        </Button>
-                        {onEdit && (
-                            <ActionButton action="edit" onClick={onEdit}>
-                                Ubah
-                            </ActionButton>
-                        )}
-                    </>
-                }
-            />
+            {!embedded && (
+                <RecordActionBar>
+                    <Button variant="outline" onClick={onClose}>
+                        Kembali ke daftar
+                    </Button>
+                    {onEdit && <ActionButton action="edit" onClick={onEdit} />}
+                </RecordActionBar>
+            )}
             <VendorContextPanel
                 key={vendor.id}
                 vendor={vendor}
@@ -1070,73 +1172,116 @@ export default function Vendors({
     vendors,
     automaticNumbers,
     initialParty,
+    initialVendor,
     canReadAddressBook,
     canManageAddressBook,
 }: Props) {
     const [editing, setEditing] = useState<Vendor | null | undefined>(
-        initialParty && canManage ? null : undefined,
+        !initialVendor && initialParty && canManage ? null : undefined,
     );
     // Party dari GAB hanya mengisi pembukaan awal, bukan setiap klik Tambah vendor.
-    const [draftParty, setDraftParty] = useState(initialParty);
+    const [draftParty, setDraftParty] = useState(
+        initialVendor ? null : initialParty,
+    );
+    const [draftKey, setDraftKey] = useState(0);
     const [selectedVendorId, setSelectedVendorId] = useState<string | null>(
         null,
     );
     const selectedVendor =
         vendors.data.find((vendor) => vendor.id === selectedVendorId) ?? null;
-    const [viewing, setViewing] = useState<Vendor | null>(null);
+    const [viewing, setViewing] = useState<Vendor | null>(initialVendor);
+    const [vendorSaving, setVendorSaving] = useState(false);
+    const [vendorDirty, setVendorDirty] = useState(false);
+    const transition = useRecordTransition(vendorDirty, vendorSaving);
+    const listRef = useRef<InfiniteScrollRef>(null);
+    const [listLoading, setListLoading] = useState(false);
+    const vendorDialogRef = useRef<HTMLDivElement>(null);
+    const replaceVendorUrl = useCallback(
+        (id: string | null, refresh = false) => {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('party');
+
+            if (id) {
+                url.searchParams.set('vendor', id);
+            } else {
+                url.searchParams.delete('vendor');
+            }
+
+            router.replace({
+                url: url.pathname + url.search + url.hash,
+                preserveState: true,
+                preserveScroll: true,
+                props: (current) => ({
+                    ...current,
+                    initialVendor: null,
+                    initialParty: null,
+                }),
+                onSuccess: refresh
+                    ? () => router.reload({ only: ['vendors'] })
+                    : undefined,
+            });
+        },
+        [],
+    );
+    const closeCard = (refresh = false) => {
+        setEditing(undefined);
+        setViewing(null);
+        replaceVendorUrl(null, refresh);
+    };
     const openExisting = useCallback(
         (account: Vendor) => {
             setEditing(undefined);
             setViewing(account);
+            replaceVendorUrl(account.id);
         },
-        [setEditing, setViewing],
+        [setEditing, setViewing, replaceVendorUrl],
     );
     const [importing, setImporting] = useState(false);
     const legalEntityName = (id: string) =>
         legalEntities.find((entity) => entity.id === id)?.name ?? id;
+    const startNew = () =>
+        transition.request(() => {
+            setDraftParty(null);
+            setViewing(null);
+            setEditing(null);
+            setDraftKey((key) => key + 1);
+            replaceVendorUrl(null);
+        });
+    const navigation = useRecordNavigation({
+        items: vendors.data,
+        currentId: editing?.id ?? viewing?.id ?? null,
+        getId: (vendor) => vendor.id,
+        onNavigate: (id) => {
+            const vendor = vendors.data.find((row) => row.id === id);
 
-    if (editing !== undefined) {
-        return (
-            <>
-                <Head title="Vendor" />
-                <VendorCard
-                    key={editing?.id ?? draftParty?.id ?? 'new'}
-                    vendor={editing}
-                    legalEntities={legalEntities}
-                    automaticNumbers={automaticNumbers}
-                    initialParty={draftParty}
-                    canReadAddressBook={canReadAddressBook}
-                    canManageAddressBook={canManageAddressBook}
-                    onClose={() => setEditing(undefined)}
-                    onCreated={setEditing}
-                    onOpenExisting={openExisting}
-                />
-            </>
-        );
-    }
+            if (!vendor) {
+                return;
+            }
 
-    if (viewing) {
-        return (
-            <>
-                <Head title="Vendor" />
-                <VendorReadCard
-                    vendor={viewing}
-                    company={legalEntityName(viewing.legal_entity_id)}
-                    canReadAddressBook={canReadAddressBook}
-                    canManageAddressBook={canManageAddressBook}
-                    onClose={() => setViewing(null)}
-                    onEdit={
-                        canManage
-                            ? () => {
-                                  setViewing(null);
-                                  setEditing(viewing);
-                              }
-                            : undefined
-                    }
-                />
-            </>
-        );
-    }
+            replaceVendorUrl(vendor.id);
+
+            if (editing !== undefined) {
+                setEditing(vendor);
+            } else {
+                setViewing(vendor);
+            }
+        },
+        scopeKey: JSON.stringify(filters),
+        disabled: vendorSaving || vendorDirty,
+        hasMore: Boolean(vendors.next_page_url),
+        loading: listLoading,
+        loadMore: () => {
+            if (!listRef.current?.hasNext()) {
+                return;
+            }
+
+            setListLoading(true);
+            listRef.current.fetchNext({
+                onFinish: () => setListLoading(false),
+                onCancel: () => setListLoading(false),
+            });
+        },
+    });
 
     return (
         <>
@@ -1152,9 +1297,11 @@ export default function Vendors({
             >
                 <ListPageLayout
                     header={
-                        <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+                        <RecordActionBar>
                             <div className="flex items-center gap-2">
-                                <Heading title="Vendor" />
+                                <h1 className="text-sm font-semibold">
+                                    Vendor
+                                </h1>
                                 <VendorHint label="vendor">
                                     Akun vendor per perusahaan. Identitas,
                                     alamat, dan kontak memakai buku alamat
@@ -1167,22 +1314,16 @@ export default function Vendors({
                                         variant="outline"
                                         onClick={() => setImporting(true)}
                                     >
-                                        Impor supplier CSV
+                                        Impor vendor CSV
                                     </Button>
                                     <ActionButton
                                         action="create"
                                         disabled={legalEntities.length === 0}
-                                        onClick={() => {
-                                            setDraftParty(null);
-                                            setViewing(null);
-                                            setEditing(null);
-                                        }}
-                                    >
-                                        Tambah vendor
-                                    </ActionButton>
+                                        onClick={startNew}
+                                    />
                                 </div>
                             )}
-                        </div>
+                        </RecordActionBar>
                     }
                     filters={
                         <div className="px-4 pb-4">
@@ -1200,6 +1341,7 @@ export default function Vendors({
                     }
                 >
                     <RecordListScroll
+                        listRef={listRef}
                         data="vendors"
                         className="flex h-full min-h-0 flex-1 flex-col"
                     >
@@ -1215,11 +1357,17 @@ export default function Vendors({
                                     ? [{ id: 'edit', label: 'Ubah vendor' }]
                                     : []),
                             ]}
-                            onRowAction={(action, vendor) =>
-                                action === 'edit'
-                                    ? setEditing(vendor)
-                                    : setViewing(vendor)
-                            }
+                            onRowAction={(action, vendor) => {
+                                replaceVendorUrl(vendor.id);
+
+                                if (action === 'edit') {
+                                    setViewing(null);
+                                    setEditing(vendor);
+                                } else {
+                                    setEditing(undefined);
+                                    setViewing(vendor);
+                                }
+                            }}
                             rowActivation="single-click"
                             activeRowKey={selectedVendorId ?? undefined}
                             onRowClick={(vendor) =>
@@ -1318,10 +1466,94 @@ export default function Vendors({
                     </RecordListScroll>
                 </ListPageLayout>
             </VendorContextPanel>
+            {editing !== undefined && (
+                <PageDialog
+                    open
+                    onOpenChange={(open) => {
+                        if (!open && !vendorSaving) {
+                            transition.request(closeCard);
+                        }
+                    }}
+                >
+                    <PageDialogContent
+                        ref={vendorDialogRef}
+                        aria-describedby={undefined}
+                        onEscapeKeyDown={(event) => {
+                            if (vendorSaving) {
+                                event.preventDefault();
+                            }
+                        }}
+                        title="Vendor"
+                        onNew={canManage ? startNew : undefined}
+                        busy={vendorSaving}
+                        navigation={editing ? navigation : undefined}
+                    >
+                        <VendorCard
+                            portalContainer={vendorDialogRef}
+                            onBusyChange={setVendorSaving}
+                            onDirtyChange={setVendorDirty}
+                            key={
+                                editing?.id ??
+                                `${draftParty?.id ?? 'new'}-${draftKey}`
+                            }
+                            vendor={editing}
+                            legalEntities={legalEntities}
+                            automaticNumbers={automaticNumbers}
+                            initialParty={draftParty}
+                            canReadAddressBook={canReadAddressBook}
+                            canManageAddressBook={canManageAddressBook}
+                            onClose={() =>
+                                transition.request(() => setEditing(undefined))
+                            }
+                            onCreated={(vendor) => {
+                                setEditing(vendor);
+                                replaceVendorUrl(vendor.id, true);
+                            }}
+                            onSaved={() => closeCard(true)}
+                            onOpenExisting={openExisting}
+                        />
+                    </PageDialogContent>
+                </PageDialog>
+            )}
+            {viewing && (
+                <PageDialog
+                    open
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            closeCard();
+                        }
+                    }}
+                >
+                    <PageDialogContent
+                        aria-describedby={undefined}
+                        title="Vendor"
+                        onNew={canManage ? startNew : undefined}
+                        busy={vendorSaving}
+                        navigation={navigation}
+                    >
+                        <VendorReadCard
+                            vendor={viewing}
+                            company={legalEntityName(viewing.legal_entity_id)}
+                            canReadAddressBook={canReadAddressBook}
+                            canManageAddressBook={canManageAddressBook}
+                            onClose={() => closeCard()}
+                            onEdit={
+                                canManage
+                                    ? () => {
+                                          setViewing(null);
+                                          setEditing(viewing);
+                                      }
+                                    : undefined
+                            }
+                        />
+                    </PageDialogContent>
+                </PageDialog>
+            )}
+            {transition.confirmation}
             <Dialog open={importing} onOpenChange={setImporting}>
                 <DialogContent size="wide">
                     <DialogHeader>
-                        <DialogTitle>Impor supplier</DialogTitle>
+                        <DialogTitle>Impor vendor</DialogTitle>
                         <DialogDescription>
                             Gunakan CSV untuk pengisian awal. Periksa pratinjau
                             sebelum menerapkan.

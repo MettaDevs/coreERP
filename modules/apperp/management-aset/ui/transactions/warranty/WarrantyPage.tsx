@@ -1,20 +1,12 @@
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useToday } from '@/hooks/use-work-date';
+import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
-import { Button } from '@apperp/ui/button';
+
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
-import {
-    Dialog,
-    DialogAction,
-    DialogBody,
-    DialogCancel,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@apperp/ui/dialog';
+
 import {
     Empty,
     EmptyDescription,
@@ -24,10 +16,18 @@ import {
 import { Field, FieldDescription } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { MultiSelect } from '@apperp/ui/multi-select';
+import {
+    PageDialog,
+    PageDialogContent,
+    PageDialogToolbar,
+    PageDialogClose,
+    PageDialogBody,
+} from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@apperp/ui/tabs';
 import { Textarea } from '@apperp/ui/textarea';
+import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
 import { day, money } from '../../_shared/format';
 import { useVendors } from '../../_shared/useVendors';
 import {
@@ -39,6 +39,9 @@ import {
 } from '../../api';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import { useRecordList } from '../../use-record-list';
+import { RecordCardHeader, recordQueryUrl } from '../_shared/record-card';
+import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
+import { useRecordQueryTarget } from '../_shared/use-record-query-target';
 import type { Contract, Expiring, Warranty } from './warranty';
 import { WARRANTY_TYPES } from './warranty';
 
@@ -115,8 +118,12 @@ export default function WarrantyPage({
     const [contractDraft, setContractDraft] = useState<ContractDraft | null>(
         null,
     );
+    const [openedWarranty, setOpenedWarranty] = useState<Warranty | null>(null);
+    const [openedContract, setOpenedContract] = useState<Contract | null>(null);
     const [errors, setErrors] = useState<Record<string, string[]>>({});
     const [busy, setBusy] = useState(false);
+    const [warrantyDirty, setWarrantyDirty] = useState(false);
+    const [contractDirty, setContractDirty] = useState(false);
     const warrantyRef = useRef<HTMLDivElement>(null);
     const contractRef = useRef<HTMLDivElement>(null);
     const assetSource = useMasterOptions(
@@ -136,8 +143,24 @@ export default function WarrantyPage({
         '/garansi-aset/vendor',
         contractDraft?.legal_entity_id ?? null,
     );
-    const warrantyVendors = warrantyVendorsSource.options;
-    const contractVendors = contractVendorsSource.options;
+    const warrantyVendor = openedWarranty?.vendor;
+    const warrantyVendors =
+        warrantyVendor &&
+        warrantyVendor.id === warrantyDraft?.vendor_id &&
+        !warrantyVendorsSource.options.some(
+            (row) => row.id === warrantyVendor.id,
+        )
+            ? [warrantyVendor, ...warrantyVendorsSource.options]
+            : warrantyVendorsSource.options;
+    const contractVendor = openedContract?.vendor;
+    const contractVendors =
+        contractVendor &&
+        contractVendor.id === contractDraft?.vendor_id &&
+        !contractVendorsSource.options.some(
+            (row) => row.id === contractVendor.id,
+        )
+            ? [contractVendor, ...contractVendorsSource.options]
+            : contractVendorsSource.options;
     const message = (field: string) => errors[field]?.[0];
     const refresh = () => setReload((current) => current + 1);
 
@@ -215,6 +238,7 @@ export default function WarrantyPage({
                       body: JSON.stringify({ ...body, aset_id: draft.aset_id }),
                   }));
             toast.success('Garansi disimpan.');
+            clearRecordTarget();
             setWarrantyDraft(null);
             refresh();
         } catch (caught) {
@@ -263,6 +287,7 @@ export default function WarrantyPage({
                       body: JSON.stringify(body),
                   }));
             toast.success('Kontrak servis disimpan.');
+            clearRecordTarget();
             setContractDraft(null);
             refresh();
         } catch (caught) {
@@ -277,24 +302,43 @@ export default function WarrantyPage({
     }
 
     async function archive(path: string, version: number, done: string) {
+        setBusy(true);
+
         try {
             await api(path, {
                 method: 'DELETE',
                 body: JSON.stringify({ version }),
             });
             toast.success(done);
+            clearRecordTarget();
             refresh();
+
+            return true;
         } catch (caught) {
             toastSaveError(caught, 'Belum dapat diarsipkan.');
+
+            return false;
+        } finally {
+            setBusy(false);
         }
     }
 
-    async function openContract(contract: Contract) {
+    async function openContract(
+        contract: Pick<Contract, 'id'>,
+        signal?: AbortSignal,
+    ) {
         try {
             const result = await api<{ data: Contract }>(
                 `/kontrak-servis/${contract.id}`,
+                { signal },
             );
             setErrors({});
+
+            if (signal?.aborted) {
+                return;
+            }
+
+            setOpenedContract(result.data);
             setContractDraft({
                 id: result.data.id,
                 version: result.data.version,
@@ -309,10 +353,34 @@ export default function WarrantyPage({
                 aset_ids: (result.data.aset ?? []).map((line) => line.aset_id),
             });
         } catch (caught) {
+            if (signal?.aborted) {
+                return;
+            }
+
             toast.error(errorMessage(caught, 'Kontrak belum dapat dibuka.'));
         }
     }
 
+    const clearRecordTarget = useRecordQueryTarget({
+        scopeKey: 'garansi-kontrak-servis',
+        enabled: can('kontrak-servis.read') || can('garansi-aset.read'),
+        onOpen: async (id, signal, kind) => {
+            if (kind === 'contract' && can('kontrak-servis.read')) {
+                setTab('kontrak');
+                await openContract({ id }, signal);
+            } else if (kind === 'warranty' && can('garansi-aset.read')) {
+                const result = await api<{ data: Warranty }>(
+                    '/garansi-aset/' + id,
+                    { signal },
+                );
+
+                if (!signal.aborted) {
+                    setTab('garansi');
+                    editWarranty(result.data);
+                }
+            }
+        },
+    });
     const warrantyColumns: DataTableColumn<Warranty>[] = [
         {
             id: 'aset',
@@ -438,72 +506,161 @@ export default function WarrantyPage({
     const expiringItems =
         expiring && expiring.days === days ? expiring.items : [];
 
+    const warrantyEditable = warrantyDraft?.id
+        ? can('garansi-aset.update')
+        : can('garansi-aset.create');
+    const discardWarranty = () =>
+        !warrantyDirty ||
+        window.confirm('Buang perubahan yang belum disimpan?');
+    const discardContract = () =>
+        !contractDirty ||
+        window.confirm('Buang perubahan yang belum disimpan?');
+    const newWarranty = () => {
+        if (!busy && discardWarranty()) {
+            clearRecordTarget();
+            (() => {
+                setErrors({});
+                setWarrantyDraft({
+                    id: null,
+                    version: 0,
+                    aset_id: '',
+                    legal_entity_id: null,
+                    vendor_id: '',
+                    jenis_garansi: 'penuh',
+                    nomor_referensi: '',
+                    berlaku_mulai: today,
+                    berlaku_sampai: '',
+                    catatan: '',
+                });
+            })();
+        }
+    };
+    const newContract = () => {
+        if (!busy && discardContract()) {
+            clearRecordTarget();
+            (() => {
+                setErrors({});
+                setContractDraft({
+                    id: null,
+                    version: 0,
+                    legal_entity_id: context.legal_entity_id,
+                    nomor_kontrak: '',
+                    vendor_id: '',
+                    berlaku_mulai: today,
+                    berlaku_sampai: '',
+                    cakupan: '',
+                    nilai_kontrak: '',
+                    keterangan: '',
+                    aset_ids: [],
+                });
+            })();
+        }
+    };
+    const closeWarranty = () => {
+        if (!busy && discardWarranty()) {
+            clearRecordTarget();
+            setWarrantyDraft(null);
+        }
+    };
+    const closeContract = () => {
+        if (!busy && discardContract()) {
+            clearRecordTarget();
+            setContractDraft(null);
+        }
+    };
+    useRecordCardDirty({
+        value: warrantyDraft,
+        ready: warrantyDraft !== null,
+        scopeKey: warrantyDraft?.id ?? 'new',
+        onDirtyChange: setWarrantyDirty,
+    });
+    useRecordCardDirty({
+        value: contractDraft,
+        ready: contractDraft !== null,
+        scopeKey: contractDraft?.id ?? 'new',
+        onDirtyChange: setContractDirty,
+    });
+    const editWarranty = (row: Warranty) => {
+        setOpenedWarranty(row);
+        setErrors({});
+        setWarrantyDraft({
+            id: row.id,
+            version: row.version,
+            aset_id: row.aset_id,
+            legal_entity_id: row.legal_entity_id,
+            vendor_id: row.vendor_id ?? '',
+            jenis_garansi: row.jenis_garansi,
+            nomor_referensi: row.nomor_referensi ?? '',
+            berlaku_mulai: row.berlaku_mulai,
+            berlaku_sampai: row.berlaku_sampai,
+            catatan: row.catatan ?? '',
+        });
+    };
+    const selectWarranty = (id: string) => {
+        const row = warrantyList.items.find((item) => item.id === id);
+
+        if (row) {
+            editWarranty(row);
+        }
+    };
+    const warrantyNavigation = useRecordNavigation({
+        items: warrantyList.items,
+        currentId: warrantyDraft?.id ?? null,
+        getId: (item) => item.id,
+        onNavigate: selectWarranty,
+        scopeKey: JSON.stringify([tab, reload, warrantyList.sort]),
+        hasMore: warrantyList.hasMore,
+        loading: warrantyList.loading,
+        loadMore: warrantyList.loadMore,
+        disabled: busy || warrantyDirty,
+    });
+    const contractNavigation = useRecordNavigation({
+        items: contractList.items,
+        currentId: contractDraft?.id ?? null,
+        getId: (item) => item.id,
+        onNavigate: (id) => {
+            const row = contractList.items.find((item) => item.id === id);
+
+            if (row) {
+                void openContract(row);
+            }
+        },
+        scopeKey: JSON.stringify([tab, reload, contractList.sort]),
+        hasMore: contractList.hasMore,
+        loading: contractList.loading,
+        loadMore: contractList.loadMore,
+        disabled: busy || contractDirty,
+    });
+
     return (
         <Tabs value={tab} onValueChange={setTab}>
-            <RecordActionBar
-                title="Garansi dan kontrak servis"
-                trailing={
-                    <TabsList>
-                        {can('garansi-aset.read') && (
-                            <TabsTrigger value="garansi">Garansi</TabsTrigger>
-                        )}
-                        {can('kontrak-servis.read') && (
-                            <TabsTrigger value="kontrak">
-                                Kontrak servis
-                            </TabsTrigger>
-                        )}
-                        <TabsTrigger value="berakhir">
-                            Akan berakhir
-                        </TabsTrigger>
-                    </TabsList>
-                }
-            >
+            <RecordActionBar title="Garansi dan kontrak servis">
                 {tab === 'garansi' && can('garansi-aset.create') && (
-                    <Button
+                    <ActionButton
+                        action="create"
                         type="button"
-                        onClick={() => {
-                            setErrors({});
-                            setWarrantyDraft({
-                                id: null,
-                                version: 0,
-                                aset_id: '',
-                                legal_entity_id: null,
-                                vendor_id: '',
-                                jenis_garansi: 'penuh',
-                                nomor_referensi: '',
-                                berlaku_mulai: today,
-                                berlaku_sampai: '',
-                                catatan: '',
-                            });
-                        }}
-                    >
-                        Catat garansi
-                    </Button>
+                        onClick={newWarranty}
+                    />
                 )}
                 {tab === 'kontrak' && can('kontrak-servis.create') && (
-                    <Button
+                    <ActionButton
+                        action="create"
                         type="button"
                         disabled={!context.legal_entity_id}
-                        onClick={() => {
-                            setErrors({});
-                            setContractDraft({
-                                id: null,
-                                version: 0,
-                                legal_entity_id: context.legal_entity_id,
-                                nomor_kontrak: '',
-                                vendor_id: '',
-                                berlaku_mulai: today,
-                                berlaku_sampai: '',
-                                cakupan: '',
-                                nilai_kontrak: '',
-                                keterangan: '',
-                                aset_ids: [],
-                            });
-                        }}
-                    >
-                        Kontrak baru
-                    </Button>
+                        onClick={newContract}
+                    />
                 )}
+                <TabsList>
+                    {can('garansi-aset.read') && (
+                        <TabsTrigger value="garansi">Garansi</TabsTrigger>
+                    )}
+                    {can('kontrak-servis.read') && (
+                        <TabsTrigger value="kontrak">
+                            Kontrak servis
+                        </TabsTrigger>
+                    )}
+                    <TabsTrigger value="berakhir">Akan berakhir</TabsTrigger>
+                </TabsList>
             </RecordActionBar>
 
             <TabsContent value="garansi">
@@ -537,7 +694,7 @@ export default function WarrantyPage({
                                 ? [
                                       {
                                           id: 'arsip',
-                                          label: 'Arsipkan',
+                                          label: 'Delete',
                                           destructive: true,
                                       },
                                   ]
@@ -554,19 +711,7 @@ export default function WarrantyPage({
                                 return;
                             }
 
-                            setErrors({});
-                            setWarrantyDraft({
-                                id: row.id,
-                                version: row.version,
-                                aset_id: row.aset_id,
-                                legal_entity_id: row.legal_entity_id,
-                                vendor_id: row.vendor_id ?? '',
-                                jenis_garansi: row.jenis_garansi,
-                                nomor_referensi: row.nomor_referensi ?? '',
-                                berlaku_mulai: row.berlaku_mulai,
-                                berlaku_sampai: row.berlaku_sampai,
-                                catatan: row.catatan ?? '',
-                            });
+                            editWarranty(row);
                         }}
                     />
                 )}
@@ -600,7 +745,7 @@ export default function WarrantyPage({
                                 ? [
                                       {
                                           id: 'arsip',
-                                          label: 'Arsipkan',
+                                          label: 'Delete',
                                           destructive: true,
                                       },
                                   ]
@@ -657,43 +802,130 @@ export default function WarrantyPage({
                 )}
             </TabsContent>
 
-            <Dialog
+            <PageDialog
                 open={warrantyDraft !== null}
-                onOpenChange={(open) => !open && setWarrantyDraft(null)}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        closeWarranty();
+                    }
+                }}
             >
-                <DialogContent size="compact" ref={warrantyRef}>
-                    <DialogHeader>
-                        <DialogTitle>
-                            {warrantyDraft?.id
-                                ? 'Ubah garansi'
-                                : 'Catat garansi'}
-                        </DialogTitle>
-                    </DialogHeader>
+                <PageDialogContent
+                    ref={warrantyRef}
+                    title={'Garansi dan kontrak servis'}
+                    busy={busy}
+                    onNew={
+                        warrantyDraft?.id && can('garansi-aset.create')
+                            ? newWarranty
+                            : undefined
+                    }
+                    navigation={
+                        warrantyDraft?.id ? warrantyNavigation : undefined
+                    }
+                >
+                    <RecordCardHeader
+                        recordTitle={
+                            warrantyDraft?.nomor_referensi ||
+                            (openedWarranty?.id === warrantyDraft?.id
+                                ? openedWarranty?.aset_kode
+                                : assets.find(
+                                      (a) => a.id === warrantyDraft?.aset_id,
+                                  )?.kode) ||
+                            'Baru'
+                        }
+                        editing={warrantyEditable}
+                        recordUrl={
+                            warrantyDraft?.id
+                                ? recordQueryUrl(
+                                      'garansi-kontrak-servis',
+                                      warrantyDraft.id,
+                                      'warranty',
+                                  )
+                                : undefined
+                        }
+                        onDelete={
+                            warrantyDraft?.id && can('garansi-aset.archive')
+                                ? async () => {
+                                      if (
+                                          await archive(
+                                              '/garansi-aset/' +
+                                                  warrantyDraft.id,
+                                              warrantyDraft.version,
+                                              'Garansi diarsipkan.',
+                                          )
+                                      ) {
+                                          setWarrantyDraft(null);
+                                      }
+                                  }
+                                : undefined
+                        }
+                    />
+                    {warrantyEditable && (
+                        <PageDialogToolbar>
+                            <ActionButton
+                                action="save"
+                                type="button"
+                                disabled={
+                                    busy ||
+                                    !warrantyDraft?.aset_id ||
+                                    !warrantyDraft?.berlaku_mulai ||
+                                    !warrantyDraft?.berlaku_sampai
+                                }
+                                onClick={() => void saveWarranty()}
+                                pending={busy}
+                            />
+                            <PageDialogClose asChild>
+                                <ActionButton action="cancel" type="button" />
+                            </PageDialogClose>
+                        </PageDialogToolbar>
+                    )}
                     {warrantyDraft && (
-                        <DialogBody className="space-y-4">
+                        <PageDialogBody className="space-y-4">
                             <Field>
-                                <Select
-                                    {...assetSource.selectProps}
-                                    label="Aset"
-                                    required
-                                    items={assetChoices}
-                                    value={warrantyDraft.aset_id || null}
-                                    placeholder="Pilih aset"
-                                    searchPlaceholder="Cari kode atau nama aset"
-                                    ariaLabel="Aset"
-                                    portalContainer={warrantyRef}
-                                    onValueChange={(value) =>
-                                        !warrantyDraft.id &&
-                                        setWarrantyDraft({
-                                            ...warrantyDraft,
-                                            aset_id: value ?? '',
-                                            legal_entity_id: value
-                                                ? legalEntityOf(value)
-                                                : null,
-                                            vendor_id: '',
-                                        })
-                                    }
-                                />
+                                {warrantyEditable ? (
+                                    <Select
+                                        {...assetSource.selectProps}
+                                        label="Aset"
+                                        required
+                                        items={assetChoices}
+                                        value={warrantyDraft.aset_id || null}
+                                        placeholder="Pilih aset"
+                                        searchPlaceholder="Cari kode atau nama aset"
+                                        ariaLabel="Aset"
+                                        portalContainer={warrantyRef}
+                                        onValueChange={(value) =>
+                                            !warrantyDraft.id &&
+                                            setWarrantyDraft({
+                                                ...warrantyDraft,
+                                                aset_id: value ?? '',
+                                                legal_entity_id: value
+                                                    ? legalEntityOf(value)
+                                                    : null,
+                                                vendor_id: '',
+                                            })
+                                        }
+                                    />
+                                ) : (
+                                    <Input
+                                        label="Aset"
+                                        readOnly
+                                        value={
+                                            openedWarranty?.aset_id ===
+                                            warrantyDraft.aset_id
+                                                ? [
+                                                      openedWarranty.aset_kode,
+                                                      openedWarranty.aset_nama,
+                                                  ]
+                                                      .filter(Boolean)
+                                                      .join(' · ')
+                                                : (assets.find(
+                                                      (row) =>
+                                                          row.id ===
+                                                          warrantyDraft.aset_id,
+                                                  )?.nama ?? '—')
+                                        }
+                                    />
+                                )}
                                 {message('aset_id') && (
                                     <FieldDescription>
                                         {message('aset_id')}
@@ -701,49 +933,79 @@ export default function WarrantyPage({
                                 )}
                             </Field>
                             <Field>
-                                <Select
-                                    {...warrantyVendorsSource.selectProps}
-                                    label="Penjamin"
-                                    items={warrantyVendors.map((vendor) => ({
-                                        value: vendor.id,
-                                        label: `${vendor.number} — ${vendor.name}`,
-                                    }))}
-                                    value={warrantyDraft.vendor_id || null}
-                                    placeholder={
-                                        warrantyDraft.aset_id
-                                            ? 'Pilih vendor'
-                                            : 'Pilih aset lebih dahulu'
-                                    }
-                                    searchPlaceholder="Cari nomor atau nama vendor"
-                                    ariaLabel="Penjamin"
-                                    portalContainer={warrantyRef}
-                                    onValueChange={(value) =>
-                                        setWarrantyDraft({
-                                            ...warrantyDraft,
-                                            vendor_id: value ?? '',
-                                        })
-                                    }
-                                />
+                                {warrantyEditable ? (
+                                    <Select
+                                        {...warrantyVendorsSource.selectProps}
+                                        label="Penjamin"
+                                        items={warrantyVendors.map(
+                                            (vendor) => ({
+                                                value: vendor.id,
+                                                label: `${vendor.number} — ${vendor.name}`,
+                                            }),
+                                        )}
+                                        value={warrantyDraft.vendor_id || null}
+                                        placeholder={
+                                            warrantyDraft.aset_id
+                                                ? 'Pilih vendor'
+                                                : 'Pilih aset lebih dahulu'
+                                        }
+                                        searchPlaceholder="Cari nomor atau nama vendor"
+                                        ariaLabel="Penjamin"
+                                        portalContainer={warrantyRef}
+                                        onValueChange={(value) =>
+                                            setWarrantyDraft({
+                                                ...warrantyDraft,
+                                                vendor_id: value ?? '',
+                                            })
+                                        }
+                                    />
+                                ) : (
+                                    <Input
+                                        label="Penjamin"
+                                        readOnly
+                                        value={
+                                            warrantyVendors.find(
+                                                (row) =>
+                                                    row.id ===
+                                                    warrantyDraft.vendor_id,
+                                            )?.name ?? '—'
+                                        }
+                                    />
+                                )}
                                 <FieldDescription>
                                     {message('vendor_id') ??
                                         'Boleh kosong bila penjaminnya bukan vendor yang tercatat.'}
                                 </FieldDescription>
                             </Field>
                             <Field>
-                                <Select
-                                    label="Cakupan garansi"
-                                    required
-                                    items={WARRANTY_TYPES}
-                                    value={warrantyDraft.jenis_garansi}
-                                    ariaLabel="Cakupan garansi"
-                                    portalContainer={warrantyRef}
-                                    onValueChange={(value) =>
-                                        setWarrantyDraft({
-                                            ...warrantyDraft,
-                                            jenis_garansi: value ?? 'penuh',
-                                        })
-                                    }
-                                />
+                                {warrantyEditable ? (
+                                    <Select
+                                        label="Cakupan garansi"
+                                        required
+                                        items={WARRANTY_TYPES}
+                                        value={warrantyDraft.jenis_garansi}
+                                        ariaLabel="Cakupan garansi"
+                                        portalContainer={warrantyRef}
+                                        onValueChange={(value) =>
+                                            setWarrantyDraft({
+                                                ...warrantyDraft,
+                                                jenis_garansi: value ?? 'penuh',
+                                            })
+                                        }
+                                    />
+                                ) : (
+                                    <Input
+                                        label="Cakupan garansi"
+                                        readOnly
+                                        value={
+                                            WARRANTY_TYPES.find(
+                                                (row) =>
+                                                    row.value ===
+                                                    warrantyDraft.jenis_garansi,
+                                            )?.label ?? '—'
+                                        }
+                                    />
+                                )}
                                 <FieldDescription>
                                     Sebagian berarti hanya bagian tertentu yang
                                     ditanggung, misalnya suku cadang tanpa jasa.
@@ -751,6 +1013,7 @@ export default function WarrantyPage({
                                 </FieldDescription>
                             </Field>
                             <Input
+                                readOnly={!warrantyEditable}
                                 label="No. kartu garansi"
                                 maxLength={80}
                                 value={warrantyDraft.nomor_referensi}
@@ -763,6 +1026,7 @@ export default function WarrantyPage({
                             />
                             <div className="grid grid-cols-2 gap-3">
                                 <Input
+                                    readOnly={!warrantyEditable}
                                     label="Berlaku mulai"
                                     type="date"
                                     required
@@ -775,6 +1039,7 @@ export default function WarrantyPage({
                                     }
                                 />
                                 <Input
+                                    readOnly={!warrantyEditable}
                                     label="Berlaku sampai"
                                     type="date"
                                     required
@@ -793,6 +1058,7 @@ export default function WarrantyPage({
                                 </p>
                             )}
                             <Textarea
+                                readOnly={!warrantyEditable}
                                 rows={2}
                                 maxLength={2000}
                                 placeholder="Catatan, misalnya syarat klaim"
@@ -804,40 +1070,101 @@ export default function WarrantyPage({
                                     })
                                 }
                             />
-                        </DialogBody>
+                        </PageDialogBody>
                     )}
-                    <DialogFooter>
-                        <DialogAction
-                            type="button"
-                            disabled={
-                                busy ||
-                                !warrantyDraft?.aset_id ||
-                                !warrantyDraft?.berlaku_mulai ||
-                                !warrantyDraft?.berlaku_sampai
-                            }
-                            onClick={() => void saveWarranty()}
-                        >
-                            {busy ? 'Menyimpan…' : 'Simpan'}
-                        </DialogAction>
-                        <DialogCancel type="button">Batal</DialogCancel>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                </PageDialogContent>
+            </PageDialog>
 
-            <Dialog
+            <PageDialog
                 open={contractDraft !== null}
-                onOpenChange={(open) => !open && setContractDraft(null)}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        closeContract();
+                    }
+                }}
             >
-                <DialogContent ref={contractRef}>
-                    <DialogHeader>
-                        <DialogTitle>
-                            {contractDraft?.id
-                                ? 'Kontrak servis'
-                                : 'Kontrak servis baru'}
-                        </DialogTitle>
-                    </DialogHeader>
+                <PageDialogContent
+                    ref={contractRef}
+                    title={'Garansi dan kontrak servis'}
+                    busy={busy}
+                    onNew={
+                        contractDraft?.id &&
+                        can('kontrak-servis.create') &&
+                        context.legal_entity_id
+                            ? newContract
+                            : undefined
+                    }
+                    navigation={
+                        contractDraft?.id ? contractNavigation : undefined
+                    }
+                >
+                    <RecordCardHeader
+                        recordTitle={contractDraft?.nomor_kontrak || 'Baru'}
+                        editing={
+                            contractDraft?.id
+                                ? can('kontrak-servis.update')
+                                : true
+                        }
+                        onDelete={
+                            contractDraft?.id && can('kontrak-servis.archive')
+                                ? async () => {
+                                      if (
+                                          await archive(
+                                              '/kontrak-servis/' +
+                                                  contractDraft.id,
+                                              contractDraft.version,
+                                              'Kontrak servis diarsipkan.',
+                                          )
+                                      ) {
+                                          clearRecordTarget();
+                                          setContractDraft(null);
+                                      }
+                                  }
+                                : undefined
+                        }
+                        recordUrl={
+                            contractDraft?.id
+                                ? recordQueryUrl(
+                                      'garansi-kontrak-servis',
+                                      contractDraft.id,
+                                      'contract',
+                                  )
+                                : undefined
+                        }
+                    />
+                    {(contractDraft?.id
+                        ? can('kontrak-servis.update')
+                        : can('kontrak-servis.create')) && (
+                        <PageDialogToolbar>
+                            {(contractDraft?.id
+                                ? can('kontrak-servis.update')
+                                : can('kontrak-servis.create')) && (
+                                <ActionButton
+                                    action="save"
+                                    type="button"
+                                    disabled={
+                                        busy ||
+                                        !contractDraft?.nomor_kontrak ||
+                                        !contractDraft?.vendor_id ||
+                                        !contractDraft?.berlaku_sampai
+                                    }
+                                    onClick={() => void saveContract()}
+                                    pending={busy}
+                                />
+                            )}
+                            {(contractDraft?.id
+                                ? can('kontrak-servis.update')
+                                : can('kontrak-servis.create')) && (
+                                <ActionButton
+                                    action="cancel"
+                                    onClick={closeContract}
+                                    disabled={busy}
+                                />
+                            )}
+                        </PageDialogToolbar>
+                    )}
                     {contractDraft && (
-                        <DialogBody className="space-y-4">
+                        <PageDialogBody className="space-y-4">
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <Input
                                     label="Nomor kontrak"
@@ -972,29 +1299,10 @@ export default function WarrantyPage({
                                     })
                                 }
                             />
-                        </DialogBody>
+                        </PageDialogBody>
                     )}
-                    <DialogFooter>
-                        {(contractDraft?.id
-                            ? can('kontrak-servis.update')
-                            : can('kontrak-servis.create')) && (
-                            <DialogAction
-                                type="button"
-                                disabled={
-                                    busy ||
-                                    !contractDraft?.nomor_kontrak ||
-                                    !contractDraft?.vendor_id ||
-                                    !contractDraft?.berlaku_sampai
-                                }
-                                onClick={() => void saveContract()}
-                            >
-                                {busy ? 'Menyimpan…' : 'Simpan'}
-                            </DialogAction>
-                        )}
-                        <DialogCancel type="button">Tutup</DialogCancel>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                </PageDialogContent>
+            </PageDialog>
         </Tabs>
     );
 }

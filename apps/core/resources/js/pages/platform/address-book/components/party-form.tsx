@@ -1,4 +1,5 @@
-import { Button } from '@apperp/ui/button';
+import { ActionButton } from '@apperp/ui/action-button';
+
 import { Checkbox } from '@apperp/ui/checkbox';
 import {
     CollapsibleSection,
@@ -20,14 +21,17 @@ import {
 } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
+import { usePageDialogRecord } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { apiJson, CoreApiError, errorText } from '@/lib/core-api';
 import {
     OrganizationAddressesSection,
     OrganizationContactsSection,
+    usePartyDraftDetails,
+    newPartyDraftKey,
 } from '../../organization/components/address-book-section';
 import type {
     DirectoryMetadata,
@@ -62,8 +66,8 @@ export function PartyForm({
     metadata,
     onClose,
     onSaved,
-    embedded = false,
     onBusyChange,
+    onDirtyChange,
 }: {
     party: PartyDetail | null;
     metadata: DirectoryMetadata;
@@ -71,6 +75,7 @@ export function PartyForm({
     onSaved: (party: Party) => void;
     embedded?: boolean;
     onBusyChange?: (busy: boolean) => void;
+    onDirtyChange?: (dirty: boolean) => void;
 }) {
     const [form, setForm] = useState<Record<string, string | number | null>>(
         () => ({
@@ -96,10 +101,23 @@ export function PartyForm({
         }),
     );
     const [bookIds, setBookIds] = useState(party?.address_book_ids ?? []);
+    const draftDetails = usePartyDraftDetails(!party && metadata.canManage);
+    const [initialForm] = useState(form);
+    const [initialBooks] = useState(bookIds);
+    const dirty =
+        JSON.stringify(form) !== JSON.stringify(initialForm) ||
+        JSON.stringify(bookIds) !== JSON.stringify(initialBooks) ||
+        draftDetails.value.locations.length > 0 ||
+        draftDetails.value.contacts.length > 0;
+    useEffect(() => {
+        onDirtyChange?.(dirty);
+
+        return () => onDirtyChange?.(false);
+    }, [dirty, onDirtyChange]);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const [errors, setErrors] = useState<Record<string, string[]>>({});
-    const creationKey = useRef(crypto.randomUUID());
+    const creationKey = useRef(newPartyDraftKey());
     const set = (key: string, value: string | number | null) =>
         setForm((current) => ({ ...current, [key]: value }));
     const searchEdited = useRef(
@@ -150,6 +168,9 @@ export function PartyForm({
                     body: JSON.stringify({
                         ...data,
                         address_book_ids: bookIds,
+                        ...(!party
+                            ? { party_details: draftDetails.payload }
+                            : {}),
                         ...(party ? { version: party.version } : {}),
                     }),
                 },
@@ -218,31 +239,33 @@ export function PartyForm({
         </div>
     );
 
+    usePageDialogRecord({
+        recordTitle: party
+            ? [party.number, String(form.name)].filter(Boolean).join(' · ')
+            : String(form.name) || 'Party baru',
+        editing: true,
+        recordUrl: party
+            ? '/settings/global-address-book?' +
+              new URLSearchParams({ party: party.id }).toString()
+            : undefined,
+    });
+
     return (
         <div className="flex h-full min-h-0 flex-col">
-            <RecordActionBar
-                title={
-                    embedded
-                        ? undefined
-                        : party
-                          ? `${party.number ?? ''} · ${party.name}`
-                          : 'Tambah Party'
-                }
-                trailing={
-                    <>
-                        <Button
-                            variant="outline"
-                            disabled={busy}
-                            onClick={onClose}
-                        >
-                            Batal
-                        </Button>
-                        <Button type="submit" form="party-form" disabled={busy}>
-                            {busy ? 'Menyimpan…' : 'Simpan'}
-                        </Button>
-                    </>
-                }
-            />
+            <RecordActionBar>
+                <ActionButton
+                    action="save"
+                    type="submit"
+                    form="party-form"
+                    disabled={busy}
+                    pending={busy}
+                />
+                <ActionButton
+                    action="cancel"
+                    disabled={busy}
+                    onClick={onClose}
+                />
+            </RecordActionBar>
             <form
                 id="party-form"
                 onSubmit={(event) => void save(event)}
@@ -496,37 +519,25 @@ export function PartyForm({
                         title="Alamat"
                         summary="Alamat bersama Party"
                     >
-                        {party ? (
-                            <OrganizationAddressesSection
-                                organizationId={party.id}
-                                resource="parties"
-                                countryCode="ID"
-                                canManage={metadata.canManage}
-                            />
-                        ) : (
-                            <p className="text-sm text-muted-foreground">
-                                Simpan pihak terlebih dahulu untuk menambahkan
-                                alamat.
-                            </p>
-                        )}
+                        <OrganizationAddressesSection
+                            organizationId={party?.id ?? ''}
+                            resource="parties"
+                            countryCode="ID"
+                            canManage={metadata.canManage}
+                            draft={!party ? draftDetails : undefined}
+                        />
                     </CollapsibleSection>
                     <CollapsibleSection
                         value="contacts"
                         title="Informasi kontak"
                         summary="Telepon, email, dan kontak lainnya"
                     >
-                        {party ? (
-                            <OrganizationContactsSection
-                                organizationId={party.id}
-                                resource="parties"
-                                canManage={metadata.canManage}
-                            />
-                        ) : (
-                            <p className="text-sm text-muted-foreground">
-                                Simpan pihak terlebih dahulu untuk menambahkan
-                                kontak.
-                            </p>
-                        )}
+                        <OrganizationContactsSection
+                            organizationId={party?.id ?? ''}
+                            resource="parties"
+                            canManage={metadata.canManage}
+                            draft={!party ? draftDetails : undefined}
+                        />
                     </CollapsibleSection>
                     <CollapsibleSection
                         value="roles"

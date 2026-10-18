@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import {
@@ -21,7 +22,9 @@ import {
 } from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
+import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
 import { api, errorMessage } from '../api';
+import { useRecordQueryTarget } from '../transactions/_shared/use-record-query-target';
 import { useRecordList } from '../use-record-list';
 import GroupBookMatrix from './GroupBookMatrix';
 import MasterForm from './MasterForm';
@@ -97,6 +100,8 @@ export default function MasterPage({
         {},
     );
     const [editing, setEditing] = useState<MasterRecord | null | undefined>();
+    const [masterBusy, setMasterBusy] = useState(false);
+    const [masterDirty, setMasterDirty] = useState(false);
     const [error, setError] = useState('');
     const [picked, setPicked] = useState<string[]>([]);
 
@@ -129,6 +134,39 @@ export default function MasterPage({
         list.reload();
     };
 
+    const clearRecordTarget = useRecordQueryTarget({
+        scopeKey: config.resource,
+        enabled: can('update'),
+        onOpen: async (id, signal) => {
+            const result = await api<{ data: MasterRecord }>(
+                `/${config.resource}/${encodeURIComponent(id)}`,
+                { signal },
+            );
+
+            if (!signal.aborted) {
+                setEditing(result.data);
+            }
+        },
+        onError: (caught) =>
+            setError(errorMessage(caught, 'Record belum dapat dibuka.')),
+    });
+    const masterNavigation = useRecordNavigation({
+        items,
+        currentId: editing?.id ?? null,
+        getId: (item) => item.id,
+        onNavigate: (id) => {
+            const row = items.find((item) => item.id === id);
+
+            if (row) {
+                setEditing(row);
+            }
+        },
+        scopeKey: JSON.stringify([config.resource, search, query, list.sort]),
+        hasMore: list.hasMore,
+        loading: list.loading,
+        loadMore: list.loadMore,
+        disabled: masterBusy || masterDirty,
+    });
     // Pilihan hanya berlaku atas baris yang sedang tampil. Dengan menyaringnya saat
     // render, ganti filter atau ganti halaman membuat sisa pilihan lama gugur sendiri
     // begitu daftar barunya masuk — tanpa effect yang menyetel ulang state.
@@ -155,7 +193,7 @@ export default function MasterPage({
     async function archive(item: MasterRecord) {
         if (
             !window.confirm(
-                `Arsipkan ${item.nama}? Data ini tidak lagi tampil pada daftar pilihan.`,
+                `Delete ${item.nama}? Data ini tidak lagi tampil pada daftar pilihan.`,
             )
         ) {
             return;
@@ -166,6 +204,9 @@ export default function MasterPage({
                 method: 'DELETE',
                 body: JSON.stringify({ version: item.version }),
             });
+            setEditing((current) =>
+                current?.id === item.id ? undefined : current,
+            );
             load();
         } catch (caught) {
             setError(errorMessage(caught, 'Data belum dapat diarsipkan.'));
@@ -213,7 +254,7 @@ export default function MasterPage({
         if (
             !selected.length ||
             !window.confirm(
-                `Arsipkan ${selected.length} data terpilih? Data ini tidak lagi tampil pada daftar pilihan.`,
+                `Delete ${selected.length} data terpilih? Data ini tidak lagi tampil pada daftar pilihan.`,
             )
         ) {
             return;
@@ -354,7 +395,7 @@ export default function MasterPage({
     if (can('archive')) {
         rowActions.push({
             id: 'archive',
-            label: 'Arsipkan',
+            label: 'Delete',
             destructive: true,
             separatorBefore: rowActions.length > 0,
         });
@@ -366,15 +407,14 @@ export default function MasterPage({
                 aria-labelledby="list-title"
                 className="flex h-full min-h-0 flex-col overflow-hidden rounded-none border-0 shadow-none"
             >
-                <CardHeader className="min-h-0 shrink-0 border-b px-5 py-3">
-                    <CardTitle id="list-title" className="text-base">
-                        {config.title}
-                    </CardTitle>
+                <CardHeader className="min-h-0 shrink-0 border-b">
+                    <CardTitle id="list-title">{config.title}</CardTitle>
                     {can('create') && (
                         <CardAction>
-                            <Button onClick={() => setEditing(null)}>
-                                ＋ Tambah {config.singular}
-                            </Button>
+                            <ActionButton
+                                action="create"
+                                onClick={() => setEditing(null)}
+                            />
                         </CardAction>
                     )}
                 </CardHeader>
@@ -471,13 +511,10 @@ export default function MasterPage({
                                     </Button>
                                 )}
                                 {can('archive') && (
-                                    <Button
-                                        variant="destructive"
-                                        size="sm"
+                                    <ActionButton
+                                        action="archive"
                                         onClick={archiveSelected}
-                                    >
-                                        Arsipkan
-                                    </Button>
+                                    />
                                 )}
                             </div>
                         </div>
@@ -546,9 +583,30 @@ export default function MasterPage({
 
             {editing !== undefined && (
                 <MasterForm
+                    onDelete={
+                        editing && can('archive')
+                            ? () => void archive(editing)
+                            : undefined
+                    }
+                    permissions={permissions}
+                    canStageDetails={can('update')}
+                    onNew={
+                        can('create')
+                            ? () => {
+                                  clearRecordTarget();
+                                  setEditing(null);
+                              }
+                            : undefined
+                    }
+                    navigation={masterNavigation}
+                    onBusyChange={setMasterBusy}
+                    onDirtyChange={setMasterDirty}
                     config={config}
                     value={editing}
-                    onClose={() => setEditing(undefined)}
+                    onClose={() => {
+                        clearRecordTarget();
+                        setEditing(undefined);
+                    }}
                     key={editing?.id ?? 'baru'}
                     onSaved={(savedRecord, created) => {
                         // Form hanya tetap terbuka bila ada rincian lanjutan yang
@@ -564,6 +622,11 @@ export default function MasterPage({
                                         changeVersion(savedRecord.id, version),
                                 ),
                             );
+
+                        if (!keepOpen) {
+                            clearRecordTarget();
+                        }
+
                         setEditing(keepOpen ? savedRecord : undefined);
                         void load();
                     }}

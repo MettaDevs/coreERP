@@ -11,6 +11,7 @@ use App\Foundation\Vendor\Support\VendorActivity;
 use App\Http\Controllers\Controller;
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\AddressBook\Models\Party;
+use App\Platform\AddressBook\Support\PartyDetailData;
 use App\Platform\Analytics\Query\AnalyticsQueryException;
 use App\Platform\Identity\Support\UserClock;
 use App\Platform\Modules\Contracts\RowVersion;
@@ -66,6 +67,7 @@ final class VendorController extends Controller
             'legal_entity' => ['nullable', 'string', 'max:26'],
             'status' => ['nullable', Rule::in([Vendor::ACTIVE, Vendor::INACTIVE])],
             'party' => ['nullable', 'ulid'],
+            'vendor' => ['nullable', 'ulid'],
         ]);
         $keyword = trim((string) ($filter['q'] ?? ''));
         $pattern = '%'.addcslashes($keyword, '\\%_').'%';
@@ -84,7 +86,12 @@ final class VendorController extends Controller
             ->withQueryString()
             ->through(fn (Vendor $vendor): array => $this->present($vendor));
 
-        $initialParty = empty($filter['party']) ? null : Party::query()->where('tenant_id', $tenant)->where('status', 'active')->whereKey($filter['party'])->firstOrFail(['id', 'name', 'type']);
+        $initialVendor = empty($filter['vendor']) ? null : Vendor::query()
+            ->where('tenant_id', $tenant)
+            ->with('party:id,name,type')
+            ->whereKey($filter['vendor'])
+            ->firstOrFail();
+        $initialParty = $initialVendor !== null || empty($filter['party']) ? null : Party::query()->where('tenant_id', $tenant)->where('status', 'active')->whereKey($filter['party'])->firstOrFail(['id', 'name', 'type']);
 
         return Inertia::render('foundation/vendor/vendors', [
             'canManage' => $membership->hasCorePermission(CoreSecurityCatalog::VENDOR_UPDATE),
@@ -93,6 +100,7 @@ final class VendorController extends Controller
             'vendors' => Inertia::scroll($vendors)->matchOn('data.id'),
             'automaticNumbers' => $this->automaticNumberAllowed($tenant),
             'initialParty' => $initialParty === null ? null : ['id' => $initialParty->id, 'name' => $initialParty->name, 'type' => $initialParty->identityType()],
+            'initialVendor' => $initialVendor === null ? null : $this->present($initialVendor),
             'canReadAddressBook' => $membership->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_READ),
             'canManageAddressBook' => $membership->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE),
         ]);
@@ -199,6 +207,7 @@ final class VendorController extends Controller
             'tax_number' => $this->npwp($data['tax_number'] ?? null),
             'status' => $data['status'] ?? Vendor::ACTIVE,
             'payment_priority' => $data['payment_priority'] ?? null,
+            'party_details' => PartyDetailData::details($request->input('party_details', [])),
         ], $key);
 
         return response()->json(['data' => $this->present($vendor->refresh()->load('party'))], $vendor->wasRecentlyCreated ? 201 : 200);

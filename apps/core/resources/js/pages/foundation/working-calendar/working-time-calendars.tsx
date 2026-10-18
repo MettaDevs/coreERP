@@ -12,21 +12,20 @@ import {
 } from '@apperp/ui/alert-dialog';
 import { Button } from '@apperp/ui/button';
 import { Checkbox } from '@apperp/ui/checkbox';
-import { DialogCancel } from '@apperp/ui/dialog';
+import { DialogClose } from '@apperp/ui/dialog';
+
 import { Field, FieldDescription, FieldError } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
 import {
+    PageDialogToolbar,
     PageDialog as Dialog,
     PageDialogAction as DialogAction,
     PageDialogBody as DialogBody,
     PageDialogContent as DialogContent,
-    PageDialogDescription as DialogDescription,
-    PageDialogFooter as DialogFooter,
-    PageDialogHeader as DialogHeader,
-    PageDialogTitle as DialogTitle,
 } from '@apperp/ui/page-dialog';
+import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import {
     Table,
     TableBody,
@@ -253,7 +252,7 @@ export default function WorkingTimeCalendars({
 
             <ListPageLayout>
                 {/* Command Ribbon */}
-                <div className="sticky top-0 z-20 flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card px-4 py-2">
+                <RecordActionBar>
                     <span className="mr-2 text-sm font-semibold text-foreground">
                         Kalender kerja
                     </span>
@@ -261,39 +260,31 @@ export default function WorkingTimeCalendars({
                     {canManage && (
                         <ActionButton
                             action="create"
-                            size="sm"
                             type="button"
                             onClick={handleOpenCreate}
-                        >
-                            + Baru
-                        </ActionButton>
+                        />
                     )}
 
                     {canManage && (
                         <ActionButton
                             action="edit"
-                            size="sm"
                             type="button"
                             disabled={!selectedCalendar}
                             onClick={handleOpenEdit}
-                        >
-                            Ubah
-                        </ActionButton>
+                        />
                     )}
 
                     {canManage && (
                         <ActionButton
                             action="archive"
-                            size="sm"
                             type="button"
                             disabled={!selectedCalendar || isDeleting}
                             onClick={() => {
                                 setFormErrors({});
                                 setIsArchiveOpen(true);
                             }}
-                        >
-                            {isDeleting ? 'Mengarsipkan…' : 'Arsipkan'}
-                        </ActionButton>
+                            pending={isDeleting}
+                        />
                     )}
 
                     <Button
@@ -334,7 +325,7 @@ export default function WorkingTimeCalendars({
                             <span>Jadwal dari pola</span>
                         </Link>
                     )}
-                </div>
+                </RecordActionBar>
 
                 {/* Notice if no legal entity selected */}
                 {!currentLegalEntity && (
@@ -467,7 +458,7 @@ export default function WorkingTimeCalendars({
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>
-                            Arsipkan kalender kerja?
+                            Delete kalender kerja?
                         </AlertDialogTitle>
                         <AlertDialogDescription>
                             {selectedCalendar?.code} - {selectedCalendar?.name}{' '}
@@ -495,20 +486,43 @@ export default function WorkingTimeCalendars({
                                 handleDelete();
                             }}
                         >
-                            {isDeleting ? 'Mengarsipkan...' : 'Arsipkan'}
+                            {isDeleting ? 'Mengarsipkan...' : 'Delete'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Tambah kalender kerja</DialogTitle>
-                        <DialogDescription>
+                <DialogContent
+                    title="Kalender kerja"
+                    recordTitle={
+                        [formCode, formName].filter(Boolean).join(' · ') ||
+                        'Kalender baru'
+                    }
+                    editing
+                    busy={isSubmitting}
+                    description={
+                        <>
                             Kalender kerja baru untuk perusahaan{' '}
                             {currentLegalEntity?.name ?? 'yang aktif'}.
-                        </DialogDescription>
-                    </DialogHeader>
+                        </>
+                    }
+                >
+                    <PageDialogToolbar>
+                        <ActionButton
+                            action="save"
+                            onClick={handleCreate}
+                            disabled={isSubmitting || !formCode || !formName}
+                            pending={isSubmitting}
+                            type="button"
+                        />
+                        <DialogClose asChild>
+                            <ActionButton
+                                action="cancel"
+                                onClick={() => setIsCreateOpen(false)}
+                                type="button"
+                            />
+                        </DialogClose>
+                    </PageDialogToolbar>
 
                     <DialogBody className="space-y-4 py-2">
                         <CalendarFormFields
@@ -526,28 +540,38 @@ export default function WorkingTimeCalendars({
                             errors={formErrors}
                         />
                     </DialogBody>
-
-                    <DialogFooter>
-                        <DialogAction
-                            onClick={handleCreate}
-                            disabled={isSubmitting || !formCode || !formName}
-                        >
-                            {isSubmitting ? 'Menyimpan…' : 'Simpan'}
-                        </DialogAction>
-                        <DialogCancel onClick={() => setIsCreateOpen(false)} />
-                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 
             <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Ubah kalender kerja</DialogTitle>
-                        <DialogDescription>
-                            Perbarui kode, nama, dan jam kerja standar kalender
-                            ini.
-                        </DialogDescription>
-                    </DialogHeader>
+                <DialogContent
+                    title="Kalender kerja"
+                    recordTitle={
+                        [formCode, formName].filter(Boolean).join(' · ') ||
+                        selectedCalendar?.name
+                    }
+                    editing
+                    busy={isSubmitting}
+                    description={
+                        'Perbarui kode, nama, dan jam kerja standar kalender\n                            ini.'
+                    }
+                >
+                    <PageDialogToolbar>
+                        <ActionButton
+                            action="save"
+                            onClick={handleUpdate}
+                            disabled={isSubmitting || !formCode || !formName}
+                            pending={isSubmitting}
+                            type="button"
+                        />
+                        <DialogClose asChild>
+                            <ActionButton
+                                action="cancel"
+                                onClick={() => setIsEditOpen(false)}
+                                type="button"
+                            />
+                        </DialogClose>
+                    </PageDialogToolbar>
 
                     <DialogBody className="space-y-4 py-2">
                         <CalendarFormFields
@@ -567,30 +591,47 @@ export default function WorkingTimeCalendars({
                             errors={formErrors}
                         />
                     </DialogBody>
-
-                    <DialogFooter>
-                        <DialogAction
-                            onClick={handleUpdate}
-                            disabled={isSubmitting || !formCode || !formName}
-                        >
-                            {isSubmitting ? 'Menyimpan…' : 'Simpan perubahan'}
-                        </DialogAction>
-                        <DialogCancel onClick={() => setIsEditOpen(false)} />
-                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 
             <Dialog open={isCopyOpen} onOpenChange={setIsCopyOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Salin kalender kerja</DialogTitle>
-                        <DialogDescription>
+                <DialogContent
+                    title="Kalender kerja"
+                    recordTitle={
+                        [copyTargetCode, copyTargetName]
+                            .filter(Boolean)
+                            .join(' · ') || 'Salinan kalender'
+                    }
+                    editing
+                    busy={isSubmitting}
+                    description={
+                        <>
                             Salin kalender{' '}
                             <strong>{selectedCalendar?.code}</strong> beserta
                             seluruh hari kerja dan jam kerjanya ke kalender
                             baru.
-                        </DialogDescription>
-                    </DialogHeader>
+                        </>
+                    }
+                >
+                    <PageDialogToolbar>
+                        <DialogAction
+                            onClick={handleExecuteCopy}
+                            disabled={
+                                isSubmitting ||
+                                !copyTargetCode ||
+                                !copyTargetName
+                            }
+                        >
+                            {isSubmitting ? 'Menyalin…' : 'Salin kalender'}
+                        </DialogAction>
+                        <DialogClose asChild>
+                            <ActionButton
+                                action="cancel"
+                                onClick={() => setIsCopyOpen(false)}
+                                type="button"
+                            />
+                        </DialogClose>
+                    </PageDialogToolbar>
 
                     <DialogBody className="space-y-4 py-2">
                         <Field data-invalid={Boolean(formErrors.code)}>
@@ -624,20 +665,6 @@ export default function WorkingTimeCalendars({
                             )}
                         </Field>
                     </DialogBody>
-
-                    <DialogFooter>
-                        <DialogAction
-                            onClick={handleExecuteCopy}
-                            disabled={
-                                isSubmitting ||
-                                !copyTargetCode ||
-                                !copyTargetName
-                            }
-                        >
-                            {isSubmitting ? 'Menyalin…' : 'Salin kalender'}
-                        </DialogAction>
-                        <DialogCancel onClick={() => setIsCopyOpen(false)} />
-                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </>

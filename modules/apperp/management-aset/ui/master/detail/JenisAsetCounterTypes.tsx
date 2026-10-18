@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Button } from '@apperp/ui/button';
+import { ActionButton } from '@apperp/ui/action-button';
+
+import { DialogToolbar } from '@apperp/ui/dialog';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
 import { TransferList } from '@apperp/ui/transfer-list';
 import type { TransferListItem } from '@apperp/ui/transfer-list';
@@ -119,6 +121,17 @@ export default function JenisAsetCounterTypes({
 
     return (
         <div className="space-y-4">
+            {canEdit && (
+                <DialogToolbar className="px-0">
+                    <ActionButton
+                        action="save"
+                        type="button"
+                        disabled={saving}
+                        onClick={() => void save()}
+                        pending={saving}
+                    />
+                </DialogToolbar>
+            )}
             <p className="text-muted-foreground text-sm">
                 Pilih counter yang dibaca pada aset jenis ini. Counter yang
                 tidak dikaitkan ke jenis aset mana pun berlaku untuk semua jenis
@@ -138,15 +151,7 @@ export default function JenisAsetCounterTypes({
                 remainingEmptyLabel="Semua counter sudah terpilih."
                 selectedEmptyLabel="Belum ada counter yang dipilih."
             />
-            {canEdit && (
-                <Button
-                    type="button"
-                    disabled={saving}
-                    onClick={() => void save()}
-                >
-                    {saving ? 'Menyimpan…' : 'Simpan counter'}
-                </Button>
-            )}
+
             {saved && (
                 <p className="text-muted-foreground text-sm">
                     Counter jenis aset tersimpan.

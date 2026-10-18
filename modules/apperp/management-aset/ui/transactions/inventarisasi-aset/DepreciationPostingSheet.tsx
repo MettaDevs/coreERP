@@ -6,7 +6,9 @@ import type {
     PostingCheckLine,
     PostingCheckProblem,
 } from '@/components/finance/posting-check';
+import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
+import { DialogToolbar } from '@apperp/ui/dialog';
 import { Field, FieldDescription, FieldGroup } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
@@ -14,7 +16,6 @@ import {
     Sheet,
     SheetContent,
     SheetDescription,
-    SheetFooter,
     SheetHeader,
     SheetTitle,
 } from '@apperp/ui/sheet';
@@ -180,6 +181,33 @@ export function DepreciationPostingSheet({
                         akhir periode.
                     </SheetDescription>
                 </SheetHeader>
+                <DialogToolbar>
+                    <Button
+                        type="button"
+                        disabled={sibuk || !siapPost}
+                        onClick={() => void post()}
+                    >
+                        {sibuk ? 'Memproses…' : 'Siapkan jurnal'}
+                    </Button>
+                    <ActionButton
+                        action="cancel"
+                        type="button"
+                        onClick={onClose}
+                    />
+                    <Button
+                        type="button"
+                        variant="outline"
+                        disabled={
+                            sibuk ||
+                            !context.legal_entity_id ||
+                            !bukuId ||
+                            !akhir
+                        }
+                        onClick={() => void periksa()}
+                    >
+                        Periksa
+                    </Button>
+                </DialogToolbar>
                 <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-5">
                     {!context.legal_entity_id ? (
                         <p className="text-destructive text-sm">
@@ -296,31 +324,6 @@ export function DepreciationPostingSheet({
                         </div>
                     )}
                 </div>
-                <SheetFooter className="border-t px-6 py-4">
-                    <Button type="button" variant="outline" onClick={onClose}>
-                        Batal
-                    </Button>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        disabled={
-                            sibuk ||
-                            !context.legal_entity_id ||
-                            !bukuId ||
-                            !akhir
-                        }
-                        onClick={() => void periksa()}
-                    >
-                        Periksa
-                    </Button>
-                    <Button
-                        type="button"
-                        disabled={sibuk || !siapPost}
-                        onClick={() => void post()}
-                    >
-                        {sibuk ? 'Memproses…' : 'Siapkan jurnal'}
-                    </Button>
-                </SheetFooter>
             </SheetContent>
         </Sheet>
     );

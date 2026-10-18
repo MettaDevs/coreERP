@@ -1,16 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Button } from '@apperp/ui/button';
+import { ActionButton } from '@apperp/ui/action-button';
+import type { DataTableColumn } from '@apperp/ui/data-table';
+import { DataTable } from '@apperp/ui/data-table';
+
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
+
 import { api, errorMessage } from '../../api';
 
 type Value = {
@@ -90,9 +86,9 @@ export default function MaintenanceChecklistVariableValues({
                 <h3 className="font-semibold">Nilai checklist</h3>
                 {canEdit && (
                     <div className="flex gap-2">
-                        <Button
+                        <ActionButton
+                            action="add"
                             type="button"
-                            variant="outline"
                             onClick={() =>
                                 setValues((current) => [
                                     ...current,
@@ -103,16 +99,14 @@ export default function MaintenanceChecklistVariableValues({
                                     },
                                 ])
                             }
-                        >
-                            Tambah
-                        </Button>
-                        <Button
+                        />
+                        <ActionButton
+                            action="save"
                             type="button"
                             disabled={saving}
                             onClick={() => void save()}
-                        >
-                            {saving ? 'Menyimpan…' : 'Simpan'}
-                        </Button>
+                            pending={saving}
+                        />
                     </div>
                 )}
             </div>
@@ -123,86 +117,101 @@ export default function MaintenanceChecklistVariableValues({
                     </EmptyDescription>
                 </Empty>
             ) : (
-                <div className="overflow-x-auto rounded-md border">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Nomor baris</TableHead>
-                                <TableHead>Nilai</TableHead>
-                                <TableHead>Hasil</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {values.map((item, index) => (
-                                <TableRow
-                                    key={
-                                        item.id ??
-                                        `${item.line_number}-${index}`
-                                    }
-                                >
-                                    <TableCell>
-                                        {canEdit ? (
-                                            <Input
-                                                aria-label={`Nomor baris ${index + 1}`}
-                                                type="number"
-                                                min="1"
-                                                value={item.line_number}
-                                                onChange={(event) =>
-                                                    update(index, {
-                                                        line_number: Number(
-                                                            event.target.value,
-                                                        ),
-                                                    })
-                                                }
-                                            />
-                                        ) : (
-                                            item.line_number
-                                        )}
-                                    </TableCell>
-                                    <TableCell>
-                                        {canEdit ? (
-                                            <Input
-                                                aria-label={`Nilai baris ${index + 1}`}
-                                                value={item.value}
-                                                onChange={(event) =>
-                                                    update(index, {
-                                                        value: event.target
-                                                            .value,
-                                                    })
-                                                }
-                                            />
-                                        ) : (
-                                            item.value
-                                        )}
-                                    </TableCell>
-                                    <TableCell>
-                                        {canEdit ? (
-                                            <Select
-                                                items={[
-                                                    'Lulus',
-                                                    'Gagal',
-                                                    'Tidak dinilai',
-                                                ]}
-                                                value={labelHasil(
-                                                    item.result_code,
-                                                )}
-                                                ariaLabel={`Hasil baris ${index + 1}`}
-                                                onValueChange={(value) =>
-                                                    update(index, {
-                                                        result_code:
-                                                            kodeHasil(value),
-                                                    })
-                                                }
-                                            />
-                                        ) : (
-                                            labelHasil(item.result_code)
-                                        )}
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </div>
+                (() => {
+                    const sdkRows = values.map((item, index) => {
+                        return { item, index };
+                    });
+                    const sdkColumns: DataTableColumn<
+                        (typeof sdkRows)[number]
+                    >[] = [
+                        {
+                            id: 'column-0',
+                            header: 'Nomor baris',
+                            cell: ({ item, index }) => (
+                                <>
+                                    {canEdit ? (
+                                        <Input
+                                            aria-label={`Nomor baris ${index + 1}`}
+                                            type="number"
+                                            min="1"
+                                            value={item.line_number}
+                                            onChange={(event) =>
+                                                update(index, {
+                                                    line_number: Number(
+                                                        event.target.value,
+                                                    ),
+                                                })
+                                            }
+                                        />
+                                    ) : (
+                                        item.line_number
+                                    )}
+                                </>
+                            ),
+                        } satisfies DataTableColumn<(typeof sdkRows)[number]>,
+                        {
+                            id: 'column-1',
+                            header: 'Nilai',
+                            cell: ({ item, index }) => (
+                                <>
+                                    {canEdit ? (
+                                        <Input
+                                            aria-label={`Nilai baris ${index + 1}`}
+                                            value={item.value}
+                                            onChange={(event) =>
+                                                update(index, {
+                                                    value: event.target.value,
+                                                })
+                                            }
+                                        />
+                                    ) : (
+                                        item.value
+                                    )}
+                                </>
+                            ),
+                        } satisfies DataTableColumn<(typeof sdkRows)[number]>,
+                        {
+                            id: 'column-2',
+                            header: 'Hasil',
+                            cell: ({ item, index }) => (
+                                <>
+                                    {canEdit ? (
+                                        <Select
+                                            items={[
+                                                'Lulus',
+                                                'Gagal',
+                                                'Tidak dinilai',
+                                            ]}
+                                            value={labelHasil(item.result_code)}
+                                            ariaLabel={`Hasil baris ${index + 1}`}
+                                            onValueChange={(value) =>
+                                                update(index, {
+                                                    result_code:
+                                                        kodeHasil(value),
+                                                })
+                                            }
+                                        />
+                                    ) : (
+                                        labelHasil(item.result_code)
+                                    )}
+                                </>
+                            ),
+                        } satisfies DataTableColumn<(typeof sdkRows)[number]>,
+                    ];
+
+                    return (
+                        <DataTable
+                            scrollMode="inline"
+                            showRowNumbers={false}
+                            serverSort
+                            data={sdkRows}
+                            columns={sdkColumns}
+                            getRowKey={({ item, index }) =>
+                                item.id ?? `${item.line_number}-${index}`
+                            }
+                        />
+                    );
+                })()
             )}
             {saved && (
                 <p className="text-muted-foreground text-sm">

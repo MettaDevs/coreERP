@@ -5,7 +5,6 @@ import { Label } from '@apperp/ui/label';
 import { Spinner } from '@apperp/ui/spinner';
 import { Form, Head } from '@inertiajs/react';
 import { FieldError } from '@apperp/ui/field';
-import PasskeyVerify from '@/components/passkey-verify';
 import PasswordInput from '@/components/password-input';
 import TextLink from '@/components/text-link';
 /* @chisel-registration */
@@ -13,8 +12,6 @@ import { register } from '@/routes';
 /* @end-chisel-registration */
 import { store } from '@/routes/login';
 import { request } from '@/routes/password';
-/* @chisel-passkeys */
-/* @end-chisel-passkeys */
 
 type Props = {
     status?: string;
@@ -60,14 +57,6 @@ export default function Login({
                     </div>
                 </div>
             )}
-
-            {/* @chisel-passkeys */}
-            <PasskeyVerify
-                label="Masuk dengan passkey"
-                loadingLabel="Memverifikasi..."
-                separator="Atau gunakan email"
-            />
-            {/* @end-chisel-passkeys */}
 
             <Form
                 {...store.form()}

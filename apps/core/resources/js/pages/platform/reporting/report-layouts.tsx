@@ -27,23 +27,24 @@ import type {
     DataTableColumn,
     DataTableRowAction,
 } from '@apperp/ui/data-table';
+
 import { Field, FieldDescription, FieldLabel } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
-import { RadioGroup, RadioGroupItem } from '@apperp/ui/radio-group';
 import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetFooter,
-    SheetHeader,
-    SheetTitle,
-} from '@apperp/ui/sheet';
+    PageDialog,
+    PageDialogContent,
+    PageDialogToolbar,
+    PageDialogBody,
+} from '@apperp/ui/page-dialog';
+import { RadioGroup, RadioGroupItem } from '@apperp/ui/radio-group';
+import { RecordActionBar } from '@apperp/ui/record-action-bar';
+
 import { Textarea } from '@apperp/ui/textarea';
 import { Head } from '@inertiajs/react';
+import { Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import Heading from '@/components/heading';
 import { useDateTimeFormat } from '@/hooks/use-date-time';
 import { toastSaveError } from '@/lib/core-api';
 import type {
@@ -224,7 +225,8 @@ export default function ReportLayouts({
                 list.push({ id: 'replace', label: 'Ganti berkas' });
                 list.push({
                     id: 'delete',
-                    label: 'Hapus',
+                    label: 'Delete',
+                    icon: <Trash2 aria-hidden="true" />,
                     destructive: true,
                     separatorBefore: true,
                 });
@@ -330,21 +332,20 @@ export default function ReportLayouts({
         <>
             <Head title="Layout laporan" />
             <main className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 p-6">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                    <Heading
-                        title="Layout laporan"
-                        description="Tampilan dokumen cetak dan ekspor dari semua aplikasi, per laporan dan per perusahaan."
-                    />
+                <RecordActionBar>
+                    <h1 className="text-sm font-semibold">Layout laporan</h1>
+                    <CardDescription>
+                        Tampilan dokumen cetak dan ekspor dari semua aplikasi,
+                        per laporan dan per perusahaan.
+                    </CardDescription>
                     {canManage && code && (
                         <ActionButton
                             action="create"
                             type="button"
                             onClick={() => setUploading(true)}
-                        >
-                            Unggah layout
-                        </ActionButton>
+                        />
                     )}
-                </div>
+                </RecordActionBar>
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 {reports.length === 0 ? (
                     <Card>
@@ -552,17 +553,44 @@ function UploadSheet({
     };
 
     return (
-        <Sheet open onOpenChange={(open) => !open && onClose()}>
-            <SheetContent side="right" className="flex flex-col">
-                <SheetHeader>
-                    <SheetTitle>Unggah layout</SheetTitle>
-                    <SheetDescription>
-                        Berkas Word (.docx) atau Excel (.xlsx) tanpa makro,
-                        paling besar 5 MB. Placeholder yang tidak dikenal tidak
-                        ditolak, tetapi dicetak kosong.
-                    </SheetDescription>
-                </SheetHeader>
-                <div className="flex-1 space-y-4 overflow-y-auto px-4">
+        <PageDialog
+            open
+            onOpenChange={(open) => {
+                if (!open && !saving) {
+                    onClose();
+                }
+            }}
+        >
+            <PageDialogContent
+                onEscapeKeyDown={(event) => {
+                    if (saving) {
+                        event.preventDefault();
+                    }
+                }}
+                title="Layout laporan"
+                recordTitle={name.trim() || file?.name || 'Layout baru'}
+                editing
+                description={
+                    'Berkas Word (.docx) atau Excel (.xlsx) tanpa makro,\n                        paling besar 5 MB. Placeholder yang tidak dikenal tidak\n                        ditolak, tetapi dicetak kosong.'
+                }
+                busy={saving}
+            >
+                <PageDialogToolbar>
+                    <ActionButton
+                        action="save"
+                        pending={saving}
+                        type="button"
+                        disabled={saving || !name || !file}
+                        onClick={() => void save()}
+                    />
+                    <ActionButton
+                        action="cancel"
+                        type="button"
+                        disabled={saving}
+                        onClick={onClose}
+                    />
+                </PageDialogToolbar>
+                <PageDialogBody className="space-y-4">
                     <Field>
                         <FieldLabel htmlFor="layout-file">
                             Berkas layout
@@ -627,21 +655,9 @@ function UploadSheet({
                             tangan perusahaan tertentu.
                         </FieldDescription>
                     </Field>
-                </div>
-                <SheetFooter>
-                    <Button
-                        type="button"
-                        disabled={saving || !name || !file}
-                        onClick={() => void save()}
-                    >
-                        {saving ? 'Mengunggah…' : 'Simpan'}
-                    </Button>
-                    <Button type="button" variant="outline" onClick={onClose}>
-                        Batal
-                    </Button>
-                </SheetFooter>
-            </SheetContent>
-        </Sheet>
+                </PageDialogBody>
+            </PageDialogContent>
+        </PageDialog>
     );
 }
 

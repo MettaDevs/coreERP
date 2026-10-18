@@ -32,6 +32,7 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\BukuAset;
 use Modules\Apperp\ManagementAset\Services\AssetNumberSequenceIssuer;
+use Modules\Apperp\ManagementAset\Services\MasterDraftDetails;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
 use Modules\Apperp\ManagementAset\Support\MasterChild;
 use Modules\Apperp\ManagementAset\Support\MasterParent;
@@ -178,14 +179,20 @@ abstract class MasterDataController extends Controller
 
     public function store(Request $request, AssetNumberSequenceIssuer $numbers): JsonResponse
     {
+        return $this->storePayload($request, $numbers, $request->all(), (string) $request->header('Idempotency-Key'));
+    }
+
+    /** @param array<string, mixed> $input */
+    public function storePayload(Request $request, AssetNumberSequenceIssuer $numbers, array $input, string $creationKey): JsonResponse
+    {
         $this->requirePermission($request, 'create');
-        $creationKey = (string) $request->header('Idempotency-Key');
         // Core membatasi idempotency_key pada 160 karakter dan kunci yang dikirim ke sana
         // diawali slug resource. Slug terpanjang `item-checklist-maintenance` (26) plus ':'
         // menyisakan 133, jadi batas app harus 133 agar tidak pernah ditolak Core sebagai 503.
         validator(['key' => $creationKey], ['key' => ['required', 'string', 'max:133', 'regex:/^[A-Za-z0-9._:-]+$/']])->validate();
         $tenantId = $this->tenantId($request);
-        $data = $request->validate($this->writeRules($tenantId, creating: true));
+        $data = validator($input, $this->writeRules($tenantId, creating: true))->validate();
+        $details = $input['details'] ?? [];
         $payload = $this->payload($data);
         if (($manualValue = $this->trimmedOrNull($data['kode'] ?? null)) !== null) {
             $payload['kode'] = $manualValue;
@@ -205,7 +212,7 @@ abstract class MasterDataController extends Controller
             //
             // Sekarang keduanya berjalan pada koneksi yang sama, jadi keduanya batal bersama.
             // Ini keuntungan yang membenarkan seluruh pemindahan ke satu runtime.
-            $record = DB::transaction(function () use ($numbers, $tenantId, $creationKey, $payload) {
+            $record = DB::transaction(function () use ($request, $numbers, $tenantId, $creationKey, $payload, $details) {
                 $code = $numbers->issue(
                     static::APP_ID.'.'.$this->resource(),
                     $tenantId,
@@ -214,12 +221,15 @@ abstract class MasterDataController extends Controller
                 );
 
                 // Dibaca ulang supaya jawaban membawa versi awal yang diisi database.
-                return $this->newQuery()->create([
+                $record = $this->newQuery()->create([
                     'tenant_id' => $tenantId,
                     'creation_key' => $creationKey,
                     'kode' => $code,
                     ...$payload,
                 ])->refresh();
+                app(MasterDraftDetails::class)->save($request, $numbers, $this->resource(), $record, $details);
+
+                return $record->refresh();
             });
         } catch (NumberSequenceException $exception) {
             return response()->json(['error' => ['code' => $exception->errorCode, 'message' => $exception->getMessage()]], NumberSequenceException::HTTP_STATUS);

@@ -25,7 +25,12 @@ export default function ValueAdjustmentPage({
     const [pertama, kedua] = segments;
 
     if (!pertama) {
-        return <ValueAdjustmentListPage permissions={permissions} />;
+        return (
+            <ValueAdjustmentListPage
+                context={context}
+                permissions={permissions}
+            />
+        );
     }
 
     if (pertama === 'baru') {

@@ -1,19 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Button } from '@apperp/ui/button';
+import { ActionButton } from '@apperp/ui/action-button';
+
 import { Checkbox } from '@apperp/ui/checkbox';
+import { DataTable } from '@apperp/ui/data-table';
+import type { DataTableColumn } from '@apperp/ui/data-table';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
 import { Field, FieldError, FieldLabel } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
+import { TableCell, TableRow } from '@apperp/ui/table';
 import { Textarea } from '@apperp/ui/textarea';
 import { ApiError, api, errorMessage } from '../../api';
 import { useRecordOptions } from '../../use-record-list';
@@ -320,9 +316,9 @@ export default function MaintenanceChecklistTemplateLines({
                 <h3 className="font-semibold">Baris checklist maintenance</h3>
                 {canEdit && (
                     <div className="flex gap-2">
-                        <Button
+                        <ActionButton
+                            action="add"
                             type="button"
-                            variant="outline"
                             onClick={() => {
                                 setLines((current) => [
                                     ...current,
@@ -330,12 +326,10 @@ export default function MaintenanceChecklistTemplateLines({
                                 ]);
                                 check(lines.length, true);
                             }}
-                        >
-                            Tambah
-                        </Button>
-                        <Button
+                        />
+                        <ActionButton
+                            action="delete"
                             type="button"
-                            variant="outline"
                             disabled={checkedIndexes.length === 0}
                             onClick={() => {
                                 setLines((current) =>
@@ -347,16 +341,14 @@ export default function MaintenanceChecklistTemplateLines({
                                 setCheckedIndexes([]);
                                 setSelectedIndex(null);
                             }}
-                        >
-                            Hapus
-                        </Button>
-                        <Button
+                        />
+                        <ActionButton
+                            action="save"
                             type="button"
                             disabled={saving}
                             onClick={() => void save()}
-                        >
-                            {saving ? 'Menyimpan…' : 'Simpan'}
-                        </Button>
+                            pending={saving}
+                        />
                     </div>
                 )}
             </div>
@@ -367,14 +359,34 @@ export default function MaintenanceChecklistTemplateLines({
                     </EmptyDescription>
                 </Empty>
             ) : (
-                <div className="overflow-x-auto rounded-md border">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead
-                                    className="w-12 cursor-pointer"
-                                    onClick={() => checkAll(!allChecked)}
-                                >
+                (() => {
+                    const sdkRows = lines.map((item, index) => {
+                        const checked = checkedIndexes.includes(index);
+                        const active = selectedIndex === index;
+                        const rowError = lineErrors[index] ?? {};
+                        const nameError = rowError.nama;
+                        const referenceError =
+                            rowError.variable_id ?? rowError.nested_template_id;
+
+                        return {
+                            item,
+                            index,
+                            checked,
+                            active,
+                            rowError,
+                            nameError,
+                            referenceError,
+                        };
+                    });
+                    const sdkColumns: DataTableColumn<
+                        (typeof sdkRows)[number]
+                    >[] = [
+                        {
+                            id: 'column-0',
+                            header: '',
+                            width: 48,
+                            headerFilter: (
+                                <div onClick={() => checkAll(!allChecked)}>
                                     <Checkbox
                                         aria-label="Pilih semua baris"
                                         checked={
@@ -391,170 +403,226 @@ export default function MaintenanceChecklistTemplateLines({
                                             checkAll(value === true)
                                         }
                                     />
-                                </TableHead>
-                                <TableHead>Nomor baris</TableHead>
-                                <TableHead>Jenis</TableHead>
-                                <TableHead>ID</TableHead>
-                                <TableHead>Nama</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {lines.map((item, index) => {
-                                const checked = checkedIndexes.includes(index);
-                                const active = selectedIndex === index;
-                                const rowError = lineErrors[index] ?? {};
-                                const nameError = rowError.nama;
-                                const referenceError =
-                                    rowError.variable_id ??
-                                    rowError.nested_template_id;
+                                </div>
+                            ),
+                            cell: () => null,
+                        } satisfies DataTableColumn<(typeof sdkRows)[number]>,
+                        {
+                            id: 'column-1',
+                            header: 'Nomor baris',
+                            cell: () => null,
+                        } satisfies DataTableColumn<(typeof sdkRows)[number]>,
+                        {
+                            id: 'column-2',
+                            header: 'Jenis',
+                            cell: () => null,
+                        } satisfies DataTableColumn<(typeof sdkRows)[number]>,
+                        {
+                            id: 'column-3',
+                            header: 'ID',
+                            cell: () => null,
+                        } satisfies DataTableColumn<(typeof sdkRows)[number]>,
+                        {
+                            id: 'column-4',
+                            header: 'Nama',
+                            cell: () => null,
+                        } satisfies DataTableColumn<(typeof sdkRows)[number]>,
+                    ];
 
-                                return (
-                                    <TableRow
-                                        key={
-                                            item.id ??
-                                            `${item.line_number}-${index}`
-                                        }
-                                        className={`cursor-pointer${active ? 'bg-primary/20' : checked ? 'bg-primary/10' : ''}${Object.keys(rowError).length > 0 ? 'bg-destructive/5' : ''}`}
-                                        aria-selected={active}
-                                        aria-invalid={
-                                            Object.keys(rowError).length > 0 ||
-                                            undefined
-                                        }
-                                        tabIndex={0}
-                                        onClick={() => select(index)}
-                                        onKeyDown={(event) => {
-                                            // Spasi pada input, textarea, select, atau checkbox di dalam baris
-                                            // adalah input pengguna, bukan perintah untuk memilih baris. Handler
-                                            // baris hanya bekerja saat fokus keyboard benar-benar berada di baris.
-                                            if (
-                                                event.target !==
-                                                event.currentTarget
-                                            ) {
-                                                return;
-                                            }
+                    return (
+                        <DataTable
+                            scrollMode="inline"
+                            showRowNumbers={false}
+                            serverSort
+                            data={sdkRows}
+                            columns={sdkColumns}
+                            getRowKey={({ item, index }) =>
+                                item.id ?? `${item.line_number}-${index}`
+                            }
+                            renderRows={() => (
+                                <>
+                                    {lines.map((item, index) => {
+                                        const checked =
+                                            checkedIndexes.includes(index);
+                                        const active = selectedIndex === index;
+                                        const rowError =
+                                            lineErrors[index] ?? {};
+                                        const nameError = rowError.nama;
+                                        const referenceError =
+                                            rowError.variable_id ??
+                                            rowError.nested_template_id;
 
-                                            if (
-                                                event.key === 'Enter' ||
-                                                event.key === ' '
-                                            ) {
-                                                event.preventDefault();
-                                                select(index);
-                                            }
-                                        }}
-                                    >
-                                        <TableCell
-                                            className="cursor-pointer"
-                                            onClick={(event) => {
-                                                event.stopPropagation();
-                                                check(index, !checked);
-                                            }}
-                                        >
-                                            <Checkbox
-                                                aria-label={`Pilih baris ${index + 1}`}
-                                                checked={checked}
-                                                onClick={(event) =>
-                                                    event.stopPropagation()
+                                        return (
+                                            <TableRow
+                                                key={
+                                                    item.id ??
+                                                    `${item.line_number}-${index}`
                                                 }
-                                                onCheckedChange={(value) =>
-                                                    check(index, value === true)
+                                                className={`cursor-pointer${active ? 'bg-primary/20' : checked ? 'bg-primary/10' : ''}${Object.keys(rowError).length > 0 ? 'bg-destructive/5' : ''}`}
+                                                aria-selected={active}
+                                                aria-invalid={
+                                                    Object.keys(rowError)
+                                                        .length > 0 || undefined
                                                 }
-                                            />
-                                        </TableCell>
-                                        <TableCell>
-                                            {canEdit ? (
-                                                <Input
-                                                    aria-label={`Nomor baris ${index + 1}`}
-                                                    type="number"
-                                                    min="1"
-                                                    value={item.line_number}
-                                                    onChange={(event) =>
-                                                        update(index, {
-                                                            line_number: Number(
-                                                                event.target
-                                                                    .value,
-                                                            ),
-                                                        })
+                                                tabIndex={0}
+                                                onClick={() => select(index)}
+                                                onKeyDown={(event) => {
+                                                    // Spasi pada input, textarea, select, atau checkbox di dalam baris
+                                                    // adalah input pengguna, bukan perintah untuk memilih baris. Handler
+                                                    // baris hanya bekerja saat fokus keyboard benar-benar berada di baris.
+                                                    if (
+                                                        event.target !==
+                                                        event.currentTarget
+                                                    ) {
+                                                        return;
                                                     }
-                                                />
-                                            ) : (
-                                                item.line_number
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            {canEdit ? (
-                                                <Select
-                                                    items={types}
-                                                    value={typeLabel(item.type)}
-                                                    ariaLabel={`Jenis baris ${index + 1}`}
-                                                    onValueChange={(value) => {
-                                                        if (value) {
-                                                            changeType(
-                                                                index,
-                                                                typeCode(value),
-                                                            );
-                                                        }
+
+                                                    if (
+                                                        event.key === 'Enter' ||
+                                                        event.key === ' '
+                                                    ) {
+                                                        event.preventDefault();
+                                                        select(index);
+                                                    }
+                                                }}
+                                            >
+                                                <TableCell
+                                                    className="cursor-pointer"
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        check(index, !checked);
                                                     }}
-                                                />
-                                            ) : (
-                                                typeLabel(item.type)
-                                            )}
-                                        </TableCell>
-                                        <TableCell
-                                            className={
-                                                referenceError
-                                                    ? 'text-destructive'
-                                                    : undefined
-                                            }
-                                        >
-                                            {lineId(item)}
-                                            {referenceError && (
-                                                <FieldError>
-                                                    {referenceError}
-                                                </FieldError>
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            {canEdit ? (
-                                                <div className="space-y-1">
-                                                    <Input
-                                                        aria-label={`Nama baris ${index + 1}`}
-                                                        aria-invalid={
-                                                            nameError
-                                                                ? true
-                                                                : undefined
+                                                >
+                                                    <Checkbox
+                                                        aria-label={`Pilih baris ${index + 1}`}
+                                                        checked={checked}
+                                                        onClick={(event) =>
+                                                            event.stopPropagation()
                                                         }
-                                                        aria-describedby={
-                                                            nameError
-                                                                ? `line-${index}-nama-error`
-                                                                : undefined
-                                                        }
-                                                        value={item.nama}
-                                                        onChange={(event) =>
-                                                            update(index, {
-                                                                nama: event
-                                                                    .target
-                                                                    .value,
-                                                            })
+                                                        onCheckedChange={(
+                                                            value,
+                                                        ) =>
+                                                            check(
+                                                                index,
+                                                                value === true,
+                                                            )
                                                         }
                                                     />
-                                                    {nameError && (
-                                                        <FieldError
-                                                            id={`line-${index}-nama-error`}
-                                                        >
-                                                            {nameError}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {canEdit ? (
+                                                        <Input
+                                                            aria-label={`Nomor baris ${index + 1}`}
+                                                            type="number"
+                                                            min="1"
+                                                            value={
+                                                                item.line_number
+                                                            }
+                                                            onChange={(event) =>
+                                                                update(index, {
+                                                                    line_number:
+                                                                        Number(
+                                                                            event
+                                                                                .target
+                                                                                .value,
+                                                                        ),
+                                                                })
+                                                            }
+                                                        />
+                                                    ) : (
+                                                        item.line_number
+                                                    )}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {canEdit ? (
+                                                        <Select
+                                                            items={types}
+                                                            value={typeLabel(
+                                                                item.type,
+                                                            )}
+                                                            ariaLabel={`Jenis baris ${index + 1}`}
+                                                            onValueChange={(
+                                                                value,
+                                                            ) => {
+                                                                if (value) {
+                                                                    changeType(
+                                                                        index,
+                                                                        typeCode(
+                                                                            value,
+                                                                        ),
+                                                                    );
+                                                                }
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        typeLabel(item.type)
+                                                    )}
+                                                </TableCell>
+                                                <TableCell
+                                                    className={
+                                                        referenceError
+                                                            ? 'text-destructive'
+                                                            : undefined
+                                                    }
+                                                >
+                                                    {lineId(item)}
+                                                    {referenceError && (
+                                                        <FieldError>
+                                                            {referenceError}
                                                         </FieldError>
                                                     )}
-                                                </div>
-                                            ) : (
-                                                item.nama
-                                            )}
-                                        </TableCell>
-                                    </TableRow>
-                                );
-                            })}
-                        </TableBody>
-                    </Table>
-                </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {canEdit ? (
+                                                        <div className="space-y-1">
+                                                            <Input
+                                                                aria-label={`Nama baris ${index + 1}`}
+                                                                aria-invalid={
+                                                                    nameError
+                                                                        ? true
+                                                                        : undefined
+                                                                }
+                                                                aria-describedby={
+                                                                    nameError
+                                                                        ? `line-${index}-nama-error`
+                                                                        : undefined
+                                                                }
+                                                                value={
+                                                                    item.nama
+                                                                }
+                                                                onChange={(
+                                                                    event,
+                                                                ) =>
+                                                                    update(
+                                                                        index,
+                                                                        {
+                                                                            nama: event
+                                                                                .target
+                                                                                .value,
+                                                                        },
+                                                                    )
+                                                                }
+                                                            />
+                                                            {nameError && (
+                                                                <FieldError
+                                                                    id={`line-${index}-nama-error`}
+                                                                >
+                                                                    {nameError}
+                                                                </FieldError>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        item.nama
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </>
+                            )}
+                        />
+                    );
+                })()
             )}
             {selected && selectedIndex !== null && (
                 <LineDetails

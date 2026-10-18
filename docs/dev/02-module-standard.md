@@ -588,8 +588,8 @@ sejak kunjungan terakhir menurut Permenkes 24/2022, dan sebuah perintah hapus ya
 "tidak boleh dipakai untuk modul tertentu" cepat atau lambat akan dipakai untuk modul yang lupa
 menyatakan penguncinya. Perintah yang tidak ada tidak bisa salah dipakai.
 
-Di layar, tindakan ini bernama **Arsipkan**, bukan Hapus. Permission-nya tetap ber-`access: delete`
-karena itu memang hak yang diberikan.
+Di layar, tindakan ini bernama **Delete** dengan ikon tempat sampah, sesuai keputusan pemilik produk.
+Perilakunya tetap penghapusan lunak; label ini tidak mengizinkan penghapusan fisik. Permission-nya tetap ber-`access: delete`.
 
 #### Indeks unik pada kode bisnis wajib parsial
 
@@ -925,7 +925,23 @@ laporan (`timezone`), dan waktu di dataset dikirim dalam UTC bertipe `datetime`;
 
 ## Layout master–detail
 
-Entitas kompleks dengan banyak field, FastTab, rincian, atau relasi, seperti aset, memakai DataTable dan kartu popup SDK `PageDialog` untuk Tambah, Detail, dan Ubah. Daftar beserta filter, sort, dan posisi scroll dipertahankan di belakang kartu. Split view dipilih ketika pekerjaan memang membutuhkan konfigurasi/detail berdampingan, bukan semata karena record kompleks.
+### Bar perintah dan tipografi
+
+Header halaman mengikuti pola ringkas Business Central: judul bar 14 px semibold, teks operasional 14 px, dan judul FastTab 18 px semibold dengan padding rapat. Susun aksi halaman pada `RecordActionBar`, atau `CardAction` pada `CardHeader`; tombol Baru/Tambah berada di kiri. Status boleh berada di kanan. SDK menetapkan kepadatan tombol, termasuk target sentuh yang lebih besar untuk perangkat pointer kasar.
+
+Gunakan `ActionButton action="create"` untuk **Baru**, yaitu membuka kartu record baru; `action="add"` untuk **Tambah**, yaitu menambah baris rincian atau memasukkan record ke kelompok/dokumen. Baris penerimaan yang masih kosong tetap memakai Tambah. SDK menetapkan label, ikon, dan ukurannya.
+
+Simpan tetap eksplisit dan tersedia di kiri atas, diikuti Batal. Form kartu memakai `PageDialogToolbar` atau `DialogToolbar` sebelum body yang menggulir. Pertahankan kepemilikan form dan urutan DOM yang sama dengan urutan visual; memindahkan footer melalui CSS `order` atau portal dapat merusak urutan keyboard atau submit native. Pemilih dan dialog konfirmasi tetap mengikuti makna aksinya. Preferensi keluarga font pengguna tetap berlaku.
+
+`PageDialogContent` merender hierarki kartu SDK. Bar paling atas berisi Back dan nama fitur, diikuti ikon Ubah, Bagikan, Baru (+), Delete; sisi kanan memuat buka di tab baru, expand, dan Close. Setelah bar itu, tampil identitas record yang lebih besar, berupa kode/nomor dan nama. Navigasi utama, navigasi sekunder, dan isi berada di bawah identitas record. `title` wajib menamai fitur; `recordTitle` menamai record. Jangan mengganti salah satunya dengan yang lain atau menambahkan bar Back/judul fitur kedua di body. `mainNavigation` dan `secondaryNavigation` hanya menerima navigasi yang memang ada pada layar.
+
+Komponen anak yang memiliki state record memakai `usePageDialogRecord` untuk mendaftarkan identitas, status edit, handler Ubah/Delete, dan URL record tanpa memindahkan aturan bisnis ke SDK. Kirim `undefined` ketika form anak mengambil alih registrasi. Tombol Bagikan dan buka tab baru hanya aktif untuk URL record yang sudah didukung router. Izin dan konfirmasi penghapusan lunak tetap berlaku. Record tersimpan memakai `navigation` dan `useRecordNavigation` sesuai urutan daftar/filter/sort aktual, termasuk batch berikutnya. `busy` mengunci perpindahan selama penyimpanan; perubahan belum tersimpan dijaga pada Back, Baru, dan navigasi record. Simpan/Batal tetap eksplisit di kiri atas area perintah form.
+
+Alamat, kontak, dan rincian milik record baru dapat diisi sebelum induknya tersimpan. Simpan draft di klien, lalu kirim bersama induk dalam satu transaksi; kegagalan rincian membatalkan seluruh penyimpanan. Batal tidak membuat record atau mengambil nomor. Jangan meminta pengguna menyimpan dua kali, dan jangan membuat induk secara tersembunyi hanya untuk memperoleh ID. Pada organisasi, teks Identitas cetak mengikuti Simpan/Batal di atas dengan pemeriksaan versi identitas cetaknya sendiri.
+
+### Pemilihan layout
+
+Entitas kompleks dengan banyak field, FastTab, rincian, atau relasi, seperti aset, memakai DataTable dan kartu popup SDK `PageDialog` untuk Baru, Detail, dan Ubah. Daftar beserta filter, sort, dan posisi scroll dipertahankan di belakang kartu. Split view dipilih ketika pekerjaan memang membutuhkan konfigurasi/detail berdampingan, bukan semata karena record kompleks.
 
 Halaman record dengan daftar di kiri dan detail di kanan memakai `MasterDetailLayout` dari
 `@apperp/ui/master-detail-layout`. Berikan daftar lewat `list`, isi detail lewat `children`, dan

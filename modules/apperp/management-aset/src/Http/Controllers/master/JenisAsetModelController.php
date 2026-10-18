@@ -21,6 +21,12 @@ class JenisAsetModelController extends Controller
 {
     public function replace(Request $request, string $jenisAsetId): JsonResponse
     {
+        return $this->replacePayload($request, $jenisAsetId, $request->all());
+    }
+
+    /** @param array<string, mixed> $payload */
+    public function replacePayload(Request $request, string $jenisAsetId, array $payload, ?int $expectedVersion = null): JsonResponse
+    {
         $permissions = $request->attributes->get('coreerp.permissions', []);
         abort_unless(in_array('management-aset.jenis-aset.update', $permissions, true), 403);
         abort_unless(in_array('management-aset.model-aset.read', $permissions, true), 403);
@@ -28,7 +34,7 @@ class JenisAsetModelController extends Controller
         $tenantId = (string) $request->attributes->get('coreerp.tenant_id');
         abort_unless(JenisAset::query()->whereKey($jenisAsetId)->exists(), 404);
 
-        $data = $request->validate([
+        $data = validator($payload, [
             'model_ids' => ['present', 'array', 'max:100'],
             'model_ids.*' => [
                 'required', 'distinct', 'ulid',
@@ -36,9 +42,9 @@ class JenisAsetModelController extends Controller
                     ->where('tenant_id', $tenantId)
                     ->whereNull('deleted_at'),
             ],
-        ]);
+        ])->validate();
         $modelIds = array_values($data['model_ids']);
-        $expected = RowVersion::expected($request);
+        $expected = ($expectedVersion ?? RowVersion::expected($request));
 
         DB::transaction(function () use ($jenisAsetId, $modelIds, $expected): void {
             RowVersion::claim(JenisAset::query()->findOrFail($jenisAsetId), $expected);

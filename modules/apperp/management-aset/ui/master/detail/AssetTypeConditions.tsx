@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Button } from '@apperp/ui/button';
+import { ActionButton } from '@apperp/ui/action-button';
+
+import { DialogToolbar } from '@apperp/ui/dialog';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
 import { TransferList } from '@apperp/ui/transfer-list';
 import type { TransferListItem } from '@apperp/ui/transfer-list';
@@ -112,6 +114,17 @@ export default function AssetTypeConditions({
 
     return (
         <div className="space-y-4">
+            {canEdit && (
+                <DialogToolbar className="px-0">
+                    <ActionButton
+                        action="save"
+                        type="button"
+                        disabled={saving}
+                        onClick={() => void save()}
+                        pending={saving}
+                    />
+                </DialogToolbar>
+            )}
             <p className="text-muted-foreground text-sm">
                 Pilih kondisi yang boleh dipakai pada aset jenis ini. Jika belum
                 ada yang dipilih, semua kondisi aktif dapat dipakai.
@@ -130,15 +143,7 @@ export default function AssetTypeConditions({
                 remainingEmptyLabel="Semua kondisi sudah terpilih."
                 selectedEmptyLabel="Belum ada kondisi yang dipilih."
             />
-            {canEdit && (
-                <Button
-                    type="button"
-                    disabled={saving}
-                    onClick={() => void save()}
-                >
-                    {saving ? 'Menyimpan…' : 'Simpan kondisi'}
-                </Button>
-            )}
+
             {saved && (
                 <p className="text-muted-foreground text-sm">
                     Kondisi jenis aset tersimpan.

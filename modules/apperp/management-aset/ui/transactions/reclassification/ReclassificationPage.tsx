@@ -25,7 +25,12 @@ export default function ReclassificationPage({
     const [pertama, kedua] = segments;
 
     if (!pertama) {
-        return <ReclassificationListPage permissions={permissions} />;
+        return (
+            <ReclassificationListPage
+                context={context}
+                permissions={permissions}
+            />
+        );
     }
 
     if (pertama === 'baru') {

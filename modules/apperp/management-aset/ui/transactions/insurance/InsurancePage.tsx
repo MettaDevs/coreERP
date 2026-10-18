@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useToday } from '@/hooks/use-work-date';
+import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
-import { Button } from '@apperp/ui/button';
+
 import { Checkbox } from '@apperp/ui/checkbox';
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
 import {
+    DialogClose,
     Dialog,
-    DialogAction,
     DialogBody,
-    DialogCancel,
     DialogContent,
     DialogFooter,
     DialogHeader,
@@ -24,10 +24,18 @@ import {
 } from '@apperp/ui/empty';
 import { Field, FieldDescription } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
+import {
+    PageDialog,
+    PageDialogContent,
+    PageDialogToolbar,
+    PageDialogBody,
+    PageDialogClose,
+} from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@apperp/ui/tabs';
 import { Textarea } from '@apperp/ui/textarea';
+import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
 import { day, money } from '../../_shared/format';
 import type { Vendor } from '../../_shared/useVendors';
 import { useVendors } from '../../_shared/useVendors';
@@ -40,6 +48,9 @@ import {
 } from '../../api';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import { useRecordList } from '../../use-record-list';
+import { RecordCardHeader, recordQueryUrl } from '../_shared/record-card';
+import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
+import { useRecordQueryTarget } from '../_shared/use-record-query-target';
 import type { Coverage, Policy } from './insurance';
 import InsuranceSummary from './InsuranceSummary';
 
@@ -114,6 +125,7 @@ export default function InsurancePage({
     const [action, setAction] = useState<CoverageAction | null>(null);
     const [errors, setErrors] = useState<Record<string, string[]>>({});
     const [busy, setBusy] = useState(false);
+    const [policyDirty, setPolicyDirty] = useState(false);
     const assetSource = useMasterOptions('aset');
     const assets = assetSource.options;
     const types = useMasterOptions('jenis-asuransi');
@@ -154,6 +166,10 @@ export default function InsurancePage({
         };
     }, [openId]);
 
+    const clearRecordTarget = useRecordQueryTarget({
+        scopeKey: 'polis-asuransi',
+        onOpen: (id) => setOpenId(id),
+    });
     const shown = opened && opened.id === openId ? opened : null;
 
     function startEdit(policy: Policy | null) {
@@ -239,16 +255,21 @@ export default function InsurancePage({
     }
 
     async function archivePolicy(policy: Policy) {
+        setBusy(true);
+
         try {
             await api(`/polis-asuransi/${policy.id}`, {
                 method: 'DELETE',
                 body: JSON.stringify({ version: policy.version }),
             });
             toast.success('Polis diarsipkan.');
+            clearRecordTarget();
             setOpenId(null);
             refresh();
         } catch (caught) {
             toastSaveError(caught, 'Polis belum dapat diarsipkan.');
+        } finally {
+            setBusy(false);
         }
     }
 
@@ -447,28 +468,69 @@ export default function InsurancePage({
         editing &&
         setEditing({ ...editing, draft: { ...editing.draft, ...change } });
 
+    const discardPolicy = () =>
+        !policyDirty || window.confirm('Buang perubahan yang belum disimpan?');
+    const newPolicy = () => {
+        if (!busy && discardPolicy()) {
+            clearRecordTarget();
+            startEdit(null);
+        }
+    };
+    const closePolicyEdit = () => {
+        if (!busy && discardPolicy()) {
+            clearRecordTarget();
+            setEditing(null);
+        }
+    };
+    useRecordCardDirty({
+        value: editing?.draft,
+        ready: editing !== null,
+        scopeKey: editing?.id ?? 'new',
+        onDirtyChange: setPolicyDirty,
+    });
+    const policyNavigation = useRecordNavigation({
+        items: list.items,
+        currentId: openId,
+        getId: (item) => item.id,
+        onNavigate: setOpenId,
+        scopeKey: JSON.stringify([reload, list.sort]),
+        hasMore: list.hasMore,
+        loading: list.loading,
+        loadMore: list.loadMore,
+        disabled: busy || policyDirty,
+    });
+    const editNavigation = useRecordNavigation({
+        items: list.items,
+        currentId: editing?.id ?? null,
+        getId: (item) => item.id,
+        onNavigate: (id) => {
+            setEditing(null);
+            setOpenId(id);
+        },
+        scopeKey: JSON.stringify([reload, list.sort]),
+        hasMore: list.hasMore,
+        loading: list.loading,
+        loadMore: list.loadMore,
+        disabled: busy || policyDirty,
+    });
+
     return (
         <Tabs defaultValue="polis">
-            <RecordActionBar
-                title="Asuransi aset"
-                trailing={
-                    <TabsList>
-                        <TabsTrigger value="polis">Polis</TabsTrigger>
-                        <TabsTrigger value="ringkasan">
-                            Belum dan kurang diasuransikan
-                        </TabsTrigger>
-                    </TabsList>
-                }
-            >
+            <RecordActionBar title="Asuransi aset">
                 {canCreate && (
-                    <Button
+                    <ActionButton
+                        action="create"
                         type="button"
                         disabled={!context.legal_entity_id}
                         onClick={() => startEdit(null)}
-                    >
-                        Polis baru
-                    </Button>
+                    />
                 )}
+                <TabsList>
+                    <TabsTrigger value="polis">Polis</TabsTrigger>
+                    <TabsTrigger value="ringkasan">
+                        Belum dan kurang diasuransikan
+                    </TabsTrigger>
+                </TabsList>
             </RecordActionBar>
 
             <TabsContent value="polis">
@@ -501,18 +563,48 @@ export default function InsurancePage({
                 <InsuranceSummary />
             </TabsContent>
 
-            <Dialog
+            <PageDialog
                 open={openId !== null}
-                onOpenChange={(open) => !open && setOpenId(null)}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        clearRecordTarget();
+                        setOpenId(null);
+                    }
+                }}
             >
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>
-                            {shown ? `${shown.kode} · ${shown.nama}` : 'Polis'}
-                        </DialogTitle>
-                    </DialogHeader>
+                <PageDialogContent
+                    title={'Asuransi aset'}
+                    busy={busy}
+                    onNew={
+                        canCreate && context.legal_entity_id
+                            ? newPolicy
+                            : undefined
+                    }
+                    navigation={policyNavigation}
+                >
+                    <RecordCardHeader
+                        recordTitle={
+                            shown ? shown.kode + ' · ' + shown.nama : undefined
+                        }
+                        recordUrl={
+                            shown
+                                ? recordQueryUrl('asuransi-aset', shown.id)
+                                : undefined
+                        }
+                        onEdit={
+                            shown && canUpdate
+                                ? () => startEdit(shown)
+                                : undefined
+                        }
+                        onDelete={
+                            shown && canArchive
+                                ? () => void archivePolicy(shown)
+                                : undefined
+                        }
+                    />
+
                     {shown && (
-                        <DialogBody className="space-y-4">
+                        <PageDialogBody className="space-y-4">
                             <dl className="grid gap-3 sm:grid-cols-3">
                                 {[
                                     ['Nomor polis', shown.nomor_polis],
@@ -560,13 +652,13 @@ export default function InsurancePage({
                                 <p className="text-sm">{shown.keterangan}</p>
                             )}
                             <div className="flex flex-wrap items-center gap-2">
-                                <span className="mr-auto font-medium">
+                                <span className="font-medium">
                                     Aset yang ditanggung
                                 </span>
                                 {canUpdate && !shown.diblokir && (
-                                    <Button
+                                    <ActionButton
+                                        action="add"
                                         type="button"
-                                        size="sm"
                                         onClick={() => {
                                             setErrors({});
                                             setAction({
@@ -582,9 +674,7 @@ export default function InsurancePage({
                                                 keterangan: '',
                                             });
                                         }}
-                                    >
-                                        Tambah aset
-                                    </Button>
+                                    />
                                 )}
                             </div>
                             {(shown.pertanggungan ?? []).length === 0 ? (
@@ -610,7 +700,7 @@ export default function InsurancePage({
                                                   },
                                                   {
                                                       id: 'arsip',
-                                                      label: 'Arsipkan (salah catat)',
+                                                      label: 'Delete',
                                                       destructive: true,
                                                   },
                                               ]
@@ -640,44 +730,72 @@ export default function InsurancePage({
                                     }}
                                 />
                             )}
-                        </DialogBody>
+                        </PageDialogBody>
                     )}
-                    <DialogFooter>
-                        {shown && canUpdate && (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => startEdit(shown)}
-                            >
-                                Ubah polis
-                            </Button>
-                        )}
-                        {shown && canArchive && (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => void archivePolicy(shown)}
-                            >
-                                Arsipkan
-                            </Button>
-                        )}
-                        <DialogCancel type="button">Tutup</DialogCancel>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                </PageDialogContent>
+            </PageDialog>
 
-            <Dialog
+            <PageDialog
                 open={editing !== null}
-                onOpenChange={(open) => !open && setEditing(null)}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        closePolicyEdit();
+                    }
+                }}
             >
-                <DialogContent size="compact" ref={editRef}>
-                    <DialogHeader>
-                        <DialogTitle>
-                            {editing?.id ? 'Ubah polis' : 'Polis baru'}
-                        </DialogTitle>
-                    </DialogHeader>
+                <PageDialogContent
+                    ref={editRef}
+                    title={'Asuransi aset'}
+                    busy={busy}
+                    onNew={
+                        editing?.id && canCreate && context.legal_entity_id
+                            ? newPolicy
+                            : undefined
+                    }
+                    navigation={editing?.id ? editNavigation : undefined}
+                >
+                    <RecordCardHeader
+                        recordTitle={
+                            editing?.id
+                                ? [
+                                      (shown?.id === editing.id
+                                          ? shown
+                                          : policies.find(
+                                                (p) => p.id === editing.id,
+                                            )
+                                      )?.kode,
+                                      editing.draft.nama,
+                                  ]
+                                      .filter(Boolean)
+                                      .join(' · ')
+                                : editing?.draft.nama || 'Baru'
+                        }
+                        editing
+                        recordUrl={
+                            editing?.id
+                                ? recordQueryUrl('asuransi-aset', editing.id)
+                                : undefined
+                        }
+                    />
+                    <PageDialogToolbar>
+                        <ActionButton
+                            action="save"
+                            type="button"
+                            disabled={
+                                busy ||
+                                !editing?.draft.nama ||
+                                !editing?.draft.nomor_polis ||
+                                !editing?.draft.berlaku_mulai
+                            }
+                            onClick={() => void savePolicy()}
+                            pending={busy}
+                        />
+                        <PageDialogClose asChild>
+                            <ActionButton action="cancel" type="button" />
+                        </PageDialogClose>
+                    </PageDialogToolbar>
                     {editing && (
-                        <DialogBody className="space-y-4">
+                        <PageDialogBody className="space-y-4">
                             <Input
                                 label="Nama polis"
                                 required
@@ -830,25 +948,10 @@ export default function InsurancePage({
                                     setDraft({ keterangan: event.target.value })
                                 }
                             />
-                        </DialogBody>
+                        </PageDialogBody>
                     )}
-                    <DialogFooter>
-                        <DialogAction
-                            type="button"
-                            disabled={
-                                busy ||
-                                !editing?.draft.nama ||
-                                !editing?.draft.nomor_polis ||
-                                !editing?.draft.berlaku_mulai
-                            }
-                            onClick={() => void savePolicy()}
-                        >
-                            {busy ? 'Menyimpan…' : 'Simpan'}
-                        </DialogAction>
-                        <DialogCancel type="button">Batal</DialogCancel>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                </PageDialogContent>
+            </PageDialog>
 
             <Dialog
                 open={action !== null}
@@ -998,7 +1101,8 @@ export default function InsurancePage({
                         </DialogBody>
                     )}
                     <DialogFooter>
-                        <DialogAction
+                        <ActionButton
+                            action="save"
                             type="button"
                             disabled={
                                 busy ||
@@ -1009,10 +1113,11 @@ export default function InsurancePage({
                                 (action?.kind === 'akhiri' && !action.sampai)
                             }
                             onClick={() => void runAction()}
-                        >
-                            {busy ? 'Menyimpan…' : 'Simpan'}
-                        </DialogAction>
-                        <DialogCancel type="button">Batal</DialogCancel>
+                            pending={busy}
+                        />
+                        <DialogClose asChild>
+                            <ActionButton action="cancel" type="button" />
+                        </DialogClose>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

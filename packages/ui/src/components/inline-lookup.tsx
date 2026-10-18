@@ -339,15 +339,12 @@ export function InlineLookup<T>({
                                     {onCreate && (
                                         <ActionButton
                                             action="create"
-                                            size="sm"
                                             onClick={() => {
                                                 closeForAction();
                                                 data.invalidate();
                                                 onCreate();
                                             }}
-                                        >
-                                            Baru
-                                        </ActionButton>
+                                        />
                                     )}
                                     <div className="ml-auto flex flex-wrap gap-1">
                                         {showDetails && (

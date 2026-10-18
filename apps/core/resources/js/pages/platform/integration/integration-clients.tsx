@@ -54,12 +54,12 @@ import {
 import { Input } from '@apperp/ui/input';
 import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
 import {
-    Sheet,
-    SheetContent,
-    SheetFooter,
-    SheetHeader,
-    SheetTitle,
-} from '@apperp/ui/sheet';
+    PageDialog,
+    PageDialogContent,
+    PageDialogToolbar,
+    PageDialogBody,
+} from '@apperp/ui/page-dialog';
+
 import {
     Table,
     TableBody,
@@ -223,16 +223,41 @@ function ClientSheet({
     };
 
     return (
-        <Sheet open onOpenChange={(open) => !open && onClose()}>
-            <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-xl">
-                <SheetHeader className="border-b px-6 py-5 pr-12">
-                    <SheetTitle>
-                        {client
-                            ? 'Ubah klien integrasi'
-                            : 'Klien integrasi baru'}
-                    </SheetTitle>
-                </SheetHeader>
-                <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+        <PageDialog
+            open
+            onOpenChange={(open) => {
+                if (!open && !saving) {
+                    onClose();
+                }
+            }}
+        >
+            <PageDialogContent
+                onEscapeKeyDown={(event) => {
+                    if (saving) {
+                        event.preventDefault();
+                    }
+                }}
+                title="Klien integrasi"
+                recordTitle={form.name.trim() || client?.name || 'Klien baru'}
+                editing
+                busy={saving}
+            >
+                <PageDialogToolbar>
+                    <ActionButton
+                        action="save"
+                        type="button"
+                        disabled={saving}
+                        onClick={save}
+                        pending={saving}
+                    />
+                    <ActionButton
+                        action="cancel"
+                        type="button"
+                        disabled={saving}
+                        onClick={onClose}
+                    />
+                </PageDialogToolbar>
+                <PageDialogBody>
                     <FieldGroup>
                         <Field data-invalid={Boolean(error('name'))}>
                             <Input
@@ -358,17 +383,9 @@ function ClientSheet({
                             <FieldError>{error('allowed_ips')}</FieldError>
                         </Field>
                     </FieldGroup>
-                </div>
-                <SheetFooter className="border-t px-6 py-4 sm:flex-row sm:justify-end">
-                    <Button variant="outline" type="button" onClick={onClose}>
-                        Batal
-                    </Button>
-                    <Button type="button" disabled={saving} onClick={save}>
-                        {saving ? 'Menyimpan…' : 'Simpan'}
-                    </Button>
-                </SheetFooter>
-            </SheetContent>
-        </Sheet>
+                </PageDialogBody>
+            </PageDialogContent>
+        </PageDialog>
     );
 }
 
@@ -406,7 +423,14 @@ function SecretsDialog({
     onClose: () => void;
 }) {
     return (
-        <Dialog open onOpenChange={(open) => !open && onClose()}>
+        <Dialog
+            open
+            onOpenChange={(open) => {
+                if (!open) {
+                    onClose();
+                }
+            }}
+        >
             <DialogContent size="wide">
                 <DialogHeader>
                     <DialogTitle>{secrets.title}</DialogTitle>
@@ -542,11 +566,8 @@ export default function IntegrationClients({
                             <CardAction>
                                 <ActionButton
                                     action="create"
-                                    size="sm"
                                     onClick={() => setEditing('new')}
-                                >
-                                    Tambah klien
-                                </ActionButton>
+                                />
                             </CardAction>
                         )}
                     </CardHeader>

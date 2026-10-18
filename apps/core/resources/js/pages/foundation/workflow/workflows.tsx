@@ -1,3 +1,4 @@
+import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import {
@@ -10,17 +11,22 @@ import {
 import { Field, FieldError } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { NativeSelect } from '@apperp/ui/native-select';
+import {
+    PageDialog,
+    PageDialogContent,
+    PageDialogToolbar,
+    PageDialogBody,
+} from '@apperp/ui/page-dialog';
+import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Switch } from '@apperp/ui/switch';
 import { Head, Link, useForm } from '@inertiajs/react';
 import {
     Check,
     GitBranch,
-    Plus,
     Power,
-    ShieldCheck,
     Workflow as WorkflowIcon,
 } from 'lucide-react';
-import Heading from '@/components/heading';
+import { useState } from 'react';
 
 type WorkflowType = {
     id: string;
@@ -65,6 +71,7 @@ export default function Workflows({
     legalEntities,
     workflows,
 }: Props) {
+    const [createOpen, setCreateOpen] = useState(false);
     const createForm = useForm({
         workflow_type_id: workflowTypes[0]?.id ?? '',
         name: '',
@@ -85,145 +92,59 @@ export default function Workflows({
         <>
             <Head title="Workflow" />
             <main className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 p-6">
-                <Heading
-                    title="Workflow"
-                    description="Susun langkah kerja aplikasi, mulai dari tugas, persetujuan, keputusan kondisi, sampai selesai."
-                />
+                <RecordActionBar title="Workflow">
+                    {canManage && (
+                        <ActionButton
+                            action="create"
+                            type="button"
+                            disabled={workflowTypes.length === 0}
+                            onClick={() => setCreateOpen(true)}
+                        />
+                    )}
+                </RecordActionBar>
 
-                {/* Card Form Buat Workflow (Sesuai Tampilan Awal) */}
-                <Card className="overflow-hidden shadow-xs">
-                    <CardHeader className="border-b border-border bg-card/50 px-6 py-4">
-                        <div className="flex items-center gap-3">
-                            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                                <Plus className="size-15" />
-                            </div>
-                            <div className="flex flex-row items-center gap-3">
-                                <CardTitle className="text-base font-bold text-foreground">
-                                    Buat Workflow Baru
-                                </CardTitle>
-                                <CardDescription className="mt-0.5 text-xs text-muted-foreground">
-                                    Workflow baru dimulai sebagai draf. Setelah
-                                    disimpan, susun alurnya di canvas.
-                                </CardDescription>
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                        {workflowTypes.length === 0 ? (
-                            <p className="text-xs text-muted-foreground italic">
-                                Belum ada proses workflow dari aplikasi yang
-                                terdaftar.
-                            </p>
-                        ) : (
+                {createOpen && (
+                    <PageDialog
+                        open
+                        onOpenChange={(open) => {
+                            if (!open && !createForm.processing) {
+                                setCreateOpen(false);
+                            }
+                        }}
+                    >
+                        <PageDialogContent
+                            onEscapeKeyDown={(event) => {
+                                if (createForm.processing) {
+                                    event.preventDefault();
+                                }
+                            }}
+                            title="Workflow"
+                            recordTitle={
+                                createForm.data.name.trim() || 'Workflow baru'
+                            }
+                            editing
+                            busy={createForm.processing}
+                            description={
+                                'Workflow baru dimulai sebagai draf. Setelah\n                                    disimpan, susun alurnya di canvas.'
+                            }
+                        >
                             <form
-                                className="grid gap-4 md:grid-cols-2"
+                                className="flex min-h-0 flex-1 flex-col"
                                 onSubmit={(event) => {
                                     event.preventDefault();
                                     createForm.post('/settings/workflows', {
-                                        onSuccess: () =>
-                                            createForm.reset('name'),
+                                        onSuccess: () => {
+                                            createForm.reset('name');
+                                            setCreateOpen(false);
+                                        },
                                     });
                                 }}
                             >
-                                <Field>
-                                    <NativeSelect
-                                        label="Proses Aplikasi"
-                                        value={createForm.data.workflow_type_id}
-                                        disabled={!canManage}
-                                        onChange={(event) =>
-                                            createForm.setData(
-                                                'workflow_type_id',
-                                                event.target.value,
-                                            )
-                                        }
-                                    >
-                                        {workflowTypes.map((type) => (
-                                            <option
-                                                key={type.id}
-                                                value={type.id}
-                                            >
-                                                {type.app_name} — {type.name}
-                                            </option>
-                                        ))}
-                                    </NativeSelect>
-                                    <FieldError>
-                                        {createForm.errors.workflow_type_id}
-                                    </FieldError>
-                                </Field>
-
-                                <Field>
-                                    <Input
-                                        label="Nama Workflow"
-                                        value={createForm.data.name}
-                                        disabled={!canManage}
-                                        onChange={(event) =>
-                                            createForm.setData(
-                                                'name',
-                                                event.target.value,
-                                            )
-                                        }
-                                        placeholder="Alur pemeriksaan usulan aset"
-                                    />
-                                    <FieldError>
-                                        {createForm.errors.name}
-                                    </FieldError>
-                                </Field>
-
-                                {needsLegalEntity && (
-                                    <Field className="md:col-span-2">
-                                        <div className="grid gap-4 md:grid-cols-2">
-                                            <div>
-                                                <NativeSelect
-                                                    label="Perusahaan"
-                                                    value={
-                                                        createForm.data
-                                                            .legal_entity_id
-                                                    }
-                                                    disabled={!canManage}
-                                                    onChange={(event) =>
-                                                        createForm.setData(
-                                                            'legal_entity_id',
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                >
-                                                    <option value="">
-                                                        Pilih perusahaan
-                                                    </option>
-                                                    {legalEntities.map(
-                                                        (entity) => (
-                                                            <option
-                                                                key={entity.id}
-                                                                value={
-                                                                    entity.id
-                                                                }
-                                                            >
-                                                                {entity.name}
-                                                            </option>
-                                                        ),
-                                                    )}
-                                                </NativeSelect>
-                                                <FieldError>
-                                                    {
-                                                        createForm.errors
-                                                            .legal_entity_id
-                                                    }
-                                                </FieldError>
-                                            </div>
-                                        </div>
-                                    </Field>
-                                )}
-
-                                <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border/40 pt-2 md:col-span-2">
-                                    <p className="text-xs text-muted-foreground">
-                                        {needsLegalEntity
-                                            ? 'Semua dokumen proses ini akan mengikuti perusahaan yang dipilih.'
-                                            : 'Workflow ini berlaku untuk seluruh bisnis (scope tenant).'}
-                                    </p>
-                                    <Button
+                                <PageDialogToolbar>
+                                    <ActionButton
+                                        action="save"
+                                        pending={createForm.processing}
                                         type="submit"
-                                        variant="default"
-                                        size="sm"
                                         disabled={
                                             !canManage ||
                                             createForm.processing ||
@@ -234,25 +155,137 @@ export default function Workflows({
                                                     .legal_entity_id === '')
                                         }
                                         className="shrink-0 px-5 text-xs font-medium shadow-xs"
-                                    >
-                                        <Plus className="mr-1.5 size-3.5" />{' '}
-                                        Buat Workflow
-                                    </Button>
-                                </div>
+                                    />
+                                    <ActionButton
+                                        action="cancel"
+                                        type="button"
+                                        disabled={createForm.processing}
+                                        onClick={() => setCreateOpen(false)}
+                                    />
+                                </PageDialogToolbar>
+                                <PageDialogBody>
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        <Field>
+                                            <NativeSelect
+                                                label="Proses Aplikasi"
+                                                value={
+                                                    createForm.data
+                                                        .workflow_type_id
+                                                }
+                                                disabled={!canManage}
+                                                onChange={(event) =>
+                                                    createForm.setData(
+                                                        'workflow_type_id',
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            >
+                                                {workflowTypes.map((type) => (
+                                                    <option
+                                                        key={type.id}
+                                                        value={type.id}
+                                                    >
+                                                        {type.app_name} —{' '}
+                                                        {type.name}
+                                                    </option>
+                                                ))}
+                                            </NativeSelect>
+                                            <FieldError>
+                                                {
+                                                    createForm.errors
+                                                        .workflow_type_id
+                                                }
+                                            </FieldError>
+                                        </Field>
+                                        <Field>
+                                            <Input
+                                                label="Nama Workflow"
+                                                value={createForm.data.name}
+                                                disabled={!canManage}
+                                                onChange={(event) =>
+                                                    createForm.setData(
+                                                        'name',
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                placeholder="Alur pemeriksaan usulan aset"
+                                            />
+                                            <FieldError>
+                                                {createForm.errors.name}
+                                            </FieldError>
+                                        </Field>
+                                        {needsLegalEntity && (
+                                            <Field className="md:col-span-2">
+                                                <div className="grid gap-4 md:grid-cols-2">
+                                                    <div>
+                                                        <NativeSelect
+                                                            label="Perusahaan"
+                                                            value={
+                                                                createForm.data
+                                                                    .legal_entity_id
+                                                            }
+                                                            disabled={
+                                                                !canManage
+                                                            }
+                                                            onChange={(event) =>
+                                                                createForm.setData(
+                                                                    'legal_entity_id',
+                                                                    event.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                        >
+                                                            <option value="">
+                                                                Pilih perusahaan
+                                                            </option>
+                                                            {legalEntities.map(
+                                                                (entity) => (
+                                                                    <option
+                                                                        key={
+                                                                            entity.id
+                                                                        }
+                                                                        value={
+                                                                            entity.id
+                                                                        }
+                                                                    >
+                                                                        {
+                                                                            entity.name
+                                                                        }
+                                                                    </option>
+                                                                ),
+                                                            )}
+                                                        </NativeSelect>
+                                                        <FieldError>
+                                                            {
+                                                                createForm
+                                                                    .errors
+                                                                    .legal_entity_id
+                                                            }
+                                                        </FieldError>
+                                                    </div>
+                                                </div>
+                                            </Field>
+                                        )}
+                                        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border/40 pt-2 md:col-span-2">
+                                            <p className="text-xs text-muted-foreground">
+                                                {needsLegalEntity
+                                                    ? 'Semua dokumen proses ini akan mengikuti perusahaan yang dipilih.'
+                                                    : 'Workflow ini berlaku untuk seluruh bisnis (scope tenant).'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </PageDialogBody>
                             </form>
-                        )}
-                    </CardContent>
-                </Card>
+                        </PageDialogContent>
+                    </PageDialog>
+                )}
 
                 {parameters.length > 0 && (
                     <Card className="overflow-hidden shadow-xs">
-                        <CardHeader className="border-b border-border bg-card/50 px-6 py-4">
+                        <CardHeader className="border-b border-border bg-card/50">
                             <div className="flex items-center gap-3">
-                                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                                    <ShieldCheck className="size-5" />
-                                </div>
                                 <div className="flex flex-row items-center gap-3">
-                                    <CardTitle className="text-base font-bold text-foreground">
+                                    <CardTitle className="text-foreground">
                                         Parameter Workflow
                                     </CardTitle>
                                     <CardDescription className="mt-0.5 text-xs text-muted-foreground">
@@ -303,10 +336,10 @@ export default function Workflows({
 
                 {/* Card Daftar Workflow (Desain Modern yang Disukai) */}
                 <Card className="overflow-hidden shadow-xs">
-                    <CardHeader className="border-b border-border bg-card/50 px-6 py-4">
+                    <CardHeader className="border-b border-border bg-card/50">
                         <div className="flex items-center justify-between gap-4">
                             <div className="flex flex-row items-center gap-3">
-                                <CardTitle className="text-base font-bold whitespace-nowrap text-foreground">
+                                <CardTitle className="whitespace-nowrap text-foreground">
                                     Daftar Workflow Terpasang
                                 </CardTitle>
                                 <CardDescription className="text-xs text-muted-foreground">
@@ -327,11 +360,7 @@ export default function Workflows({
                                     Belum ada workflow
                                 </h3>
                                 <p className="mt-1 max-w-sm text-xs text-muted-foreground">
-                                    Gunakan form{' '}
-                                    <span className="font-semibold text-foreground">
-                                        Buat Workflow Baru
-                                    </span>{' '}
-                                    di atas untuk membuat alur persetujuan
+                                    Pilih Baru untuk membuat alur persetujuan
                                     pertama Anda.
                                 </p>
                             </div>

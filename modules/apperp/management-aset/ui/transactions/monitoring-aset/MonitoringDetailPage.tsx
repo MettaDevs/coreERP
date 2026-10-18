@@ -1,5 +1,5 @@
 import { router } from '@inertiajs/react';
-import { CheckCheck, ListPlus, Plus, Trash2 } from 'lucide-react';
+import { CheckCheck, ListPlus, Trash2 } from 'lucide-react';
 import type { RefObject } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -20,18 +20,14 @@ import {
     CollapsibleSection,
     CollapsibleSectionGroup,
 } from '@apperp/ui/collapsible-section';
+import { DataTable } from '@apperp/ui/data-table';
+import type { DataTableColumn } from '@apperp/ui/data-table';
 import { Field, FieldDescription } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
+import { usePageDialogRecord } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
+import { TableCell, TableRow } from '@apperp/ui/table';
 import { Textarea } from '@apperp/ui/textarea';
 import EditShield from '../../_shared/EditShield';
 import {
@@ -44,6 +40,9 @@ import {
 import AssetConditionSelect from '../../master/AssetConditionSelect';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import { useRecordOptions } from '../../use-record-list';
+import { RecordCardHeader } from '../_shared/record-card';
+import type { RecordCardControls } from '../_shared/record-card';
+import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
 import type {
     Context,
     EditableMonitoring,
@@ -97,14 +96,18 @@ const keForm = (data: Monitoring): EditableMonitoring => ({
 export default function MonitoringDetailPage({
     context,
     permissions,
+    card,
     monitoringId,
     mode,
 }: {
     context: Context;
     permissions: string[];
+    card?: RecordCardControls;
     monitoringId?: string;
     mode: Mode;
 }) {
+    const embedded = usePageDialogRecord(undefined);
+
     const can = izin(permissions);
     const { date: workDate } = useWorkDate();
     const [record, setRecord] = useState<EditableMonitoring>(() => ({
@@ -122,6 +125,37 @@ export default function MonitoringDetailPage({
     const unitKerja = useMasterOptions('reference-data/unit-kerja');
     const anggota = useMasterOptions('reference-data/anggota');
     const panelRef = useRef<HTMLDivElement>(null);
+    const lookupPortal = card?.portalContainer ?? panelRef;
+    const onBusyChange = card?.onBusyChange;
+    useEffect(() => {
+        onBusyChange?.(menyimpan);
+
+        return () => onBusyChange?.(false);
+    }, [menyimpan, onBusyChange]);
+    const viewRecord = (id: string) => {
+        if (!menyimpan) {
+            (card?.onRequestView ?? bukaMonitoring)(id);
+        }
+    };
+    const editRecord = (id: string) => {
+        if (!menyimpan) {
+            (card?.onRequestEdit ?? bukaMonitoringUbah)(id);
+        }
+    };
+    const closeRecord = () => {
+        if (!menyimpan) {
+            (card?.onClose ?? bukaDaftar)();
+        }
+    };
+    const saveCompleted = (id: string) => (card?.onSaved ?? bukaMonitoring)(id);
+    const deleteCompleted = () => {
+        if (card?.onClose) {
+            card.onSaved?.(String(monitoringId));
+            card.onClose();
+        } else {
+            bukaDaftar();
+        }
+    };
 
     const readOnly = mode === 'view';
     const selesai = tersimpan?.status === 'selesai';
@@ -133,19 +167,24 @@ export default function MonitoringDetailPage({
             return;
         }
 
+        const request = new AbortController();
         let dibatalkan = false;
-        api<{ data: Monitoring }>(`/monitoring-aset/${monitoringId}`)
+        api<{ data: Monitoring }>(`/monitoring-aset/${monitoringId}`, {
+            signal: request.signal,
+        })
             .then((result) => {
                 if (!dibatalkan) {
                     setTersimpan(result.data);
                     setRecord(keForm(result.data));
                 }
             })
-            .catch((caught) =>
-                toast.error(
-                    errorMessage(caught, 'Monitoring belum dapat dimuat.'),
-                ),
-            )
+            .catch((caught) => {
+                if (!request.signal.aborted) {
+                    toast.error(
+                        errorMessage(caught, 'Monitoring belum dapat dimuat.'),
+                    );
+                }
+            })
             .finally(() => {
                 if (!dibatalkan) {
                     setMemuat(false);
@@ -154,6 +193,7 @@ export default function MonitoringDetailPage({
 
         return () => {
             dibatalkan = true;
+            request.abort();
         };
     }, [monitoringId]);
 
@@ -219,7 +259,7 @@ export default function MonitoringDetailPage({
                 toast.success(
                     `Monitoring ${hasil.data.kode} disimpan sebagai draf.`,
                 );
-                bukaMonitoring(hasil.data.id);
+                saveCompleted(hasil.data.id);
 
                 return;
             }
@@ -235,7 +275,7 @@ export default function MonitoringDetailPage({
                 },
             );
             toast.success('Perubahan monitoring disimpan.');
-            bukaMonitoring(String(monitoringId));
+            saveCompleted(String(monitoringId));
         } catch (caught) {
             if (caught instanceof ApiError) {
                 setGalat(caught.validationErrors);
@@ -289,6 +329,7 @@ export default function MonitoringDetailPage({
             setTersimpan(hasil.data);
             setRecord(keForm(hasil.data));
             toast.success('Monitoring diselesaikan. Hasilnya sudah dikunci.');
+            card?.onSaved?.(String(monitoringId));
         } catch (caught) {
             if (caught instanceof ApiError) {
                 setGalat(caught.validationErrors);
@@ -303,17 +344,28 @@ export default function MonitoringDetailPage({
     async function arsipkan() {
         setKonfirmasiArsip(false);
 
+        setMenyimpan(true);
+
         try {
             await api(`/monitoring-aset/${monitoringId}`, {
                 method: 'DELETE',
                 body: JSON.stringify({ version: tersimpan?.version }),
             });
             toast.success('Draf monitoring diarsipkan.');
-            bukaDaftar();
+            deleteCompleted();
         } catch (caught) {
             toastSaveError(caught, 'Monitoring belum dapat diarsipkan.');
+        } finally {
+            setMenyimpan(false);
         }
     }
+
+    useRecordCardDirty({
+        value: record,
+        ready: !memuat,
+        scopeKey: JSON.stringify([monitoringId, mode, tersimpan?.version]),
+        onDirtyChange: card?.onDirtyChange,
+    });
 
     if (memuat) {
         return (
@@ -333,12 +385,29 @@ export default function MonitoringDetailPage({
     const tidakSesuai = record.details.filter(
         (baris) => baris.hasil === 'tidak_sesuai',
     ).length;
-    const ubah = () => monitoringId && bukaMonitoringUbah(monitoringId);
+    const ubah = () => monitoringId && editRecord(monitoringId);
 
     return (
         <div className="flex h-full min-h-0 flex-col overflow-hidden">
+            <RecordCardHeader
+                recordTitle={tersimpan?.kode ?? 'Baru'}
+                editing={!readOnly}
+                recordUrl={
+                    monitoringId
+                        ? `/management-aset/monitoring-aset/${monitoringId}`
+                        : undefined
+                }
+                onEdit={
+                    readOnly && !selesai && can('update') ? ubah : undefined
+                }
+                onDelete={
+                    readOnly && !selesai && can('archive')
+                        ? () => setKonfirmasiArsip(true)
+                        : undefined
+                }
+            />
             <RecordActionBar
-                title={judul}
+                title={embedded ? undefined : judul}
                 trailing={
                     tersimpan ? (
                         <StatusBadge status={tersimpan.status} />
@@ -347,13 +416,13 @@ export default function MonitoringDetailPage({
             >
                 {readOnly && !selesai && can('update') && (
                     <>
-                        <ActionButton
-                            action="edit"
-                            type="button"
-                            onClick={ubah}
-                        >
-                            Ubah
-                        </ActionButton>
+                        {!embedded && (
+                            <ActionButton
+                                action="edit"
+                                type="button"
+                                onClick={ubah}
+                            />
+                        )}
                         <Button
                             type="button"
                             variant="outline"
@@ -374,40 +443,40 @@ export default function MonitoringDetailPage({
                         Selesaikan monitoring
                     </Button>
                 )}
-                {readOnly && !selesai && can('archive') && (
+                {readOnly && !selesai && can('archive') && !embedded && (
                     <ActionButton
                         action="archive"
                         type="button"
                         onClick={() => setKonfirmasiArsip(true)}
-                    >
-                        Arsipkan
-                    </ActionButton>
+                    />
                 )}
                 {!readOnly && (
                     <>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() =>
-                                monitoringId
-                                    ? bukaMonitoring(monitoringId)
-                                    : bukaDaftar()
-                            }
-                        >
-                            Batal
-                        </Button>
-                        <Button
+                        <ActionButton
+                            action="save"
                             type="button"
                             onClick={() => void simpan()}
                             disabled={menyimpan}
-                        >
-                            {menyimpan ? 'Menyimpan…' : 'Simpan draf'}
-                        </Button>
+                            pending={menyimpan}
+                        />
+                        <ActionButton
+                            action="cancel"
+                            type="button"
+                            onClick={() =>
+                                monitoringId
+                                    ? viewRecord(monitoringId)
+                                    : closeRecord()
+                            }
+                        />
                     </>
                 )}
             </RecordActionBar>
 
-            <div ref={panelRef} className="min-h-0 flex-1 overflow-y-auto">
+            <div
+                data-page-dialog-body
+                ref={panelRef}
+                className="min-h-0 flex-1 overflow-y-auto"
+            >
                 <div className="space-y-5 p-5">
                     <CollapsibleSectionGroup
                         defaultValue={['general', 'lines']}
@@ -461,7 +530,7 @@ export default function MonitoringDetailPage({
                                                 searchPlaceholder="Cari lokasi aset"
                                                 emptyMessage="Lokasi aset tidak ditemukan."
                                                 ariaLabel="Lokasi aset"
-                                                portalContainer={panelRef}
+                                                portalContainer={lookupPortal}
                                                 onValueChange={(item) =>
                                                     setRecord({
                                                         ...record,
@@ -506,7 +575,7 @@ export default function MonitoringDetailPage({
                                                 searchPlaceholder="Cari unit kerja"
                                                 emptyMessage="Unit kerja tidak ditemukan."
                                                 ariaLabel="Unit organisasi"
-                                                portalContainer={panelRef}
+                                                portalContainer={lookupPortal}
                                                 onValueChange={(item) =>
                                                     setRecord({
                                                         ...record,
@@ -548,7 +617,7 @@ export default function MonitoringDetailPage({
                                                 searchPlaceholder="Cari nama"
                                                 emptyMessage="Orang tidak ditemukan."
                                                 ariaLabel="Penanggung jawab"
-                                                portalContainer={panelRef}
+                                                portalContainer={lookupPortal}
                                                 onValueChange={(item) =>
                                                     setRecord({
                                                         ...record,
@@ -617,10 +686,9 @@ export default function MonitoringDetailPage({
                                                         sebagai ada
                                                     </Button>
                                                 )}
-                                                <Button
+                                                <ActionButton
+                                                    action="add"
                                                     type="button"
-                                                    variant="outline"
-                                                    size="sm"
                                                     onClick={() =>
                                                         setRecord({
                                                             ...record,
@@ -630,10 +698,7 @@ export default function MonitoringDetailPage({
                                                             ],
                                                         })
                                                     }
-                                                >
-                                                    <Plus />
-                                                    Tambah aset
-                                                </Button>
+                                                />
                                             </div>
                                         )}
                                     </div>
@@ -655,84 +720,176 @@ export default function MonitoringDetailPage({
                                                 : 'Belum ada aset di daftar periksa. Pakai Isi otomatis untuk memasukkan semua aset yang tercatat di lokasi ini.'}
                                         </p>
                                     ) : (
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead className="w-12">
-                                                        No
-                                                    </TableHead>
-                                                    <TableHead>Aset</TableHead>
-                                                    <TableHead>
-                                                        Di catatan aset
-                                                    </TableHead>
-                                                    <TableHead>
-                                                        Keberadaan
-                                                    </TableHead>
-                                                    <TableHead>
-                                                        Kondisi fisik
-                                                    </TableHead>
-                                                    <TableHead>Hasil</TableHead>
-                                                    <TableHead>
-                                                        Keterangan
-                                                    </TableHead>
-                                                    <TableHead className="text-right">
-                                                        Nilai buku
-                                                    </TableHead>
-                                                    {readOnly && (
-                                                        <TableHead>
-                                                            Tindak lanjut
-                                                        </TableHead>
-                                                    )}
-                                                    {!readOnly && (
-                                                        <TableHead className="w-12" />
-                                                    )}
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {record.details.map(
-                                                    (baris, index) => (
-                                                        <MonitoringRow
-                                                            key={
-                                                                baris.id ??
-                                                                `baru-${index}`
-                                                            }
-                                                            baris={baris}
-                                                            index={index}
-                                                            readOnly={readOnly}
-                                                            lokasiDokumen={
-                                                                tersimpan?.lokasi_aset_id ??
-                                                                record.lokasi_aset_id ??
-                                                                ''
-                                                            }
-                                                            permissions={
-                                                                permissions
-                                                            }
-                                                            panelRef={panelRef}
-                                                            onChange={(patch) =>
-                                                                ubahBaris(
+                                        (() => {
+                                            const sdkRows = record.details.map(
+                                                (baris, index) => {
+                                                    return { baris, index };
+                                                },
+                                            );
+                                            const sdkColumns: DataTableColumn<
+                                                (typeof sdkRows)[number]
+                                            >[] = [
+                                                {
+                                                    id: 'column-0',
+                                                    header: 'No',
+                                                    width: 48,
+                                                    cell: () => null,
+                                                } satisfies DataTableColumn<
+                                                    (typeof sdkRows)[number]
+                                                >,
+                                                {
+                                                    id: 'column-1',
+                                                    header: 'Aset',
+                                                    cell: () => null,
+                                                } satisfies DataTableColumn<
+                                                    (typeof sdkRows)[number]
+                                                >,
+                                                {
+                                                    id: 'column-2',
+                                                    header: 'Di catatan aset',
+                                                    cell: () => null,
+                                                } satisfies DataTableColumn<
+                                                    (typeof sdkRows)[number]
+                                                >,
+                                                {
+                                                    id: 'column-3',
+                                                    header: 'Keberadaan',
+                                                    cell: () => null,
+                                                } satisfies DataTableColumn<
+                                                    (typeof sdkRows)[number]
+                                                >,
+                                                {
+                                                    id: 'column-4',
+                                                    header: 'Kondisi fisik',
+                                                    cell: () => null,
+                                                } satisfies DataTableColumn<
+                                                    (typeof sdkRows)[number]
+                                                >,
+                                                {
+                                                    id: 'column-5',
+                                                    header: 'Hasil',
+                                                    cell: () => null,
+                                                } satisfies DataTableColumn<
+                                                    (typeof sdkRows)[number]
+                                                >,
+                                                {
+                                                    id: 'column-6',
+                                                    header: 'Keterangan',
+                                                    cell: () => null,
+                                                } satisfies DataTableColumn<
+                                                    (typeof sdkRows)[number]
+                                                >,
+                                                {
+                                                    id: 'column-7',
+                                                    header: 'Nilai buku',
+                                                    align: 'right',
+                                                    cell: () => null,
+                                                } satisfies DataTableColumn<
+                                                    (typeof sdkRows)[number]
+                                                >,
+                                                ...(readOnly
+                                                    ? [
+                                                          {
+                                                              id: 'column-8',
+                                                              header: 'Tindak lanjut',
+                                                              cell: () => null,
+                                                          } satisfies DataTableColumn<
+                                                              (typeof sdkRows)[number]
+                                                          >,
+                                                      ]
+                                                    : []),
+                                                ...(!readOnly
+                                                    ? [
+                                                          {
+                                                              id: 'column-9',
+                                                              header: '',
+                                                              width: 48,
+                                                              cell: () => null,
+                                                          } satisfies DataTableColumn<
+                                                              (typeof sdkRows)[number]
+                                                          >,
+                                                      ]
+                                                    : []),
+                                            ];
+
+                                            return (
+                                                <DataTable
+                                                    scrollMode="inline"
+                                                    showRowNumbers={false}
+                                                    serverSort
+                                                    data={sdkRows}
+                                                    columns={sdkColumns}
+                                                    getRowKey={({
+                                                        baris,
+                                                        index,
+                                                    }) =>
+                                                        baris.id ??
+                                                        `baru-${index}`
+                                                    }
+                                                    renderRows={() => (
+                                                        <>
+                                                            {record.details.map(
+                                                                (
+                                                                    baris,
                                                                     index,
-                                                                    patch,
-                                                                )
-                                                            }
-                                                            onRemove={() =>
-                                                                setRecord({
-                                                                    ...record,
-                                                                    details:
-                                                                        record.details.filter(
-                                                                            (
-                                                                                _,
-                                                                                posisi,
-                                                                            ) =>
-                                                                                posisi !==
+                                                                ) => (
+                                                                    <MonitoringRow
+                                                                        key={
+                                                                            baris.id ??
+                                                                            `baru-${index}`
+                                                                        }
+                                                                        baris={
+                                                                            baris
+                                                                        }
+                                                                        index={
+                                                                            index
+                                                                        }
+                                                                        readOnly={
+                                                                            readOnly
+                                                                        }
+                                                                        lokasiDokumen={
+                                                                            tersimpan?.lokasi_aset_id ??
+                                                                            record.lokasi_aset_id ??
+                                                                            ''
+                                                                        }
+                                                                        permissions={
+                                                                            permissions
+                                                                        }
+                                                                        panelRef={
+                                                                            lookupPortal
+                                                                        }
+                                                                        onChange={(
+                                                                            patch,
+                                                                        ) =>
+                                                                            ubahBaris(
                                                                                 index,
-                                                                        ),
-                                                                })
-                                                            }
-                                                        />
-                                                    ),
-                                                )}
-                                            </TableBody>
-                                        </Table>
+                                                                                patch,
+                                                                            )
+                                                                        }
+                                                                        onRemove={() =>
+                                                                            setRecord(
+                                                                                {
+                                                                                    ...record,
+                                                                                    details:
+                                                                                        record.details.filter(
+                                                                                            (
+                                                                                                _,
+                                                                                                posisi,
+                                                                                            ) =>
+                                                                                                posisi !==
+                                                                                                index,
+                                                                                        ),
+                                                                                },
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                ),
+                                                            )}
+                                                        </>
+                                                    )}
+                                                />
+                                            );
+                                        })()
                                     )}
                                 </div>
                             </div>
@@ -806,7 +963,7 @@ export default function MonitoringDetailPage({
             >
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Arsipkan draf ini?</AlertDialogTitle>
+                        <AlertDialogTitle>Delete draf ini?</AlertDialogTitle>
                         <AlertDialogDescription>
                             Draf disembunyikan dari daftar dan nomornya tidak
                             dipakai ulang. Catatan aset tidak terpengaruh.
@@ -814,8 +971,11 @@ export default function MonitoringDetailPage({
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Batal</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => void arsipkan()}>
-                            Arsipkan
+                        <AlertDialogAction
+                            onClick={() => void arsipkan()}
+                            asChild
+                        >
+                            <ActionButton action="archive" />
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

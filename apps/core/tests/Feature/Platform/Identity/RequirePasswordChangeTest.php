@@ -36,12 +36,12 @@ final class RequirePasswordChangeTest extends TestCase
 
         $this->assertFalse($pengguna->must_change_password);
         $this->actingAs($pengguna)->get(route('dashboard'))->assertOk();
-        $this->actingAs($pengguna)->get('/')->assertOk();
+        $this->actingAs($pengguna)->get('/')->assertRedirect(route('dashboard'));
     }
 
     public function test_tamu_tidak_tersentuh(): void
     {
-        $this->get('/')->assertOk();
+        $this->get('/')->assertRedirect(route('login'));
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace App\Platform\Organization\Http\Requests;
 
 use App\Platform\Access\Support\CoreSecurityCatalog;
+use App\Platform\AddressBook\Support\PartyDetailData;
 use App\Platform\Organization\Models\OperatingUnit;
 use DateTimeZone;
 use Illuminate\Foundation\Http\FormRequest;
@@ -30,6 +31,7 @@ class OrganizationRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'party_details' => ['sometimes', 'array'],
             'classification' => ['required', Rule::in(['legal_entity', 'operating_unit'])],
             'name' => ['required', 'string', 'max:150'],
             'company_code' => [
@@ -70,12 +72,12 @@ class OrganizationRequest extends FormRequest
         ];
     }
 
-    /** @return array{classification:string,name:string,company_code:?string,country_code:?string,timezone:?string,operating_unit_type:?string,operating_unit_number:?string} */
+    /** @return array{classification:string,name:string,company_code:?string,country_code:?string,timezone:?string,operating_unit_type:?string,operating_unit_number:?string,party_details?:array{locations:list<array<string,mixed>>,contacts:list<array<string,mixed>>}} */
     public function payload(): array
     {
         $legalEntity = $this->validated('classification') === 'legal_entity';
 
-        return [
+        $payload = [
             'classification' => $this->string('classification')->toString(),
             'name' => $this->string('name')->toString(),
             'company_code' => $legalEntity ? (strtoupper($this->string('company_code')->toString()) ?: null) : null,
@@ -84,5 +86,10 @@ class OrganizationRequest extends FormRequest
             'operating_unit_type' => $legalEntity ? null : ($this->string('operating_unit_type')->toString() ?: null),
             'operating_unit_number' => $legalEntity ? null : ($this->string('operating_unit_number')->toString() ?: null),
         ];
+        if ($this->has('party_details')) {
+            $payload['party_details'] = PartyDetailData::details($this->input('party_details'));
+        }
+
+        return $payload;
     }
 }

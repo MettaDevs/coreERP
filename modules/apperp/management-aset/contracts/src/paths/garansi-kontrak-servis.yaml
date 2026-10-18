@@ -33,6 +33,14 @@
     responses: {'200': {description: Yang akan berakhir, content: {application/json: {schema: {type: object, required: [data, meta], properties: {data: {type: array, items: {$ref: '#/components/schemas/ExpiringCoverage'}}, meta: {type: object, properties: {hari: {type: integer}, sampai: {type: string, format: date}}}}}}}}}
 /api/v1/garansi-aset/{id}:
   parameters: [$ref: '#/components/parameters/RecordId']
+  get:
+    tags: [Garansi dan kontrak servis]
+    operationId: getAssetWarranty
+    description: Membaca garansi tepat menurut ID dengan izin `garansi-aset.read`. Catatan di luar tenant atau jangkauan organisasi aset dijawab 404, tanpa bergantung pada halaman daftar.
+    responses:
+      '200': {description: Garansi aset, content: {application/json: {schema: {type: object, required: [data], properties: {data: {$ref: '#/components/schemas/AssetWarranty'}}}}}}
+      '403': {$ref: '#/components/responses/Forbidden'}
+      '404': {$ref: '#/components/responses/NotFound'}
   patch: {tags: [Garansi dan kontrak servis], operationId: updateAssetWarranty, description: Aset tidak dapat diganti., parameters: [$ref: '#/components/parameters/IfMatch'], requestBody: {required: true, content: {application/json: {schema: {allOf: [{$ref: '#/components/schemas/AssetWarrantyWrite'}, {type: object, properties: {version: {$ref: '#/components/schemas/VersionField'}}}]}}}}, responses: {'200': {description: Garansi diubah, content: {application/json: {schema: {type: object, required: [data], properties: {data: {$ref: '#/components/schemas/AssetWarranty'}}}}}}, '409': {$ref: '#/components/responses/StaleVersion'}, '422': {$ref: '#/components/responses/ValidationError'}, '428': {$ref: '#/components/responses/VersionRequired'}}}
   delete: {tags: [Garansi dan kontrak servis], operationId: archiveAssetWarranty, parameters: [$ref: '#/components/parameters/IfMatch'], requestBody: {required: false, content: {application/json: {schema: {$ref: '#/components/schemas/VersionInput'}}}}, responses: {'204': {description: Garansi diarsipkan}, '409': {$ref: '#/components/responses/StaleVersion'}, '428': {$ref: '#/components/responses/VersionRequired'}}}
 /api/v1/pemeliharaan-aset/referensi/garansi:

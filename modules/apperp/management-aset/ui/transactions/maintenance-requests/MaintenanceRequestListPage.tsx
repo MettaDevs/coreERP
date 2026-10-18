@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDateTimeFormat } from '@/hooks/use-date-time';
 import { ActionButton } from '@apperp/ui/action-button';
@@ -15,19 +15,21 @@ import {
 } from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
+import { PageDialog, PageDialogContent } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
+import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
 import { useRecordList } from '../../use-record-list';
+import type { RecordCardState } from '../_shared/record-card';
+import type { Context } from './maintenanceRequest';
 import type { MaintenanceRequest } from './maintenanceRequest';
 import {
     STATUS,
     StatusBadge,
     codeName,
-    openNewRequest,
-    openRequest,
-    openRequestEdit,
     permissionCheck,
 } from './maintenanceRequest';
+import MaintenanceRequestDetailPage from './MaintenanceRequestDetailPage';
 
 /**
  * Nilai pilihan "semua". `Select` baru menganggap field terisi bila nilainya tidak kosong; dengan nilai
@@ -45,10 +47,36 @@ const STATUS_FILTER = [
  * membuat work order dilakukan di halaman rincian.
  */
 export default function MaintenanceRequestListPage({
+    context,
     permissions,
 }: {
+    context: Context;
     permissions: string[];
 }) {
+    const [card, setCard] = useState<RecordCardState>(null);
+    const [cardBusy, setCardBusy] = useState(false);
+    const [cardDirty, setCardDirty] = useState(false);
+    const discardChanges = () =>
+        !cardDirty || window.confirm('Buang perubahan yang belum disimpan?');
+    const openNewCard = () => {
+        if (!cardBusy && discardChanges()) {
+            setCardDirty(false);
+            setCard({ mode: 'create' });
+        }
+    };
+    const closeCard = () => {
+        if (!cardBusy && discardChanges()) {
+            setCard(null);
+            setCardDirty(false);
+            list.reload();
+        }
+    };
+    const [cardRevision, setCardRevision] = useState(0);
+    const cardContentRef = useRef<HTMLDivElement>(null);
+    const openNewRequest = () => setCard({ mode: 'create' });
+    const openRequest = (id: string) => setCard({ mode: 'view', id });
+    const openRequestEdit = (id: string) => setCard({ mode: 'edit', id });
+
     const can = permissionCheck(permissions);
     const formatDateTime = useDateTimeFormat();
     const [status, setStatus] = useState('');
@@ -140,89 +168,167 @@ export default function MaintenanceRequestListPage({
         actions.push({ id: 'edit', label: 'Ubah' });
     }
 
+    const currentCardId = card && 'id' in card ? card.id : null;
+    const cardNavigation = useRecordNavigation({
+        items: list.items,
+        currentId: currentCardId,
+        getId: (item) => item.id,
+        onNavigate: (id) => setCard({ mode: 'view', id }),
+        scopeKey: JSON.stringify([
+            '/permintaan-pemeliharaan',
+            search,
+            Object.fromEntries(
+                Object.entries({ status }).filter(([, value]) => value !== ''),
+            ),
+            list.sort,
+        ]),
+        hasMore: list.hasMore,
+        loading: list.loading,
+        loadMore: list.loadMore,
+        disabled: cardBusy || cardDirty,
+    });
+
     return (
-        <ListPageLayout
-            header={
-                <RecordActionBar title="Permintaan pemeliharaan">
-                    {can('create') && (
-                        <ActionButton
-                            action="create"
-                            type="button"
-                            onClick={openNewRequest}
-                        >
-                            Buat permintaan
-                        </ActionButton>
-                    )}
-                </RecordActionBar>
-            }
-            filters={
-                <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
-                    <div className="w-full sm:w-72">
-                        <Input
-                            label="Cari"
-                            type="search"
-                            placeholder="Nomor, aset, lokasi, atau deskripsi"
-                            value={search}
-                            onChange={(event) => setSearch(event.target.value)}
-                        />
+        <>
+            <ListPageLayout
+                header={
+                    <RecordActionBar title="Permintaan pemeliharaan">
+                        {can('create') && (
+                            <ActionButton
+                                action="create"
+                                type="button"
+                                onClick={openNewRequest}
+                            />
+                        )}
+                    </RecordActionBar>
+                }
+                filters={
+                    <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
+                        <div className="w-full sm:w-72">
+                            <Input
+                                label="Cari"
+                                type="search"
+                                placeholder="Nomor, aset, lokasi, atau deskripsi"
+                                value={search}
+                                onChange={(event) =>
+                                    setSearch(event.target.value)
+                                }
+                            />
+                        </div>
+                        <div className="w-full sm:w-52">
+                            <Select
+                                label="Status"
+                                items={STATUS_FILTER}
+                                value={status || ALL}
+                                ariaLabel="Saring berdasarkan status"
+                                onValueChange={(value) => {
+                                    setStatus(
+                                        !value || value === ALL ? '' : value,
+                                    );
+                                }}
+                            />
+                        </div>
                     </div>
-                    <div className="w-full sm:w-52">
-                        <Select
-                            label="Status"
-                            items={STATUS_FILTER}
-                            value={status || ALL}
-                            ariaLabel="Saring berdasarkan status"
-                            onValueChange={(value) => {
-                                setStatus(!value || value === ALL ? '' : value);
-                            }}
-                        />
-                    </div>
-                </div>
-            }
-        >
-            {!loading && !visible.length ? (
-                <Empty>
-                    <EmptyHeader>
-                        <EmptyTitle>
-                            Belum ada permintaan pemeliharaan
-                        </EmptyTitle>
-                        <EmptyDescription>
-                            Unit melaporkan kerusakan atau kebutuhan perbaikan
-                            aset di sini. Perencana meninjaunya lalu membuatkan
-                            work order.
-                        </EmptyDescription>
-                    </EmptyHeader>
-                </Empty>
-            ) : (
-                <DataTable
-                    columns={columns}
-                    incremental={list}
-                    sort={list.sort}
-                    onSortChange={list.onSortChange}
-                    data={visible}
-                    getRowKey={(row) => row.id}
-                    getRowLabel={(row) => row.kode}
-                    actions={actions}
-                    onRowClick={(row) => openRequest(row.id)}
-                    onRowAction={(action, row) => {
-                        if (action === 'detail') {
-                            openRequest(row.id);
-                        }
-
-                        if (action === 'edit') {
-                            if (row.status !== 'draft') {
-                                toast.error(
-                                    'Hanya permintaan draf yang dapat diubah.',
-                                );
-
-                                return;
+                }
+            >
+                {!loading && !visible.length ? (
+                    <Empty>
+                        <EmptyHeader>
+                            <EmptyTitle>
+                                Belum ada permintaan pemeliharaan
+                            </EmptyTitle>
+                            <EmptyDescription>
+                                Unit melaporkan kerusakan atau kebutuhan
+                                perbaikan aset di sini. Perencana meninjaunya
+                                lalu membuatkan work order.
+                            </EmptyDescription>
+                        </EmptyHeader>
+                    </Empty>
+                ) : (
+                    <DataTable
+                        columns={columns}
+                        incremental={list}
+                        sort={list.sort}
+                        onSortChange={list.onSortChange}
+                        data={visible}
+                        getRowKey={(row) => row.id}
+                        getRowLabel={(row) => row.kode}
+                        actions={actions}
+                        onRowClick={(row) => openRequest(row.id)}
+                        onRowAction={(action, row) => {
+                            if (action === 'detail') {
+                                openRequest(row.id);
                             }
 
-                            openRequestEdit(row.id);
+                            if (action === 'edit') {
+                                if (row.status !== 'draft') {
+                                    toast.error(
+                                        'Hanya permintaan draf yang dapat diubah.',
+                                    );
+
+                                    return;
+                                }
+
+                                openRequestEdit(row.id);
+                            }
+                        }}
+                    />
+                )}
+            </ListPageLayout>
+            {card && (
+                <PageDialog
+                    open
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            closeCard();
                         }
                     }}
-                />
+                >
+                    <PageDialogContent
+                        ref={cardContentRef}
+                        onEscapeKeyDown={(event) => {
+                            if (cardBusy) {
+                                event.preventDefault();
+                            }
+                        }}
+                        title={'Permintaan pemeliharaan'}
+                        busy={cardBusy}
+                        onNew={
+                            !(card?.mode === 'create') && can('create')
+                                ? openNewCard
+                                : undefined
+                        }
+                        navigation={currentCardId ? cardNavigation : undefined}
+                    >
+                        <MaintenanceRequestDetailPage
+                            key={`${card.mode}-${'id' in card ? card.id : 'new'}-${cardRevision}`}
+                            context={context}
+                            permissions={permissions}
+                            requestId={'id' in card ? card.id : undefined}
+                            mode={card.mode}
+                            portalContainer={cardContentRef}
+                            onBusyChange={setCardBusy}
+                            onClose={closeCard}
+                            onSaved={(id) => {
+                                setCard({ mode: 'view', id });
+                                setCardRevision((version) => version + 1);
+                                list.reload();
+                            }}
+                            onRequestView={(id) => {
+                                if (!cardBusy && discardChanges()) {
+                                    setCard({ mode: 'view', id });
+                                }
+                            }}
+                            onRequestEdit={(id) => {
+                                if (!cardBusy && discardChanges()) {
+                                    setCard({ mode: 'edit', id });
+                                }
+                            }}
+                            onDirtyChange={setCardDirty}
+                        />
+                    </PageDialogContent>
+                </PageDialog>
             )}
-        </ListPageLayout>
+        </>
     );
 }

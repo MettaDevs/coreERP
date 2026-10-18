@@ -76,7 +76,13 @@ export default function AsetPage({
     }
 
     if (!pertama) {
-        return <AsetListPage canUpdate={canUpdate} permissions={permissions} />;
+        return (
+            <AsetListPage
+                context={context}
+                canUpdate={canUpdate}
+                permissions={permissions}
+            />
+        );
     }
 
     return (

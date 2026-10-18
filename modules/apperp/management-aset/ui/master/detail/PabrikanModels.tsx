@@ -1,3 +1,4 @@
+import { Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { ActionButton } from '@apperp/ui/action-button';
 import {
@@ -23,6 +24,7 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
+import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
 import { api, errorMessage } from '../../api';
 import { useRecordList } from '../../use-record-list';
 import type { MasterRecord, ParentSummary } from '../masters';
@@ -48,6 +50,22 @@ export default function PabrikanModels({
     canReadAset: boolean;
     onChanged: () => void;
 }) {
+    const [modelBusy, setModelBusy] = useState(false);
+    const [modelDirty, setModelDirty] = useState(false);
+    const discardModel = () =>
+        !modelDirty || window.confirm('Buang perubahan yang belum disimpan?');
+    const closeModel = () => {
+        if (!modelBusy && discardModel()) {
+            setEditing(undefined);
+            setModelDirty(false);
+        }
+    };
+    const createModel = () => {
+        if (!modelBusy && discardModel()) {
+            setEditing(null);
+            setModelDirty(false);
+        }
+    };
     const [error, setError] = useState('');
     // Effect adalah satu-satunya pemilik pengambilan data; pemuatan ulang setelah
     // simpan atau arsip dinyatakan dengan menaikkan penanda ini.
@@ -71,6 +89,23 @@ export default function PabrikanModels({
     );
     const { items, loading } = list;
 
+    const modelNavigation = useRecordNavigation({
+        items,
+        currentId: editing?.id ?? null,
+        getId: (item) => item.id,
+        onNavigate: (id) => {
+            const row = items.find((item) => item.id === id);
+
+            if (row) {
+                setEditing(row);
+            }
+        },
+        scopeKey: JSON.stringify([manufacturer.id, list.sort]),
+        hasMore: list.hasMore,
+        loading: list.loading,
+        loadMore: list.loadMore,
+        disabled: modelBusy || modelDirty,
+    });
     async function archive() {
         if (!archiving) {
             return;
@@ -81,6 +116,9 @@ export default function PabrikanModels({
                 method: 'DELETE',
                 body: JSON.stringify({ version: archiving.version }),
             });
+            setEditing((current) =>
+                current?.id === archiving.id ? undefined : current,
+            );
             setArchiving(null);
             muatUlang();
             onChanged();
@@ -154,8 +192,9 @@ export default function PabrikanModels({
 
     if (canArchive) {
         actions.push({
+            icon: <Trash2 aria-hidden="true" />,
             id: 'archive',
-            label: 'Arsipkan',
+            label: 'Delete',
             destructive: true,
             separatorBefore: actions.length > 0,
         });
@@ -175,9 +214,7 @@ export default function PabrikanModels({
                         action="create"
                         type="button"
                         onClick={() => setEditing(null)}
-                    >
-                        Tambah model
-                    </ActionButton>
+                    />
                 )}
             </div>
             {/* Keadaan memuat diperiksa lebih dulu daripada pesan kesalahan supaya
@@ -232,11 +269,20 @@ export default function PabrikanModels({
 
             {editing !== undefined && (
                 <ModelAsetFormSheet
+                    onDelete={
+                        editing && canArchive
+                            ? () => setArchiving(editing)
+                            : undefined
+                    }
                     key={editing?.id ?? 'baru'}
                     manufacturer={manufacturer}
                     value={editing}
                     canReadJenis={canReadJenis}
-                    onClose={() => setEditing(undefined)}
+                    onClose={closeModel}
+                    onNew={canCreate ? createModel : undefined}
+                    navigation={modelNavigation}
+                    onBusyChange={setModelBusy}
+                    onDirtyChange={setModelDirty}
                     onSaved={() => {
                         setEditing(undefined);
                         muatUlang();
@@ -252,7 +298,7 @@ export default function PabrikanModels({
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>
-                            Arsipkan {archiving?.nama}?
+                            Delete {archiving?.nama}?
                         </AlertDialogTitle>
                         <AlertDialogDescription>
                             Model ini tidak lagi tampil pada daftar pilihan.
@@ -261,8 +307,11 @@ export default function PabrikanModels({
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Batal</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => void archive()}>
-                            Arsipkan
+                        <AlertDialogAction
+                            onClick={() => void archive()}
+                            asChild
+                        >
+                            <ActionButton action="archive" />
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

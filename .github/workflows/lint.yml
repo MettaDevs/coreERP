@@ -104,6 +104,18 @@ jobs:
       - name: Check Page Dialog Stack
         run: node --test ../../packages/ui/scripts/page-dialog-stack.test.mjs
 
+      - name: Check Record Commands
+        run: node ../../packages/ui/scripts/action-button.test.mjs
+
+      - name: Check Record Navigation
+        run: node ../../packages/ui/scripts/record-navigation.test.mjs
+
+      - name: Check Record Header
+        run: node ../../packages/ui/scripts/page-dialog-record.test.mjs
+
+      - name: Check Asset Master Drafts
+        run: node ../../modules/apperp/management-aset/ui/master/DraftMasterDetails.test.mjs
+
       - name: Check Master Detail Layout
         run: node ../../packages/ui/scripts/check-master-detail-layout.mjs
 

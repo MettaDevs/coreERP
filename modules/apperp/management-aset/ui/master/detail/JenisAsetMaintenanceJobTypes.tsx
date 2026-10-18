@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Button } from '@apperp/ui/button';
+import { ActionButton } from '@apperp/ui/action-button';
+
+import { DialogToolbar } from '@apperp/ui/dialog';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
 import { TransferList } from '@apperp/ui/transfer-list';
 import type { TransferListItem } from '@apperp/ui/transfer-list';
@@ -128,6 +130,17 @@ export default function JenisAsetMaintenanceJobTypes({
 
     return (
         <div className="space-y-4">
+            {canEdit && (
+                <DialogToolbar className="px-0">
+                    <ActionButton
+                        action="save"
+                        type="button"
+                        disabled={saving}
+                        onClick={() => void save()}
+                        pending={saving}
+                    />
+                </DialogToolbar>
+            )}
             <p className="text-muted-foreground text-sm">
                 Pilih jenis pekerjaan yang dapat dipakai oleh jenis aset ini.
             </p>
@@ -145,15 +158,7 @@ export default function JenisAsetMaintenanceJobTypes({
                 remainingEmptyLabel="Semua pekerjaan sudah terpilih."
                 selectedEmptyLabel="Belum ada pekerjaan yang dipilih."
             />
-            {canEdit && (
-                <Button
-                    type="button"
-                    disabled={saving}
-                    onClick={() => void save()}
-                >
-                    {saving ? 'Menyimpan…' : 'Simpan jenis pekerjaan'}
-                </Button>
-            )}
+
             {saved && (
                 <p className="text-muted-foreground text-sm">
                     Relasi jenis pekerjaan tersimpan.

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Button } from '@apperp/ui/button';
+import { ActionButton } from '@apperp/ui/action-button';
+
 import {
     Card,
     CardAction,
@@ -7,6 +8,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@apperp/ui/card';
+
 import {
     Empty,
     EmptyDescription,
@@ -16,12 +18,12 @@ import {
 import { Field } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import {
-    Sheet,
-    SheetContent,
-    SheetFooter,
-    SheetHeader,
-    SheetTitle,
-} from '@apperp/ui/sheet';
+    PageDialog,
+    PageDialogContent,
+    PageDialogToolbar,
+    PageDialogBody,
+} from '@apperp/ui/page-dialog';
+
 import {
     api,
     errorMessage,
@@ -56,6 +58,7 @@ export default function LifecycleDocumentPage({
     const [open, setOpen] = useState(false);
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
+    const [draftDirty, setDraftDirty] = useState(false);
     const load = useCallback(
         () =>
             api<{ data: Record[] }>('/' + config.resource)
@@ -104,14 +107,28 @@ export default function LifecycleDocumentPage({
         }
     }
 
+    const closeDocument = () => {
+        if (
+            !saving &&
+            (!draftDirty ||
+                window.confirm('Buang perubahan yang belum disimpan?'))
+        ) {
+            setOpen(false);
+        }
+    };
+
     return (
         <Card className="min-h-full rounded-none border-0 shadow-none">
-            <CardHeader className="border-b px-5 py-3">
+            <CardHeader className="border-b">
                 <CardTitle>{config.title}</CardTitle>
                 <CardAction>
-                    <Button onClick={() => setOpen(true)}>
-                        {config.action}
-                    </Button>
+                    <ActionButton
+                        action="create"
+                        onClick={() => {
+                            setDraftDirty(false);
+                            setOpen(true);
+                        }}
+                    />
                 </CardAction>
             </CardHeader>
             <CardContent className="px-0">
@@ -153,64 +170,72 @@ export default function LifecycleDocumentPage({
                     </div>
                 )}
             </CardContent>
-            <Sheet open={open} onOpenChange={setOpen}>
-                <SheetContent side="right">
-                    <SheetHeader>
-                        <SheetTitle>{config.action}</SheetTitle>
-                    </SheetHeader>
+            <PageDialog
+                open={open}
+                onOpenChange={(value) => {
+                    if (!value) {
+                        closeDocument();
+                    }
+                }}
+            >
+                <PageDialogContent title={config.title} busy={saving}>
                     <form
-                        className="space-y-4 p-4"
+                        onChangeCapture={() => setDraftDirty(true)}
+                        className="flex min-h-0 flex-1 flex-col"
                         onSubmit={(event) => {
                             event.preventDefault();
                             void save(event.currentTarget);
                         }}
                     >
-                        <Field>
-                            <Input
-                                name="tanggal"
-                                label="Tanggal"
-                                type="date"
-                                required
+                        <PageDialogToolbar>
+                            <ActionButton
+                                action="save"
+                                type="submit"
+                                disabled={saving}
+                                pending={saving}
                             />
-                        </Field>
-                        {config.needsAset && (
+                            <ActionButton
+                                action="cancel"
+                                type="button"
+                                onClick={closeDocument}
+                            />
+                        </PageDialogToolbar>
+                        <PageDialogBody className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
                             <Field>
                                 <Input
-                                    name="aset_id"
-                                    label="ID aset"
+                                    name="tanggal"
+                                    label="Tanggal"
+                                    type="date"
                                     required
                                 />
                             </Field>
-                        )}
-                        {config.financial && (
+                            {config.needsAset && (
+                                <Field>
+                                    <Input
+                                        name="aset_id"
+                                        label="ID aset"
+                                        required
+                                    />
+                                </Field>
+                            )}
+                            {config.financial && (
+                                <Field>
+                                    <Input
+                                        name="nilai"
+                                        label="Nilai usulan"
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                    />
+                                </Field>
+                            )}
                             <Field>
-                                <Input
-                                    name="nilai"
-                                    label="Nilai usulan"
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                />
+                                <Input name="keterangan" label="Keterangan" />
                             </Field>
-                        )}
-                        <Field>
-                            <Input name="keterangan" label="Keterangan" />
-                        </Field>
-                        <SheetFooter>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setOpen(false)}
-                            >
-                                Batal
-                            </Button>
-                            <Button type="submit" disabled={saving}>
-                                {saving ? 'Menyimpan…' : 'Simpan'}
-                            </Button>
-                        </SheetFooter>
+                        </PageDialogBody>
                     </form>
-                </SheetContent>
-            </Sheet>
+                </PageDialogContent>
+            </PageDialog>
         </Card>
     );
 }

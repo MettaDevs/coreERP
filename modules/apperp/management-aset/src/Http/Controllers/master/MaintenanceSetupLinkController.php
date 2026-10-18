@@ -53,12 +53,18 @@ final class MaintenanceSetupLinkController extends Controller
 
     public function replaceJobTypeAsetTypes(Request $request, string $jobTypeId): JsonResponse
     {
+        return $this->replaceJobTypeAsetTypesPayload($request, $jobTypeId, $request->all());
+    }
+
+    /** @param array<string, mixed> $payload */
+    public function replaceJobTypeAsetTypesPayload(Request $request, string $jobTypeId, array $payload, ?int $expectedVersion = null): JsonResponse
+    {
         $tenant = $this->tenant($request);
         $this->jobType($jobTypeId);
         $this->permission($request, 'maintenance-job-types', 'update');
 
-        $data = $request->validate($this->asetTypeIdsRules($tenant));
-        $this->replaceAsetTypeLink($jobTypeId, $data['jenis_aset_ids'], RowVersion::expected($request));
+        $data = validator($payload, $this->asetTypeIdsRules($tenant))->validate();
+        $this->replaceAsetTypeLink($jobTypeId, $data['jenis_aset_ids'], $expectedVersion ?? RowVersion::expected($request));
 
         return response()->json($this->asetTypeTransfer($jobTypeId, 'job_type_id', MaintenanceJobType::class));
     }
@@ -73,12 +79,18 @@ final class MaintenanceSetupLinkController extends Controller
 
     public function replaceJenisAsetAsetTypes(Request $request, string $jenisAsetId): JsonResponse
     {
+        return $this->replaceJenisAsetAsetTypesPayload($request, $jenisAsetId, $request->all());
+    }
+
+    /** @param array<string, mixed> $payload */
+    public function replaceJenisAsetAsetTypesPayload(Request $request, string $jenisAsetId, array $payload, ?int $expectedVersion = null): JsonResponse
+    {
         $tenant = $this->tenant($request);
         $this->jenisAset($jenisAsetId);
         $this->permission($request, 'jenis-aset', 'update');
 
-        $data = $request->validate($this->jobTypeIdsRules($tenant));
-        $expected = RowVersion::expected($request);
+        $data = validator($payload, $this->jobTypeIdsRules($tenant))->validate();
+        $expected = ($expectedVersion ?? RowVersion::expected($request));
         DB::transaction(function () use ($jenisAsetId, $data, $expected): void {
             // Kunci job type diambil lebih dulu, baru versi jenis aset diklaim: arah yang satunya
             // mengunci job type lalu jenis aset, jadi urutan kuncinya sama dan tidak saling menunggu.
@@ -116,15 +128,21 @@ final class MaintenanceSetupLinkController extends Controller
 
     public function replaceVariableValues(Request $request, string $variableId): JsonResponse
     {
+        return $this->replaceVariableValuesPayload($request, $variableId, $request->all());
+    }
+
+    /** @param array<string, mixed> $payload */
+    public function replaceVariableValuesPayload(Request $request, string $variableId, array $payload, ?int $expectedVersion = null): JsonResponse
+    {
         $this->record(MaintenanceChecklistVariable::class, $variableId);
         $this->permission($request, 'maintenance-checklist-variables', 'update');
-        $data = $request->validate([
+        $data = validator($payload, [
             'values' => ['present', 'array', 'max:100'],
-            'values.*.line_number' => ['required', 'numeric', 'min:1'],
+            'values.*.line_number' => ['required', 'numeric', 'min:1', 'distinct'],
             'values.*.value' => ['required', 'string', 'max:255'],
             'values.*.result_code' => ['required', Rule::in(['pass', 'fail', 'none'])],
-        ]);
-        $expected = RowVersion::expected($request);
+        ])->validate();
+        $expected = ($expectedVersion ?? RowVersion::expected($request));
         DB::transaction(function () use ($variableId, $data, $expected): void {
             RowVersion::claim(MaintenanceChecklistVariable::query()->findOrFail($variableId), $expected);
             MaintenanceChecklistVariableValue::query()->where('variable_id', $variableId)->delete();
@@ -153,12 +171,18 @@ final class MaintenanceSetupLinkController extends Controller
 
     public function replaceTemplateLines(Request $request, string $templateId): JsonResponse
     {
+        return $this->replaceTemplateLinesPayload($request, $templateId, $request->all());
+    }
+
+    /** @param array<string, mixed> $payload */
+    public function replaceTemplateLinesPayload(Request $request, string $templateId, array $payload, ?int $expectedVersion = null): JsonResponse
+    {
         $tenant = $this->tenant($request);
         $this->record(MaintenanceChecklistTemplate::class, $templateId);
         $this->permission($request, 'maintenance-checklist-templates', 'update');
-        $data = $request->validate([
+        $data = validator($payload, [
             'lines' => ['present', 'array', 'max:100'],
-            'lines.*.line_number' => ['required', 'numeric', 'min:1'],
+            'lines.*.line_number' => ['required', 'numeric', 'min:1', 'distinct'],
             'lines.*.type' => ['required', Rule::in(['header', 'text', 'measurement', 'variable', 'template'])],
             'lines.*.nama' => ['required', 'string', 'max:255'],
             'lines.*.instruksi' => ['sometimes', 'nullable', 'string', 'max:2000'],
@@ -170,9 +194,9 @@ final class MaintenanceSetupLinkController extends Controller
             'lines.*.nested_template_id' => ['sometimes', 'nullable', 'ulid', Rule::exists('aset_m_maintenance_checklist_template', 'id')->where('tenant_id', $tenant)],
         ], [
             'lines.*.nama.required' => 'Nama baris wajib diisi.',
-        ]);
+        ])->validate();
         $unitCodes = $this->measurementUnitCodes($tenant, $data['lines']);
-        $expected = RowVersion::expected($request);
+        $expected = ($expectedVersion ?? RowVersion::expected($request));
 
         DB::transaction(function () use ($templateId, $data, $unitCodes, $expected): void {
             RowVersion::claim(MaintenanceChecklistTemplate::query()->findOrFail($templateId), $expected);

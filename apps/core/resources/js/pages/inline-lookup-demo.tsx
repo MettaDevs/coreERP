@@ -7,9 +7,6 @@ import {
     PageDialog as Dialog,
     PageDialogBody as DialogBody,
     PageDialogContent as DialogContent,
-    PageDialogDescription as DialogDescription,
-    PageDialogHeader as DialogHeader,
-    PageDialogTitle as DialogTitle,
     PageDialogTrigger as DialogTrigger,
 } from '@apperp/ui/page-dialog';
 import { useId, useRef, useState } from 'react';
@@ -263,16 +260,11 @@ export function InlineLookupDemo() {
                             event.preventDefault();
                         }
                     }}
+                    title={'Dropdown dengan pencarian di field'}
+                    description={
+                        'Coba mengetik, memilih, dan membatalkan pencarian di\n                            dalam dialog.'
+                    }
                 >
-                    <DialogHeader>
-                        <DialogTitle>
-                            Dropdown dengan pencarian di field
-                        </DialogTitle>
-                        <DialogDescription>
-                            Coba mengetik, memilih, dan membatalkan pencarian di
-                            dalam dialog.
-                        </DialogDescription>
-                    </DialogHeader>
                     <DialogBody>
                         <InlineLookupField
                             portalContainer={dialogRef}

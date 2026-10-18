@@ -15,10 +15,9 @@ import {
 import { Button } from '@apperp/ui/button';
 import { Checkbox } from '@apperp/ui/checkbox';
 import {
+    DialogClose,
     Dialog,
-    DialogAction,
     DialogBody,
-    DialogCancel,
     DialogContent,
     DialogDescription,
     DialogFooter,
@@ -201,9 +200,7 @@ export function ReportPresets({
                     action="archive"
                     type="button"
                     onClick={() => setArchiving(true)}
-                >
-                    Arsipkan preset
-                </ActionButton>
+                />
             )}
 
             <Dialog open={saving} onOpenChange={setSaving}>
@@ -276,14 +273,16 @@ export function ReportPresets({
                         )}
                     </DialogBody>
                     <DialogFooter>
-                        <DialogAction
+                        <ActionButton
+                            action="save"
                             type="button"
                             disabled={busy}
                             onClick={() => void save()}
-                        >
-                            {busy ? 'Menyimpan…' : 'Simpan preset'}
-                        </DialogAction>
-                        <DialogCancel type="button">Batal</DialogCancel>
+                            pending={busy}
+                        />
+                        <DialogClose asChild>
+                            <ActionButton action="cancel" type="button" />
+                        </DialogClose>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -295,7 +294,7 @@ export function ReportPresets({
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>
-                            Arsipkan preset {selected?.name ?? ''}?
+                            Delete preset {selected?.name ?? ''}?
                         </AlertDialogTitle>
                         <AlertDialogDescription>
                             {selected?.shared
@@ -307,8 +306,11 @@ export function ReportPresets({
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Batal</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => void archive()}>
-                            Arsipkan
+                        <AlertDialogAction
+                            onClick={() => void archive()}
+                            asChild
+                        >
+                            <ActionButton action="archive" />
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

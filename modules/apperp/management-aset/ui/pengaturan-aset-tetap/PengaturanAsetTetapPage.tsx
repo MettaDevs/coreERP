@@ -124,22 +124,22 @@ export default function PengaturanAsetTetapPage({
                         action="edit"
                         type="button"
                         onClick={() => setMengubah(true)}
-                    >
-                        Ubah
-                    </ActionButton>
+                    />
                 )}
                 {mengubah && (
                     <>
-                        <Button type="button" variant="outline" onClick={batal}>
-                            Batal
-                        </Button>
-                        <Button
+                        <ActionButton
+                            action="save"
                             type="button"
                             onClick={() => void simpan()}
                             disabled={menyimpan}
-                        >
-                            {menyimpan ? 'Menyimpan…' : 'Simpan'}
-                        </Button>
+                            pending={menyimpan}
+                        />
+                        <ActionButton
+                            action="cancel"
+                            type="button"
+                            onClick={batal}
+                        />
                     </>
                 )}
             </RecordActionBar>

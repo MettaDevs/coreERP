@@ -11,7 +11,7 @@ import {
     AlertDialogTrigger,
 } from '@apperp/ui/alert-dialog';
 import { Badge } from '@apperp/ui/badge';
-import { Button } from '@apperp/ui/button';
+
 import {
     Field,
     FieldDescription,
@@ -20,6 +20,7 @@ import {
 } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
+import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Switch } from '@apperp/ui/switch';
 import {
     Table,
@@ -29,7 +30,7 @@ import {
     TableHeader,
     TableRow,
 } from '@apperp/ui/table';
-import { Plus } from 'lucide-react';
+
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -239,6 +240,15 @@ export function FinancePostingSection({
 
                 {canManage && (
                     <div className="grid gap-4 rounded-lg border p-4 md:grid-cols-2">
+                        <RecordActionBar className="md:col-span-2">
+                            <ActionButton
+                                action="save"
+                                type="button"
+                                onClick={save}
+                                disabled={saving}
+                            />
+                        </RecordActionBar>
+
                         <Field orientation="horizontal">
                             <Switch
                                 id={`feed-${organizationId}`}
@@ -268,16 +278,6 @@ export function FinancePostingSection({
                                 {saveErrors.cutover_date?.[0]}
                             </FieldError>
                         </Field>
-                        <div className="md:col-span-2">
-                            <Button
-                                type="button"
-                                size="sm"
-                                onClick={save}
-                                disabled={saving}
-                            >
-                                Simpan setelan posting
-                            </Button>
-                        </div>
                     </div>
                 )}
             </div>
@@ -338,10 +338,7 @@ export function FinancePostingSection({
                                                             <ActionButton
                                                                 action="delete"
                                                                 type="button"
-                                                                size="sm"
-                                                            >
-                                                                Hapus
-                                                            </ActionButton>
+                                                            />
                                                         </AlertDialogTrigger>
                                                         <AlertDialogContent>
                                                             <AlertDialogHeader>
@@ -437,16 +434,13 @@ export function FinancePostingSection({
                                 {modeErrors.effective_from?.[0]}
                             </FieldError>
                         </Field>
-                        <Button
+                        <ActionButton
+                            action="create"
                             type="button"
-                            size="sm"
                             className="md:mt-1"
                             onClick={addMode}
                             disabled={addingMode || newFrom === ''}
-                        >
-                            <Plus className="mr-1.5 size-3.5" />
-                            Tambah kebijakan
-                        </Button>
+                        />
                     </div>
                 )}
             </div>

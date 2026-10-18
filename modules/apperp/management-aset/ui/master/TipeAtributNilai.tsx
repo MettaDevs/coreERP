@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button } from '@apperp/ui/button';
+import { ActionButton } from '@apperp/ui/action-button';
+
 import { Field } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { api, errorMessage } from '../api';
@@ -129,16 +130,13 @@ export default function TipeAtributNilai({
                         />
                     </Field>
                     {canEdit && (
-                        <Button
-                            variant="outline"
-                            size="sm"
+                        <ActionButton
+                            action="delete"
                             type="button"
                             onClick={() =>
                                 setRows(rows.filter((_, i) => i !== index))
                             }
-                        >
-                            Hapus
-                        </Button>
+                        />
                     )}
                 </div>
             ))}
@@ -152,20 +150,18 @@ export default function TipeAtributNilai({
 
             {canEdit && (
                 <div className="flex gap-2">
-                    <Button
-                        variant="outline"
+                    <ActionButton
+                        action="add"
                         type="button"
                         onClick={() => setRows([...rows, { nilai: '' }])}
-                    >
-                        Tambah pilihan
-                    </Button>
-                    <Button
+                    />
+                    <ActionButton
+                        action="save"
                         type="button"
                         disabled={saving}
                         onClick={() => void save()}
-                    >
-                        {saving ? 'Menyimpan…' : 'Simpan pilihan'}
-                    </Button>
+                        pending={saving}
+                    />
                 </div>
             )}
         </div>
