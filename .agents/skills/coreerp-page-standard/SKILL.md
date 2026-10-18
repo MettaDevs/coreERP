@@ -17,6 +17,10 @@ Apply `coreerp-ui` first. Treat an existing Core page with the same job as the v
 5. Compare desktop/mobile, light/dark, keyboard focus, loading, error, populated, and empty states.
 6. Build or type-check the changed package.
 
+## Memilih daftar dan kartu record
+
+Entitas kompleks, misalnya aset dengan banyak field dan relasi, memakai DataTable sebagai daftar dan `PageDialog` SDK sebagai kartu Tambah/Detail/Ubah. Split view dipilih untuk alur konfigurasi atau pemeriksaan berdampingan yang memang memerlukannya; banyak field saja tidak membuat split view menjadi pilihan yang benar. Pertahankan konteks daftar saat kartu dibuka, pisahkan izin baca/edit/create, dan jaga draft serta error penyimpanan.
+
 ## Page hierarchy
 
 - Use one content title. Do not add uppercase category eyebrows such as "MASTER DATA" unless the reference page has one for a real user need.
@@ -66,7 +70,7 @@ Apply `coreerp-ui` first. Treat an existing Core page with the same job as the v
 - App manifests provide labels and permissions; Shell renders navigation.
 - Do not invent placeholder dots or circles for items without meaningful icons. Text-only child navigation is valid.
 - Use a real icon only when it consistently communicates the destination.
-- Long labels may truncate, but retain the full accessible name.
+- Label menu sidebar tampil penuh tanpa titik-titik atau line clamp. Label panjang membungkus dan tinggi item mengikuti isinya. Menu aktif tidak mengubah ukuran maupun ketebalan huruf; gunakan warna, latar, atau indikator untuk menandainya.
 - Navigation is declared in the module manifest and rendered by the Core Shell; modules do not announce readiness through an iframe/message handshake.
 
 ## Acceptance

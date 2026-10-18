@@ -5,7 +5,6 @@ import type { PropsWithChildren } from 'react';
 import Heading from '@/components/heading';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { cn, toUrl } from '@/lib/utils';
-import { edit as editAppearance } from '@/routes/appearance';
 import { edit } from '@/routes/profile';
 import { edit as editSecurity } from '@/routes/security';
 import type { NavItem } from '@/types';
@@ -47,18 +46,13 @@ const sidebarNavItems: NavItem[] = [
         icon: null,
     },
     {
-        title: 'Profile',
+        title: 'Profil',
         href: edit(),
         icon: null,
     },
     {
-        title: 'Security',
+        title: 'Keamanan',
         href: editSecurity(),
-        icon: null,
-    },
-    {
-        title: 'Appearance',
-        href: editAppearance(),
         icon: null,
     },
 ];

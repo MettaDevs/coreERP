@@ -1,30 +1,40 @@
 import { ActionButton } from '@apperp/ui/action-button';
+import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
-import { Card, CardContent } from '@apperp/ui/card';
 import { Checkbox } from '@apperp/ui/checkbox';
+import {
+    CollapsibleSection,
+    CollapsibleSectionGroup,
+} from '@apperp/ui/collapsible-section';
+import {
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyTitle,
+} from '@apperp/ui/empty';
+import {
+    Field,
+    FieldDescription,
+    FieldError,
+    FieldHint,
+    FieldLabel,
+} from '@apperp/ui/field';
+import { IncrementalListStatus } from '@apperp/ui/incremental-list-status';
 import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { MasterDetailLayout } from '@apperp/ui/master-detail-layout';
 import { NativeSelect } from '@apperp/ui/native-select';
+import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import {
     RecordEditBoundary,
     RecordEditControl,
 } from '@apperp/ui/record-edit-boundary';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@apperp/ui/tooltip';
+import { useIncrementalList } from '@apperp/ui/use-incremental-list';
+import type { ListLoader } from '@apperp/ui/use-incremental-list';
 import { Head, useForm } from '@inertiajs/react';
-import {
-    ArrowLeft,
-    ChevronRight,
-    CircleAlert,
-    GripVertical,
-    Hash,
-    Plus,
-    Save,
-    Search,
-    Trash2,
-} from 'lucide-react';
-import { useState } from 'react';
-import Heading from '@/components/heading';
+import { ArrowDown, ArrowUp, CircleHelp, Save, X } from 'lucide-react';
+import { useId, useState } from 'react';
+import { apiJson, CoreApiError, errorText } from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
 
 type Segment = {
@@ -64,7 +74,6 @@ type Sequence = {
 type Props = {
     canManage: boolean;
     tenant: { id: string; name: string };
-    sequences: Sequence[];
     profiles: { code: string; name: string }[];
 };
 
@@ -88,114 +97,98 @@ function SegmentEditor({
     value,
     onChange,
     contextFields,
-    disabled = false,
+    disabled,
 }: {
     value: Segment[];
-    contextFields: Segment[];
     onChange: (segments: Segment[]) => void;
-    disabled?: boolean;
+    contextFields: Segment[];
+    disabled: boolean;
 }) {
-    const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-
     const update = (index: number, patch: Partial<Segment>) =>
         onChange(
             value.map((segment, current) =>
                 current === index ? { ...segment, ...patch } : segment,
             ),
         );
-
-    const handleDragStart = (index: number) => {
-        setDraggedIndex(index);
-    };
-
-    const handleDragOver = (event: React.DragEvent, targetIndex: number) => {
-        event.preventDefault();
-
-        if (draggedIndex === null || draggedIndex === targetIndex) {
-            return;
-        }
-
+    const move = (index: number, offset: number) => {
         const next = [...value];
-        const [movedItem] = next.splice(draggedIndex, 1);
-        next.splice(targetIndex, 0, movedItem);
-        setDraggedIndex(targetIndex);
+        const [segment] = next.splice(index, 1);
+        next.splice(index + offset, 0, segment);
         onChange(next);
     };
 
-    const handleDragEnd = () => {
-        setDraggedIndex(null);
-    };
-
     return (
-        <div className="space-y-2.5">
+        <div className="space-y-4">
             {value.map((segment, index) => (
-                <div
-                    key={`${segment.type}-${index}`}
-                    draggable={!disabled}
-                    onDragStart={() => handleDragStart(index)}
-                    onDragOver={(e) => handleDragOver(e, index)}
-                    onDragEnd={handleDragEnd}
-                    className={`flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3 shadow-xs transition-all ${
-                        draggedIndex === index
-                            ? 'scale-[0.99] border-primary opacity-40 ring-2 ring-primary/20'
-                            : 'hover:border-primary/40'
-                    } ${!disabled ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                <fieldset
+                    key={index}
+                    className="min-w-0 space-y-4 rounded-lg border p-4"
+                    disabled={disabled}
                 >
-                    <div className="flex items-center gap-2">
-                        <GripVertical className="size-4 shrink-0 text-muted-foreground/50 hover:text-foreground" />
-                        <span className="min-w-[3.5rem] text-xs font-semibold text-muted-foreground">
-                            Bagian {index + 1}
-                        </span>
-                    </div>
+                    <legend className="px-1 text-sm font-medium">
+                        Bagian {index + 1}
+                    </legend>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <NativeSelect
+                            label="Jenis bagian"
+                            value={segment.type}
+                            onChange={(event) => {
+                                const type = event.target.value;
 
-                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-                        {/* Wrapper berukuran tetap untuk Dropdown Tipe */}
-                        <div className="w-48 shrink-0">
-                            <NativeSelect
-                                value={segment.type}
-                                disabled={disabled}
-                                onChange={(event) =>
-                                    update(index, {
-                                        type: event.target
-                                            .value as Segment['type'],
-                                        value: '',
-                                        length:
-                                            event.target.value === 'context'
-                                                ? 20
-                                                : event.target.value ===
-                                                    'number'
-                                                  ? 5
-                                                  : event.target.value ===
-                                                      'fiscal_period'
-                                                    ? 2
-                                                    : undefined,
-                                    })
+                                if (
+                                    type !== 'constant' &&
+                                    type !== 'number' &&
+                                    type !== 'context' &&
+                                    type !== 'year' &&
+                                    type !== 'scope' &&
+                                    type !== 'fiscal_year' &&
+                                    type !== 'fiscal_period'
+                                ) {
+                                    return;
                                 }
-                            >
-                                <option value="constant">Teks tetap</option>
-                                <option value="number">Nomor urut</option>
-                                {contextFields.length > 0 && (
-                                    <option value="context">
-                                        Data dari formulir
-                                    </option>
-                                )}
-                                <option value="year">Tahun kalender</option>
-                                <option value="scope">Kode organisasi</option>
-                                <option value="fiscal_year">
-                                    Tahun fiskal
-                                </option>
-                                <option value="fiscal_period">
-                                    Periode fiskal
-                                </option>
-                            </NativeSelect>
-                        </div>
 
-                        {/* Input Textfield Mengisi Sisa Ruang (flex-1) */}
+                                update(index, {
+                                    type,
+                                    value: '',
+                                    name: undefined,
+                                    length:
+                                        type === 'context'
+                                            ? 20
+                                            : type === 'number'
+                                              ? 5
+                                              : type === 'fiscal_period'
+                                                ? 2
+                                                : undefined,
+                                });
+                            }}
+                        >
+                            <option value="constant">Teks tetap</option>
+                            <option value="number">Nomor urut</option>
+                            {contextFields.length > 0 && (
+                                <option value="context">
+                                    Data dari formulir
+                                </option>
+                            )}
+                            <option value="year">Tahun kalender</option>
+                            <option value="scope">Kode organisasi</option>
+                            <option value="fiscal_year">Tahun fiskal</option>
+                            <option value="fiscal_period">
+                                Periode fiskal
+                            </option>
+                        </NativeSelect>
+                        {segment.type === 'constant' && (
+                            <Input
+                                label="Teks tetap"
+                                value={segment.value ?? ''}
+                                onChange={(event) =>
+                                    update(index, { value: event.target.value })
+                                }
+                            />
+                        )}
                         {segment.type === 'context' && (
                             <NativeSelect
-                                aria-label="Bagian kode"
+                                label="Bagian kode"
                                 value={segment.value ?? ''}
-                                disabled={disabled}
                                 onChange={(event) => {
                                     const field = contextFields.find(
                                         (item) =>
@@ -219,137 +212,146 @@ function SegmentEditor({
                                 ))}
                             </NativeSelect>
                         )}
-                        {segment.type === 'constant' && (
-                            <div className="min-w-0 flex-1">
-                                <Input
-                                    aria-label="Teks tetap"
-                                    placeholder="Masukkan nilai teks (contoh: MDLA)"
-                                    className="w-full font-mono text-xs"
-                                    disabled={disabled}
-                                    value={segment.value ?? ''}
-                                    onChange={(event) =>
-                                        update(index, {
-                                            value: event.target.value,
-                                        })
-                                    }
-                                />
-                            </div>
-                        )}
                         {(segment.type === 'number' ||
-                            segment.type === 'context') && (
-                            <div className="flex min-w-0 flex-1 items-center gap-2">
-                                <Input
-                                    aria-label={
-                                        segment.type === 'context'
-                                            ? 'Panjang maksimal kode'
-                                            : 'Jumlah digit'
-                                    }
-                                    className="min-w-0 flex-1 font-mono text-xs"
-                                    type="number"
-                                    min="1"
-                                    max={segment.type === 'context' ? 50 : 18}
-                                    disabled={disabled}
-                                    value={segment.length ?? 5}
-                                    onChange={(event) =>
-                                        update(index, {
-                                            length: Number(event.target.value),
-                                        })
-                                    }
-                                />
-                                <span className="shrink-0 font-mono text-xs whitespace-nowrap text-muted-foreground">
-                                    {segment.type === 'context' ? (
-                                        'karakter'
-                                    ) : (
-                                        <>
-                                            digit (
-                                            {'0'.repeat(
-                                                Math.min(
-                                                    segment.length ?? 5,
-                                                    8,
-                                                ),
-                                            )}
-                                            )
-                                        </>
-                                    )}
-                                </span>
-                            </div>
-                        )}
-                        {segment.type === 'fiscal_period' && (
-                            <div className="flex min-w-0 flex-1 items-center gap-2">
-                                <Input
-                                    aria-label="Jumlah digit periode"
-                                    className="min-w-0 flex-1 font-mono text-xs"
-                                    type="number"
-                                    min="1"
-                                    max="4"
-                                    disabled={disabled}
-                                    value={segment.length ?? 2}
-                                    onChange={(event) =>
-                                        update(index, {
-                                            length: Number(event.target.value),
-                                        })
-                                    }
-                                />
-                                <span className="shrink-0 text-xs whitespace-nowrap text-muted-foreground">
-                                    digit
-                                </span>
-                            </div>
+                            segment.type === 'context' ||
+                            segment.type === 'fiscal_period') && (
+                            <Input
+                                label={
+                                    segment.type === 'context'
+                                        ? 'Panjang maksimal kode'
+                                        : 'Jumlah digit'
+                                }
+                                type="number"
+                                min={1}
+                                max={
+                                    segment.type === 'context'
+                                        ? 50
+                                        : segment.type === 'fiscal_period'
+                                          ? 4
+                                          : 18
+                                }
+                                value={
+                                    segment.length ??
+                                    (segment.type === 'fiscal_period' ? 2 : 5)
+                                }
+                                onChange={(event) =>
+                                    update(index, {
+                                        length: Number(event.target.value),
+                                    })
+                                }
+                            />
                         )}
                         {(segment.type === 'year' ||
                             segment.type === 'scope' ||
                             segment.type === 'fiscal_year') && (
-                            <div className="min-w-0 flex-1">
-                                <Input
-                                    disabled
-                                    className="w-full bg-muted/40 font-mono text-xs text-muted-foreground"
-                                    value={
-                                        segment.type === 'year'
-                                            ? String(new Date().getFullYear())
-                                            : segment.type === 'scope'
-                                              ? 'ORG'
-                                              : `FY${new Date().getFullYear()}`
-                                    }
-                                    aria-label="Nilai otomatis"
-                                />
-                            </div>
+                            <Input
+                                label="Nilai otomatis"
+                                readOnly
+                                editActivation={false}
+                                value={
+                                    segment.type === 'year'
+                                        ? String(new Date().getFullYear())
+                                        : segment.type === 'scope'
+                                          ? 'Kode organisasi saat dipakai'
+                                          : 'Tahun fiskal saat dipakai'
+                                }
+                            />
                         )}
                     </div>
-
                     {!disabled && (
-                        <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            className="ml-auto h-8 w-8 text-destructive hover:bg-destructive/10"
-                            onClick={() =>
-                                onChange(
-                                    value.filter(
-                                        (_, current) => current !== index,
-                                    ),
-                                )
-                            }
-                            title="Hapus bagian"
-                        >
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex flex-wrap gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={index === 0}
+                                onClick={() => move(index, -1)}
+                                aria-label={`Pindahkan bagian ${index + 1} ke atas`}
+                            >
+                                <ArrowUp /> Naik
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={index === value.length - 1}
+                                onClick={() => move(index, 1)}
+                                aria-label={`Pindahkan bagian ${index + 1} ke bawah`}
+                            >
+                                <ArrowDown /> Turun
+                            </Button>
+                            <ActionButton
+                                type="button"
+                                action="delete"
+                                size="sm"
+                                onClick={() =>
+                                    onChange(
+                                        value.filter(
+                                            (_, current) => current !== index,
+                                        ),
+                                    )
+                                }
+                            >
+                                Hapus bagian
+                            </ActionButton>
+                        </div>
                     )}
-                </div>
+                </fieldset>
             ))}
-
             {!disabled && (
-                <Button
+                <ActionButton
                     type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-full justify-center border-dashed border-primary/40 py-2.5 text-xs font-medium text-primary transition-colors hover:bg-primary/5 hover:text-primary"
+                    action="create"
                     onClick={() =>
                         onChange([...value, { type: 'constant', value: '' }])
                     }
                 >
-                    <Plus className="mr-1.5 size-4" /> Tambah bagian format
-                </Button>
+                    Tambah bagian
+                </ActionButton>
             )}
         </div>
+    );
+}
+
+function SequenceCheckbox({
+    label,
+    checked,
+    disabled,
+    onCheckedChange,
+    hint,
+}: {
+    label: string;
+    checked: boolean;
+    disabled: boolean;
+    onCheckedChange: (checked: boolean) => void;
+    hint?: string;
+}) {
+    const id = useId();
+
+    return (
+        <RecordEditControl label={label}>
+            <Field orientation="horizontal">
+                <Checkbox
+                    id={id}
+                    checked={checked}
+                    disabled={disabled}
+                    onCheckedChange={(value) => onCheckedChange(value === true)}
+                />
+                <FieldLabel htmlFor={id}>{label}</FieldLabel>
+                {hint && (
+                    <FieldHint hint={hint}>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`Bantuan ${label}`}
+                        >
+                            <CircleHelp />
+                        </Button>
+                    </FieldHint>
+                )}
+            </Field>
+        </RecordEditControl>
     );
 }
 
@@ -357,12 +359,17 @@ function SequenceForm({
     sequence,
     profiles,
     canManage,
+    onSaved,
 }: {
     sequence: Sequence;
     profiles: Props['profiles'];
     canManage: boolean;
+    onSaved: (sequence: Sequence) => void;
 }) {
     const [editing, setEditing] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState('');
+    const [errors, setErrors] = useState<Record<string, string[]>>({});
     const form = useForm({
         profile_code: sequence.profile_code,
         scope_type: sequence.scope_type,
@@ -377,13 +384,53 @@ function SequenceForm({
         maximum_number: sequence.maximum_number?.toString() ?? '',
         segments: sequence.segments,
     });
-    const error = Object.values(form.errors)[0];
+    const unavailable = !canManage || saving;
+    async function save() {
+        if (!editing || !canManage || saving) {
+            return;
+        }
+
+        setSaving(true);
+        setSaveError('');
+        setErrors({});
+
+        try {
+            const result = await apiJson<{ data: Sequence }>(
+                `/api/v1/number-sequences/${sequence.id}`,
+                {
+                    method: 'PATCH',
+                    body: JSON.stringify({
+                        ...form.data,
+                        maximum_number:
+                            form.data.maximum_number === ''
+                                ? null
+                                : Number(form.data.maximum_number),
+                        version: sequence.version,
+                    }),
+                },
+            );
+            onSaved(result.data);
+        } catch (caught) {
+            setSaveError(
+                errorText(
+                    caught,
+                    'Pengaturan nomor belum dapat disimpan. Coba lagi.',
+                ),
+            );
+
+            if (caught instanceof CoreApiError) {
+                setErrors(caught.errors);
+            }
+        } finally {
+            setSaving(false);
+        }
+    }
 
     return (
         <RecordEditBoundary
             editing={editing}
             canEdit={canManage}
-            disabled={form.processing}
+            disabled={saving}
             onEdit={() => setEditing(true)}
             className="flex h-full min-h-0 min-w-0 flex-col"
         >
@@ -391,55 +438,15 @@ function SequenceForm({
                 className="flex min-h-0 flex-1 flex-col"
                 onSubmit={(event) => {
                     event.preventDefault();
-                    form.transform((data) => ({
-                        ...data,
-                        maximum_number:
-                            data.maximum_number === ''
-                                ? null
-                                : Number(data.maximum_number),
-                        version: sequence.version,
-                    }));
-
-                    if (editing && canManage) {
-                        form.patch(
-                            `/settings/number-sequences/${sequence.id}`,
-                            { onSuccess: () => setEditing(false) },
-                        );
-                    }
+                    void save();
                 }}
             >
-                {/* Header Sticky: Icon Badge & Judul dengan Icon Info Penjelas */}
-                <div className="sticky top-0 z-10 flex shrink-0 flex-wrap items-center justify-between gap-4 border-b border-border bg-card px-6 py-4">
-                    <div className="flex items-center gap-3.5">
-                        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                            <Hash className="size-5" />
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <h2 className="text-lg font-bold tracking-tight text-foreground">
-                                {sequence.reference_name}
-                            </h2>
-                            <Tooltip clickToPin>
-                                <TooltipTrigger asChild>
-                                    <button
-                                        type="button"
-                                        aria-label="Lihat penjelasan"
-                                        className="shrink-0 cursor-pointer rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                    >
-                                        <CircleAlert className="size-4" />
-                                    </button>
-                                </TooltipTrigger>
-                                <TooltipContent
-                                    side="right"
-                                    className="max-w-72"
-                                >
-                                    Konfigurasi format nomor dokumen untuk{' '}
-                                    <span className="font-semibold">
-                                        {sequence.app_name}
-                                    </span>
-                                </TooltipContent>
-                            </Tooltip>
-                        </div>
-                    </div>
+                <RecordActionBar
+                    title={sequence.reference_name}
+                    trailing={
+                        <Badge variant="outline">{sequence.app_name}</Badge>
+                    }
+                >
                     {canManage && !editing && (
                         <ActionButton
                             action="edit"
@@ -448,451 +455,483 @@ function SequenceForm({
                             Ubah
                         </ActionButton>
                     )}
-                </div>
-
-                {/* Form Body - Mengikuti Browser Default Scroll */}
-                <div className="min-h-0 flex-1 space-y-6 overflow-auto px-6 py-6">
-                    {/* Section 1: Aturan & Status Nomor */}
-                    <div className="space-y-3">
-                        <h3 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                            ATURAN & STATUS NOMOR
-                        </h3>
-                        <div className="grid gap-4 md:grid-cols-3">
-                            <RecordEditControl label="Mode dasar">
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-medium text-foreground">
-                                        Mode dasar
-                                    </label>
-                                    <NativeSelect
-                                        value={form.data.profile_code}
-                                        disabled={!canManage}
-                                        onChange={(event) =>
-                                            form.setData(
-                                                'profile_code',
-                                                event.target.value,
-                                            )
-                                        }
-                                    >
-                                        {profiles.map((profile) => (
-                                            <option
-                                                key={profile.code}
-                                                value={profile.code}
-                                            >
-                                                {profile.name}
-                                            </option>
-                                        ))}
-                                    </NativeSelect>
-                                </div>
-                            </RecordEditControl>
-                            <RecordEditControl label="Berlaku untuk">
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-medium text-foreground">
-                                        Berlaku untuk
-                                    </label>
-                                    <NativeSelect
-                                        value={form.data.scope_type}
-                                        disabled={!canManage}
-                                        onChange={(event) =>
-                                            form.setData(
-                                                'scope_type',
-                                                event.target.value,
-                                            )
-                                        }
-                                    >
-                                        {sequence.allowed_scopes.map(
-                                            (scope) => (
+                    {editing && (
+                        <>
+                            <Button
+                                type="submit"
+                                disabled={!form.isDirty || saving}
+                            >
+                                <Save /> Simpan
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                disabled={saving}
+                                onClick={() => {
+                                    form.reset();
+                                    setErrors({});
+                                    setSaveError('');
+                                    setEditing(false);
+                                }}
+                            >
+                                <X /> Batal
+                            </Button>
+                        </>
+                    )}
+                </RecordActionBar>
+                <div
+                    className="min-h-0 flex-1 overflow-auto p-4"
+                    scroll-region=""
+                >
+                    <CollapsibleSectionGroup
+                        defaultValue={['rules', 'range', 'format']}
+                    >
+                        <CollapsibleSection
+                            value="rules"
+                            title="Aturan nomor"
+                            summary="Mode, perusahaan, status, dan pengulangan nomor"
+                        >
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <RecordEditControl label="Mode dasar">
+                                    <Field>
+                                        <NativeSelect
+                                            label="Mode dasar"
+                                            value={form.data.profile_code}
+                                            disabled={unavailable}
+                                            onChange={(event) =>
+                                                form.setData(
+                                                    'profile_code',
+                                                    event.target.value,
+                                                )
+                                            }
+                                        >
+                                            {profiles.map((profile) => (
                                                 <option
-                                                    key={scope}
-                                                    value={scope}
+                                                    key={profile.code}
+                                                    value={profile.code}
                                                 >
-                                                    {scope === 'tenant'
-                                                        ? 'Seluruh bisnis'
-                                                        : scope ===
-                                                            'legal_entity'
-                                                          ? 'Perusahaan'
-                                                          : 'Unit operasi'}
+                                                    {profile.name}
                                                 </option>
-                                            ),
-                                        )}
-                                    </NativeSelect>
-                                </div>
-                            </RecordEditControl>
-                            <RecordEditControl label="Status">
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-medium text-foreground">
-                                        Status
-                                    </label>
-                                    <NativeSelect
-                                        value={form.data.status}
-                                        disabled={!canManage}
-                                        onChange={(event) =>
-                                            form.setData(
-                                                'status',
-                                                event.target.value,
-                                            )
-                                        }
-                                    >
-                                        <option value="draft">
-                                            Belum aktif
-                                        </option>
-                                        <option value="active">Aktif</option>
-                                        <option value="stopped">
-                                            Dihentikan
-                                        </option>
-                                    </NativeSelect>
-                                </div>
-                            </RecordEditControl>
-                            <RecordEditControl label="Mulai ulang nomor">
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-medium text-foreground">
-                                        Mulai ulang nomor
-                                    </label>
-                                    <NativeSelect
-                                        value={form.data.reset_period}
-                                        disabled={!canManage}
-                                        onChange={(event) =>
-                                            form.setData(
-                                                'reset_period',
-                                                event.target.value,
-                                            )
-                                        }
-                                    >
-                                        <option value="never">
-                                            Tidak pernah
-                                        </option>
-                                        <option value="year">
-                                            Setiap tahun
-                                        </option>
-                                        <option value="fiscal_year">
-                                            Setiap tahun fiskal
-                                        </option>
-                                        <option value="fiscal_period">
-                                            Setiap periode fiskal
-                                        </option>
-                                    </NativeSelect>
-                                </div>
-                            </RecordEditControl>
-                        </div>
-                    </div>
-
-                    {/* Section 2: Kapasitas & Parameter */}
-                    <div className="space-y-3">
-                        <h3 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                            KAPASITAS & PARAMETER
-                        </h3>
-                        <div className="grid gap-4 md:grid-cols-3">
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-medium text-foreground">
-                                    Nomor awal
-                                </label>
-                                <Input
-                                    type="number"
-                                    min="0"
-                                    readOnly={!editing || !canManage}
-                                    value={form.data.minimum_number}
-                                    onChange={(event) =>
-                                        form.setData(
-                                            'minimum_number',
-                                            Number(event.target.value),
-                                        )
-                                    }
-                                />
+                                            ))}
+                                        </NativeSelect>
+                                        <FieldError>
+                                            {errors.profile_code?.[0]}
+                                        </FieldError>
+                                    </Field>
+                                </RecordEditControl>
+                                <RecordEditControl label="Berlaku untuk">
+                                    <Field>
+                                        <NativeSelect
+                                            label="Berlaku untuk"
+                                            value={form.data.scope_type}
+                                            disabled={unavailable}
+                                            onChange={(event) =>
+                                                form.setData(
+                                                    'scope_type',
+                                                    event.target.value,
+                                                )
+                                            }
+                                        >
+                                            {sequence.allowed_scopes.map(
+                                                (scope) => (
+                                                    <option
+                                                        key={scope}
+                                                        value={scope}
+                                                    >
+                                                        {scope === 'tenant'
+                                                            ? 'Seluruh bisnis'
+                                                            : scope ===
+                                                                'legal_entity'
+                                                              ? 'Perusahaan'
+                                                              : 'Unit operasi'}
+                                                    </option>
+                                                ),
+                                            )}
+                                        </NativeSelect>
+                                        <FieldError>
+                                            {errors.scope_type?.[0]}
+                                        </FieldError>
+                                    </Field>
+                                </RecordEditControl>
+                                <RecordEditControl label="Status">
+                                    <Field>
+                                        <NativeSelect
+                                            label="Status"
+                                            value={form.data.status}
+                                            disabled={unavailable}
+                                            onChange={(event) =>
+                                                form.setData(
+                                                    'status',
+                                                    event.target.value,
+                                                )
+                                            }
+                                        >
+                                            <option value="draft">
+                                                Belum aktif
+                                            </option>
+                                            <option value="active">
+                                                Aktif
+                                            </option>
+                                            <option value="stopped">
+                                                Dihentikan
+                                            </option>
+                                        </NativeSelect>
+                                        <FieldError>
+                                            {errors.status?.[0]}
+                                        </FieldError>
+                                    </Field>
+                                </RecordEditControl>
+                                <RecordEditControl label="Mulai ulang nomor">
+                                    <Field>
+                                        <NativeSelect
+                                            label="Mulai ulang nomor"
+                                            value={form.data.reset_period}
+                                            disabled={unavailable}
+                                            onChange={(event) =>
+                                                form.setData(
+                                                    'reset_period',
+                                                    event.target.value,
+                                                )
+                                            }
+                                        >
+                                            <option value="never">
+                                                Tidak pernah
+                                            </option>
+                                            <option value="calendar_year">
+                                                Setiap tahun
+                                            </option>
+                                            <option value="fiscal_year">
+                                                Setiap tahun fiskal
+                                            </option>
+                                            <option value="fiscal_period">
+                                                Setiap periode fiskal
+                                            </option>
+                                        </NativeSelect>
+                                        <FieldError>
+                                            {errors.reset_period?.[0]}
+                                        </FieldError>
+                                    </Field>
+                                </RecordEditControl>
                             </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-medium text-foreground">
-                                    Batas akhir (opsional)
-                                </label>
-                                <Input
-                                    type="number"
-                                    min="1"
-                                    placeholder="Tanpa batas"
-                                    readOnly={!editing || !canManage}
-                                    value={form.data.maximum_number}
-                                    onChange={(event) =>
-                                        form.setData(
-                                            'maximum_number',
-                                            event.target.value,
-                                        )
-                                    }
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-medium text-foreground">
-                                    Jumlah nomor disiapkan
-                                </label>
-                                <Input
-                                    type="number"
-                                    min="1"
-                                    max="1000"
-                                    disabled={
-                                        !canManage ||
-                                        !form.data.preallocation_enabled
-                                    }
-                                    readOnly={!editing || !canManage}
-                                    value={form.data.preallocation_quantity}
-                                    onChange={(event) =>
-                                        form.setData(
-                                            'preallocation_quantity',
-                                            Number(event.target.value),
-                                        )
-                                    }
-                                />
-                            </div>
-                        </div>
-                        <div className="flex flex-wrap gap-6 pt-1 text-sm">
-                            <RecordEditControl label="Nomor berkelanjutan">
-                                <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
-                                    <Checkbox
+                        </CollapsibleSection>
+                        <CollapsibleSection
+                            value="range"
+                            title="Rentang dan pengambilan nomor"
+                            summary="Batas nomor dan pilihan manual atau otomatis"
+                        >
+                            <div className="space-y-6">
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <Field>
+                                        <Input
+                                            label="Nomor awal"
+                                            type="number"
+                                            min={0}
+                                            required
+                                            readOnly={!editing || !canManage}
+                                            disabled={saving}
+                                            value={form.data.minimum_number}
+                                            onChange={(event) =>
+                                                form.setData(
+                                                    'minimum_number',
+                                                    Number(event.target.value),
+                                                )
+                                            }
+                                        />
+                                        <FieldError>
+                                            {errors.minimum_number?.[0]}
+                                        </FieldError>
+                                    </Field>
+                                    <Field>
+                                        <Input
+                                            label="Batas akhir"
+                                            type="number"
+                                            min={0}
+                                            readOnly={!editing || !canManage}
+                                            disabled={saving}
+                                            value={form.data.maximum_number}
+                                            onChange={(event) =>
+                                                form.setData(
+                                                    'maximum_number',
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                        <FieldError>
+                                            {errors.maximum_number?.[0]}
+                                        </FieldError>
+                                    </Field>
+                                </div>
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <SequenceCheckbox
+                                        label="Nomor berkelanjutan"
                                         checked={form.data.is_continuous}
-                                        disabled={!canManage}
+                                        disabled={unavailable}
                                         onCheckedChange={(checked) =>
                                             form.setData(
                                                 'is_continuous',
-                                                checked === true,
+                                                checked,
                                             )
                                         }
-                                    />{' '}
-                                    Nomor berkelanjutan
-                                </label>
-                            </RecordEditControl>
-                            <RecordEditControl label="Izinkan nomor manual">
-                                <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
-                                    <Checkbox
+                                        hint="Nomor dilacak sampai dikonfirmasi atau dibatalkan. Pilihan ini tidak dapat digabungkan dengan nomor manual."
+                                    />
+                                    <SequenceCheckbox
+                                        label="Izinkan nomor manual"
                                         checked={form.data.allow_manual}
                                         disabled={
-                                            !canManage ||
+                                            unavailable ||
                                             form.data.is_continuous
                                         }
                                         onCheckedChange={(checked) =>
                                             form.setData(
                                                 'allow_manual',
-                                                checked === true,
-                                            )
-                                        }
-                                    />{' '}
-                                    Izinkan nomor manual
-                                </label>
-                            </RecordEditControl>
-                            <RecordEditControl label="Buat nomor otomatis">
-                                <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
-                                    <Checkbox
-                                        checked={form.data.allow_automatic}
-                                        disabled={!canManage}
-                                        onCheckedChange={(checked) =>
-                                            form.setData(
-                                                'allow_automatic',
-                                                checked === true,
+                                                checked,
                                             )
                                         }
                                     />
-                                    Buat nomor otomatis
-                                </label>
-                            </RecordEditControl>
-                            <RecordEditControl label="Siapkan nomor lebih awal">
-                                <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
-                                    <Checkbox
+                                    <SequenceCheckbox
+                                        label="Buat nomor otomatis"
+                                        checked={form.data.allow_automatic}
+                                        disabled={unavailable}
+                                        onCheckedChange={(checked) =>
+                                            form.setData(
+                                                'allow_automatic',
+                                                checked,
+                                            )
+                                        }
+                                    />
+                                    <SequenceCheckbox
+                                        label="Siapkan nomor lebih awal"
                                         checked={
                                             form.data.preallocation_enabled
                                         }
-                                        disabled={!canManage}
+                                        disabled={unavailable}
                                         onCheckedChange={(checked) =>
                                             form.setData(
                                                 'preallocation_enabled',
-                                                checked === true,
+                                                checked,
                                             )
                                         }
-                                    />{' '}
-                                    Siapkan nomor lebih awal
-                                </label>
-                            </RecordEditControl>
-                        </div>
-                    </div>
-
-                    {/* Section 3: Susunan Format Nomor */}
-                    <div className="space-y-3">
-                        {form.data.allow_manual && (
-                            <p className="text-xs text-muted-foreground">
-                                Kode manual boleh berbeda dari format otomatis,
-                                tetapi harus unik.
-                            </p>
-                        )}
-                        <h3 className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                            SUSUNAN FORMAT NOMOR
-                        </h3>
-                        <RecordEditControl label="Susunan nomor">
-                            <SegmentEditor
-                                value={form.data.segments}
-                                contextFields={sequence.context_fields}
-                                disabled={!canManage || !editing}
-                                onChange={(segments) =>
-                                    form.setData('segments', segments)
-                                }
-                            />
-                        </RecordEditControl>
-                        <p className="text-xs text-muted-foreground">
-                            Contoh:{' '}
-                            {numberPreview(
-                                form.data.segments,
-                                form.data.minimum_number,
-                            )}
-                            {form.data.maximum_number !== '' && (
-                                <>
-                                    {' '}
-                                    –{' '}
+                                        hint="Menyiapkan beberapa nomor sekaligus untuk mengurangi waktu pengambilan nomor berikutnya."
+                                    />
+                                </div>
+                                <div className="max-w-sm">
+                                    <Field>
+                                        <Input
+                                            label="Jumlah nomor disiapkan"
+                                            type="number"
+                                            min={1}
+                                            max={1000}
+                                            required
+                                            disabled={
+                                                unavailable ||
+                                                !form.data.preallocation_enabled
+                                            }
+                                            readOnly={!editing || !canManage}
+                                            value={
+                                                form.data.preallocation_quantity
+                                            }
+                                            onChange={(event) =>
+                                                form.setData(
+                                                    'preallocation_quantity',
+                                                    Number(event.target.value),
+                                                )
+                                            }
+                                        />
+                                        <FieldError>
+                                            {errors.preallocation_quantity?.[0]}
+                                        </FieldError>
+                                    </Field>
+                                </div>
+                                {form.data.allow_manual && (
+                                    <FieldDescription>
+                                        Kode manual boleh berbeda dari format
+                                        otomatis, tetapi harus unik.
+                                    </FieldDescription>
+                                )}
+                            </div>
+                        </CollapsibleSection>
+                        <CollapsibleSection
+                            value="format"
+                            title="Format nomor"
+                            summary="Urutan teks, angka, dan bagian kode"
+                        >
+                            <div className="space-y-4">
+                                <RecordEditControl label="Susunan nomor">
+                                    <SegmentEditor
+                                        value={form.data.segments}
+                                        contextFields={sequence.context_fields}
+                                        disabled={unavailable || !editing}
+                                        onChange={(segments) =>
+                                            form.setData('segments', segments)
+                                        }
+                                    />
+                                </RecordEditControl>
+                                <FieldDescription>
+                                    Contoh:{' '}
                                     {numberPreview(
                                         form.data.segments,
-                                        Number(form.data.maximum_number),
+                                        form.data.minimum_number,
                                     )}
-                                </>
-                            )}
-                        </p>
-                    </div>
-
-                    {error && (
-                        <p className="text-sm font-medium text-destructive">
-                            {error}
-                        </p>
-                    )}
-                </div>
-
-                {/* Action Footer */}
-                {editing && (
-                    <div className="sticky bottom-0 z-10 flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border bg-card px-6 py-4">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="text-xs font-medium"
-                            onClick={() => {
-                                form.reset();
-                                setEditing(false);
-                            }}
-                            disabled={form.processing}
-                        >
-                            <ArrowLeft className="mr-1.5 size-3.5" /> Batal /
-                            Reset
-                        </Button>
-
-                        {canManage && (
-                            <div className="flex items-center gap-3">
-                                {form.recentlySuccessful && (
-                                    <span className="mr-2 flex items-center gap-1 text-xs font-medium text-primary">
-                                        ✓ Tersimpan dengan sukses.
-                                    </span>
-                                )}
-                                <Button
-                                    type="submit"
-                                    variant="default"
-                                    size="sm"
-                                    disabled={!form.isDirty || form.processing}
-                                    className="px-5 font-medium shadow-xs"
-                                >
-                                    <Save className="mr-1.5 size-3.5" /> Simpan
-                                </Button>
+                                    {form.data.maximum_number !== '' && (
+                                        <>
+                                            {' '}
+                                            sampai{' '}
+                                            {numberPreview(
+                                                form.data.segments,
+                                                Number(
+                                                    form.data.maximum_number,
+                                                ),
+                                            )}
+                                        </>
+                                    )}
+                                </FieldDescription>
                             </div>
-                        )}
-                    </div>
-                )}
+                        </CollapsibleSection>
+                    </CollapsibleSectionGroup>
+                    <FieldError className="mt-4">{saveError}</FieldError>
+                </div>
             </form>
         </RecordEditBoundary>
     );
 }
 
-export default function NumberSequences({
-    canManage,
-    sequences,
-    profiles,
-}: Props) {
-    const [selected, setSelected] = useState('');
+const loadSequences: ListLoader<Sequence> = async ({
+    query,
+    cursor,
+    sort,
+    signal,
+}) => {
+    const params = new URLSearchParams({ incremental: '1', q: query });
+
+    if (cursor) {
+        params.set('cursor', cursor);
+    }
+
+    if (sort) {
+        params.set('sort', sort.columnId);
+        params.set('direction', sort.direction);
+    }
+
+    const result = await apiJson<{
+        data: Sequence[];
+        next_cursor: string | null;
+    }>(`/settings/number-sequences?${params}`, { signal });
+
+    return { items: result.data, nextCursor: result.next_cursor };
+};
+
+export default function NumberSequences(props: Props) {
+    return <NumberSequencesPage key={props.tenant.id} {...props} />;
+}
+
+function NumberSequencesPage({ canManage, profiles }: Props) {
+    const [sequence, setSequence] = useState<Sequence | null>(null);
     const [showDetail, setShowDetail] = useState(false);
     const [search, setSearch] = useState('');
-    const sequence = sequences.find((item) => item.id === selected);
-
-    const filteredSequences = sequences.filter(
-        (item) =>
-            item.reference_name.toLowerCase().includes(search.toLowerCase()) ||
-            item.app_name.toLowerCase().includes(search.toLowerCase()),
-    );
+    const list = useIncrementalList({
+        loadItems: loadSequences,
+        query: search,
+        getKey: (item) => item.id,
+    });
 
     return (
         <>
             <Head title="Nomor dokumen" />
-            <ListPageLayout
-                className="p-4"
-                header={<Heading title="Nomor dokumen" />}
-            >
+            <ListPageLayout header={<RecordActionBar title="Nomor dokumen" />}>
                 <MasterDetailLayout
                     detailOpen={showDetail}
                     onDetailOpenChange={setShowDetail}
                     list={
-                        <Card className="flex h-full min-h-0 flex-col overflow-hidden">
-                            <div className="shrink-0 space-y-3 border-b border-border bg-card p-4">
-                                <h3 className="text-base font-bold tracking-tight text-foreground">
-                                    Jenis nomor
-                                </h3>
-                                <div className="relative">
-                                    <Search className="absolute top-2.5 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                                    <Input
-                                        type="search"
-                                        placeholder="Cari jenis nomor…"
-                                        className="h-8 w-full bg-background pl-8 text-xs"
-                                        value={search}
-                                        onChange={(e) =>
-                                            setSearch(e.target.value)
-                                        }
-                                    />
-                                </div>
+                        <div className="flex h-full min-h-0 flex-col">
+                            <div className="shrink-0 p-4">
+                                <Input
+                                    type="search"
+                                    label="Cari jenis nomor"
+                                    value={search}
+                                    onChange={(event) =>
+                                        setSearch(event.target.value)
+                                    }
+                                />
                             </div>
-                            <CardContent className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
-                                {filteredSequences.map((item) => {
-                                    const isSelected = item.id === selected;
-
-                                    return (
-                                        <button
-                                            key={item.id}
-                                            type="button"
-                                            className={`group flex w-full items-center justify-between rounded-md border-l-4 p-3 text-left transition-all duration-150 ${
-                                                isSelected
-                                                    ? 'border-l-primary bg-primary/10 font-semibold text-primary shadow-xs'
-                                                    : 'border-l-transparent text-foreground hover:bg-accent/60'
-                                            }`}
-                                            onClick={() => {
-                                                setSelected(item.id);
-                                                setShowDetail(true);
-                                            }}
-                                        >
-                                            <div className="min-w-0 flex-1 pr-2">
-                                                <span className="block truncate text-sm leading-tight font-medium">
-                                                    {item.reference_name}
-                                                </span>
-                                                <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground">
-                                                    {item.app_name}
-                                                </span>
-                                            </div>
-                                            <ChevronRight className="size-4 shrink-0 text-muted-foreground/60 group-hover:text-foreground" />
-                                        </button>
-                                    );
-                                })}
-                                {filteredSequences.length === 0 && (
-                                    <p className="p-4 text-center text-xs text-muted-foreground italic">
-                                        {search
-                                            ? 'Tidak ada nomor yang cocok.'
-                                            : 'Belum ada aplikasi yang mendaftarkan nomor.'}
-                                    </p>
-                                )}
-                            </CardContent>
-                        </Card>
+                            <div
+                                className="min-h-0 flex-1 overflow-y-auto"
+                                scroll-region=""
+                            >
+                                {list.items.map((item) => (
+                                    <Button
+                                        key={item.id}
+                                        type="button"
+                                        variant={
+                                            item.id === sequence?.id
+                                                ? 'secondary'
+                                                : 'ghost'
+                                        }
+                                        className="h-auto w-full justify-start rounded-none px-4 py-3 text-left"
+                                        aria-pressed={item.id === sequence?.id}
+                                        onClick={() => {
+                                            setSequence(item);
+                                            setShowDetail(true);
+                                        }}
+                                    >
+                                        <span className="min-w-0">
+                                            <span className="block truncate">
+                                                {item.reference_name}
+                                            </span>
+                                            <span className="block truncate text-xs font-normal text-muted-foreground">
+                                                {item.app_name}
+                                            </span>
+                                        </span>
+                                    </Button>
+                                ))}
+                                {!list.loading &&
+                                    !list.error &&
+                                    list.items.length === 0 && (
+                                        <Empty>
+                                            <EmptyHeader>
+                                                <EmptyTitle>
+                                                    {search
+                                                        ? 'Tidak ada nomor yang cocok'
+                                                        : 'Belum ada jenis nomor'}
+                                                </EmptyTitle>
+                                                <EmptyDescription>
+                                                    {search
+                                                        ? 'Coba nama atau aplikasi lain.'
+                                                        : 'Jenis nomor muncul setelah aplikasi yang memakainya siap digunakan.'}
+                                                </EmptyDescription>
+                                            </EmptyHeader>
+                                        </Empty>
+                                    )}
+                                <IncrementalListStatus state={list} />
+                            </div>
+                        </div>
                     }
                 >
-                    {sequence && (
-                        <Card className="h-full min-h-0 gap-0 overflow-hidden border border-border bg-card p-0 shadow-xs">
-                            <SequenceForm
-                                key={sequence.id}
-                                sequence={sequence}
-                                profiles={profiles}
-                                canManage={canManage}
-                            />
-                        </Card>
+                    {sequence ? (
+                        <SequenceForm
+                            key={`${sequence.id}-${sequence.version}`}
+                            sequence={sequence}
+                            profiles={profiles}
+                            canManage={canManage}
+                            onSaved={(saved) => {
+                                setSequence(saved);
+                                list.setItems((current) =>
+                                    current.map((item) =>
+                                        item.id === saved.id ? saved : item,
+                                    ),
+                                );
+                                list.reload();
+                            }}
+                        />
+                    ) : (
+                        <Empty>
+                            <EmptyHeader>
+                                <EmptyTitle>Pilih jenis nomor</EmptyTitle>
+                                <EmptyDescription>
+                                    Pilih dari daftar untuk melihat format dan
+                                    aturan nomornya.
+                                </EmptyDescription>
+                            </EmptyHeader>
+                        </Empty>
                     )}
                 </MasterDetailLayout>
             </ListPageLayout>

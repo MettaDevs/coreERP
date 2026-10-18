@@ -1,52 +1,13 @@
 import { Button } from '@apperp/ui/button';
 import { Sidebar, useSidebar } from '@apperp/ui/sidebar';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@apperp/ui/tooltip';
 import { Link, usePage } from '@inertiajs/react';
 import { ChevronsLeft, ChevronsRight } from 'lucide-react';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 
 import { ProductLauncher } from '@/components/product-launcher';
 import { useShellNavigation } from '@/hooks/use-shell-navigation';
 import type { NavigationItem } from '@/hooks/use-shell-navigation';
 import { cn } from '@/lib/utils';
-
-function TruncatedLabel({ children }: { children: string }) {
-    const label = useRef<HTMLSpanElement>(null);
-    const [truncated, setTruncated] = useState(false);
-
-    useLayoutEffect(() => {
-        const update = () =>
-            setTruncated(
-                (label.current?.scrollWidth ?? 0) >
-                    (label.current?.clientWidth ?? 0),
-            );
-        update();
-        const observer = new ResizeObserver(update);
-
-        if (label.current) {
-            observer.observe(label.current);
-        }
-
-        return () => observer.disconnect();
-    }, [children]);
-
-    const content = (
-        <span ref={label} className="truncate">
-            {children}
-        </span>
-    );
-
-    if (!truncated) {
-        return content;
-    }
-
-    return (
-        <Tooltip>
-            <TooltipTrigger asChild>{content}</TooltipTrigger>
-            <TooltipContent side="right">{children}</TooltipContent>
-        </Tooltip>
-    );
-}
 
 export function AppSidebar() {
     const { open, setOpen, isMobile, setOpenMobile } = useSidebar();
@@ -111,7 +72,7 @@ export function AppSidebar() {
             }}
         >
             <div className="relative flex h-full w-full">
-                <aside className="flex h-full w-18 shrink-0 flex-col items-center border-r border-sidebar-border">
+                <aside className="flex h-full w-(--sidebar-width-icon) shrink-0 flex-col items-center border-r border-sidebar-border">
                     <div className="flex h-12 w-full shrink-0 items-center justify-center border-b border-sidebar-border">
                         <ProductLauncher />
                     </div>
@@ -136,9 +97,9 @@ export function AppSidebar() {
                                         : undefined
                                 }
                                 className={cn(
-                                    'flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-md py-1 text-center text-[10px] text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring [&_svg]:size-4',
+                                    'flex min-h-11 min-w-0 shrink-0 flex-col items-center justify-center gap-0.5 rounded-md px-0.5 py-1 text-center text-[10px] font-normal text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring [&_svg]:size-4',
                                     selectedItem?.label === item.label &&
-                                        'font-semibold text-sidebar-foreground',
+                                        'text-sidebar-foreground',
                                     previewLabel === item.label &&
                                         selectedItem?.label !== item.label &&
                                         'bg-sidebar-accent text-sidebar-accent-foreground',
@@ -155,7 +116,7 @@ export function AppSidebar() {
                                             'border-sidebar-accent-foreground/30',
                                     )}
                                 />
-                                <span className="w-full leading-tight break-words whitespace-normal">
+                                <span className="w-full min-w-0 leading-tight break-words whitespace-normal">
                                     {item.label}
                                 </span>
                             </Link>
@@ -187,12 +148,12 @@ export function AppSidebar() {
                             'flex min-h-0 min-w-0 flex-1 flex-col bg-sidebar',
                             !isMobile &&
                                 !open &&
-                                'absolute inset-y-0 left-18 w-[calc(var(--sidebar-width)-var(--sidebar-width-icon))] border-r border-sidebar-border shadow-lg',
+                                'absolute inset-y-0 left-(--sidebar-width-icon) w-[calc(var(--sidebar-width)-var(--sidebar-width-icon))] border-r border-sidebar-border shadow-lg',
                         )}
                         aria-label={`Menu ${displayedItem.label}`}
                     >
-                        <div className="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-sidebar-border px-3">
-                            <h2 className="min-w-0 truncate text-[13px] font-semibold">
+                        <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b border-sidebar-border px-3 py-2">
+                            <h2 className="min-w-0 text-[13px] font-semibold break-words">
                                 {displayedItem.label}
                             </h2>
                             <Button
@@ -241,15 +202,15 @@ export function AppSidebar() {
                                         isChildActive(item) ? 'page' : undefined
                                     }
                                     className={cn(
-                                        'flex min-h-8 shrink-0 items-center gap-2 rounded-md px-2 text-[13px] text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-ring [&_svg]:size-3.5 [&_svg]:shrink-0',
+                                        'flex min-h-8 shrink-0 items-center gap-2 rounded-md px-2 py-1 text-[13px] text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-ring [&_svg]:size-3.5 [&_svg]:shrink-0',
                                         isChildActive(item) &&
-                                            'bg-sidebar-primary/15 font-semibold text-sidebar-primary ring-1 ring-sidebar-primary/30 ring-inset hover:bg-sidebar-primary/20 hover:text-sidebar-primary',
+                                            'bg-sidebar-primary/15 text-sidebar-primary ring-1 ring-sidebar-primary/30 ring-inset hover:bg-sidebar-primary/20 hover:text-sidebar-primary',
                                     )}
                                 >
                                     {item.icon && <item.icon />}
-                                    <TruncatedLabel>
+                                    <span className="min-w-0 break-words whitespace-normal">
                                         {item.label}
-                                    </TruncatedLabel>
+                                    </span>
                                 </Link>
                             ))}
                         </div>

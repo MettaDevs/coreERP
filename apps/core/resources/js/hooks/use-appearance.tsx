@@ -11,6 +11,7 @@ export type UseAppearanceReturn = {
 
 const listeners = new Set<() => void>();
 let currentAppearance: Appearance = 'system';
+let systemAppearance: ResolvedAppearance = 'light';
 
 const prefersDark = (): boolean => {
     if (typeof window === 'undefined') {
@@ -34,7 +35,9 @@ const getStoredAppearance = (): Appearance => {
         return 'system';
     }
 
-    return (localStorage.getItem('appearance') as Appearance) || 'system';
+    const stored = localStorage.getItem('appearance');
+
+    return stored === 'light' || stored === 'dark' ? stored : 'system';
 };
 
 const isDarkMode = (appearance: Appearance): boolean => {
@@ -68,7 +71,11 @@ const mediaQuery = (): MediaQueryList | null => {
     return window.matchMedia('(prefers-color-scheme: dark)');
 };
 
-const handleSystemThemeChange = (): void => applyTheme(currentAppearance);
+const handleSystemThemeChange = (): void => {
+    systemAppearance = prefersDark() ? 'dark' : 'light';
+    applyTheme(currentAppearance);
+    notify();
+};
 
 export function initializeTheme(): void {
     if (typeof window === 'undefined') {
@@ -81,10 +88,12 @@ export function initializeTheme(): void {
     }
 
     currentAppearance = getStoredAppearance();
-    applyTheme(currentAppearance);
+    handleSystemThemeChange();
 
     // Set up system theme change listener
-    mediaQuery()?.addEventListener('change', handleSystemThemeChange);
+    const query = mediaQuery();
+    query?.removeEventListener('change', handleSystemThemeChange);
+    query?.addEventListener('change', handleSystemThemeChange);
 }
 
 export function useAppearance(): UseAppearanceReturn {
@@ -94,9 +103,12 @@ export function useAppearance(): UseAppearanceReturn {
         () => 'system',
     );
 
-    const resolvedAppearance: ResolvedAppearance = isDarkMode(appearance)
-        ? 'dark'
-        : 'light';
+    const system = useSyncExternalStore<ResolvedAppearance>(
+        subscribe,
+        () => systemAppearance,
+        () => 'light',
+    );
+    const resolvedAppearance = appearance === 'system' ? system : appearance;
 
     const updateAppearance = (mode: Appearance): void => {
         currentAppearance = mode;

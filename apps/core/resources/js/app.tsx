@@ -9,7 +9,9 @@ import halamanModule from '@/lib/halaman-module';
 import { pasangPelaporanKesalahan } from '@/lib/pelaporan-kesalahan';
 import { installSentry } from '@/lib/sentry';
 
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+const appName =
+    document.querySelector<HTMLMetaElement>('meta[name="application-name"]')
+        ?.content || 'CoreERP';
 
 type ModulHalaman = { default: ComponentType<Record<string, unknown>> };
 

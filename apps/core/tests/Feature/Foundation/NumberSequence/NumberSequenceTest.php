@@ -78,6 +78,37 @@ class NumberSequenceTest extends TestCase
         ]);
     }
 
+    public function test_settings_batches_search_and_record_lookup_keep_tenant_scope(): void
+    {
+        [$sequence, $context] = $this->sequence();
+        $user = User::factory()->create();
+        $this->makeOwner(TenantMembership::create(['tenant_id' => $context['tenant_id'], 'user_id' => $user->id, 'status' => 'active']));
+        $this->actingAs($user);
+        $foreign = $sequence->replicate(['id']);
+        $foreign->tenant_id = $this->foreignTenant();
+        $foreign->save();
+        $this->withoutVite();
+        $this->get('/settings/number-sequences')->assertOk();
+        $ids = [];
+        $cursor = null;
+        do {
+            $batch = $this->getJson('/settings/number-sequences?'.http_build_query(['incremental' => 1, 'per_page' => 2, 'cursor' => $cursor]))
+                ->assertOk()->assertJsonStructure(['data', 'next_cursor']);
+            $rows = $batch->json('data');
+            $this->assertLessThanOrEqual(2, count($rows));
+            $ids = [...$ids, ...array_column($rows, 'id')];
+            $this->assertLessThan(100, count($ids));
+            $cursor = $batch->json('next_cursor');
+        } while ($cursor !== null);
+        $this->assertContains($sequence->id, $ids);
+        $this->assertNotContains($foreign->id, $ids);
+        $this->assertCount(count($ids), array_unique($ids));
+        $this->getJson('/settings/number-sequences?incremental=1&q=sample-app.document')->assertOk()
+            ->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $sequence->id)
+            ->assertJsonStructure(['data' => [['reference_name', 'segments', 'allowed_scopes', 'version']]]);
+        $this->getJson('/settings/number-sequences?incremental=1&record_id='.$foreign->id)->assertOk()->assertJsonCount(0, 'data');
+    }
+
     public function test_scope_has_an_independent_counter_for_each_operating_unit(): void
     {
         [$sequence, $context] = $this->sequence(['scope_type' => 'operating_unit', 'preallocation_enabled' => false]);
