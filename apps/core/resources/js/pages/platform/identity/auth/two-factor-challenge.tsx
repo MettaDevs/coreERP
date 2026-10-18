@@ -1,10 +1,11 @@
 import { Button } from '@apperp/ui/button';
+import { FieldError, FieldLabel } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@apperp/ui/input-otp';
+import { Spinner } from '@apperp/ui/spinner';
 import { Form, Head, setLayoutProps } from '@inertiajs/react';
 import { REGEXP_ONLY_DIGITS } from 'input-otp';
 import { useMemo, useState } from 'react';
-import InputError from '@/components/input-error';
 import { OTP_MAX_LENGTH } from '@/hooks/use-two-factor-auth';
 import { store } from '@/routes/two-factor/login';
 
@@ -19,18 +20,17 @@ export default function TwoFactorChallenge() {
     }>(() => {
         if (showRecoveryInput) {
             return {
-                title: 'Recovery code',
+                title: 'Kode pemulihan',
                 description:
-                    'Please confirm access to your account by entering one of your emergency recovery codes.',
-                toggleText: 'login using an authentication code',
+                    'Masukkan salah satu kode pemulihan yang Anda simpan saat mengaktifkan verifikasi dua langkah.',
+                toggleText: 'Gunakan kode aplikasi autentikator',
             };
         }
 
         return {
-            title: 'Authentication code',
-            description:
-                'Enter the authentication code provided by your authenticator application.',
-            toggleText: 'login using a recovery code',
+            title: 'Kode autentikasi',
+            description: 'Masukkan kode dari aplikasi autentikator Anda.',
+            toggleText: 'Gunakan kode pemulihan',
         };
     }, [showRecoveryInput]);
 
@@ -47,7 +47,7 @@ export default function TwoFactorChallenge() {
 
     return (
         <>
-            <Head title="Two-factor authentication" />
+            <Head title="Verifikasi dua langkah" />
 
             <div className="space-y-6">
                 <Form
@@ -61,26 +61,56 @@ export default function TwoFactorChallenge() {
                             {showRecoveryInput ? (
                                 <>
                                     <Input
-                                        label="Recovery code"
+                                        label="Kode pemulihan"
                                         name="recovery_code"
+                                        aria-invalid={Boolean(
+                                            errors.recovery_code,
+                                        )}
+                                        aria-describedby={
+                                            errors.recovery_code
+                                                ? 'recovery_code-error'
+                                                : undefined
+                                        }
                                         type="text"
                                         autoFocus={showRecoveryInput}
                                         required
                                     />
-                                    <InputError
-                                        message={errors.recovery_code}
-                                    />
+                                    <FieldError id="recovery_code-error">
+                                        {errors.recovery_code}
+                                    </FieldError>
                                 </>
                             ) : (
                                 <div className="flex flex-col items-center justify-center space-y-3 text-center">
+                                    <FieldLabel htmlFor="code">
+                                        Kode autentikasi
+                                        <span
+                                            aria-hidden="true"
+                                            className="text-destructive"
+                                        >
+                                            *
+                                        </span>
+                                        <span className="sr-only">
+                                            wajib diisi
+                                        </span>
+                                    </FieldLabel>
                                     <div className="flex w-full items-center justify-center">
                                         <InputOTP
+                                            id="code"
                                             name="code"
+                                            aria-invalid={Boolean(errors.code)}
+                                            aria-describedby={
+                                                errors.code
+                                                    ? 'code-error'
+                                                    : undefined
+                                            }
                                             maxLength={OTP_MAX_LENGTH}
                                             value={code}
                                             onChange={(value) => setCode(value)}
                                             disabled={processing}
                                             pattern={REGEXP_ONLY_DIGITS}
+                                            aria-label="Kode autentikasi"
+                                            autoComplete="one-time-code"
+                                            required
                                             autoFocus
                                         >
                                             <InputOTPGroup>
@@ -96,7 +126,9 @@ export default function TwoFactorChallenge() {
                                             </InputOTPGroup>
                                         </InputOTP>
                                     </div>
-                                    <InputError message={errors.code} />
+                                    <FieldError id="code-error">
+                                        {errors.code}
+                                    </FieldError>
                                 </div>
                             )}
 
@@ -105,20 +137,20 @@ export default function TwoFactorChallenge() {
                                 className="w-full"
                                 disabled={processing}
                             >
-                                Continue
+                                {processing && <Spinner />}
+                                Lanjutkan
                             </Button>
 
                             <div className="text-center text-sm text-muted-foreground">
-                                <span>or you can </span>
-                                <button
+                                <Button
                                     type="button"
-                                    className="cursor-pointer text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
+                                    variant="link"
                                     onClick={() =>
                                         toggleRecoveryMode(clearErrors)
                                     }
                                 >
                                     {authConfigContent.toggleText}
-                                </button>
+                                </Button>
                             </div>
                         </>
                     )}

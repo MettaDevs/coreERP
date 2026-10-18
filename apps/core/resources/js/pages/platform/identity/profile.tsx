@@ -1,4 +1,5 @@
 import { Button } from '@apperp/ui/button';
+import { Card, CardHeader, CardTitle, CardContent } from '@apperp/ui/card';
 import { FieldHint } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
@@ -9,7 +10,7 @@ import { Link } from '@inertiajs/react';
 /* @end-chisel-email-verification */
 import ProfileController from '@/actions/App/Platform/Identity/Http/Controllers/ProfileController';
 import DeleteUser from '@/components/delete-user';
-import Heading from '@/components/heading';
+import AppearanceTabs from '@/components/appearance-tabs';
 import InputError from '@/components/input-error';
 import { useWorkDate } from '@/hooks/use-work-date';
 import { edit } from '@/routes/profile';
@@ -51,77 +52,88 @@ function DateTimeSettings({ dateTime }: { dateTime: DateTimeProps }) {
     ];
 
     return (
-        <div className="flex flex-col gap-6">
-            <Heading variant="small" title="Tanggal dan waktu" />
-
-            <form
-                className="space-y-6"
-                onSubmit={(event) => {
-                    event.preventDefault();
-                    form.patch('/settings/date-time', { preserveScroll: true });
-                }}
-            >
-                <div className="grid gap-2">
-                    <Select
-                        label="Zona waktu"
-                        items={zones}
-                        value={form.data.timezone ?? FOLLOW_LEGAL_ENTITY}
-                        onValueChange={(value) =>
-                            form.setData(
-                                'timezone',
-                                value === null || value === FOLLOW_LEGAL_ENTITY
-                                    ? null
-                                    : value,
-                            )
-                        }
-                        searchPlaceholder="Cari zona waktu..."
-                        emptyMessage="Zona waktu tidak ditemukan."
-                    />
-                    <InputError message={form.errors.timezone} />
-                </div>
-
-                <div className="grid gap-2">
-                    <div className="flex items-center gap-2">
-                        <Input
-                            id="work_date"
-                            type="date"
-                            label="Tanggal kerja"
-                            className="block w-full"
-                            value={form.data.work_date}
-                            onChange={(event) =>
-                                form.setData('work_date', event.target.value)
+        <Card>
+            <CardHeader>
+                <CardTitle>Tanggal dan waktu</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <form
+                    className="space-y-6"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        form.patch('/settings/date-time', {
+                            preserveScroll: true,
+                        });
+                    }}
+                >
+                    <div className="grid gap-2">
+                        <Select
+                            label="Zona waktu"
+                            items={zones}
+                            value={form.data.timezone ?? FOLLOW_LEGAL_ENTITY}
+                            onValueChange={(value) =>
+                                form.setData(
+                                    'timezone',
+                                    value === null ||
+                                        value === FOLLOW_LEGAL_ENTITY
+                                        ? null
+                                        : value,
+                                )
                             }
+                            searchPlaceholder="Cari zona waktu..."
+                            emptyMessage="Zona waktu tidak ditemukan."
                         />
-                        <FieldHint hint="Tanggal bawaan untuk transaksi baru selama kamu masuk. Kembali ke hari ini saat kamu masuk lagi atau pindah tenant atau perusahaan.">
-                            <button
-                                type="button"
-                                aria-label="Bantuan tanggal kerja"
-                                className="text-muted-foreground"
-                            >
-                                <CircleHelp className="size-4" />
-                            </button>
-                        </FieldHint>
+                        <InputError message={form.errors.timezone} />
                     </div>
-                    {form.data.work_date !== today && (
-                        <div>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => form.setData('work_date', today)}
-                            >
-                                Pakai hari ini
-                            </Button>
-                        </div>
-                    )}
-                    <InputError message={form.errors.work_date} />
-                </div>
 
-                <Button type="submit" disabled={form.processing}>
-                    Simpan
-                </Button>
-            </form>
-        </div>
+                    <div className="grid gap-2">
+                        <div className="flex items-center gap-2">
+                            <Input
+                                id="work_date"
+                                type="date"
+                                label="Tanggal kerja"
+                                className="block w-full"
+                                value={form.data.work_date}
+                                onChange={(event) =>
+                                    form.setData(
+                                        'work_date',
+                                        event.target.value,
+                                    )
+                                }
+                            />
+                            <FieldHint hint="Tanggal bawaan untuk transaksi baru selama kamu masuk. Kembali ke hari ini saat kamu masuk lagi atau pindah ruang kerja atau perusahaan.">
+                                <button
+                                    type="button"
+                                    aria-label="Bantuan tanggal kerja"
+                                    className="text-muted-foreground"
+                                >
+                                    <CircleHelp className="size-4" />
+                                </button>
+                            </FieldHint>
+                        </div>
+                        {form.data.work_date !== today && (
+                            <div>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                        form.setData('work_date', today)
+                                    }
+                                >
+                                    Pakai hari ini
+                                </Button>
+                            </div>
+                        )}
+                        <InputError message={form.errors.work_date} />
+                    </div>
+
+                    <Button type="submit" disabled={form.processing}>
+                        Simpan
+                    </Button>
+                </form>
+            </CardContent>
+        </Card>
     );
 }
 
@@ -142,107 +154,123 @@ export default function Profile(
 
     return (
         <>
-            <Head title="Profile settings" />
+            <Head title="Profil" />
 
-            <main className="mx-auto flex w-full max-w-3xl flex-col gap-12 p-6">
-                <h1 className="sr-only">Profile settings</h1>
+            <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 sm:p-6">
+                <h1 className="text-xl font-semibold">Profil</h1>
 
-                <div className="flex flex-col gap-6">
-                    <Heading
-                        variant="small"
-                        title="Profile"
-                        description="Update your name and email address"
-                    />
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Informasi pribadi</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <Form
+                            {...ProfileController.update.form()}
+                            options={{
+                                preserveScroll: true,
+                            }}
+                            className="space-y-6"
+                        >
+                            {({ processing, errors }) => (
+                                <>
+                                    <div className="grid gap-2">
+                                        <Input
+                                            id="name"
+                                            label="Nama lengkap"
+                                            className="block w-full"
+                                            defaultValue={auth.user.name}
+                                            name="name"
+                                            required
+                                            autoComplete="name"
+                                        />
 
-                    <Form
-                        {...ProfileController.update.form()}
-                        options={{
-                            preserveScroll: true,
-                        }}
-                        className="space-y-6"
-                    >
-                        {({ processing, errors }) => (
-                            <>
-                                <div className="grid gap-2">
-                                    <Input
-                                        id="name"
-                                        label="Name"
-                                        className="mt-1 block w-full"
-                                        defaultValue={auth.user.name}
-                                        name="name"
-                                        required
-                                        autoComplete="name"
-                                    />
+                                        <InputError
+                                            className="mt-2"
+                                            message={errors.name}
+                                        />
+                                    </div>
 
-                                    <InputError
-                                        className="mt-2"
-                                        message={errors.name}
-                                    />
-                                </div>
+                                    <div className="grid gap-2">
+                                        <Input
+                                            id="email"
+                                            label="Email"
+                                            type="email"
+                                            className="block w-full"
+                                            defaultValue={auth.user.email}
+                                            name="email"
+                                            required
+                                            autoComplete="username"
+                                        />
 
-                                <div className="grid gap-2">
-                                    <Input
-                                        id="email"
-                                        label="Email address"
-                                        type="email"
-                                        className="mt-1 block w-full"
-                                        defaultValue={auth.user.email}
-                                        name="email"
-                                        required
-                                        autoComplete="username"
-                                    />
+                                        <InputError
+                                            className="mt-2"
+                                            message={errors.email}
+                                        />
+                                    </div>
 
-                                    <InputError
-                                        className="mt-2"
-                                        message={errors.email}
-                                    />
-                                </div>
+                                    {/* @chisel-email-verification */}
+                                    {mustVerifyEmail &&
+                                        auth.user.email_verified_at ===
+                                            null && (
+                                            <div>
+                                                <p className="-mt-4 text-sm text-muted-foreground">
+                                                    Email Anda belum
+                                                    diverifikasi.{' '}
+                                                    <Link
+                                                        href={send()}
+                                                        as="button"
+                                                        className="text-primary underline underline-offset-4"
+                                                    >
+                                                        Kirim ulang email
+                                                        verifikasi.
+                                                    </Link>
+                                                </p>
 
-                                {/* @chisel-email-verification */}
-                                {mustVerifyEmail &&
-                                    auth.user.email_verified_at === null && (
-                                        <div>
-                                            <p className="-mt-4 text-sm text-muted-foreground">
-                                                Your email address is
-                                                unverified.{' '}
-                                                <Link
-                                                    href={send()}
-                                                    as="button"
-                                                    className="text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
-                                                >
-                                                    Click here to re-send the
-                                                    verification email.
-                                                </Link>
-                                            </p>
+                                                {status ===
+                                                    'verification-link-sent' && (
+                                                    <div className="mt-2 text-sm text-success">
+                                                        Tautan verifikasi sudah
+                                                        dikirim ke email Anda.
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    {/* @end-chisel-email-verification */}
 
-                                            {status ===
-                                                'verification-link-sent' && (
-                                                <div className="mt-2 text-sm font-medium text-green-600">
-                                                    A new verification link has
-                                                    been sent to your email
-                                                    address.
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-                                {/* @end-chisel-email-verification */}
-
-                                <div className="flex items-center gap-4">
-                                    <Button
-                                        disabled={processing}
-                                        data-test="update-profile-button"
-                                    >
-                                        Save
-                                    </Button>
-                                </div>
-                            </>
-                        )}
-                    </Form>
-                </div>
+                                    <div className="flex items-center gap-4">
+                                        <Button
+                                            disabled={processing}
+                                            data-test="update-profile-button"
+                                        >
+                                            Simpan profil
+                                        </Button>
+                                    </div>
+                                </>
+                            )}
+                        </Form>
+                    </CardContent>
+                </Card>
 
                 <DateTimeSettings dateTime={dateTime} />
 
-                <DeleteUser />
+                <Card id="appearance">
+                    <CardHeader>
+                        <CardTitle>Tampilan</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <AppearanceTabs />
+                        <p className="text-sm text-muted-foreground">
+                            Tema langsung diterapkan dan disimpan di perangkat
+                            ini.
+                        </p>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardContent>
+                        <DeleteUser />
+                    </CardContent>
+                </Card>
             </main>
         </>
     );
@@ -251,7 +279,7 @@ export default function Profile(
 Profile.layout = {
     breadcrumbs: [
         {
-            title: 'Profile settings',
+            title: 'Profil',
             href: edit(),
         },
     ],

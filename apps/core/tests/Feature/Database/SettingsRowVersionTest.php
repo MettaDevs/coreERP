@@ -215,7 +215,7 @@ final class SettingsRowVersionTest extends TestCase
         ]);
         $url = "/api/v1/units-of-measure/{$unitId}";
 
-        $this->assertSame(1, $this->actingAs($this->user)->getJson('/api/v1/units-of-measure')->assertOk()->json('data.units.0.version'));
+        $this->assertSame(1, $this->actingAs($this->user)->getJson('/api/v1/units-of-measure?resource=units')->assertOk()->json('data.0.version'));
         $this->actingAs($this->user)->patchJson($url, ['name' => 'Biji', 'version' => 1])->assertCreated()->assertJsonPath('data.version', 3);
         $this->actingAs($this->user)->patchJson($url, ['name' => 'Unit', 'version' => 1])->assertStatus(409)->assertJsonPath('error.code', 'stale_version');
         $this->actingAs($this->user)->patchJson($url, ['name' => 'Unit'])->assertStatus(428);

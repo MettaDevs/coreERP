@@ -8,6 +8,7 @@ use App\Foundation\NumberSequence\Http\Requests\NumberSequenceSettingsRequest;
 use App\Foundation\NumberSequence\Models\TenantNumberSequence;
 use App\Foundation\NumberSequence\Support\CoreNumberSequences;
 use App\Http\Controllers\Controller;
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -21,10 +22,28 @@ class NumberSequenceController extends Controller
     public function index(Request $request, EnsureNumberSequenceDrafts $drafts, CoreNumberSequences $core): JsonResponse|Response
     {
         $membership = $this->currentMembership($request);
-        $drafts->forReadyTenant($membership->tenant_id);
-        $core->ensureAll($membership->tenant_id);
-        $sequences = TenantNumberSequence::query()->where('tenant_id', $membership->tenant_id)->with('reference.app')->orderBy('created_at')->get()
-            ->map(fn (TenantNumberSequence $sequence): array => $this->present($sequence));
+        if (! $request->boolean('incremental')) {
+            $drafts->forReadyTenant($membership->tenant_id);
+            $core->ensureAll($membership->tenant_id);
+        }
+        if ($request->boolean('incremental')) {
+            $query = TenantNumberSequence::query()->where('tenant_number_sequences.tenant_id', $membership->tenant_id)
+                ->join('app_number_sequence_references as reference', 'reference.id', '=', 'tenant_number_sequences.reference_id')
+                ->join('apps as app', 'app.id', '=', 'reference.app_id')
+                ->select(['tenant_number_sequences.*', 'reference.code as reference_code', 'reference.name as reference_name', 'app.name as app_name']);
+            $batch = IncrementalList::query($request, $query->toBase(), [
+                'reference_name' => 'reference_name', 'reference_code' => 'reference_code', 'app_name' => 'app_name', 'status' => 'status',
+            ], ['reference_name', 'reference_code', 'app_name'], 'reference_name');
+            $records = TenantNumberSequence::hydrate($batch['data']->map(fn ($row) => (array) $row)->all());
+            $records->load('reference.app');
+            $batch['data'] = $records->map(fn (TenantNumberSequence $record): array => $this->present($record));
+
+            return response()->json($batch);
+        }
+        $sequences = $request->is('api/*')
+            ? TenantNumberSequence::query()->where('tenant_id', $membership->tenant_id)->with('reference.app')->orderBy('created_at')->get()
+                ->map(fn (TenantNumberSequence $sequence): array => $this->present($sequence))
+            : [];
 
         if ($request->is('api/*')) {
             return response()->json(['data' => $sequences]);

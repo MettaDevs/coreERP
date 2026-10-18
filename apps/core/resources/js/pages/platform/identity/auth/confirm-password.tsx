@@ -1,5 +1,5 @@
 import { Form, Head } from '@inertiajs/react';
-import InputError from '@/components/input-error';
+import { FieldError } from '@apperp/ui/field';
 import PasswordInput from '@/components/password-input';
 import { Button } from '@apperp/ui/button';
 import { Spinner } from '@apperp/ui/spinner';
@@ -15,7 +15,7 @@ import PasskeyVerify from '@/components/passkey-verify';
 export default function ConfirmPassword() {
     return (
         <>
-            <Head title="Confirm password" />
+            <Head title="Konfirmasi kata sandi" />
 
             {/* @chisel-passkeys */}
             <PasskeyVerify
@@ -23,9 +23,9 @@ export default function ConfirmPassword() {
                     options: confirmOptions(),
                     submit: confirmStore(),
                 }}
-                label="Confirm with passkey"
-                loadingLabel="Confirming..."
-                separator="Or confirm with password"
+                label="Konfirmasi dengan passkey"
+                loadingLabel="Memverifikasi..."
+                separator="Atau gunakan kata sandi"
             />
             {/* @end-chisel-passkeys */}
 
@@ -35,13 +35,22 @@ export default function ConfirmPassword() {
                         <div className="grid gap-2">
                             <PasswordInput
                                 id="password"
-                                label="Password"
+                                label="Kata sandi"
                                 name="password"
+                                aria-invalid={Boolean(errors.password)}
+                                aria-describedby={
+                                    errors.password
+                                        ? 'password-error'
+                                        : undefined
+                                }
                                 autoComplete="current-password"
+                                required
                                 autoFocus
                             />
 
-                            <InputError message={errors.password} />
+                            <FieldError id="password-error">
+                                {errors.password}
+                            </FieldError>
                         </div>
 
                         <div className="flex items-center">
@@ -51,7 +60,7 @@ export default function ConfirmPassword() {
                                 data-test="confirm-password-button"
                             >
                                 {processing && <Spinner />}
-                                Confirm password
+                                Konfirmasi kata sandi
                             </Button>
                         </div>
                     </div>
@@ -62,7 +71,6 @@ export default function ConfirmPassword() {
 }
 
 ConfirmPassword.layout = {
-    title: 'Confirm password',
-    description:
-        'This is a secure area of the application. Please confirm your password before continuing.',
+    title: 'Konfirmasi kata sandi',
+    description: 'Konfirmasi identitas Anda sebelum melanjutkan tindakan ini.',
 };

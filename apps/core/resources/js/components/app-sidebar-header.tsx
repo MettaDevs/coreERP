@@ -8,15 +8,17 @@ import {
 import { Kbd } from '@apperp/ui/kbd';
 import { SidebarTrigger } from '@apperp/ui/sidebar';
 import { Link, usePage } from '@inertiajs/react';
-import { Command, Moon, Palette, Search } from 'lucide-react';
+import { Command, Moon, Search, Sun } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { AppCommandPalette } from '@/components/app-command-palette';
+import AppLogoIcon from '@/components/app-logo-icon';
 import { ExportTray } from '@/components/export-tray';
 import { NotificationBell } from '@/components/notification-bell';
 import { PrintDialog } from '@/components/print-dialog';
 import { UserMenuContent } from '@/components/user-menu-content';
 import { WorkDateBadge } from '@/components/work-date-notice';
 import { WorkspaceSwitcher } from '@/components/workspace-switcher';
+import { useAppearance } from '@/hooks/use-appearance';
 import { cn } from '@/lib/utils';
 import { login } from '@/routes';
 
@@ -27,6 +29,7 @@ export function AppSidebarHeader({
 }) {
     const { auth } = usePage().props;
     const [commandOpen, setCommandOpen] = useState(false);
+    const { resolvedAppearance, updateAppearance } = useAppearance();
 
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
@@ -59,7 +62,13 @@ export function AppSidebarHeader({
                 >
                     <Search />
                 </Button>
-                <WorkspaceSwitcher />
+                <Link
+                    href="/dashboard"
+                    aria-label="Beranda"
+                    className="flex size-8 shrink-0 items-center justify-center rounded-md bg-white"
+                >
+                    <AppLogoIcon className="size-7" />
+                </Link>
                 <WorkDateBadge />
                 <div className="hidden h-6 w-px bg-border lg:block" />
                 <Button
@@ -85,17 +94,27 @@ export function AppSidebarHeader({
                     <Button
                         variant="ghost"
                         size="icon"
-                        aria-label="Toggle theme"
+                        aria-label={
+                            resolvedAppearance === 'dark'
+                                ? 'Gunakan tema terang'
+                                : 'Gunakan tema gelap'
+                        }
+                        title={
+                            resolvedAppearance === 'dark'
+                                ? 'Gunakan tema terang'
+                                : 'Gunakan tema gelap'
+                        }
+                        onClick={() =>
+                            updateAppearance(
+                                resolvedAppearance === 'dark'
+                                    ? 'light'
+                                    : 'dark',
+                            )
+                        }
                     >
-                        <Moon />
+                        {resolvedAppearance === 'dark' ? <Sun /> : <Moon />}
                     </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Theme presets"
-                    >
-                        <Palette />
-                    </Button>
+                    <WorkspaceSwitcher />
                     <div className="mx-2 hidden h-6 w-px bg-border sm:block" />
                     {auth.user ? (
                         <DropdownMenu>
@@ -104,7 +123,7 @@ export function AppSidebarHeader({
                                     variant="ghost"
                                     size="icon"
                                     className="rounded-full"
-                                    aria-label="Open profile menu"
+                                    aria-label="Buka menu profil"
                                     data-test="header-profile-menu"
                                 >
                                     <Avatar>
@@ -129,7 +148,7 @@ export function AppSidebarHeader({
                         </DropdownMenu>
                     ) : (
                         <Button asChild size="sm">
-                            <Link href={login()}>Sign in</Link>
+                            <Link href={login()}>Masuk</Link>
                         </Button>
                     )}
                 </div>

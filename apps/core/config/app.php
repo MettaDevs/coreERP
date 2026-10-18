@@ -13,7 +13,9 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'Laravel'),
+    'name' => in_array(env('APP_NAME', 'CoreERP'), ['Laravel', 'Laravel Starter Kit'], true)
+        ? 'CoreERP'
+        : env('APP_NAME', 'CoreERP'),
 
     // Diisi otomatis oleh perakit pada image rilis, sama untuk SaaS dan on-prem.
     'product_version' => env('COREERP_PRODUCT_VERSION') ?: null,
