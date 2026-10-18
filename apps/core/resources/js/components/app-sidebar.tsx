@@ -13,12 +13,14 @@ export function AppSidebar() {
     const { open, setOpen, isMobile, setOpenMobile } = useSidebar();
     const { url, props } = usePage();
     const [previewLabel, setPreviewLabel] = useState<string | null>(null);
+    const [pinnedLabel, setPinnedLabel] = useState<string | null>(null);
     const path = url.split('?')[0];
     const [prevUrl, setPrevUrl] = useState(url);
 
     if (prevUrl !== url) {
         setPrevUrl(url);
         setPreviewLabel(null);
+        setPinnedLabel(null);
     }
 
     const { primaryItems } = useShellNavigation();
@@ -43,6 +45,9 @@ export function AppSidebar() {
     };
     const displayedItem =
         primaryItems.find((item) => item.label === previewLabel) ??
+        (open
+            ? primaryItems.find((item) => item.label === pinnedLabel)
+            : undefined) ??
         selectedItem;
     const showChildren = isMobile || open || previewLabel !== null;
 
@@ -145,10 +150,10 @@ export function AppSidebar() {
                 {displayedItem && showChildren && (
                     <nav
                         className={cn(
-                            'flex min-h-0 min-w-0 flex-1 flex-col bg-sidebar',
+                            'flex min-h-0 w-[calc(var(--sidebar-width)-var(--sidebar-width-icon))] shrink-0 flex-col bg-sidebar',
                             !isMobile &&
                                 !open &&
-                                'absolute inset-y-0 left-(--sidebar-width-icon) w-[calc(var(--sidebar-width)-var(--sidebar-width-icon))] border-r border-sidebar-border shadow-lg',
+                                'absolute inset-y-0 left-(--sidebar-width-icon) border-r border-sidebar-border shadow-lg',
                         )}
                         aria-label={`Menu ${displayedItem.label}`}
                     >
@@ -175,6 +180,10 @@ export function AppSidebar() {
                                     if (isMobile) {
                                         setOpenMobile(false);
                                     } else {
+                                        if (!open) {
+                                            setPinnedLabel(displayedItem.label);
+                                        }
+
                                         setOpen(!open);
                                     }
                                 }}
