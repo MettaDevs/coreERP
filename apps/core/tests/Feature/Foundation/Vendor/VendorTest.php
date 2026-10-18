@@ -175,10 +175,10 @@ class VendorTest extends TestCase
         // Urutannya lahir saat layar Nomor dokumen dibuka, jadi admin dapat menyesuaikan format
         // dengan nomor pemasok lama sebelum memindahkannya.
         $this->actingAs($this->owner)->get('/settings/number-sequences')->assertOk()
-            ->assertInertia(fn (AssertableInertia $page) => $page->where(
-                'sequences',
-                fn ($urutan): bool => collect($urutan)->contains(fn (array $baris): bool => $baris['reference_code'] === 'core.vendor'
-                    && $baris['app_name'] === 'CoreERP'),
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('sequences', []));
+        $this->getJson('/settings/number-sequences?incremental=1&q=core.vendor')->assertOk()
+            ->assertJsonPath('data', fn ($sequences): bool => collect($sequences)->contains(
+                fn (array $sequence): bool => $sequence['reference_code'] === 'core.vendor' && $sequence['app_name'] === 'CoreERP',
             ));
         $urutan = TenantNumberSequence::query()
             ->where('tenant_id', $this->membership->tenant_id)
