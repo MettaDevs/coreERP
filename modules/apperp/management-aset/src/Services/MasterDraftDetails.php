@@ -46,8 +46,8 @@ final class MasterDraftDetails
         foreach ($details as $section => $payload) {
             try {
                 if (($resource === 'pabrikan-aset' && $section === 'models') || ($resource === 'maintenance-job-types' && $section === 'variants')) {
-                    $rows = validator($payload, ['rows' => ['present', 'array', 'list', 'max:100'], 'rows.*' => ['array'], 'rows.*.kode' => ['sometimes', 'nullable', 'string', 'distinct']])->validate()['rows'];
-                    foreach ($rows as $index => $row) {
+                    validator($payload, ['rows' => ['present', 'array', 'list', 'max:100'], 'rows.*' => ['array'], 'rows.*.kode' => ['sometimes', 'nullable', 'string', 'distinct']])->validate();
+                    foreach ($payload['rows'] as $index => $row) {
                         try {
                             $controller = $resource === 'pabrikan-aset' ? app(ModelAsetController::class) : app(MaintenanceJobTypeVariantController::class);
                             $ownerField = $resource === 'pabrikan-aset' ? 'pabrikan_aset_id' : 'maintenance_job_type_id';
