@@ -12,5 +12,4 @@ Route::post('prakualifikasi', [PrakualifikasiController::class, 'store'])->name(
 
 Route::get('prakualifikasi/{id}', [PrakualifikasiController::class, 'show'])->name('procurement.prakualifikasi.show');
 Route::put('prakualifikasi/{id}', [PrakualifikasiController::class, 'update'])->name('procurement.prakualifikasi.update');
-Route::patch('prakualifikasi/{id}', [PrakualifikasiController::class, 'update']);
 Route::delete('prakualifikasi/{id}', [PrakualifikasiController::class, 'destroy'])->name('procurement.prakualifikasi.destroy');
