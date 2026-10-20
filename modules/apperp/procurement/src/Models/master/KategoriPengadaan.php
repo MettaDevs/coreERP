@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\Procurement\Models\master;
 
+use App\Platform\Modules\Contracts\DataClass;
 use Modules\Apperp\Procurement\Models\MasterData;
 
 /**
@@ -17,6 +18,11 @@ use Modules\Apperp\Procurement\Models\MasterData;
  */
 class KategoriPengadaan extends MasterData
 {
+    /** @var array<string, DataClass> */
+    public const COLUMN_CLASSIFICATION = [
+        'kategori_pengadaan' => DataClass::CustomerContent,
+    ];
+
     protected $table = 'procurement_kategori_pengadaan';
 
     protected $fillable = [
