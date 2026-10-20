@@ -73,12 +73,7 @@ function LoadingState() {
     );
 }
 
-export default function App({
-    view,
-    segments,
-    permissions,
-    konteks: _konteks,
-}: PropsModul) {
+export default function App({ view, segments, permissions }: PropsModul) {
     const pageProps = { view, segments, permissions };
 
     return (
