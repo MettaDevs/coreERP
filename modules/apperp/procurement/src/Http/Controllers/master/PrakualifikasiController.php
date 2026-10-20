@@ -8,6 +8,8 @@ use App\Platform\Modules\Contracts\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Apperp\Procurement\Models\master\Prakualifikasi;
 use Modules\Apperp\Procurement\Models\master\PrakualifikasiDokumen;
@@ -400,10 +402,11 @@ final class PrakualifikasiController extends Controller
      */
     private function generateNextNumber(string $tenantId, string $date): string
     {
-        $yearShort = date('y', strtotime($date));
-        $romanMonth = $this->toRoman((int) date('m', strtotime($date)));
+        $carbon = Carbon::parse($date);
+        $yearShort = $carbon->format('y');
+        $romanMonth = $this->toRoman((int) $carbon->format('m'));
         $count = Prakualifikasi::where('tenant_id', $tenantId)
-            ->whereYear('tanggal_prakualifikasi', date('Y', strtotime($date)))
+            ->whereYear('tanggal_prakualifikasi', $carbon->format('Y'))
             ->count() + 1;
         $candidate = sprintf('Pra/%s/%s/%04d', $romanMonth, $yearShort, $count);
 
