@@ -18,15 +18,19 @@ import { PrakualifikasiDetailModal } from './prakualifikasi/PrakualifikasiDetail
 import type { PrakualifikasiFormData } from './prakualifikasi/PrakualifikasiFormModal';
 
 const kualifikasiColumns = [
-    { id: 'no', header: 'No.' },
-    { id: 'info', header: 'Info Prakualifikasi' },
-    { id: 'kode_vendor', header: 'Kode Vendor/Supplier' },
-    { id: 'nama_vendor', header: 'Nama Vendor/Supplier' },
-    { id: 'pic', header: 'Contact Person' },
-    { id: 'telepon', header: 'Telp/HP' },
-    { id: 'alamat', header: 'Alamat Vendor/Supplier' },
-    { id: 'status_vendor', header: 'Status Vendor/Supplier' },
-    { id: 'status_kualifikasi', header: 'Status Kualifikasi' },
+    { id: 'no', header: 'No.', cell: () => null },
+    { id: 'info', header: 'Info Prakualifikasi', cell: () => null },
+    { id: 'kode_vendor', header: 'Kode Vendor/Supplier', cell: () => null },
+    { id: 'nama_vendor', header: 'Nama Vendor/Supplier', cell: () => null },
+    { id: 'pic', header: 'Contact Person', cell: () => null },
+    { id: 'telepon', header: 'Telp/HP', cell: () => null },
+    { id: 'alamat', header: 'Alamat Vendor/Supplier', cell: () => null },
+    { id: 'status_vendor', header: 'Status Vendor/Supplier', cell: () => null },
+    {
+        id: 'status_kualifikasi',
+        header: 'Status Kualifikasi',
+        cell: () => null,
+    },
 ];
 
 type KualifikasiRow = PrakualifikasiFormData & {
@@ -61,7 +65,14 @@ function formatDisplayDate(dateStr: string): string {
     return dateStr;
 }
 
-export default function KualifikasiPage() {
+type PageProps = {
+    view?: string;
+    segments?: string[];
+    permissions?: string[];
+};
+
+export default function KualifikasiPage(_props?: PageProps) {
+    void _props;
     const [items, setItems] = useState<KualifikasiRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
