@@ -1,21 +1,3 @@
-import { Button } from '@apperp/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@apperp/ui/dialog';
-import { Badge } from '@apperp/ui/badge';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
 import {
     Building2,
     Check,
@@ -29,7 +11,35 @@ import {
     X,
     XCircle,
 } from 'lucide-react';
+import { Badge } from '@apperp/ui/badge';
+import { Button } from '@apperp/ui/button';
+import { DataTable } from '@apperp/ui/data-table';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@apperp/ui/dialog';
+import { TableCell, TableRow } from '@apperp/ui/table';
 import type { PrakualifikasiFormData } from './PrakualifikasiFormModal';
+
+const docColumns = [
+    { id: 'no', header: 'No.', cell: () => null },
+    { id: 'nama_dokumen', header: 'Uraian Dokumen', cell: () => null },
+    { id: 'status', header: 'Status', cell: () => null },
+    { id: 'keterangan', header: 'Keterangan', cell: () => null },
+];
+
+const itemColumns = [
+    { id: 'no', header: 'No.', cell: () => null },
+    { id: 'jenis_item', header: 'Jenis Item', cell: () => null },
+    { id: 'kode_item', header: 'Kode Item', cell: () => null },
+    { id: 'nama_item', header: 'Nama Item', cell: () => null },
+    { id: 'satuan', header: 'Satuan', cell: () => null },
+    { id: 'kesediaan', header: 'Kesediaan', cell: () => null },
+];
 
 type Props = {
     open: boolean;
@@ -40,12 +50,20 @@ type Props = {
 };
 
 function formatDisplayDate(dateStr: string): string {
-    if (!dateStr) return '';
-    if (dateStr.includes('/')) return dateStr;
+    if (!dateStr) {
+        return '';
+    }
+
+    if (dateStr.includes('/')) {
+        return dateStr;
+    }
+
     const parts = dateStr.split('-');
+
     if (parts.length === 3) {
         return `${parts[2]}/${parts[1]}/${parts[0]}`;
     }
+
     return dateStr;
 }
 
@@ -56,7 +74,9 @@ export function PrakualifikasiDetailModal({
     onEdit,
     onDelete,
 }: Props) {
-    if (!data) return null;
+    if (!data) {
+        return null;
+    }
 
     const handlePrint = () => {
         window.print();
@@ -75,6 +95,7 @@ export function PrakualifikasiDetailModal({
                 </Badge>
             );
         }
+
         if (
             status === 'Batal' ||
             status === 'Tidak Memenuhi Syarat' ||
@@ -87,6 +108,7 @@ export function PrakualifikasiDetailModal({
                 </Badge>
             );
         }
+
         return (
             <Badge
                 variant="secondary"
@@ -227,67 +249,60 @@ export function PrakualifikasiDetailModal({
                         </div>
 
                         <div className="overflow-hidden rounded-md border">
-                            <Table>
-                                <TableHeader className="bg-sky-50 dark:bg-sky-950/40">
-                                    <TableRow>
-                                        <TableHead className="w-12 text-center text-xs">
-                                            No.
-                                        </TableHead>
-                                        <TableHead className="text-xs">
-                                            Uraian Dokumen
-                                        </TableHead>
-                                        <TableHead className="w-28 text-center text-xs">
-                                            Status
-                                        </TableHead>
-                                        <TableHead className="text-xs">
-                                            Keterangan
-                                        </TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {!data.dokumen ||
-                                    data.dokumen.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell
-                                                colSpan={4}
-                                                className="text-muted-foreground py-4 text-center text-xs"
-                                            >
-                                                Tidak ada catatan dokumen.
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        data.dokumen.map((doc, idx) => (
-                                            <TableRow
-                                                key={idx}
-                                                className="h-8 text-xs"
-                                            >
-                                                <TableCell className="text-center font-mono font-medium">
-                                                    {idx + 1}
-                                                </TableCell>
-                                                <TableCell className="font-medium">
-                                                    {doc.nama_dokumen}
-                                                </TableCell>
-                                                <TableCell className="text-center">
-                                                    {doc.ada ? (
-                                                        <span className="inline-flex items-center rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-                                                            <Check className="mr-1 h-3 w-3" />{' '}
-                                                            Ada
-                                                        </span>
-                                                    ) : (
-                                                        <span className="inline-flex items-center rounded bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-800 dark:bg-rose-900/40 dark:text-rose-300">
-                                                            <X className="mr-1 h-3 w-3" />{' '}
-                                                            Tidak Ada
-                                                        </span>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-muted-foreground">
-                                                    {doc.keterangan || '-'}
+                            <DataTable
+                                scrollMode="inline"
+                                showRowNumbers={false}
+                                columns={docColumns}
+                                data={data.dokumen || []}
+                                getRowKey={(doc) =>
+                                    doc.id || doc.nama_dokumen || doc.urutan
+                                }
+                                renderRows={() => (
+                                    <>
+                                        {!data.dokumen ||
+                                        data.dokumen.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell
+                                                    colSpan={4}
+                                                    className="text-muted-foreground py-4 text-center text-xs"
+                                                >
+                                                    Tidak ada catatan dokumen.
                                                 </TableCell>
                                             </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
+                                        ) : (
+                                            data.dokumen.map((doc, idx) => (
+                                                <TableRow
+                                                    key={idx}
+                                                    className="h-8 text-xs"
+                                                >
+                                                    <TableCell className="text-center font-mono font-medium">
+                                                        {idx + 1}
+                                                    </TableCell>
+                                                    <TableCell className="font-medium">
+                                                        {doc.nama_dokumen}
+                                                    </TableCell>
+                                                    <TableCell className="text-center">
+                                                        {doc.ada ? (
+                                                            <span className="inline-flex items-center rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                                                                <Check className="mr-1 h-3 w-3" />{' '}
+                                                                Ada
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center rounded bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-800 dark:bg-rose-900/40 dark:text-rose-300">
+                                                                <X className="mr-1 h-3 w-3" />{' '}
+                                                                Tidak Ada
+                                                            </span>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className="text-muted-foreground">
+                                                        {doc.keterangan || '-'}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        )}
+                                    </>
+                                )}
+                            />
                         </div>
                     </div>
 
@@ -310,69 +325,61 @@ export function PrakualifikasiDetailModal({
                             Daftar List Item yang tersedia
                         </h4>
                         <div className="overflow-hidden rounded-md border">
-                            <Table>
-                                <TableHeader className="bg-sky-50 dark:bg-sky-950/40">
-                                    <TableRow>
-                                        <TableHead className="w-12 text-center text-xs">
-                                            No.
-                                        </TableHead>
-                                        <TableHead className="w-32 text-center text-xs">
-                                            Jenis Item
-                                        </TableHead>
-                                        <TableHead className="w-28 text-center text-xs">
-                                            Kode Item
-                                        </TableHead>
-                                        <TableHead className="text-center text-xs">
-                                            Nama Item
-                                        </TableHead>
-                                        <TableHead className="w-24 text-center text-xs">
-                                            Satuan
-                                        </TableHead>
-                                        <TableHead className="w-28 text-center text-xs">
-                                            Kesediaan
-                                        </TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {!data.items || data.items.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell
-                                                colSpan={6}
-                                                className="text-muted-foreground py-4 text-center text-xs"
-                                            >
-                                                Tidak ada data item barang/jasa.
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        data.items.map((item, idx) => (
-                                            <TableRow
-                                                key={idx}
-                                                className="h-8 text-xs"
-                                            >
-                                                <TableCell className="text-center font-mono font-medium">
-                                                    {idx + 1}
-                                                </TableCell>
-                                                <TableCell className="text-center">
-                                                    {item.jenis_item || '-'}
-                                                </TableCell>
-                                                <TableCell className="text-muted-foreground text-center font-mono">
-                                                    {item.kode_item || '-'}
-                                                </TableCell>
-                                                <TableCell className="text-foreground text-center font-semibold">
-                                                    {item.nama_item}
-                                                </TableCell>
-                                                <TableCell className="text-center">
-                                                    {item.satuan || '-'}
-                                                </TableCell>
-                                                <TableCell className="text-center font-mono">
-                                                    {item.kesediaan ||
-                                                        'Tersedia'}
+                            <DataTable
+                                scrollMode="inline"
+                                showRowNumbers={false}
+                                columns={itemColumns}
+                                data={data.items || []}
+                                getRowKey={(item) =>
+                                    item.id ||
+                                    item.kode_item ||
+                                    item.nama_item ||
+                                    item.urutan
+                                }
+                                renderRows={() => (
+                                    <>
+                                        {!data.items ||
+                                        data.items.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell
+                                                    colSpan={6}
+                                                    className="text-muted-foreground py-4 text-center text-xs"
+                                                >
+                                                    Tidak ada data item
+                                                    barang/jasa.
                                                 </TableCell>
                                             </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
+                                        ) : (
+                                            data.items.map((item, idx) => (
+                                                <TableRow
+                                                    key={idx}
+                                                    className="h-8 text-xs"
+                                                >
+                                                    <TableCell className="text-center font-mono font-medium">
+                                                        {idx + 1}
+                                                    </TableCell>
+                                                    <TableCell className="text-center">
+                                                        {item.jenis_item || '-'}
+                                                    </TableCell>
+                                                    <TableCell className="text-muted-foreground text-center font-mono">
+                                                        {item.kode_item || '-'}
+                                                    </TableCell>
+                                                    <TableCell className="text-foreground text-center font-semibold">
+                                                        {item.nama_item}
+                                                    </TableCell>
+                                                    <TableCell className="text-center">
+                                                        {item.satuan || '-'}
+                                                    </TableCell>
+                                                    <TableCell className="text-center font-mono">
+                                                        {item.kesediaan ||
+                                                            'Tersedia'}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        )}
+                                    </>
+                                )}
+                            />
                         </div>
                     </div>
                 </div>

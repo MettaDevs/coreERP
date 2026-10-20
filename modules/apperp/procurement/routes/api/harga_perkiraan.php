@@ -9,5 +9,4 @@ Route::get('harga-perkiraan', [HargaPerkiraanController::class, 'index'])->name(
 Route::post('harga-perkiraan', [HargaPerkiraanController::class, 'store'])->name('procurement.harga-perkiraan.store');
 Route::get('harga-perkiraan/{id}', [HargaPerkiraanController::class, 'show'])->name('procurement.harga-perkiraan.show');
 Route::put('harga-perkiraan/{id}', [HargaPerkiraanController::class, 'update'])->name('procurement.harga-perkiraan.update');
-Route::patch('harga-perkiraan/{id}', [HargaPerkiraanController::class, 'update']);
 Route::delete('harga-perkiraan/{id}', [HargaPerkiraanController::class, 'destroy'])->name('procurement.harga-perkiraan.destroy');

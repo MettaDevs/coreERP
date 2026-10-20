@@ -29,6 +29,11 @@ class PrakualifikasiItem extends Model
     use BelongsToTenant;
     use HasUlids;
 
+    /** @var array<string, DataClass> */
+    public const COLUMN_CLASSIFICATION = [
+        'nama_item' => DataClass::CustomerContent,
+    ];
+
     protected $table = 'procurement_prakualifikasi_item';
 
     protected $fillable = [
