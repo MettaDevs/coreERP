@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
-import {
-    Card,
-    CardContent,
-    CardHeader,
-} from '@apperp/ui/card';
+import { Card, CardContent, CardHeader } from '@apperp/ui/card';
 import {
     Empty,
     EmptyDescription,
@@ -74,7 +70,9 @@ export default function HargaPerkiraanPage({
 
     // Edit Modal State
     const [editModalOpen, setEditModalOpen] = useState(false);
-    const [editingItem, setEditingItem] = useState<HargaPerkiraanItem | null>(null);
+    const [editingItem, setEditingItem] = useState<HargaPerkiraanItem | null>(
+        null,
+    );
 
     const fetchData = useCallback(
         async (page = 1) => {
@@ -83,7 +81,8 @@ export default function HargaPerkiraanPage({
                 const params = new URLSearchParams();
                 params.set('page', String(page));
                 if (search.trim()) params.set('search', search.trim());
-                if (selectedGroup !== 'semua') params.set('group_item', selectedGroup);
+                if (selectedGroup !== 'semua')
+                    params.set('group_item', selectedGroup);
 
                 const res = await api<{
                     status: string;
@@ -120,7 +119,9 @@ export default function HargaPerkiraanPage({
 
     const handleUpdateSuccess = (updated: HargaPerkiraanItem) => {
         setItems((prev) =>
-            prev.map((it) => (it.id === updated.id ? { ...it, ...updated } : it)),
+            prev.map((it) =>
+                it.id === updated.id ? { ...it, ...updated } : it,
+            ),
         );
     };
 
@@ -144,13 +145,14 @@ export default function HargaPerkiraanPage({
                         </span>
                     </div>
                     <div className="mt-1 flex items-center gap-2">
-                        <Calculator className="h-6 w-6 text-primary" />
-                        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                        <Calculator className="text-primary h-6 w-6" />
+                        <h1 className="text-foreground text-2xl font-bold tracking-tight">
                             Harga Perkiraan
                         </h1>
                     </div>
-                    <p className="text-muted-foreground text-xs mt-0.5">
-                        Daftar acuan estimasi harga satuan bahan, upah, asset, subkontraktor, dan biaya overhead.
+                    <p className="text-muted-foreground mt-0.5 text-xs">
+                        Daftar acuan estimasi harga satuan bahan, upah, asset,
+                        subkontraktor, dan biaya overhead.
                     </p>
                 </div>
 
@@ -175,23 +177,23 @@ export default function HargaPerkiraanPage({
 
             {/* Container Card Tabel Harga Perkiraan */}
             <Card className="border shadow-sm">
-                <CardHeader className="p-4 border-b bg-card">
+                <CardHeader className="bg-card border-b p-4">
                     <div className="flex items-center justify-between gap-4">
-                        <div className="relative flex-1 max-w-sm">
-                            <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-muted-foreground">
+                        <div className="relative max-w-sm flex-1">
+                            <div className="text-muted-foreground pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
                                 <Search className="h-3.5 w-3.5" />
                             </div>
                             <Input
                                 placeholder="Pencarian harga perkiraan..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                className="h-8 pl-8 pr-7 text-xs bg-background border-input"
+                                className="bg-background border-input h-8 pl-8 pr-7 text-xs"
                             />
                             {search && (
                                 <button
                                     type="button"
                                     onClick={() => setSearch('')}
-                                    className="absolute inset-y-0 right-0 pr-2 flex items-center text-muted-foreground hover:text-foreground"
+                                    className="text-muted-foreground hover:text-foreground absolute inset-y-0 right-0 flex items-center pr-2"
                                 >
                                     <X className="h-3.5 w-3.5" />
                                 </button>
@@ -202,11 +204,11 @@ export default function HargaPerkiraanPage({
 
                 <CardContent className="p-0">
                     {/* Header Strip Hijau: "Daftar Harga Perkiraan" Sesuai Mockup */}
-                    <div className="px-4 py-2 bg-emerald-50 dark:bg-emerald-950/30 border-b border-emerald-200/60 dark:border-emerald-900/40 flex items-center justify-between">
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-emerald-100/90 dark:bg-emerald-900/50 text-emerald-900 dark:text-emerald-200 border border-emerald-300/80 dark:border-emerald-700/60 text-xs font-bold tracking-wide">
+                    <div className="flex items-center justify-between border-b border-emerald-200/60 bg-emerald-50 px-4 py-2 dark:border-emerald-900/40 dark:bg-emerald-950/30">
+                        <div className="inline-flex items-center gap-1.5 rounded border border-emerald-300/80 bg-emerald-100/90 px-3 py-1 text-xs font-bold tracking-wide text-emerald-900 dark:border-emerald-700/60 dark:bg-emerald-900/50 dark:text-emerald-200">
                             <span>Daftar Harga Perkiraan</span>
                         </div>
-                        <span className="text-xs text-muted-foreground font-medium">
+                        <span className="text-muted-foreground text-xs font-medium">
                             Total: {meta.total} Item Harga Perkiraan
                         </span>
                     </div>
@@ -214,33 +216,33 @@ export default function HargaPerkiraanPage({
                     {/* Tabel Daftar Harga Perkiraan (9 Kolom Persis Mockup Gambar) */}
                     <div className="overflow-x-auto">
                         <Table>
-                            <TableHeader className="bg-blue-50/70 dark:bg-slate-900/80 border-b">
+                            <TableHeader className="border-b bg-blue-50/70 dark:bg-slate-900/80">
                                 <TableRow className="hover:bg-transparent">
-                                    <TableHead className="w-12 text-center font-bold text-foreground border-r text-xs">
+                                    <TableHead className="text-foreground w-12 border-r text-center text-xs font-bold">
                                         No.
                                     </TableHead>
-                                    <TableHead className="w-28 text-center font-bold text-foreground border-r text-xs">
+                                    <TableHead className="text-foreground w-28 border-r text-center text-xs font-bold">
                                         Group Item
                                     </TableHead>
-                                    <TableHead className="w-32 text-center font-bold text-foreground border-r text-xs">
+                                    <TableHead className="text-foreground w-32 border-r text-center text-xs font-bold">
                                         Jenis Item
                                     </TableHead>
-                                    <TableHead className="w-28 text-center font-bold text-foreground border-r text-xs">
+                                    <TableHead className="text-foreground w-28 border-r text-center text-xs font-bold">
                                         Kode Item
                                     </TableHead>
-                                    <TableHead className="min-w-[160px] text-center font-bold text-foreground border-r text-xs">
+                                    <TableHead className="text-foreground min-w-[160px] border-r text-center text-xs font-bold">
                                         Nama Item
                                     </TableHead>
-                                    <TableHead className="w-24 text-center font-bold text-foreground border-r text-xs">
+                                    <TableHead className="text-foreground w-24 border-r text-center text-xs font-bold">
                                         Satuan
                                     </TableHead>
-                                    <TableHead className="w-36 text-center font-bold text-foreground border-r text-xs">
+                                    <TableHead className="text-foreground w-36 border-r text-center text-xs font-bold">
                                         Harga Per Satuan
                                     </TableHead>
-                                    <TableHead className="w-36 text-center font-bold text-foreground border-r text-xs">
+                                    <TableHead className="text-foreground w-36 border-r text-center text-xs font-bold">
                                         Tgl Update
                                     </TableHead>
-                                    <TableHead className="w-32 text-center font-bold text-foreground text-xs">
+                                    <TableHead className="text-foreground w-32 text-center text-xs font-bold">
                                         Aksi
                                     </TableHead>
                                 </TableRow>
@@ -250,7 +252,7 @@ export default function HargaPerkiraanPage({
                                     <TableRow>
                                         <TableCell
                                             colSpan={9}
-                                            className="py-12 text-center text-muted-foreground text-sm"
+                                            className="text-muted-foreground py-12 text-center text-sm"
                                         >
                                             Memuat daftar harga perkiraan...
                                         </TableCell>
@@ -264,10 +266,15 @@ export default function HargaPerkiraanPage({
                                             <Empty>
                                                 <EmptyHeader>
                                                     <EmptyTitle>
-                                                        Belum Ada Data Harga Perkiraan
+                                                        Belum Ada Data Harga
+                                                        Perkiraan
                                                     </EmptyTitle>
                                                     <EmptyDescription>
-                                                        Item barang dan jasa yang masuk pengadaan akan ditampilkan di sini beserta nilai estimasi HPS.
+                                                        Item barang dan jasa
+                                                        yang masuk pengadaan
+                                                        akan ditampilkan di sini
+                                                        beserta nilai estimasi
+                                                        HPS.
                                                     </EmptyDescription>
                                                 </EmptyHeader>
                                             </Empty>
@@ -277,10 +284,10 @@ export default function HargaPerkiraanPage({
                                     items.map((row, idx) => (
                                         <TableRow
                                             key={row.id}
-                                            className="hover:bg-muted/50 cursor-pointer transition-colors border-b text-xs"
+                                            className="hover:bg-muted/50 cursor-pointer border-b text-xs transition-colors"
                                         >
                                             {/* 1. No */}
-                                            <TableCell className="text-center font-medium text-muted-foreground border-r">
+                                            <TableCell className="text-muted-foreground border-r text-center font-medium">
                                                 {(meta.current_page - 1) *
                                                     meta.per_page +
                                                     idx +
@@ -288,50 +295,56 @@ export default function HargaPerkiraanPage({
                                             </TableCell>
 
                                             {/* 2. Group Item */}
-                                            <TableCell className="text-center font-medium text-foreground border-r">
+                                            <TableCell className="text-foreground border-r text-center font-medium">
                                                 {row.group_item}
                                             </TableCell>
 
                                             {/* 3. Jenis Item */}
-                                            <TableCell className="text-center text-muted-foreground border-r">
+                                            <TableCell className="text-muted-foreground border-r text-center">
                                                 {row.jenis_item}
                                             </TableCell>
 
                                             {/* 4. Kode Item */}
-                                            <TableCell className="text-center font-mono font-medium text-foreground border-r">
+                                            <TableCell className="text-foreground border-r text-center font-mono font-medium">
                                                 {row.kode_item}
                                             </TableCell>
 
                                             {/* 5. Nama Item */}
-                                            <TableCell className="font-bold text-foreground border-r">
+                                            <TableCell className="text-foreground border-r font-bold">
                                                 {row.nama_item}
                                             </TableCell>
 
                                             {/* 6. Satuan */}
-                                            <TableCell className="text-center text-muted-foreground border-r">
+                                            <TableCell className="text-muted-foreground border-r text-center">
                                                 {row.satuan}
                                             </TableCell>
 
                                             {/* 7. Harga Per Satuan */}
-                                            <TableCell className="text-right font-mono font-bold text-foreground border-r px-4">
-                                                {formatRupiah(row.harga_perkiraan)}
+                                            <TableCell className="text-foreground border-r px-4 text-right font-mono font-bold">
+                                                {formatRupiah(
+                                                    row.harga_perkiraan,
+                                                )}
                                             </TableCell>
 
                                             {/* 8. Tgl Update */}
-                                            <TableCell className="text-center text-muted-foreground border-r">
+                                            <TableCell className="text-muted-foreground border-r text-center">
                                                 {row.tanggal_update
-                                                    ? formatIndonesianDate(row.tanggal_update)
+                                                    ? formatIndonesianDate(
+                                                          row.tanggal_update,
+                                                      )
                                                     : '-'}
                                             </TableCell>
 
                                             {/* 9. Aksi (Tombol Langsung) */}
-                                            <TableCell className="text-center p-2 whitespace-nowrap">
+                                            <TableCell className="whitespace-nowrap p-2 text-center">
                                                 <Button
                                                     type="button"
                                                     variant="outline"
                                                     size="sm"
-                                                    onClick={() => handleEdit(row)}
-                                                    className="h-7 px-3 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/50 dark:text-amber-300 border-amber-300 dark:border-amber-800"
+                                                    onClick={() =>
+                                                        handleEdit(row)
+                                                    }
+                                                    className="h-7 border-amber-300 bg-amber-50 px-3 text-xs font-medium text-amber-700 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
                                                 >
                                                     <Pencil className="mr-1 h-3.5 w-3.5" />
                                                     Edit
@@ -346,9 +359,10 @@ export default function HargaPerkiraanPage({
 
                     {/* Pagination Bar */}
                     {meta.last_page > 1 && (
-                        <div className="px-4 py-3 border-t flex items-center justify-between">
-                            <span className="text-xs text-muted-foreground">
-                                Halaman {meta.current_page} dari {meta.last_page} (Total: {meta.total})
+                        <div className="flex items-center justify-between border-t px-4 py-3">
+                            <span className="text-muted-foreground text-xs">
+                                Halaman {meta.current_page} dari{' '}
+                                {meta.last_page} (Total: {meta.total})
                             </span>
                             <div className="flex gap-2">
                                 <Button

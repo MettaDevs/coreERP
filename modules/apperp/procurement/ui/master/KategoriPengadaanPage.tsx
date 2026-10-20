@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
-import {
-    Card,
-    CardContent,
-    CardHeader,
-} from '@apperp/ui/card';
+import { Card, CardContent, CardHeader } from '@apperp/ui/card';
 import {
     Empty,
     EmptyDescription,
@@ -86,7 +82,8 @@ export default function KategoriPengadaanPage({
 
     // Form Modal State
     const [modalOpen, setModalOpen] = useState(false);
-    const [editingItem, setEditingItem] = useState<KategoriPengadaanItem | null>(null);
+    const [editingItem, setEditingItem] =
+        useState<KategoriPengadaanItem | null>(null);
 
     // Archive / Delete State
     const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -144,7 +141,9 @@ export default function KategoriPengadaanPage({
             setMeta((prev) => ({ ...prev, total: prev.total + 1 }));
         } else {
             setItems((prev) =>
-                prev.map((it) => (it.id === saved.id ? { ...it, ...saved } : it)),
+                prev.map((it) =>
+                    it.id === saved.id ? { ...it, ...saved } : it,
+                ),
             );
         }
     };
@@ -161,7 +160,9 @@ export default function KategoriPengadaanPage({
 
             toast.success(res.message);
             setItems((prev) =>
-                prev.map((it) => (it.id === item.id ? { ...it, aktif: res.data.aktif } : it)),
+                prev.map((it) =>
+                    it.id === item.id ? { ...it, aktif: res.data.aktif } : it,
+                ),
             );
         } catch (err) {
             toastSaveError(err, 'Gagal mengubah status kategori pengadaan.');
@@ -177,7 +178,10 @@ export default function KategoriPengadaanPage({
             });
             toast.success('Kategori pengadaan berhasil dihapus.');
             setItems((prev) => prev.filter((it) => it.id !== deleteId));
-            setMeta((prev) => ({ ...prev, total: Math.max(0, prev.total - 1) }));
+            setMeta((prev) => ({
+                ...prev,
+                total: Math.max(0, prev.total - 1),
+            }));
             setDeleteId(null);
         } catch (err) {
             toastSaveError(err, 'Gagal menghapus kategori pengadaan.');
@@ -206,13 +210,14 @@ export default function KategoriPengadaanPage({
                         </span>
                     </div>
                     <div className="mt-1 flex items-center gap-2">
-                        <FolderKanban className="h-6 w-6 text-primary" />
-                        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                        <FolderKanban className="text-primary h-6 w-6" />
+                        <h1 className="text-foreground text-2xl font-bold tracking-tight">
                             Kategori Pengadaan
                         </h1>
                     </div>
-                    <p className="text-muted-foreground text-xs mt-0.5">
-                        Klasifikasi bidang dan jenis pengadaan paket belanja barang, jasa, dan operasional.
+                    <p className="text-muted-foreground mt-0.5 text-xs">
+                        Klasifikasi bidang dan jenis pengadaan paket belanja
+                        barang, jasa, dan operasional.
                     </p>
                 </div>
 
@@ -221,7 +226,7 @@ export default function KategoriPengadaanPage({
                     <Button
                         size="sm"
                         onClick={handleCreate}
-                        className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium h-9 shadow-sm"
+                        className="bg-primary hover:bg-primary/90 text-primary-foreground h-9 font-medium shadow-sm"
                     >
                         <Plus className="mr-1.5 h-3.5 w-3.5" />
                         Tambah Kategori
@@ -245,24 +250,24 @@ export default function KategoriPengadaanPage({
 
             {/* Container Card Tabel Kategori Pengadaan */}
             <Card className="border shadow-sm">
-                <CardHeader className="p-4 border-b bg-card">
+                <CardHeader className="bg-card border-b p-4">
                     {/* Baris Pencarian Standar */}
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="relative min-w-[200px] max-w-xs">
-                            <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-muted-foreground">
+                            <div className="text-muted-foreground pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
                                 <Search className="h-3.5 w-3.5" />
                             </div>
                             <Input
                                 placeholder="Pencarian..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                className="h-8 pl-8 pr-7 text-xs bg-background border-input"
+                                className="bg-background border-input h-8 pl-8 pr-7 text-xs"
                             />
                             {search && (
                                 <button
                                     type="button"
                                     onClick={() => setSearch('')}
-                                    className="absolute inset-y-0 right-0 pr-2 flex items-center text-muted-foreground hover:text-foreground"
+                                    className="text-muted-foreground hover:text-foreground absolute inset-y-0 right-0 flex items-center pr-2"
                                 >
                                     <X className="h-3.5 w-3.5" />
                                 </button>
@@ -277,19 +282,19 @@ export default function KategoriPengadaanPage({
                         <Table>
                             <TableHeader className="bg-muted/40 border-b">
                                 <TableRow className="hover:bg-transparent">
-                                    <TableHead className="w-12 text-center font-bold text-foreground border-r text-xs">
+                                    <TableHead className="text-foreground w-12 border-r text-center text-xs font-bold">
                                         No
                                     </TableHead>
-                                    <TableHead className="w-48 text-center font-bold text-foreground border-r text-xs">
+                                    <TableHead className="text-foreground w-48 border-r text-center text-xs font-bold">
                                         Kode Pengadaan
                                     </TableHead>
-                                    <TableHead className="min-w-[200px] text-center font-bold text-foreground border-r text-xs">
+                                    <TableHead className="text-foreground min-w-[200px] border-r text-center text-xs font-bold">
                                         Kategori Pengadaan
                                     </TableHead>
-                                    <TableHead className="min-w-[250px] text-center font-bold text-foreground border-r text-xs">
+                                    <TableHead className="text-foreground min-w-[250px] border-r text-center text-xs font-bold">
                                         Keterangan
                                     </TableHead>
-                                    <TableHead className="w-72 text-center font-bold text-foreground text-xs">
+                                    <TableHead className="text-foreground w-72 text-center text-xs font-bold">
                                         Aksi
                                     </TableHead>
                                 </TableRow>
@@ -299,7 +304,7 @@ export default function KategoriPengadaanPage({
                                     <TableRow>
                                         <TableCell
                                             colSpan={5}
-                                            className="py-12 text-center text-muted-foreground text-sm"
+                                            className="text-muted-foreground py-12 text-center text-sm"
                                         >
                                             Memuat daftar kategori pengadaan...
                                         </TableCell>
@@ -313,17 +318,22 @@ export default function KategoriPengadaanPage({
                                             <Empty>
                                                 <EmptyHeader>
                                                     <EmptyTitle>
-                                                        Belum Ada Kategori Pengadaan
+                                                        Belum Ada Kategori
+                                                        Pengadaan
                                                     </EmptyTitle>
                                                     <EmptyDescription>
-                                                        Tambahkan kategori pengadaan baru dengan menekan tombol <strong>TAMBAH</strong> di atas.
+                                                        Tambahkan kategori
+                                                        pengadaan baru dengan
+                                                        menekan tombol{' '}
+                                                        <strong>TAMBAH</strong>{' '}
+                                                        di atas.
                                                     </EmptyDescription>
                                                 </EmptyHeader>
                                                 <div className="mt-4 flex justify-center">
                                                     <Button
                                                         size="sm"
                                                         onClick={handleCreate}
-                                                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs"
+                                                        className="bg-blue-600 text-xs text-white hover:bg-blue-700"
                                                     >
                                                         <Plus className="mr-1.5 h-3.5 w-3.5" />
                                                         Tambah Kategori
@@ -336,10 +346,10 @@ export default function KategoriPengadaanPage({
                                     items.map((row, idx) => (
                                         <TableRow
                                             key={row.id}
-                                            className="hover:bg-muted/50 transition-colors border-b text-xs"
+                                            className="hover:bg-muted/50 border-b text-xs transition-colors"
                                         >
                                             {/* 1. No */}
-                                            <TableCell className="text-center font-medium text-muted-foreground border-r">
+                                            <TableCell className="text-muted-foreground border-r text-center font-medium">
                                                 {(meta.current_page - 1) *
                                                     meta.per_page +
                                                     idx +
@@ -347,12 +357,12 @@ export default function KategoriPengadaanPage({
                                             </TableCell>
 
                                             {/* 2. Kode Pengadaan */}
-                                            <TableCell className="text-center font-mono font-medium text-foreground border-r">
+                                            <TableCell className="text-foreground border-r text-center font-mono font-medium">
                                                 {row.kode_pengadaan}
                                             </TableCell>
 
                                             {/* 3. Kategori Pengadaan */}
-                                            <TableCell className="font-bold text-foreground border-r">
+                                            <TableCell className="text-foreground border-r font-bold">
                                                 {row.kategori_pengadaan}
                                             </TableCell>
 
@@ -362,14 +372,16 @@ export default function KategoriPengadaanPage({
                                             </TableCell>
 
                                             {/* 5. Aksi (Edit, Hapus, Aktif/Non Aktif) */}
-                                            <TableCell className="text-center p-2 whitespace-nowrap">
+                                            <TableCell className="whitespace-nowrap p-2 text-center">
                                                 <div className="flex items-center justify-center gap-1.5">
                                                     <Button
                                                         type="button"
                                                         variant="outline"
                                                         size="sm"
-                                                        onClick={() => handleEdit(row)}
-                                                        className="h-7 px-2.5 text-xs font-medium text-amber-600 border-amber-200 hover:bg-amber-50 hover:text-amber-700 dark:border-amber-900 dark:hover:bg-amber-950"
+                                                        onClick={() =>
+                                                            handleEdit(row)
+                                                        }
+                                                        className="h-7 border-amber-200 px-2.5 text-xs font-medium text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:border-amber-900 dark:hover:bg-amber-950"
                                                     >
                                                         <Pencil className="mr-1 h-3.5 w-3.5" />
                                                         Edit
@@ -378,8 +390,10 @@ export default function KategoriPengadaanPage({
                                                         type="button"
                                                         variant="outline"
                                                         size="sm"
-                                                        onClick={() => setDeleteId(row.id)}
-                                                        className="h-7 px-2.5 text-xs font-medium text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700 dark:border-rose-900 dark:hover:bg-rose-950"
+                                                        onClick={() =>
+                                                            setDeleteId(row.id)
+                                                        }
+                                                        className="h-7 border-rose-200 px-2.5 text-xs font-medium text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:border-rose-900 dark:hover:bg-rose-950"
                                                     >
                                                         <Trash2 className="mr-1 h-3.5 w-3.5" />
                                                         Hapus
@@ -388,16 +402,22 @@ export default function KategoriPengadaanPage({
                                                         type="button"
                                                         variant="outline"
                                                         size="sm"
-                                                        onClick={() => handleToggleStatus(row)}
+                                                        onClick={() =>
+                                                            handleToggleStatus(
+                                                                row,
+                                                            )
+                                                        }
                                                         title={`Status: ${row.aktif ? 'Aktif' : 'Non Aktif'} (Klik untuk ubah status)`}
                                                         className={`h-7 px-2.5 text-xs font-medium transition-colors ${
                                                             row.aktif
-                                                                ? 'text-emerald-700 bg-emerald-50 border-emerald-300 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800'
-                                                                : 'text-slate-600 bg-slate-50 border-slate-300 hover:bg-slate-100 dark:bg-slate-900/40 dark:text-slate-400 dark:border-slate-700'
+                                                                ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400'
+                                                                : 'border-slate-300 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400'
                                                         }`}
                                                     >
                                                         <Power className="mr-1 h-3.5 w-3.5" />
-                                                        {row.aktif ? 'Aktif' : 'Non Aktif'}
+                                                        {row.aktif
+                                                            ? 'Aktif'
+                                                            : 'Non Aktif'}
                                                     </Button>
                                                 </div>
                                             </TableCell>
@@ -410,9 +430,10 @@ export default function KategoriPengadaanPage({
 
                     {/* Pagination Bar */}
                     {meta.last_page > 1 && (
-                        <div className="px-4 py-3 border-t flex items-center justify-between">
-                            <span className="text-xs text-muted-foreground">
-                                Halaman {meta.current_page} dari {meta.last_page} (Total: {meta.total})
+                        <div className="flex items-center justify-between border-t px-4 py-3">
+                            <span className="text-muted-foreground text-xs">
+                                Halaman {meta.current_page} dari{' '}
+                                {meta.last_page} (Total: {meta.total})
                             </span>
                             <div className="flex gap-2">
                                 <Button
@@ -464,7 +485,9 @@ export default function KategoriPengadaanPage({
                             Hapus Kategori Pengadaan?
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            Apakah Anda yakin ingin menghapus kategori pengadaan ini? Data yang dihapus tidak akan tampil dalam pilihan transaksi baru.
+                            Apakah Anda yakin ingin menghapus kategori pengadaan
+                            ini? Data yang dihapus tidak akan tampil dalam
+                            pilihan transaksi baru.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -474,7 +497,7 @@ export default function KategoriPengadaanPage({
                         <AlertDialogAction
                             onClick={handleArchive}
                             disabled={deleting}
-                            className="bg-rose-600 hover:bg-rose-700 text-white"
+                            className="bg-rose-600 text-white hover:bg-rose-700"
                         >
                             {deleting ? 'Menghapus...' : 'Hapus'}
                         </AlertDialogAction>
