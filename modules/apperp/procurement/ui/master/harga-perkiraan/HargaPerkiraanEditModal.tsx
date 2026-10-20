@@ -1,10 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@apperp/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogTitle,
-} from '@apperp/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@apperp/ui/dialog';
 import { Input } from '@apperp/ui/input';
 import { Label } from '@apperp/ui/label';
 import { Loader2 } from 'lucide-react';
@@ -47,7 +43,9 @@ const BULAN_INDONESIA = [
     'Desember',
 ];
 
-export function formatIndonesianDate(dateStr: string | null | undefined): string {
+export function formatIndonesianDate(
+    dateStr: string | null | undefined,
+): string {
     if (!dateStr) return '';
     try {
         const parts = dateStr.split('-');
@@ -65,7 +63,9 @@ export function formatIndonesianDate(dateStr: string | null | undefined): string
     }
 }
 
-export function formatRupiah(value: number | string | null | undefined): string {
+export function formatRupiah(
+    value: number | string | null | undefined,
+): string {
     if (value === null || value === undefined || value === '') return 'Rp. 0';
     const num = typeof value === 'string' ? parseFloat(value) : value;
     if (isNaN(num)) return 'Rp. 0';
@@ -94,9 +94,14 @@ export function HargaPerkiraanEditModal({
             setUnit(item.satuan || '');
             const today = new Date().toISOString().slice(0, 10);
             setDateInput(item.tanggal_update || today);
-            if (item.harga_perkiraan !== undefined && item.harga_perkiraan !== null) {
+            if (
+                item.harga_perkiraan !== undefined &&
+                item.harga_perkiraan !== null
+            ) {
                 setPriceInput(
-                    new Intl.NumberFormat('id-ID').format(Number(item.harga_perkiraan))
+                    new Intl.NumberFormat('id-ID').format(
+                        Number(item.harga_perkiraan),
+                    ),
                 );
             } else {
                 setPriceInput('');
@@ -134,7 +139,8 @@ export function HargaPerkiraanEditModal({
                 method: 'PUT',
                 body: JSON.stringify({
                     harga_perkiraan: numericPrice,
-                    tanggal_update: dateInput || new Date().toISOString().slice(0, 10),
+                    tanggal_update:
+                        dateInput || new Date().toISOString().slice(0, 10),
                     kode_item: code,
                     nama_item: name,
                     group_item: group,
@@ -154,22 +160,22 @@ export function HargaPerkiraanEditModal({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[460px] p-0 overflow-hidden border shadow-lg">
-                <div className="px-5 py-3.5 bg-muted/20 border-b">
-                    <DialogTitle className="text-sm font-semibold text-foreground">
+            <DialogContent className="overflow-hidden border p-0 shadow-lg sm:max-w-[460px]">
+                <div className="bg-muted/20 border-b px-5 py-3.5">
+                    <DialogTitle className="text-foreground text-sm font-semibold">
                         Ubah Data Harga Perkiraan
                     </DialogTitle>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-5 space-y-3">
+                <form onSubmit={handleSubmit} className="space-y-3 p-5">
                     {/* 1. Tanggal Update */}
                     <div className="space-y-1">
                         <div className="flex items-center justify-between">
-                            <Label className="text-xs font-medium text-foreground">
+                            <Label className="text-foreground text-xs font-medium">
                                 Tanggal Update
                             </Label>
                             {dateInput && (
-                                <span className="text-[11px] text-muted-foreground font-normal">
+                                <span className="text-muted-foreground text-[11px] font-normal">
                                     {formatIndonesianDate(dateInput)}
                                 </span>
                             )}
@@ -179,13 +185,13 @@ export function HargaPerkiraanEditModal({
                             value={dateInput}
                             onChange={(e) => setDateInput(e.target.value)}
                             required
-                            className="h-8 text-xs font-mono bg-background border-input"
+                            className="bg-background border-input h-8 font-mono text-xs"
                         />
                     </div>
 
                     {/* 2. Kode Item */}
                     <div className="space-y-1">
-                        <Label className="text-xs font-medium text-foreground">
+                        <Label className="text-foreground text-xs font-medium">
                             Kode Item
                         </Label>
                         <Input
@@ -193,13 +199,13 @@ export function HargaPerkiraanEditModal({
                             value={code}
                             onChange={(e) => setCode(e.target.value)}
                             required
-                            className="h-8 text-xs font-mono bg-background border-input"
+                            className="bg-background border-input h-8 font-mono text-xs"
                         />
                     </div>
 
                     {/* 3. Nama Item */}
                     <div className="space-y-1">
-                        <Label className="text-xs font-medium text-foreground">
+                        <Label className="text-foreground text-xs font-medium">
                             Nama Item
                         </Label>
                         <Input
@@ -207,14 +213,14 @@ export function HargaPerkiraanEditModal({
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             required
-                            className="h-8 text-xs font-medium bg-background border-input"
+                            className="bg-background border-input h-8 text-xs font-medium"
                         />
                     </div>
 
                     {/* 4. Group Item & Satuan */}
                     <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
-                            <Label className="text-xs font-medium text-foreground">
+                            <Label className="text-foreground text-xs font-medium">
                                 Group Item
                             </Label>
                             <Input
@@ -222,11 +228,11 @@ export function HargaPerkiraanEditModal({
                                 value={group}
                                 onChange={(e) => setGroup(e.target.value)}
                                 required
-                                className="h-8 text-xs bg-background border-input"
+                                className="bg-background border-input h-8 text-xs"
                             />
                         </div>
                         <div className="space-y-1">
-                            <Label className="text-xs font-medium text-foreground">
+                            <Label className="text-foreground text-xs font-medium">
                                 Satuan
                             </Label>
                             <Input
@@ -234,7 +240,7 @@ export function HargaPerkiraanEditModal({
                                 value={unit}
                                 onChange={(e) => setUnit(e.target.value)}
                                 required
-                                className="h-8 text-xs bg-background border-input"
+                                className="bg-background border-input h-8 text-xs"
                             />
                         </div>
                     </div>
@@ -242,15 +248,19 @@ export function HargaPerkiraanEditModal({
                     {/* 5. Harga Perkiraan (HPS) */}
                     <div className="space-y-1">
                         <div className="flex items-center justify-between">
-                            <Label className="text-xs font-bold text-foreground">
+                            <Label className="text-foreground text-xs font-bold">
                                 Harga Perkiraan (HPS)
                             </Label>
-                            <span className="text-xs font-bold text-primary font-mono">
-                                {formatRupiah(priceInput ? priceInput.replace(/[^0-9]/g, '') : 0)}
+                            <span className="text-primary font-mono text-xs font-bold">
+                                {formatRupiah(
+                                    priceInput
+                                        ? priceInput.replace(/[^0-9]/g, '')
+                                        : 0,
+                                )}
                             </span>
                         </div>
                         <div className="relative">
-                            <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center text-xs font-bold text-muted-foreground pointer-events-none">
+                            <span className="text-muted-foreground pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5 text-xs font-bold">
                                 Rp.
                             </span>
                             <Input
@@ -259,13 +269,13 @@ export function HargaPerkiraanEditModal({
                                 value={priceInput}
                                 onChange={handlePriceChange}
                                 placeholder="0"
-                                className="h-8 pl-9 text-xs font-bold text-foreground bg-background border-input"
+                                className="text-foreground bg-background border-input h-8 pl-9 text-xs font-bold"
                             />
                         </div>
                     </div>
 
                     {/* Tombol Aksi */}
-                    <div className="pt-3 flex items-center justify-end gap-2 border-t mt-4">
+                    <div className="mt-4 flex items-center justify-end gap-2 border-t pt-3">
                         <Button
                             type="button"
                             variant="ghost"
