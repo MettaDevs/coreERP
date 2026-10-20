@@ -1,22 +1,15 @@
+import {
+    CheckCircle2,
+    ClipboardCheck,
+    Clock,
+    Filter,
+    Plus,
+    RefreshCw,
+    Search,
+    XCircle,
+} from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { Badge } from '@apperp/ui/badge';
-import { Button } from '@apperp/ui/button';
-import { Card, CardContent, CardHeader } from '@apperp/ui/card';
-import {
-    Empty,
-    EmptyDescription,
-    EmptyHeader,
-    EmptyTitle,
-} from '@apperp/ui/empty';
-import { Input } from '@apperp/ui/input';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
+import { toast } from 'sonner';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -27,32 +20,34 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@apperp/ui/alert-dialog';
-
+import { Button } from '@apperp/ui/button';
+import { Card, CardContent, CardHeader } from '@apperp/ui/card';
+import { DataTable } from '@apperp/ui/data-table';
 import {
-    Building2,
-    Calendar,
-    CheckCircle2,
-    ClipboardCheck,
-    Clock,
-    Filter,
-    Plus,
-    RefreshCw,
-    Search,
-    XCircle,
-} from 'lucide-react';
-import { toast } from 'sonner';
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyTitle,
+} from '@apperp/ui/empty';
+import { Input } from '@apperp/ui/input';
+import { TableCell, TableRow } from '@apperp/ui/table';
+
 import { api, toastSaveError } from '../api';
-import {
-    PrakualifikasiFormModal,
-    type PrakualifikasiFormData,
-} from './prakualifikasi/PrakualifikasiFormModal';
 import { PrakualifikasiDetailModal } from './prakualifikasi/PrakualifikasiDetailModal';
+import { PrakualifikasiFormModal } from './prakualifikasi/PrakualifikasiFormModal';
+import type { PrakualifikasiFormData } from './prakualifikasi/PrakualifikasiFormModal';
 
-type PageProps = {
-    view: string;
-    segments?: string[];
-    permissions?: string[];
-};
+const prakualifikasiColumns = [
+    { id: 'no', header: 'No.' },
+    { id: 'info', header: 'Info Prakualifikasi' },
+    { id: 'kode_vendor', header: 'Kode Vendor/Supplier' },
+    { id: 'nama_vendor', header: 'Nama Vendor/Supplier' },
+    { id: 'pic', header: 'Contact Person' },
+    { id: 'telepon', header: 'Telp/HP' },
+    { id: 'alamat', header: 'Alamat Vendor/Supplier' },
+    { id: 'status_vendor', header: 'Status Vendor/Supplier' },
+    { id: 'status_kualifikasi', header: 'Status Kualifikasi' },
+];
 
 type PrakualifikasiRow = PrakualifikasiFormData & {
     id: string;
@@ -69,26 +64,28 @@ type PaginationMeta = {
 };
 
 function formatDisplayDate(dateStr: string): string {
-    if (!dateStr) return '';
-    if (dateStr.includes('/')) return dateStr;
+    if (!dateStr) {
+        return '';
+    }
+
+    if (dateStr.includes('/')) {
+        return dateStr;
+    }
+
     const parts = dateStr.split('-');
+
     if (parts.length === 3) {
         return `${parts[2]}/${parts[1]}/${parts[0]}`;
     }
+
     return dateStr;
 }
 
-export default function PrakualifikasiPage({
-    view: _view,
-    segments: _segments,
-    permissions: _permissions,
-}: PageProps) {
+export default function PrakualifikasiPage() {
     const [items, setItems] = useState<PrakualifikasiRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('semua');
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
 
     const [meta, setMeta] = useState<PaginationMeta>({
         current_page: 1,
@@ -112,14 +109,18 @@ export default function PrakualifikasiPage({
     const fetchData = useCallback(
         async (page = 1) => {
             setLoading(true);
+
             try {
                 const params = new URLSearchParams();
                 params.set('page', String(page));
-                if (search.trim()) params.set('search', search.trim());
-                if (statusFilter !== 'semua')
+
+                if (search.trim()) {
+                    params.set('search', search.trim());
+                }
+
+                if (statusFilter !== 'semua') {
                     params.set('status_kualifikasi', statusFilter);
-                if (startDate) params.set('start_date', startDate);
-                if (endDate) params.set('end_date', endDate);
+                }
 
                 const res = await api<{
                     status: string;
@@ -142,11 +143,15 @@ export default function PrakualifikasiPage({
                 setLoading(false);
             }
         },
-        [search, statusFilter, startDate, endDate],
+        [search, statusFilter],
     );
 
     useEffect(() => {
-        fetchData(1);
+        const timer = setTimeout(() => {
+            fetchData(1);
+        }, 0);
+
+        return () => clearTimeout(timer);
     }, [fetchData]);
 
     const handleCreate = () => {
@@ -165,8 +170,12 @@ export default function PrakualifikasiPage({
     };
 
     const handleArchive = async () => {
-        if (!deleteId) return;
+        if (!deleteId) {
+            return;
+        }
+
         setDeleting(true);
+
         try {
             await api(`/prakualifikasi/${deleteId}`, {
                 method: 'DELETE',
@@ -194,6 +203,7 @@ export default function PrakualifikasiPage({
                 </span>
             );
         }
+
         if (
             status === 'Batal' ||
             status === 'Tidak Memenuhi Syarat' ||
@@ -206,6 +216,7 @@ export default function PrakualifikasiPage({
                 </span>
             );
         }
+
         return (
             <span className="inline-flex items-center rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
                 <Clock className="mr-1 h-3 w-3" />
@@ -324,40 +335,14 @@ export default function PrakualifikasiPage({
                         </span>
                     </div>
 
-                    <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader className="bg-muted/40 border-b">
-                                <TableRow>
-                                    <TableHead className="text-foreground w-12 border-r text-center font-semibold">
-                                        No.
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-44 border-r text-center font-semibold">
-                                        Info Prakualifikasi
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-36 border-r text-center font-semibold">
-                                        Kode Vendor/Supplier
-                                    </TableHead>
-                                    <TableHead className="text-foreground min-w-[180px] border-r text-center font-semibold">
-                                        Nama Vendor/Supplier
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-36 border-r text-center font-semibold">
-                                        Contact Person
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-36 border-r text-center font-semibold">
-                                        Telp/HP
-                                    </TableHead>
-                                    <TableHead className="text-foreground min-w-[200px] border-r text-center font-semibold">
-                                        Alamat Vendor/Supplier
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-36 border-r text-center font-semibold">
-                                        Status Vendor/Supplier
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-36 text-center font-semibold">
-                                        Status Kualifikasi
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                    <DataTable
+                        scrollMode="inline"
+                        showRowNumbers={false}
+                        columns={prakualifikasiColumns}
+                        data={items}
+                        getRowKey={(row) => row.id}
+                        renderRows={() => (
+                            <>
                                 {loading ? (
                                     <TableRow>
                                         <TableCell
@@ -420,7 +405,7 @@ export default function PrakualifikasiPage({
                                                     1}
                                             </TableCell>
 
-                                            {/* 2. Info Prakualifikasi (Tanggal baris 1, No Prakualifikasi baris 2) */}
+                                            {/* 2. Info Prakualifikasi */}
                                             <TableCell className="border-r text-center font-mono">
                                                 <div className="text-foreground font-medium">
                                                     {formatDisplayDate(
@@ -477,9 +462,9 @@ export default function PrakualifikasiPage({
                                         </TableRow>
                                     ))
                                 )}
-                            </TableBody>
-                        </Table>
-                    </div>
+                            </>
+                        )}
+                    />
 
                     {/* Pagination */}
                     {meta.total > 0 && (
@@ -549,8 +534,7 @@ export default function PrakualifikasiPage({
                 data={viewingItem}
                 onEdit={() => {
                     if (viewingItem) {
-                        setEditingItem(viewingItem);
-                        setFormOpen(true);
+                        handleEdit(viewingItem);
                     }
                 }}
                 onDelete={() => {
