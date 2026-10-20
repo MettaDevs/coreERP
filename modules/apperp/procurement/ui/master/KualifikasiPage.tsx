@@ -1,7 +1,9 @@
+import { Award, CheckCircle2, RefreshCw, Search, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { Badge } from '@apperp/ui/badge';
+import { toast } from 'sonner';
 import { Button } from '@apperp/ui/button';
 import { Card, CardContent, CardHeader } from '@apperp/ui/card';
+import { DataTable } from '@apperp/ui/data-table';
 import {
     Empty,
     EmptyDescription,
@@ -9,36 +11,23 @@ import {
     EmptyTitle,
 } from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
+import { TableCell, TableRow } from '@apperp/ui/table';
 
-import {
-    Award,
-    CheckCircle2,
-    Eye,
-    MoreHorizontal,
-    Printer,
-    RefreshCw,
-    Search,
-    ShieldCheck,
-    X,
-} from 'lucide-react';
-import { toast } from 'sonner';
 import { api, toastSaveError } from '../api';
-import type { PrakualifikasiFormData } from './prakualifikasi/PrakualifikasiFormModal';
 import { PrakualifikasiDetailModal } from './prakualifikasi/PrakualifikasiDetailModal';
+import type { PrakualifikasiFormData } from './prakualifikasi/PrakualifikasiFormModal';
 
-type PageProps = {
-    view: string;
-    segments?: string[];
-    permissions?: string[];
-};
+const kualifikasiColumns = [
+    { id: 'no', header: 'No.' },
+    { id: 'info', header: 'Info Prakualifikasi' },
+    { id: 'kode_vendor', header: 'Kode Vendor/Supplier' },
+    { id: 'nama_vendor', header: 'Nama Vendor/Supplier' },
+    { id: 'pic', header: 'Contact Person' },
+    { id: 'telepon', header: 'Telp/HP' },
+    { id: 'alamat', header: 'Alamat Vendor/Supplier' },
+    { id: 'status_vendor', header: 'Status Vendor/Supplier' },
+    { id: 'status_kualifikasi', header: 'Status Kualifikasi' },
+];
 
 type KualifikasiRow = PrakualifikasiFormData & {
     id: string;
@@ -55,20 +44,24 @@ type PaginationMeta = {
 };
 
 function formatDisplayDate(dateStr: string): string {
-    if (!dateStr) return '';
-    if (dateStr.includes('/')) return dateStr;
+    if (!dateStr) {
+        return '';
+    }
+
+    if (dateStr.includes('/')) {
+        return dateStr;
+    }
+
     const parts = dateStr.split('-');
+
     if (parts.length === 3) {
         return `${parts[2]}/${parts[1]}/${parts[0]}`;
     }
+
     return dateStr;
 }
 
-export default function KualifikasiPage({
-    view: _view,
-    segments: _segments,
-    permissions: _permissions,
-}: PageProps) {
+export default function KualifikasiPage() {
     const [items, setItems] = useState<KualifikasiRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -87,10 +80,14 @@ export default function KualifikasiPage({
     const fetchData = useCallback(
         async (page = 1) => {
             setLoading(true);
+
             try {
                 const params = new URLSearchParams();
                 params.set('page', String(page));
-                if (search.trim()) params.set('search', search.trim());
+
+                if (search.trim()) {
+                    params.set('search', search.trim());
+                }
 
                 const res = await api<{
                     status: string;
@@ -117,7 +114,11 @@ export default function KualifikasiPage({
     );
 
     useEffect(() => {
-        fetchData(1);
+        const timer = setTimeout(() => {
+            fetchData(1);
+        }, 0);
+
+        return () => clearTimeout(timer);
     }, [fetchData]);
 
     const handleView = (item: KualifikasiRow) => {
@@ -215,40 +216,14 @@ export default function KualifikasiPage({
                     </div>
 
                     {/* Tabel Daftar Kualifikasi Vendor (9 Kolom) */}
-                    <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader className="bg-muted/40 border-b">
-                                <TableRow className="hover:bg-transparent">
-                                    <TableHead className="text-foreground w-12 border-r text-center text-xs font-bold">
-                                        No.
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-44 border-r text-center text-xs font-bold">
-                                        Info Prakualifikasi
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-36 border-r text-center text-xs font-bold">
-                                        Kode Vendor/Supplier
-                                    </TableHead>
-                                    <TableHead className="text-foreground min-w-[180px] border-r text-center text-xs font-bold">
-                                        Nama Vendor/Supplier
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-36 border-r text-center text-xs font-bold">
-                                        Contact Person
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-36 border-r text-center text-xs font-bold">
-                                        Telp/HP
-                                    </TableHead>
-                                    <TableHead className="text-foreground min-w-[200px] border-r text-center text-xs font-bold">
-                                        Alamat Vendor/Supplier
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-36 border-r text-center text-xs font-bold">
-                                        Status Vendor/Supplier
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-36 text-center text-xs font-bold">
-                                        Status Kualifikasi
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                    <DataTable
+                        scrollMode="inline"
+                        showRowNumbers={false}
+                        columns={kualifikasiColumns}
+                        data={items}
+                        getRowKey={(row) => row.id}
+                        renderRows={() => (
+                            <>
                                 {loading ? (
                                     <TableRow>
                                         <TableCell
@@ -358,9 +333,9 @@ export default function KualifikasiPage({
                                         </TableRow>
                                     ))
                                 )}
-                            </TableBody>
-                        </Table>
-                    </div>
+                            </>
+                        )}
+                    />
 
                     {/* Pagination Bar */}
                     {meta.last_page > 1 && (
