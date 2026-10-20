@@ -11,8 +11,6 @@ final class ModuleServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
-        $this->loadMigrationsFrom(dirname(__DIR__).'/database/migrations');
-
         $this->app->booted(function (): void {
             Route::middleware(['web', 'auth'])
                 ->prefix('api/modules/procurement')

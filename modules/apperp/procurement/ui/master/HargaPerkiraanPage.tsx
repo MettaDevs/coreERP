@@ -1,7 +1,9 @@
+import { Calculator, Pencil, RefreshCw, Search, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { Badge } from '@apperp/ui/badge';
+import { toast } from 'sonner';
 import { Button } from '@apperp/ui/button';
 import { Card, CardContent, CardHeader } from '@apperp/ui/card';
+import { DataTable } from '@apperp/ui/data-table';
 import {
     Empty,
     EmptyDescription,
@@ -9,37 +11,29 @@ import {
     EmptyTitle,
 } from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
-
-import {
-    Calculator,
-    Edit,
-    FileSpreadsheet,
-    MoreHorizontal,
-    Pencil,
-    RefreshCw,
-    Search,
-    Tag,
-    X,
-} from 'lucide-react';
-import { toast } from 'sonner';
+import { TableCell, TableRow } from '@apperp/ui/table';
 import { api, toastSaveError } from '../api';
 import {
     HargaPerkiraanEditModal,
     formatIndonesianDate,
     formatRupiah,
-    type HargaPerkiraanItem,
 } from './harga-perkiraan/HargaPerkiraanEditModal';
+import type { HargaPerkiraanItem } from './harga-perkiraan/HargaPerkiraanEditModal';
+
+const hargaPerkiraanColumns = [
+    { id: 'no', header: 'No.', cell: () => null },
+    { id: 'group_item', header: 'Group Item', cell: () => null },
+    { id: 'jenis_item', header: 'Jenis Item', cell: () => null },
+    { id: 'kode_item', header: 'Kode Item', cell: () => null },
+    { id: 'nama_item', header: 'Nama Item', cell: () => null },
+    { id: 'satuan', header: 'Satuan', cell: () => null },
+    { id: 'harga_perkiraan', header: 'Harga Per Satuan', cell: () => null },
+    { id: 'tanggal_update', header: 'Tgl Update', cell: () => null },
+    { id: 'aksi', header: 'Aksi', cell: () => null },
+];
 
 type PageProps = {
-    view: string;
+    view?: string;
     segments?: string[];
     permissions?: string[];
 };
@@ -51,15 +45,11 @@ type PaginationMeta = {
     total: number;
 };
 
-export default function HargaPerkiraanPage({
-    view: _view,
-    segments: _segments,
-    permissions: _permissions,
-}: PageProps) {
+export default function HargaPerkiraanPage(_props?: PageProps) {
+    void _props;
     const [items, setItems] = useState<HargaPerkiraanItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
-    const [selectedGroup, setSelectedGroup] = useState('semua');
 
     const [meta, setMeta] = useState<PaginationMeta>({
         current_page: 1,
@@ -77,12 +67,14 @@ export default function HargaPerkiraanPage({
     const fetchData = useCallback(
         async (page = 1) => {
             setLoading(true);
+
             try {
                 const params = new URLSearchParams();
                 params.set('page', String(page));
-                if (search.trim()) params.set('search', search.trim());
-                if (selectedGroup !== 'semua')
-                    params.set('group_item', selectedGroup);
+
+                if (search.trim()) {
+                    params.set('search', search.trim());
+                }
 
                 const res = await api<{
                     status: string;
@@ -105,11 +97,15 @@ export default function HargaPerkiraanPage({
                 setLoading(false);
             }
         },
-        [search, selectedGroup],
+        [search],
     );
 
     useEffect(() => {
-        fetchData(1);
+        const timer = setTimeout(() => {
+            void fetchData(1);
+        }, 0);
+
+        return () => clearTimeout(timer);
     }, [fetchData]);
 
     const handleEdit = (item: HargaPerkiraanItem) => {
@@ -214,40 +210,14 @@ export default function HargaPerkiraanPage({
                     </div>
 
                     {/* Tabel Daftar Harga Perkiraan (9 Kolom Persis Mockup Gambar) */}
-                    <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader className="border-b bg-blue-50/70 dark:bg-slate-900/80">
-                                <TableRow className="hover:bg-transparent">
-                                    <TableHead className="text-foreground w-12 border-r text-center text-xs font-bold">
-                                        No.
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-28 border-r text-center text-xs font-bold">
-                                        Group Item
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-32 border-r text-center text-xs font-bold">
-                                        Jenis Item
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-28 border-r text-center text-xs font-bold">
-                                        Kode Item
-                                    </TableHead>
-                                    <TableHead className="text-foreground min-w-[160px] border-r text-center text-xs font-bold">
-                                        Nama Item
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-24 border-r text-center text-xs font-bold">
-                                        Satuan
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-36 border-r text-center text-xs font-bold">
-                                        Harga Per Satuan
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-36 border-r text-center text-xs font-bold">
-                                        Tgl Update
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-32 text-center text-xs font-bold">
-                                        Aksi
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                    <DataTable
+                        scrollMode="inline"
+                        showRowNumbers={false}
+                        columns={hargaPerkiraanColumns}
+                        data={items}
+                        getRowKey={(row) => row.id}
+                        renderRows={() => (
+                            <>
                                 {loading ? (
                                     <TableRow>
                                         <TableCell
@@ -353,9 +323,9 @@ export default function HargaPerkiraanPage({
                                         </TableRow>
                                     ))
                                 )}
-                            </TableBody>
-                        </Table>
-                    </div>
+                            </>
+                        )}
+                    />
 
                     {/* Pagination Bar */}
                     {meta.last_page > 1 && (

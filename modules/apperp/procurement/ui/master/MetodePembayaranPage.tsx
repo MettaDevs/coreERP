@@ -1,22 +1,15 @@
+import {
+    CreditCard,
+    Pencil,
+    Plus,
+    Power,
+    RefreshCw,
+    Search,
+    Trash2,
+    X,
+} from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { Badge } from '@apperp/ui/badge';
-import { Button } from '@apperp/ui/button';
-import { Card, CardContent, CardHeader } from '@apperp/ui/card';
-import {
-    Empty,
-    EmptyDescription,
-    EmptyHeader,
-    EmptyTitle,
-} from '@apperp/ui/empty';
-import { Input } from '@apperp/ui/input';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
+import { toast } from 'sonner';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -27,27 +20,31 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@apperp/ui/alert-dialog';
-
+import { Button } from '@apperp/ui/button';
+import { Card, CardContent, CardHeader } from '@apperp/ui/card';
+import { DataTable } from '@apperp/ui/data-table';
 import {
-    CreditCard,
-    MoreHorizontal,
-    Pencil,
-    Plus,
-    Power,
-    RefreshCw,
-    Search,
-    Trash2,
-    X,
-} from 'lucide-react';
-import { toast } from 'sonner';
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyTitle,
+} from '@apperp/ui/empty';
+import { Input } from '@apperp/ui/input';
+import { TableCell, TableRow } from '@apperp/ui/table';
 import { api, toastSaveError } from '../api';
-import {
-    MetodePembayaranModal,
-    type MetodePembayaranItem,
-} from './metode-pembayaran/MetodePembayaranModal';
+import { MetodePembayaranModal } from './metode-pembayaran/MetodePembayaranModal';
+import type { MetodePembayaranItem } from './metode-pembayaran/MetodePembayaranModal';
+
+const metodePembayaranColumns = [
+    { id: 'no', header: 'No', cell: () => null },
+    { id: 'kode_bayar', header: 'Kode Bayar', cell: () => null },
+    { id: 'nama_metode_bayar', header: 'Nama Metode Bayar', cell: () => null },
+    { id: 'keterangan', header: 'Keterangan', cell: () => null },
+    { id: 'aksi', header: 'Aksi', cell: () => null },
+];
 
 type PageProps = {
-    view: string;
+    view?: string;
     segments?: string[];
     permissions?: string[];
 };
@@ -59,11 +56,8 @@ type PaginationMeta = {
     total: number;
 };
 
-export default function MetodePembayaranPage({
-    view: _view,
-    segments: _segments,
-    permissions: _permissions,
-}: PageProps) {
+export default function MetodePembayaranPage(_props?: PageProps) {
+    void _props;
     const [items, setItems] = useState<MetodePembayaranItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -88,10 +82,14 @@ export default function MetodePembayaranPage({
     const fetchData = useCallback(
         async (page = 1) => {
             setLoading(true);
+
             try {
                 const params = new URLSearchParams();
                 params.set('page', String(page));
-                if (search.trim()) params.set('search', search.trim());
+
+                if (search.trim()) {
+                    params.set('search', search.trim());
+                }
 
                 const res = await api<{
                     status: string;
@@ -118,7 +116,11 @@ export default function MetodePembayaranPage({
     );
 
     useEffect(() => {
-        fetchData(1);
+        const timer = setTimeout(() => {
+            void fetchData(1);
+        }, 0);
+
+        return () => clearTimeout(timer);
     }, [fetchData]);
 
     const handleCreate = () => {
@@ -166,8 +168,12 @@ export default function MetodePembayaranPage({
     };
 
     const handleArchive = async () => {
-        if (!deleteId) return;
+        if (!deleteId) {
+            return;
+        }
+
         setDeleting(true);
+
         try {
             await api(`/metode-pembayaran/${deleteId}`, {
                 method: 'DELETE',
@@ -212,8 +218,8 @@ export default function MetodePembayaranPage({
                         </h1>
                     </div>
                     <p className="text-muted-foreground mt-0.5 text-xs">
-                        Daftar metode penyelesaian transaksi dan pembayaran
-                        tagihan pengadaan barang dan jasa.
+                        Pengaturan saluran dan cara transaksi pembayaran
+                        pembelian serta penyelesaian tagihan rekanan.
                     </p>
                 </div>
 
@@ -225,7 +231,7 @@ export default function MetodePembayaranPage({
                         className="bg-primary hover:bg-primary/90 text-primary-foreground h-9 font-medium shadow-sm"
                     >
                         <Plus className="mr-1.5 h-3.5 w-3.5" />
-                        Tambah Metode Bayar
+                        Tambah Metode
                     </Button>
                     <Button
                         variant="outline"
@@ -274,28 +280,14 @@ export default function MetodePembayaranPage({
 
                 <CardContent className="p-0">
                     {/* Tabel Daftar Metode Pembayaran (5 Kolom) */}
-                    <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader className="bg-muted/40 border-b">
-                                <TableRow className="hover:bg-transparent">
-                                    <TableHead className="text-foreground w-12 border-r text-center text-xs font-bold">
-                                        No
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-48 border-r text-center text-xs font-bold">
-                                        Kode Bayar
-                                    </TableHead>
-                                    <TableHead className="text-foreground min-w-[200px] border-r text-center text-xs font-bold">
-                                        Nama Metode Bayar
-                                    </TableHead>
-                                    <TableHead className="text-foreground min-w-[250px] border-r text-center text-xs font-bold">
-                                        Keterangan
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-72 text-center text-xs font-bold">
-                                        Aksi
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                    <DataTable
+                        scrollMode="inline"
+                        showRowNumbers={false}
+                        columns={metodePembayaranColumns}
+                        data={items}
+                        getRowKey={(row) => row.id}
+                        renderRows={() => (
+                            <>
                                 {loading ? (
                                     <TableRow>
                                         <TableCell
@@ -332,7 +324,7 @@ export default function MetodePembayaranPage({
                                                         className="bg-blue-600 text-xs text-white hover:bg-blue-700"
                                                     >
                                                         <Plus className="mr-1.5 h-3.5 w-3.5" />
-                                                        Tambah Metode Bayar
+                                                        Tambah Metode
                                                     </Button>
                                                 </div>
                                             </Empty>
@@ -420,9 +412,9 @@ export default function MetodePembayaranPage({
                                         </TableRow>
                                     ))
                                 )}
-                            </TableBody>
-                        </Table>
-                    </div>
+                            </>
+                        )}
+                    />
 
                     {/* Pagination Bar */}
                     {meta.last_page > 1 && (
@@ -462,7 +454,7 @@ export default function MetodePembayaranPage({
                 </CardContent>
             </Card>
 
-            {/* Modal Tambah/Ubah Metode Bayar Sesuai Form Kanan Gambar */}
+            {/* Modal Tambah/Ubah Sesuai Form Kanan Gambar */}
             <MetodePembayaranModal
                 open={modalOpen}
                 onOpenChange={setModalOpen}
@@ -483,7 +475,7 @@ export default function MetodePembayaranPage({
                         <AlertDialogDescription>
                             Apakah Anda yakin ingin menghapus metode pembayaran
                             ini? Data yang dihapus tidak akan tampil dalam
-                            pilihan transaksi belanja pengadaan baru.
+                            pilihan transaksi pengadaan baru.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

@@ -1,13 +1,11 @@
+import { CheckCircle2, Wrench, XCircle } from 'lucide-react';
 import { Button } from '@apperp/ui/button';
 import {
     Dialog,
     DialogContent,
     DialogFooter,
-    DialogHeader,
     DialogTitle,
 } from '@apperp/ui/dialog';
-import { Badge } from '@apperp/ui/badge';
-import { CheckCircle2, Eye, Wrench, XCircle } from 'lucide-react';
 import type { ItemJasaRecord } from './ItemJasaModal';
 
 type Props = {
@@ -23,7 +21,9 @@ export function ItemJasaDetailModal({
     item,
     onEdit,
 }: Props) {
-    if (!item) return null;
+    if (!item) {
+        return null;
+    }
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>

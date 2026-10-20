@@ -5,94 +5,20 @@ declare(strict_types=1);
 namespace Modules\Apperp\Procurement\Http\Controllers\master;
 
 use App\Platform\Modules\Contracts\TenantContext;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Modules\Apperp\Procurement\Models\master\TerminPembayaran;
 
 final class TerminPembayaranController extends Controller
 {
     /**
-     * Pastikan tabel dan data acuan termin pembayaran tersedia.
-     */
-    private function ensureTablesExist(string $tenantId): void
-    {
-        if (! Schema::hasTable('procurement_termin_pembayaran')) {
-            Schema::create('procurement_termin_pembayaran', function (Blueprint $blueprint): void {
-                $blueprint->ulid('id')->primary();
-                $blueprint->ulid('tenant_id')->index();
-                $blueprint->string('creation_key', 160)->nullable();
-                $blueprint->string('kode_termin', 100);
-                $blueprint->string('nama_termin_bayar', 255);
-                $blueprint->text('keterangan')->nullable();
-                $blueprint->boolean('aktif')->default(true);
-                $blueprint->softDeletes();
-                $blueprint->timestamps();
-
-                $blueprint->unique(['tenant_id', 'id']);
-                $blueprint->unique(['tenant_id', 'kode_termin']);
-                $blueprint->index(['tenant_id', 'aktif']);
-            });
-        }
-
-        // Jika data kosong, sediakan sampel acuan sesuai diagram persis
-        if (TerminPembayaran::where('tenant_id', $tenantId)->count() === 0) {
-            $samples = [
-                [
-                    'kode_termin' => 'Termin.001',
-                    'nama_termin_bayar' => 'Down Payment (DP)',
-                    'keterangan' => 'Pembayaran sebagian di awal, sisanya setelah barang/jasa diterima',
-                    'aktif' => true,
-                ],
-                [
-                    'kode_termin' => 'Termin.002',
-                    'nama_termin_bayar' => 'Cash on Delivery (COD)',
-                    'keterangan' => 'Pembayaran lunas saat barang atau hasil pekerjaan telah diterima di tempat',
-                    'aktif' => true,
-                ],
-                [
-                    'kode_termin' => 'Termin.003',
-                    'nama_termin_bayar' => 'Net 30 Hari',
-                    'keterangan' => 'Jatuh tempo pembayaran penuh 30 hari kalender setelah faktur diterbitkan',
-                    'aktif' => true,
-                ],
-                [
-                    'kode_termin' => 'Termin.004',
-                    'nama_termin_bayar' => 'Net 14 Hari',
-                    'keterangan' => 'Jatuh tempo pembayaran 14 hari kalender setelah faktur diterima dan diverifikasi',
-                    'aktif' => true,
-                ],
-                [
-                    'kode_termin' => 'Termin.005',
-                    'nama_termin_bayar' => 'Bertahap Sesuai Progress (Milestone)',
-                    'keterangan' => 'Pembayaran diangsur bertahap sesuai persentase kemajuan penyelesaian pekerjaan',
-                    'aktif' => true,
-                ],
-            ];
-
-            foreach ($samples as $sample) {
-                TerminPembayaran::create([
-                    'tenant_id' => $tenantId,
-                    'creation_key' => (string) Str::uuid(),
-                    'kode_termin' => $sample['kode_termin'],
-                    'nama_termin_bayar' => $sample['nama_termin_bayar'],
-                    'keterangan' => $sample['keterangan'],
-                    'aktif' => $sample['aktif'],
-                ]);
-            }
-        }
-    }
-
-    /**
      * Tampilkan daftar seluruh termin pembayaran.
      */
     public function index(Request $request, TenantContext $context): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $query = TerminPembayaran::query()
             ->where('tenant_id', $tenantId)
@@ -131,7 +57,6 @@ final class TerminPembayaranController extends Controller
     public function show(string $id, TenantContext $context): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $record = TerminPembayaran::where('tenant_id', $tenantId)
             ->where('id', $id)
@@ -149,7 +74,6 @@ final class TerminPembayaranController extends Controller
     public function store(Request $request, TenantContext $context): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $validated = $request->validate([
             'kode_termin' => ['required', 'string', 'max:100'],
@@ -195,7 +119,6 @@ final class TerminPembayaranController extends Controller
     public function update(Request $request, string $id, TenantContext $context): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $record = TerminPembayaran::where('tenant_id', $tenantId)
             ->where('id', $id)
@@ -244,7 +167,6 @@ final class TerminPembayaranController extends Controller
     public function toggleStatus(string $id, TenantContext $context): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $record = TerminPembayaran::where('tenant_id', $tenantId)
             ->where('id', $id)
@@ -266,7 +188,6 @@ final class TerminPembayaranController extends Controller
     public function destroy(string $id, TenantContext $context): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $record = TerminPembayaran::where('tenant_id', $tenantId)
             ->where('id', $id)
