@@ -131,6 +131,7 @@ export function toastSaveError(caught: unknown, fallback: string): void {
         toast.error(
             `${fallback} Terjadi kendala sistem. Silakan coba kembali nanti.`,
         );
+
         return;
     }
 
