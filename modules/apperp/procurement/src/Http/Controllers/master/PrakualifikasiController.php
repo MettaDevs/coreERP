@@ -103,7 +103,6 @@ final class PrakualifikasiController extends Controller
     public function show(Request $request, TenantContext $context, string $id): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $record = Prakualifikasi::where('tenant_id', $tenantId)
             ->with(['documents', 'items'])
@@ -131,7 +130,6 @@ final class PrakualifikasiController extends Controller
     public function store(Request $request, TenantContext $context): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $validated = $request->validate([
             'tanggal_prakualifikasi' => 'required|date',
@@ -268,7 +266,6 @@ final class PrakualifikasiController extends Controller
     public function update(Request $request, TenantContext $context, string $id): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $prakualifikasi = Prakualifikasi::where('tenant_id', $tenantId)->find($id);
 
@@ -319,6 +316,8 @@ final class PrakualifikasiController extends Controller
 
     /**
      * Eksekusi update data induk, dokumen, dan item.
+     *
+     * @param  array<string, mixed>  $validated
      */
     private function performUpdate(Prakualifikasi $prakualifikasi, array $validated, string $tenantId): JsonResponse
     {
@@ -422,7 +421,6 @@ final class PrakualifikasiController extends Controller
     public function destroy(Request $request, TenantContext $context, string $id): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $prakualifikasi = Prakualifikasi::where('tenant_id', $tenantId)->find($id);
 
