@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\Procurement\Models\master;
 
+use App\Platform\Modules\Contracts\DataClass;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Apperp\Procurement\Models\MasterData;
 
@@ -32,6 +33,16 @@ use Modules\Apperp\Procurement\Models\MasterData;
  */
 class Prakualifikasi extends MasterData
 {
+    /** @var array<string, DataClass> */
+    public const COLUMN_CLASSIFICATION = [
+        'nama_vendor' => DataClass::CustomerContent,
+        'nama_pic' => DataClass::EndUserIdentifiableInformation,
+        'npwp_ktp' => DataClass::EndUserIdentifiableInformation,
+        'telepon' => DataClass::EndUserIdentifiableInformation,
+        'email' => DataClass::EndUserIdentifiableInformation,
+        'alamat' => DataClass::EndUserIdentifiableInformation,
+    ];
+
     protected $table = 'procurement_prakualifikasi';
 
     protected $fillable = [
