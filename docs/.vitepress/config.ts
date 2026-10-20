@@ -67,8 +67,9 @@ export default withMermaid({
   // sengaja menggagalkan build supaya jembatan antar dokumen tidak diam-diam putus.
   ignoreDeadLinks: [
     /^\/settings\//, // rute aplikasi Control Plane
-    /\.(php|tsx?|drawio|ya?ml|sh|png|pdf)$/, // berkas sumber dan aset
+    /\.(php|tsx?|drawio|ya?ml|sh|png|pdf|sql)$/, // berkas sumber dan aset
     /\.agents\//, // berkas skill di luar docs/
+    /bo_metta_anggaran_new/, // repositori eksternal yang dirujuk dokumen
   ],
 
   themeConfig: {
