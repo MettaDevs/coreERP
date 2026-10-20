@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\Procurement\Models\master;
 
+use App\Platform\Modules\Contracts\DataClass;
 use Modules\Apperp\Procurement\Models\MasterData;
 
 /**
@@ -17,6 +18,11 @@ use Modules\Apperp\Procurement\Models\MasterData;
  */
 class JenisVendor extends MasterData
 {
+    /** @var array<string, DataClass> */
+    public const COLUMN_CLASSIFICATION = [
+        'nama_jenis_vendor' => DataClass::CustomerContent,
+    ];
+
     protected $table = 'procurement_jenis_vendor';
 
     protected $fillable = [

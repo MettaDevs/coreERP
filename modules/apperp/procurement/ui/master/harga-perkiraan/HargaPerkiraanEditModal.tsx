@@ -1,10 +1,10 @@
+import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@apperp/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@apperp/ui/dialog';
 import { Input } from '@apperp/ui/input';
 import { Label } from '@apperp/ui/label';
-import { Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
 import { api, toastSaveError } from '../../api';
 
 export type HargaPerkiraanItem = {
@@ -46,17 +46,23 @@ const BULAN_INDONESIA = [
 export function formatIndonesianDate(
     dateStr: string | null | undefined,
 ): string {
-    if (!dateStr) return '';
+    if (!dateStr) {
+        return '';
+    }
+
     try {
         const parts = dateStr.split('-');
+
         if (parts.length === 3) {
             const day = parseInt(parts[2], 10);
             const monthIdx = parseInt(parts[1], 10) - 1;
             const year = parts[0];
+
             if (monthIdx >= 0 && monthIdx < 12) {
                 return `${day} ${BULAN_INDONESIA[monthIdx]} ${year}`;
             }
         }
+
         return dateStr;
     } catch {
         return dateStr || '';
@@ -66,9 +72,16 @@ export function formatIndonesianDate(
 export function formatRupiah(
     value: number | string | null | undefined,
 ): string {
-    if (value === null || value === undefined || value === '') return 'Rp. 0';
+    if (value === null || value === undefined || value === '') {
+        return 'Rp. 0';
+    }
+
     const num = typeof value === 'string' ? parseFloat(value) : value;
-    if (isNaN(num)) return 'Rp. 0';
+
+    if (isNaN(num)) {
+        return 'Rp. 0';
+    }
+
     return `Rp. ${new Intl.NumberFormat('id-ID').format(num)}`;
 }
 
@@ -87,13 +100,19 @@ export function HargaPerkiraanEditModal({
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
-        if (item) {
+        if (!item) {
+            return;
+        }
+
+        const timer = setTimeout(() => {
             setCode(item.kode_item || '');
             setName(item.nama_item || '');
             setGroup(item.group_item || '');
             setUnit(item.satuan || '');
             const today = new Date().toISOString().slice(0, 10);
+
             setDateInput(item.tanggal_update || today);
+
             if (
                 item.harga_perkiraan !== undefined &&
                 item.harga_perkiraan !== null
@@ -106,17 +125,24 @@ export function HargaPerkiraanEditModal({
             } else {
                 setPriceInput('');
             }
-        }
+        }, 0);
+
+        return () => clearTimeout(timer);
     }, [item]);
 
-    if (!item) return null;
+    if (!item) {
+        return null;
+    }
 
     const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const raw = e.target.value.replace(/[^0-9]/g, '');
+
         if (!raw) {
             setPriceInput('');
+
             return;
         }
+
         const num = parseInt(raw, 10);
         setPriceInput(new Intl.NumberFormat('id-ID').format(num));
     };
@@ -124,12 +150,15 @@ export function HargaPerkiraanEditModal({
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const numericPrice = parseFloat(priceInput.replace(/[^0-9]/g, ''));
+
         if (isNaN(numericPrice) || numericPrice < 0) {
             toast.error('Harga perkiraan harus berupa nominal angka valid.');
+
             return;
         }
 
         setSaving(true);
+
         try {
             const res = await api<{
                 status: string;
