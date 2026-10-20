@@ -110,17 +110,19 @@ export function KategoriPengadaanModal({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[440px] p-0 overflow-hidden border shadow-lg">
-                <div className="px-5 py-3.5 bg-muted/20 border-b">
-                    <DialogTitle className="text-sm font-semibold text-foreground">
-                        {editingItem ? 'Edit Kategori Pengadaan' : 'Tambah Kategori Pengadaan'}
+            <DialogContent className="overflow-hidden border p-0 shadow-lg sm:max-w-[440px]">
+                <div className="bg-muted/20 border-b px-5 py-3.5">
+                    <DialogTitle className="text-foreground text-sm font-semibold">
+                        {editingItem
+                            ? 'Edit Kategori Pengadaan'
+                            : 'Tambah Kategori Pengadaan'}
                     </DialogTitle>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-5 space-y-3">
+                <form onSubmit={handleSubmit} className="space-y-3 p-5">
                     {/* 1. Kode Pengadaan */}
                     <div className="space-y-1">
-                        <Label className="text-xs font-medium text-foreground">
+                        <Label className="text-foreground text-xs font-medium">
                             Kode Pengadaan
                         </Label>
                         <Input
@@ -128,27 +130,29 @@ export function KategoriPengadaanModal({
                             value={kodePengadaan}
                             onChange={(e) => setKodePengadaan(e.target.value)}
                             required
-                            className="h-8 text-xs font-mono bg-background border-input"
+                            className="bg-background border-input h-8 font-mono text-xs"
                         />
                     </div>
 
                     {/* 2. Kategori Pengadaan */}
                     <div className="space-y-1">
-                        <Label className="text-xs font-medium text-foreground">
+                        <Label className="text-foreground text-xs font-medium">
                             Kategori Pengadaan
                         </Label>
                         <Input
                             placeholder="Contoh: Pengadaan Bahan"
                             value={kategoriPengadaan}
-                            onChange={(e) => setKategoriPengadaan(e.target.value)}
+                            onChange={(e) =>
+                                setKategoriPengadaan(e.target.value)
+                            }
                             required
-                            className="h-8 text-xs font-medium bg-background border-input"
+                            className="bg-background border-input h-8 text-xs font-medium"
                         />
                     </div>
 
                     {/* 3. Keterangan */}
                     <div className="space-y-1">
-                        <Label className="text-xs font-medium text-foreground">
+                        <Label className="text-foreground text-xs font-medium">
                             Keterangan
                         </Label>
                         <Textarea
@@ -156,12 +160,12 @@ export function KategoriPengadaanModal({
                             value={keterangan}
                             onChange={(e) => setKeterangan(e.target.value)}
                             rows={2}
-                            className="text-xs bg-background border-input resize-none"
+                            className="bg-background border-input resize-none text-xs"
                         />
                     </div>
 
                     {/* Tombol Aksi */}
-                    <div className="pt-3 flex items-center justify-end gap-2 border-t mt-4">
+                    <div className="mt-4 flex items-center justify-end gap-2 border-t pt-3">
                         <Button
                             type="button"
                             variant="ghost"
