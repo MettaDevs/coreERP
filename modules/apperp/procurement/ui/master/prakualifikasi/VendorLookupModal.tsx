@@ -1,5 +1,7 @@
+import { Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Button } from '@apperp/ui/button';
+import { DataTable } from '@apperp/ui/data-table';
 import {
     Dialog,
     DialogContent,
@@ -9,15 +11,7 @@ import {
     DialogTitle,
 } from '@apperp/ui/dialog';
 import { Input } from '@apperp/ui/input';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
-import { Search } from 'lucide-react';
+import { TableCell, TableRow } from '@apperp/ui/table';
 import { api } from '../../api';
 
 export type VendorLookupItem = {
@@ -47,6 +41,13 @@ type VendorLookupModalProps = {
     onSelect: (vendor: VendorLookupItem) => void;
 };
 
+const lookupColumns = [
+    { id: 'select', header: '', cell: () => null },
+    { id: 'kode_vendor', header: 'Kode Vendor/Supplier', cell: () => null },
+    { id: 'nama_vendor', header: 'Nama Vendor/Supplier', cell: () => null },
+    { id: 'alamat', header: 'Alamat Vendor/Supplier', cell: () => null },
+];
+
 export function VendorLookupModal({
     open,
     onOpenChange,
@@ -59,47 +60,65 @@ export function VendorLookupModal({
 
     useEffect(() => {
         if (!open) {
-            setSelectedCode(null);
             return;
         }
 
         let isMounted = true;
-        setLoading(true);
+        const fetchVendors = async () => {
+            setLoading(true);
 
-        api<{ status: string; data: VendorLookupItem[] }>(
-            `/prakualifikasi/vendors/lookup?search=${encodeURIComponent(search)}`,
-        )
-            .then((res) => {
+            try {
+                const res = await api<{
+                    status: string;
+                    data: VendorLookupItem[];
+                }>(
+                    `/prakualifikasi/vendors/lookup?search=${encodeURIComponent(search)}`,
+                );
+
                 if (isMounted) {
                     setVendors(res.data ?? []);
                 }
-            })
-            .catch(() => {
+            } catch {
                 if (isMounted) {
                     setVendors([]);
                 }
-            })
-            .finally(() => {
+            } finally {
                 if (isMounted) {
                     setLoading(false);
                 }
-            });
+            }
+        };
+
+        const timer = setTimeout(() => {
+            void fetchVendors();
+        }, 0);
 
         return () => {
             isMounted = false;
+            clearTimeout(timer);
         };
     }, [open, search]);
 
     const handleConfirm = () => {
         const found = vendors.find((v) => v.kode_vendor === selectedCode);
+
         if (found) {
             onSelect(found);
+            setSelectedCode(null);
             onOpenChange(false);
         }
     };
 
+    const handleOpenChange = (nextOpen: boolean) => {
+        if (!nextOpen) {
+            setSelectedCode(null);
+        }
+
+        onOpenChange(nextOpen);
+    };
+
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent className="max-w-2xl">
                 <DialogHeader className="border-b pb-3">
                     <DialogTitle className="text-base font-semibold">
@@ -124,86 +143,80 @@ export function VendorLookupModal({
                     </div>
 
                     <div className="overflow-hidden rounded-md border">
-                        <Table>
-                            <TableHeader className="bg-muted/40 border-b">
-                                <TableRow className="h-8">
-                                    <TableHead className="w-12 text-center text-xs"></TableHead>
-                                    <TableHead className="w-36 text-xs font-semibold">
-                                        Kode Vendor/Supplier
-                                    </TableHead>
-                                    <TableHead className="text-xs font-semibold">
-                                        Nama Vendor/Supplier
-                                    </TableHead>
-                                    <TableHead className="text-xs font-semibold">
-                                        Alamat Vendor/Supplier
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {loading ? (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={4}
-                                            className="text-muted-foreground py-8 text-center text-xs"
-                                        >
-                                            Memuat data vendor...
-                                        </TableCell>
-                                    </TableRow>
-                                ) : vendors.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={4}
-                                            className="text-muted-foreground py-8 text-center text-xs"
-                                        >
-                                            Tidak ada vendor ditemukan.
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    vendors.map((v) => {
-                                        const isSelected =
-                                            selectedCode === v.kode_vendor;
-                                        return (
-                                            <TableRow
-                                                key={v.kode_vendor}
-                                                onClick={() =>
-                                                    setSelectedCode(
-                                                        v.kode_vendor,
-                                                    )
-                                                }
-                                                className={`h-9 cursor-pointer text-xs transition-colors ${
-                                                    isSelected
-                                                        ? 'bg-primary/10 font-medium'
-                                                        : 'hover:bg-muted/50'
-                                                }`}
+                        <DataTable
+                            scrollMode="inline"
+                            showRowNumbers={false}
+                            columns={lookupColumns}
+                            data={vendors}
+                            getRowKey={(v) => v.kode_vendor}
+                            renderRows={() => (
+                                <>
+                                    {loading ? (
+                                        <TableRow>
+                                            <TableCell
+                                                colSpan={4}
+                                                className="text-muted-foreground py-8 text-center text-xs"
                                             >
-                                                <TableCell className="py-1 text-center">
-                                                    <input
-                                                        type="radio"
-                                                        name="selected_vendor"
-                                                        checked={isSelected}
-                                                        onChange={() =>
-                                                            setSelectedCode(
-                                                                v.kode_vendor,
-                                                            )
-                                                        }
-                                                        className="text-primary h-3.5 w-3.5 cursor-pointer"
-                                                    />
-                                                </TableCell>
-                                                <TableCell className="py-1 font-mono text-xs font-medium">
-                                                    {v.kode_vendor}
-                                                </TableCell>
-                                                <TableCell className="text-foreground py-1 text-xs font-semibold">
-                                                    {v.nama_vendor}
-                                                </TableCell>
-                                                <TableCell className="text-muted-foreground py-1 text-xs">
-                                                    {v.alamat || '-'}
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })
-                                )}
-                            </TableBody>
-                        </Table>
+                                                Memuat data vendor...
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : vendors.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell
+                                                colSpan={4}
+                                                className="text-muted-foreground py-8 text-center text-xs"
+                                            >
+                                                Tidak ada vendor ditemukan.
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        vendors.map((v) => {
+                                            const isSelected =
+                                                selectedCode === v.kode_vendor;
+
+                                            return (
+                                                <TableRow
+                                                    key={v.kode_vendor}
+                                                    onClick={() =>
+                                                        setSelectedCode(
+                                                            v.kode_vendor,
+                                                        )
+                                                    }
+                                                    className={`h-9 cursor-pointer text-xs transition-colors ${
+                                                        isSelected
+                                                            ? 'bg-primary/10 font-medium'
+                                                            : 'hover:bg-muted/50'
+                                                    }`}
+                                                >
+                                                    <TableCell className="py-1 text-center">
+                                                        <input
+                                                            type="radio"
+                                                            name="selected_vendor"
+                                                            checked={isSelected}
+                                                            onChange={() =>
+                                                                setSelectedCode(
+                                                                    v.kode_vendor,
+                                                                )
+                                                            }
+                                                            className="text-primary h-3.5 w-3.5 cursor-pointer"
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell className="py-1 font-mono text-xs font-medium">
+                                                        {v.kode_vendor}
+                                                    </TableCell>
+                                                    <TableCell className="text-foreground py-1 text-xs font-semibold">
+                                                        {v.nama_vendor}
+                                                    </TableCell>
+                                                    <TableCell className="text-muted-foreground py-1 text-xs">
+                                                        {v.alamat || '-'}
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })
+                                    )}
+                                </>
+                            )}
+                        />
                     </div>
                 </div>
 
@@ -211,7 +224,7 @@ export function VendorLookupModal({
                     <Button
                         type="button"
                         variant="outline"
-                        onClick={() => onOpenChange(false)}
+                        onClick={() => handleOpenChange(false)}
                         className="h-8 text-xs"
                     >
                         Batal

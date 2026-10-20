@@ -5,94 +5,20 @@ declare(strict_types=1);
 namespace Modules\Apperp\Procurement\Http\Controllers\master;
 
 use App\Platform\Modules\Contracts\TenantContext;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Modules\Apperp\Procurement\Models\master\MetodePembayaran;
 
 final class MetodePembayaranController extends Controller
 {
     /**
-     * Pastikan tabel dan data acuan metode pembayaran tersedia.
-     */
-    private function ensureTablesExist(string $tenantId): void
-    {
-        if (! Schema::hasTable('procurement_metode_pembayaran')) {
-            Schema::create('procurement_metode_pembayaran', function (Blueprint $blueprint): void {
-                $blueprint->ulid('id')->primary();
-                $blueprint->ulid('tenant_id')->index();
-                $blueprint->string('creation_key', 160)->nullable();
-                $blueprint->string('kode_bayar', 100);
-                $blueprint->string('nama_metode_bayar', 255);
-                $blueprint->text('keterangan')->nullable();
-                $blueprint->boolean('aktif')->default(true);
-                $blueprint->softDeletes();
-                $blueprint->timestamps();
-
-                $blueprint->unique(['tenant_id', 'id']);
-                $blueprint->unique(['tenant_id', 'kode_bayar']);
-                $blueprint->index(['tenant_id', 'aktif']);
-            });
-        }
-
-        // Jika data kosong, sediakan sampel acuan sesuai diagram persis
-        if (MetodePembayaran::where('tenant_id', $tenantId)->count() === 0) {
-            $samples = [
-                [
-                    'kode_bayar' => 'Metode.001',
-                    'nama_metode_bayar' => 'Transfer Bank',
-                    'keterangan' => 'Pembayaran melalui rekening bank',
-                    'aktif' => true,
-                ],
-                [
-                    'kode_bayar' => 'Metode.002',
-                    'nama_metode_bayar' => 'Giro / Cek',
-                    'keterangan' => 'Pembayaran menggunakan warkat kliring giro atau cek tunai',
-                    'aktif' => true,
-                ],
-                [
-                    'kode_bayar' => 'Metode.003',
-                    'nama_metode_bayar' => 'Kas Kecil / Tunai',
-                    'keterangan' => 'Pembayaran tunai langsung melalui kas operasional kantor',
-                    'aktif' => true,
-                ],
-                [
-                    'kode_bayar' => 'Metode.004',
-                    'nama_metode_bayar' => 'Letter of Credit (L/C)',
-                    'keterangan' => 'Pembayaran berdokumen L/C untuk pengadaan impor dan skala besar',
-                    'aktif' => true,
-                ],
-                [
-                    'kode_bayar' => 'Metode.005',
-                    'nama_metode_bayar' => 'Virtual Account / VA',
-                    'keterangan' => 'Pembayaran tagihan otomatis melalui nomor virtual account bank rekanan',
-                    'aktif' => true,
-                ],
-            ];
-
-            foreach ($samples as $sample) {
-                MetodePembayaran::create([
-                    'tenant_id' => $tenantId,
-                    'creation_key' => (string) Str::uuid(),
-                    'kode_bayar' => $sample['kode_bayar'],
-                    'nama_metode_bayar' => $sample['nama_metode_bayar'],
-                    'keterangan' => $sample['keterangan'],
-                    'aktif' => $sample['aktif'],
-                ]);
-            }
-        }
-    }
-
-    /**
      * Tampilkan daftar seluruh metode pembayaran.
      */
     public function index(Request $request, TenantContext $context): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $query = MetodePembayaran::query()
             ->where('tenant_id', $tenantId)
@@ -131,7 +57,6 @@ final class MetodePembayaranController extends Controller
     public function show(string $id, TenantContext $context): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $record = MetodePembayaran::where('tenant_id', $tenantId)
             ->where('id', $id)
@@ -149,7 +74,6 @@ final class MetodePembayaranController extends Controller
     public function store(Request $request, TenantContext $context): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $validated = $request->validate([
             'kode_bayar' => ['required', 'string', 'max:100'],
@@ -195,7 +119,6 @@ final class MetodePembayaranController extends Controller
     public function update(Request $request, string $id, TenantContext $context): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $record = MetodePembayaran::where('tenant_id', $tenantId)
             ->where('id', $id)
@@ -244,7 +167,6 @@ final class MetodePembayaranController extends Controller
     public function toggleStatus(string $id, TenantContext $context): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $record = MetodePembayaran::where('tenant_id', $tenantId)
             ->where('id', $id)
@@ -266,7 +188,6 @@ final class MetodePembayaranController extends Controller
     public function destroy(string $id, TenantContext $context): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $record = MetodePembayaran::where('tenant_id', $tenantId)
             ->where('id', $id)
