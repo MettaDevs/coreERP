@@ -29,7 +29,6 @@ export function PlaceholderPage({
     category,
     view,
     segments = [],
-    permissions = [],
 }: PlaceholderPageProps) {
     return (
         <div className="space-y-6 p-6">
