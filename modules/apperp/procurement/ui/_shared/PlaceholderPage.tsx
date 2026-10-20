@@ -69,7 +69,8 @@ export function PlaceholderPage({
                                 {segments.length > 0 && (
                                     <>
                                         {' '}
-                                        · Ruas: <code>{segments.join('/')}</code>
+                                        · Ruas:{' '}
+                                        <code>{segments.join('/')}</code>
                                     </>
                                 )}
                             </CardDescription>
@@ -85,9 +86,12 @@ export function PlaceholderPage({
                         <EmptyHeader>
                             <EmptyTitle>Halaman Siap Dikembangkan</EmptyTitle>
                             <EmptyDescription>
-                                Rute menu, izin akses (<code>procurement.{view}.read</code>),
-                                dan tata letak shell sudah terhubung dengan baik ke CoreERP.
-                                Langkah berikutnya adalah melengkapi tabel database, API CRUD, dan komponen form untuk layar ini.
+                                Rute menu, izin akses (
+                                <code>procurement.{view}.read</code>), dan tata
+                                letak shell sudah terhubung dengan baik ke
+                                CoreERP. Langkah berikutnya adalah melengkapi
+                                tabel database, API CRUD, dan komponen form
+                                untuk layar ini.
                             </EmptyDescription>
                         </EmptyHeader>
                     </Empty>

@@ -105,7 +105,7 @@ export function VendorLookupModal({
                     <DialogTitle className="text-base font-semibold">
                         Cari Data Vendor/Supplier
                     </DialogTitle>
-                    <DialogDescription className="text-xs text-muted-foreground">
+                    <DialogDescription className="text-muted-foreground text-xs">
                         Pilih data rekanan vendor dari master untuk mengisi
                         identitas formulir secara otomatis.
                     </DialogDescription>
@@ -113,17 +113,17 @@ export function VendorLookupModal({
 
                 <div className="space-y-3 py-2">
                     <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                        <Search className="text-muted-foreground absolute left-2.5 top-2.5 h-3.5 w-3.5" />
                         <Input
                             placeholder="Cari kode, nama, atau alamat vendor..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            className="pl-8 h-8 text-xs"
+                            className="h-8 pl-8 text-xs"
                             autoFocus
                         />
                     </div>
 
-                    <div className="rounded-md border overflow-hidden">
+                    <div className="overflow-hidden rounded-md border">
                         <Table>
                             <TableHeader className="bg-muted/40 border-b">
                                 <TableRow className="h-8">
@@ -144,7 +144,7 @@ export function VendorLookupModal({
                                     <TableRow>
                                         <TableCell
                                             colSpan={4}
-                                            className="py-8 text-center text-muted-foreground text-xs"
+                                            className="text-muted-foreground py-8 text-center text-xs"
                                         >
                                             Memuat data vendor...
                                         </TableCell>
@@ -153,7 +153,7 @@ export function VendorLookupModal({
                                     <TableRow>
                                         <TableCell
                                             colSpan={4}
-                                            className="py-8 text-center text-muted-foreground text-xs"
+                                            className="text-muted-foreground py-8 text-center text-xs"
                                         >
                                             Tidak ada vendor ditemukan.
                                         </TableCell>
@@ -170,13 +170,13 @@ export function VendorLookupModal({
                                                         v.kode_vendor,
                                                     )
                                                 }
-                                                className={`cursor-pointer text-xs h-9 transition-colors ${
+                                                className={`h-9 cursor-pointer text-xs transition-colors ${
                                                     isSelected
                                                         ? 'bg-primary/10 font-medium'
                                                         : 'hover:bg-muted/50'
                                                 }`}
                                             >
-                                                <TableCell className="text-center py-1">
+                                                <TableCell className="py-1 text-center">
                                                     <input
                                                         type="radio"
                                                         name="selected_vendor"
@@ -186,16 +186,16 @@ export function VendorLookupModal({
                                                                 v.kode_vendor,
                                                             )
                                                         }
-                                                        className="h-3.5 w-3.5 text-primary cursor-pointer"
+                                                        className="text-primary h-3.5 w-3.5 cursor-pointer"
                                                     />
                                                 </TableCell>
-                                                <TableCell className="font-mono text-xs font-medium py-1">
+                                                <TableCell className="py-1 font-mono text-xs font-medium">
                                                     {v.kode_vendor}
                                                 </TableCell>
-                                                <TableCell className="font-semibold text-xs text-foreground py-1">
+                                                <TableCell className="text-foreground py-1 text-xs font-semibold">
                                                     {v.nama_vendor}
                                                 </TableCell>
-                                                <TableCell className="text-xs text-muted-foreground py-1">
+                                                <TableCell className="text-muted-foreground py-1 text-xs">
                                                     {v.alamat || '-'}
                                                 </TableCell>
                                             </TableRow>
@@ -220,7 +220,7 @@ export function VendorLookupModal({
                         type="button"
                         disabled={!selectedCode}
                         onClick={handleConfirm}
-                        className="bg-primary hover:bg-primary/90 text-primary-foreground min-w-[80px] h-8 text-xs font-medium"
+                        className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 min-w-[80px] text-xs font-medium"
                     >
                         Pilih Rekanan
                     </Button>
