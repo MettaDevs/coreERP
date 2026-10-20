@@ -63,15 +63,23 @@ export function PrakualifikasiDetailModal({
     };
 
     const getStatusBadge = (status: string) => {
-        if (status === 'Lolos' || status === 'Memenuhi Syarat' || status === '1. Lolos') {
+        if (
+            status === 'Lolos' ||
+            status === 'Memenuhi Syarat' ||
+            status === '1. Lolos'
+        ) {
             return (
-                <Badge className="bg-emerald-600 hover:bg-emerald-600/90 text-white font-medium">
+                <Badge className="bg-emerald-600 font-medium text-white hover:bg-emerald-600/90">
                     <CheckCircle2 className="mr-1 h-3 w-3" />
                     Lolos
                 </Badge>
             );
         }
-        if (status === 'Batal' || status === 'Tidak Memenuhi Syarat' || status === '2. Batal') {
+        if (
+            status === 'Batal' ||
+            status === 'Tidak Memenuhi Syarat' ||
+            status === '2. Batal'
+        ) {
             return (
                 <Badge variant="destructive" className="font-medium">
                     <XCircle className="mr-1 h-3 w-3" />
@@ -82,7 +90,7 @@ export function PrakualifikasiDetailModal({
         return (
             <Badge
                 variant="secondary"
-                className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 font-medium"
+                className="border-amber-500/30 bg-amber-500/15 font-medium text-amber-700 dark:text-amber-400"
             >
                 <Clock className="mr-1 h-3 w-3" />
                 {status || 'Dalam Proses'}
@@ -92,75 +100,113 @@ export function PrakualifikasiDetailModal({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
                 <DialogHeader className="border-b pb-3">
                     <div className="flex items-center justify-between">
                         <DialogTitle className="flex items-center gap-2 text-xl font-bold">
-                            <Building2 className="h-5 w-5 text-primary" />
+                            <Building2 className="text-primary h-5 w-5" />
                             Data Prakualifikasi Vendor/Supplier
                         </DialogTitle>
                         <div>{getStatusBadge(data.status_kualifikasi)}</div>
                     </div>
-                    <DialogDescription className="font-mono text-xs text-muted-foreground">
-                        Nomor Dokumen: <strong className="text-foreground">{data.nomor_prakualifikasi}</strong> · Tanggal: {formatDisplayDate(data.tanggal_prakualifikasi)}
+                    <DialogDescription className="text-muted-foreground font-mono text-xs">
+                        Nomor Dokumen:{' '}
+                        <strong className="text-foreground">
+                            {data.nomor_prakualifikasi}
+                        </strong>{' '}
+                        · Tanggal:{' '}
+                        {formatDisplayDate(data.tanggal_prakualifikasi)}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-6 py-2 text-sm">
                     {/* Profil Vendor */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-lg border bg-muted/20 p-4">
+                    <div className="bg-muted/20 grid grid-cols-1 gap-4 rounded-lg border p-4 md:grid-cols-2">
                         <div className="space-y-2">
-                            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            <div className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
                                 Identitas Vendor/Supplier
                             </div>
-                            <div className="text-base font-bold text-foreground">
+                            <div className="text-foreground text-base font-bold">
                                 {data.nama_vendor}
                             </div>
-                            <div className="text-xs font-mono text-muted-foreground">
-                                Kode: {data.kode_vendor} · {data.jenis_vendor || 'Supplier'}
+                            <div className="text-muted-foreground font-mono text-xs">
+                                Kode: {data.kode_vendor} ·{' '}
+                                {data.jenis_vendor || 'Supplier'}
                             </div>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
+                            <div className="text-muted-foreground mt-2 flex items-center gap-2 text-xs">
                                 <MapPin className="h-3.5 w-3.5 shrink-0" />
                                 <span>{data.alamat || '-'}</span>
                             </div>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <div className="text-muted-foreground flex items-center gap-2 text-xs">
                                 <User className="h-3.5 w-3.5 shrink-0" />
-                                <span>Nama PIC Vendor/Supp: {data.nama_pic || '-'}</span>
+                                <span>
+                                    Nama PIC Vendor/Supp: {data.nama_pic || '-'}
+                                </span>
                             </div>
                         </div>
 
-                        <div className="space-y-2 border-t md:border-t-0 md:border-l md:pl-4 pt-2 md:pt-0">
-                            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <div className="space-y-2 border-t pt-2 md:border-l md:border-t-0 md:pl-4 md:pt-0">
+                            <div className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
                                 Legalitas & Status Rekanan
                             </div>
                             <div className="grid grid-cols-2 gap-2 text-xs">
                                 <div>
-                                    <span className="text-muted-foreground">Status Vendor:</span>
-                                    <div className="font-semibold text-foreground">{data.status_vendor || 'Vendor Resmi'}</div>
+                                    <span className="text-muted-foreground">
+                                        Status Vendor:
+                                    </span>
+                                    <div className="text-foreground font-semibold">
+                                        {data.status_vendor || 'Vendor Resmi'}
+                                    </div>
                                 </div>
                                 <div>
-                                    <span className="text-muted-foreground">Badan Hukum:</span>
-                                    <div className="font-medium text-foreground">{data.status_badan_hukum}</div>
+                                    <span className="text-muted-foreground">
+                                        Badan Hukum:
+                                    </span>
+                                    <div className="text-foreground font-medium">
+                                        {data.status_badan_hukum}
+                                    </div>
                                 </div>
                                 <div>
-                                    <span className="text-muted-foreground">NPWP/KTP:</span>
-                                    <div className="font-mono text-foreground">{data.npwp_ktp || '-'}</div>
+                                    <span className="text-muted-foreground">
+                                        NPWP/KTP:
+                                    </span>
+                                    <div className="text-foreground font-mono">
+                                        {data.npwp_ktp || '-'}
+                                    </div>
                                 </div>
                                 <div>
-                                    <span className="text-muted-foreground">Telepon/HP:</span>
-                                    <div className="font-mono text-foreground">{data.telepon || '-'}</div>
+                                    <span className="text-muted-foreground">
+                                        Telepon/HP:
+                                    </span>
+                                    <div className="text-foreground font-mono">
+                                        {data.telepon || '-'}
+                                    </div>
                                 </div>
                                 <div>
-                                    <span className="text-muted-foreground">Email:</span>
-                                    <div className="text-foreground">{data.email || '-'}</div>
+                                    <span className="text-muted-foreground">
+                                        Email:
+                                    </span>
+                                    <div className="text-foreground">
+                                        {data.email || '-'}
+                                    </div>
                                 </div>
                                 <div>
-                                    <span className="text-muted-foreground">Waktu Kesediaan Item:</span>
-                                    <div className="font-medium text-foreground">{data.waktu_kesediaan_item || '-'}</div>
+                                    <span className="text-muted-foreground">
+                                        Waktu Kesediaan Item:
+                                    </span>
+                                    <div className="text-foreground font-medium">
+                                        {data.waktu_kesediaan_item || '-'}
+                                    </div>
                                 </div>
                                 <div>
-                                    <span className="text-muted-foreground">Jumlah Karyawan yg dimiliki:</span>
-                                    <div className="font-medium text-foreground">{data.jumlah_karyawan ? `${data.jumlah_karyawan} Orang` : '-'}</div>
+                                    <span className="text-muted-foreground">
+                                        Jumlah Karyawan yg dimiliki:
+                                    </span>
+                                    <div className="text-foreground font-medium">
+                                        {data.jumlah_karyawan
+                                            ? `${data.jumlah_karyawan} Orang`
+                                            : '-'}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -169,36 +215,53 @@ export function PrakualifikasiDetailModal({
                     {/* Kelengkapan Dokumen */}
                     <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                            <h4 className="font-semibold text-sm flex items-center gap-2">
-                                <FileText className="h-4 w-4 text-primary" />
+                            <h4 className="flex items-center gap-2 text-sm font-semibold">
+                                <FileText className="text-primary h-4 w-4" />
                                 Kelengkapan Dokumen
                             </h4>
-                            <span className="text-xs text-muted-foreground">
-                                {data.dokumen?.filter((d) => d.ada).length || 0} dari {data.dokumen?.length || 0} Dokumen Terpenuhi
+                            <span className="text-muted-foreground text-xs">
+                                {data.dokumen?.filter((d) => d.ada).length || 0}{' '}
+                                dari {data.dokumen?.length || 0} Dokumen
+                                Terpenuhi
                             </span>
                         </div>
 
-                        <div className="rounded-md border overflow-hidden">
+                        <div className="overflow-hidden rounded-md border">
                             <Table>
                                 <TableHeader className="bg-sky-50 dark:bg-sky-950/40">
                                     <TableRow>
-                                        <TableHead className="w-12 text-center text-xs">No.</TableHead>
-                                        <TableHead className="text-xs">Uraian Dokumen</TableHead>
-                                        <TableHead className="w-28 text-center text-xs">Status</TableHead>
-                                        <TableHead className="text-xs">Keterangan</TableHead>
+                                        <TableHead className="w-12 text-center text-xs">
+                                            No.
+                                        </TableHead>
+                                        <TableHead className="text-xs">
+                                            Uraian Dokumen
+                                        </TableHead>
+                                        <TableHead className="w-28 text-center text-xs">
+                                            Status
+                                        </TableHead>
+                                        <TableHead className="text-xs">
+                                            Keterangan
+                                        </TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {(!data.dokumen || data.dokumen.length === 0) ? (
+                                    {!data.dokumen ||
+                                    data.dokumen.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={4} className="py-4 text-center text-muted-foreground text-xs">
+                                            <TableCell
+                                                colSpan={4}
+                                                className="text-muted-foreground py-4 text-center text-xs"
+                                            >
                                                 Tidak ada catatan dokumen.
                                             </TableCell>
                                         </TableRow>
                                     ) : (
                                         data.dokumen.map((doc, idx) => (
-                                            <TableRow key={idx} className="h-8 text-xs">
-                                                <TableCell className="text-center font-medium font-mono">
+                                            <TableRow
+                                                key={idx}
+                                                className="h-8 text-xs"
+                                            >
+                                                <TableCell className="text-center font-mono font-medium">
                                                     {idx + 1}
                                                 </TableCell>
                                                 <TableCell className="font-medium">
@@ -206,12 +269,14 @@ export function PrakualifikasiDetailModal({
                                                 </TableCell>
                                                 <TableCell className="text-center">
                                                     {doc.ada ? (
-                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-                                                            <Check className="mr-1 h-3 w-3" /> Ada
+                                                        <span className="inline-flex items-center rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                                                            <Check className="mr-1 h-3 w-3" />{' '}
+                                                            Ada
                                                         </span>
                                                     ) : (
-                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300">
-                                                            <X className="mr-1 h-3 w-3" /> Tidak Ada
+                                                        <span className="inline-flex items-center rounded bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-800 dark:bg-rose-900/40 dark:text-rose-300">
+                                                            <X className="mr-1 h-3 w-3" />{' '}
+                                                            Tidak Ada
                                                         </span>
                                                     )}
                                                 </TableCell>
@@ -228,59 +293,80 @@ export function PrakualifikasiDetailModal({
 
                     {/* Catatan Khusus */}
                     {data.catatan && (
-                        <div className="rounded-md border p-3 bg-muted/10">
-                            <div className="text-xs font-semibold text-muted-foreground mb-1">
+                        <div className="bg-muted/10 rounded-md border p-3">
+                            <div className="text-muted-foreground mb-1 text-xs font-semibold">
                                 Catatan Evaluasi:
                             </div>
-                            <p className="text-xs text-foreground whitespace-pre-wrap">{data.catatan}</p>
+                            <p className="text-foreground whitespace-pre-wrap text-xs">
+                                {data.catatan}
+                            </p>
                         </div>
                     )}
 
                     {/* Daftar List Item yang tersedia */}
                     <div className="space-y-3">
-                        <h4 className="font-semibold text-sm flex items-center gap-2">
-                            <Package className="h-4 w-4 text-primary" />
+                        <h4 className="flex items-center gap-2 text-sm font-semibold">
+                            <Package className="text-primary h-4 w-4" />
                             Daftar List Item yang tersedia
                         </h4>
-                        <div className="rounded-md border overflow-hidden">
+                        <div className="overflow-hidden rounded-md border">
                             <Table>
                                 <TableHeader className="bg-sky-50 dark:bg-sky-950/40">
                                     <TableRow>
-                                        <TableHead className="w-12 text-center text-xs">No.</TableHead>
-                                        <TableHead className="w-32 text-center text-xs">Jenis Item</TableHead>
-                                        <TableHead className="w-28 text-center text-xs">Kode Item</TableHead>
-                                        <TableHead className="text-center text-xs">Nama Item</TableHead>
-                                        <TableHead className="w-24 text-center text-xs">Satuan</TableHead>
-                                        <TableHead className="w-28 text-center text-xs">Kesediaan</TableHead>
+                                        <TableHead className="w-12 text-center text-xs">
+                                            No.
+                                        </TableHead>
+                                        <TableHead className="w-32 text-center text-xs">
+                                            Jenis Item
+                                        </TableHead>
+                                        <TableHead className="w-28 text-center text-xs">
+                                            Kode Item
+                                        </TableHead>
+                                        <TableHead className="text-center text-xs">
+                                            Nama Item
+                                        </TableHead>
+                                        <TableHead className="w-24 text-center text-xs">
+                                            Satuan
+                                        </TableHead>
+                                        <TableHead className="w-28 text-center text-xs">
+                                            Kesediaan
+                                        </TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {(!data.items || data.items.length === 0) ? (
+                                    {!data.items || data.items.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={6} className="py-4 text-center text-muted-foreground text-xs">
+                                            <TableCell
+                                                colSpan={6}
+                                                className="text-muted-foreground py-4 text-center text-xs"
+                                            >
                                                 Tidak ada data item barang/jasa.
                                             </TableCell>
                                         </TableRow>
                                     ) : (
                                         data.items.map((item, idx) => (
-                                            <TableRow key={idx} className="h-8 text-xs">
-                                                <TableCell className="text-center font-medium font-mono">
+                                            <TableRow
+                                                key={idx}
+                                                className="h-8 text-xs"
+                                            >
+                                                <TableCell className="text-center font-mono font-medium">
                                                     {idx + 1}
                                                 </TableCell>
                                                 <TableCell className="text-center">
                                                     {item.jenis_item || '-'}
                                                 </TableCell>
-                                                <TableCell className="text-center font-mono text-muted-foreground">
+                                                <TableCell className="text-muted-foreground text-center font-mono">
                                                     {item.kode_item || '-'}
                                                 </TableCell>
-                                                <TableCell className="text-center font-semibold text-foreground">
+                                                <TableCell className="text-foreground text-center font-semibold">
                                                     {item.nama_item}
                                                 </TableCell>
                                                 <TableCell className="text-center">
                                                     {item.satuan || '-'}
                                                 </TableCell>
                                                 <TableCell className="text-center font-mono">
-                                                    {item.kesediaan || 'Tersedia'}
+                                                    {item.kesediaan ||
+                                                        'Tersedia'}
                                                 </TableCell>
                                             </TableRow>
                                         ))
@@ -296,7 +382,7 @@ export function PrakualifikasiDetailModal({
                         type="button"
                         variant="outline"
                         onClick={handlePrint}
-                        className="gap-1.5 h-8 text-xs"
+                        className="h-8 gap-1.5 text-xs"
                     >
                         <Printer className="h-4 w-4" />
                         Cetak
@@ -310,7 +396,7 @@ export function PrakualifikasiDetailModal({
                                     onOpenChange(false);
                                     onDelete();
                                 }}
-                                className="h-8 text-xs text-destructive hover:bg-destructive/10 border-destructive/30"
+                                className="text-destructive hover:bg-destructive/10 border-destructive/30 h-8 text-xs"
                             >
                                 Arsipkan
                             </Button>
