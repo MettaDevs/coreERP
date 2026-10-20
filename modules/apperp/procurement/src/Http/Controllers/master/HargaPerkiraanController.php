@@ -6,117 +6,20 @@ namespace Modules\Apperp\Procurement\Http\Controllers\master;
 
 use App\Platform\Modules\Contracts\TenantContext;
 use Carbon\Carbon;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Modules\Apperp\Procurement\Models\master\HargaPerkiraan;
 
 final class HargaPerkiraanController extends Controller
 {
     /**
-     * Pastikan tabel dan data acuan harga perkiraan (HPS) tersedia.
-     */
-    private function ensureTablesExist(string $tenantId): void
-    {
-        if (! Schema::hasTable('procurement_harga_perkiraan')) {
-            Schema::create('procurement_harga_perkiraan', function (Blueprint $blueprint): void {
-                $blueprint->ulid('id')->primary();
-                $blueprint->ulid('tenant_id')->index();
-                $blueprint->string('creation_key', 160)->nullable();
-                $blueprint->string('group_item', 100);
-                $blueprint->string('jenis_item', 100);
-                $blueprint->string('kode_item', 100);
-                $blueprint->string('nama_item', 255);
-                $blueprint->string('satuan', 50);
-                $blueprint->decimal('harga_perkiraan', 18, 2)->default(0);
-                $blueprint->date('tanggal_update')->nullable();
-                $blueprint->text('keterangan')->nullable();
-                $blueprint->softDeletes();
-                $blueprint->timestamps();
-
-                $blueprint->unique(['tenant_id', 'id']);
-                $blueprint->unique(['tenant_id', 'kode_item']);
-                $blueprint->index(['tenant_id', 'group_item']);
-                $blueprint->index(['tenant_id', 'jenis_item']);
-            });
-        }
-
-        // Jika data kosong, sediakan 5 sampel item persis sesuai diagram acuan
-        if (HargaPerkiraan::where('tenant_id', $tenantId)->count() === 0) {
-            $samples = [
-                [
-                    'group_item' => 'Bahan',
-                    'jenis_item' => 'Obat',
-                    'kode_item' => 'Bahan 01',
-                    'nama_item' => 'Obat A',
-                    'satuan' => 'Tablet',
-                    'harga_perkiraan' => 2000,
-                    'tanggal_update' => '2026-08-10',
-                ],
-                [
-                    'group_item' => 'Upah',
-                    'jenis_item' => 'Perbaikan',
-                    'kode_item' => 'Bahan 02',
-                    'nama_item' => 'Obat B',
-                    'satuan' => 'Botol',
-                    'harga_perkiraan' => 5000,
-                    'tanggal_update' => null,
-                ],
-                [
-                    'group_item' => 'Asset',
-                    'jenis_item' => 'Kendaraan',
-                    'kode_item' => 'Bahan 03',
-                    'nama_item' => 'BMHP1',
-                    'satuan' => 'Pcs',
-                    'harga_perkiraan' => 350,
-                    'tanggal_update' => null,
-                ],
-                [
-                    'group_item' => 'Subkont',
-                    'jenis_item' => 'BMHP',
-                    'kode_item' => 'Bahan 04',
-                    'nama_item' => 'BMHP2',
-                    'satuan' => 'Box',
-                    'harga_perkiraan' => 10000,
-                    'tanggal_update' => null,
-                ],
-                [
-                    'group_item' => 'Overhead',
-                    'jenis_item' => 'BMHP',
-                    'kode_item' => 'Bahan 05',
-                    'nama_item' => 'BMHP3',
-                    'satuan' => 'Set',
-                    'harga_perkiraan' => 50000,
-                    'tanggal_update' => null,
-                ],
-            ];
-
-            foreach ($samples as $sample) {
-                HargaPerkiraan::create([
-                    'tenant_id' => $tenantId,
-                    'creation_key' => (string) Str::uuid(),
-                    'group_item' => $sample['group_item'],
-                    'jenis_item' => $sample['jenis_item'],
-                    'kode_item' => $sample['kode_item'],
-                    'nama_item' => $sample['nama_item'],
-                    'satuan' => $sample['satuan'],
-                    'harga_perkiraan' => $sample['harga_perkiraan'],
-                    'tanggal_update' => $sample['tanggal_update'],
-                ]);
-            }
-        }
-    }
-
-    /**
      * Daftar harga perkiraan (HPS) barang, upah, asset, subkont, dan overhead.
      */
     public function index(Request $request, TenantContext $context): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $query = HargaPerkiraan::query()
             ->where('tenant_id', $tenantId)
@@ -160,7 +63,6 @@ final class HargaPerkiraanController extends Controller
     public function show(string $id, TenantContext $context): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $record = HargaPerkiraan::where('tenant_id', $tenantId)
             ->where('id', $id)
@@ -178,7 +80,6 @@ final class HargaPerkiraanController extends Controller
     public function store(Request $request, TenantContext $context): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $validated = $request->validate([
             'group_item' => ['required', 'string', 'max:100'],
@@ -217,7 +118,6 @@ final class HargaPerkiraanController extends Controller
     public function update(Request $request, string $id, TenantContext $context): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $record = HargaPerkiraan::where('tenant_id', $tenantId)
             ->where('id', $id)
@@ -273,7 +173,6 @@ final class HargaPerkiraanController extends Controller
     public function destroy(string $id, TenantContext $context): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $record = HargaPerkiraan::where('tenant_id', $tenantId)
             ->where('id', $id)
