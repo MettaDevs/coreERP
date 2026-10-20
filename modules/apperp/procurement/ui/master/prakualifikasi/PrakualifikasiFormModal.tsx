@@ -1,5 +1,18 @@
-import { useEffect, useState } from 'react';
+import {
+    Building2,
+    FileText,
+    Package,
+    Plus,
+    RotateCcw,
+    Search,
+    Trash2,
+} from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
+import { DataTable } from '@apperp/ui/data-table';
 import {
     Dialog,
     DialogContent,
@@ -10,31 +23,35 @@ import {
 } from '@apperp/ui/dialog';
 import { Input } from '@apperp/ui/input';
 import { Label } from '@apperp/ui/label';
+import { TableCell, TableRow } from '@apperp/ui/table';
 import { Textarea } from '@apperp/ui/textarea';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
-import { Badge } from '@apperp/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
-import {
-    Building2,
-    Check,
-    FileText,
-    Package,
-    Plus,
-    RotateCcw,
-    Search,
-    Trash2,
-    X,
-} from 'lucide-react';
-import { toast } from 'sonner';
 import { api, toastSaveError } from '../../api';
-import { VendorLookupModal, type VendorLookupItem } from './VendorLookupModal';
+import { VendorLookupModal } from './VendorLookupModal';
+import type { VendorLookupItem } from './VendorLookupModal';
+
+const standardDocColumns = [
+    { id: 'no', header: 'No.' },
+    { id: 'uraian', header: 'Uraian' },
+    { id: 'ada', header: 'Ada' },
+    { id: 'tidak', header: 'Tidak' },
+];
+
+const additionalDocColumns = [
+    { id: 'no', header: 'No.' },
+    { id: 'nama_dokumen', header: 'Nama Dokumen' },
+    { id: 'keterangan', header: 'Ket.' },
+    { id: 'aksi', header: 'Aksi' },
+];
+
+const itemFormColumns = [
+    { id: 'no', header: 'No.' },
+    { id: 'jenis_item', header: 'Jenis Item' },
+    { id: 'kode_item', header: 'Kode Item' },
+    { id: 'nama_item', header: 'Nama Item' },
+    { id: 'satuan', header: 'Satuan' },
+    { id: 'kesediaan', header: 'Kesediaan' },
+    { id: 'aksi', header: 'Aksi' },
+];
 
 export type PrakualifikasiDokumenForm = {
     id?: string;
@@ -172,6 +189,7 @@ export function PrakualifikasiFormModal({
     function getDefaultStandardDocs(): PrakualifikasiDokumenForm[] {
         // Status awal persis gambar acuan: Ada untuk baris 1, 5, 6, 7, 8, 9, 10; Tidak Ada untuk baris 2, 3, 4
         const checkedIndices = [0, 4, 5, 6, 7, 8, 9];
+
         return STANDARD_DOCUMENTS.map((name, idx) => ({
             kategori: 'wajib',
             urutan: idx + 1,
@@ -231,7 +249,7 @@ export function PrakualifikasiFormModal({
         ];
     }
 
-    function resetToEmptyForm() {
+    const resetToEmptyForm = useCallback(() => {
         const today = new Date().toISOString().split('T')[0];
         setQualificationDate(today);
         setQualificationNumber('');
@@ -254,7 +272,7 @@ export function PrakualifikasiFormModal({
         setDocumentList(getEmptyStandardDocs());
         setAdditionalDocuments([]);
         setItems(getEmptyInitialItems());
-    }
+    }, []);
 
     function resetToSampleData() {
         setQualificationDate('2026-08-05');
@@ -283,97 +301,128 @@ export function PrakualifikasiFormModal({
     }
 
     useEffect(() => {
-        if (!open) return;
-
-        if (initialData) {
-            setQualificationDate(
-                initialData.tanggal_prakualifikasi ||
-                    new Date().toISOString().split('T')[0],
-            );
-            setQualificationNumber(initialData.nomor_prakualifikasi || '');
-            setVendorId(initialData.vendor_id || null);
-            setVendorCode(initialData.kode_vendor || '');
-            setVendorName(initialData.nama_vendor || '');
-            setVendorType(initialData.jenis_vendor || '');
-            setPicName(initialData.nama_pic || '');
-            setTaxOrIdNumber(initialData.npwp_ktp || '');
-            setPhone(initialData.telepon || '');
-            setEmail(initialData.email || '');
-            setSocialMedia(initialData.media_sosial || '');
-            setAddress(initialData.alamat || '');
-            setVendorStatus(initialData.status_vendor || 'Vendor Resmi');
-            setLegalStatus(initialData.status_badan_hukum || 'Badan Hukum');
-            setQualificationStatus(initialData.status_kualifikasi || 'Lolos');
-            setLeadTime(initialData.waktu_kesediaan_item || '');
-            setEmployeeCount(
-                initialData.jumlah_karyawan !== null &&
-                    initialData.jumlah_karyawan !== undefined
-                    ? String(initialData.jumlah_karyawan)
-                    : '',
-            );
-            setNotes(initialData.catatan || '');
-
-            const allDocs = initialData.dokumen || [];
-            const standardDocs: PrakualifikasiDokumenForm[] =
-                STANDARD_DOCUMENTS.map((name, idx) => {
-                    const match = allDocs.find((d) => d.nama_dokumen === name);
-                    return {
-                        id: match?.id,
-                        kategori: 'wajib',
-                        urutan: idx + 1,
-                        nama_dokumen: name,
-                        ada: match ? Boolean(match.ada) : false,
-                        keterangan: match?.keterangan || '',
-                    };
-                });
-            setDocumentList(standardDocs);
-
-            const extraDocs = allDocs
-                .filter((d) => !STANDARD_DOCUMENTS.includes(d.nama_dokumen))
-                .map((d, idx) => ({
-                    id: d.id,
-                    kategori: 'tambahan' as const,
-                    urutan: idx + 1,
-                    nama_dokumen: d.nama_dokumen,
-                    ada: Boolean(d.ada),
-                    keterangan: d.keterangan || '',
-                }));
-            setAdditionalDocuments(extraDocs);
-
-            if (initialData.items && initialData.items.length > 0) {
-                setItems(
-                    initialData.items.map((it, idx) => ({
-                        id: it.id,
-                        urutan: idx + 1,
-                        jenis_item: it.jenis_item || '',
-                        kode_item: it.kode_item || '',
-                        nama_item: it.nama_item || '',
-                        satuan: it.satuan || '',
-                        kesediaan: it.kesediaan || '',
-                        keterangan: it.keterangan || '',
-                    })),
-                );
-            } else {
-                setItems(getEmptyInitialItems());
-            }
-        } else {
-            resetToEmptyForm();
-            if (open) {
-                setLookupOpen(true);
-            }
+        if (!open) {
+            return;
         }
-    }, [open, initialData]);
+
+        const timer = setTimeout(() => {
+            if (initialData) {
+                setQualificationDate(
+                    initialData.tanggal_prakualifikasi ||
+                        new Date().toISOString().split('T')[0],
+                );
+                setQualificationNumber(initialData.nomor_prakualifikasi || '');
+                setVendorId(initialData.vendor_id || null);
+                setVendorCode(initialData.kode_vendor || '');
+                setVendorName(initialData.nama_vendor || '');
+                setVendorType(initialData.jenis_vendor || '');
+                setPicName(initialData.nama_pic || '');
+                setTaxOrIdNumber(initialData.npwp_ktp || '');
+                setPhone(initialData.telepon || '');
+                setEmail(initialData.email || '');
+                setSocialMedia(initialData.media_sosial || '');
+                setAddress(initialData.alamat || '');
+                setVendorStatus(initialData.status_vendor || 'Vendor Resmi');
+                setLegalStatus(initialData.status_badan_hukum || 'Badan Hukum');
+                setQualificationStatus(
+                    initialData.status_kualifikasi || 'Lolos',
+                );
+                setLeadTime(initialData.waktu_kesediaan_item || '');
+                setEmployeeCount(
+                    initialData.jumlah_karyawan !== null &&
+                        initialData.jumlah_karyawan !== undefined
+                        ? String(initialData.jumlah_karyawan)
+                        : '',
+                );
+                setNotes(initialData.catatan || '');
+
+                const allDocs = initialData.dokumen || [];
+                const standardDocs: PrakualifikasiDokumenForm[] =
+                    STANDARD_DOCUMENTS.map((name, idx) => {
+                        const match = allDocs.find(
+                            (d) => d.nama_dokumen === name,
+                        );
+
+                        return {
+                            id: match?.id,
+                            kategori: 'wajib',
+                            urutan: idx + 1,
+                            nama_dokumen: name,
+                            ada: match ? Boolean(match.ada) : false,
+                            keterangan: match?.keterangan || '',
+                        };
+                    });
+                setDocumentList(standardDocs);
+
+                const extraDocs = allDocs
+                    .filter((d) => !STANDARD_DOCUMENTS.includes(d.nama_dokumen))
+                    .map((d, idx) => ({
+                        id: d.id,
+                        kategori: 'tambahan' as const,
+                        urutan: idx + 1,
+                        nama_dokumen: d.nama_dokumen,
+                        ada: Boolean(d.ada),
+                        keterangan: d.keterangan || '',
+                    }));
+                setAdditionalDocuments(extraDocs);
+
+                if (initialData.items && initialData.items.length > 0) {
+                    setItems(
+                        initialData.items.map((it, idx) => ({
+                            id: it.id,
+                            urutan: idx + 1,
+                            jenis_item: it.jenis_item || '',
+                            kode_item: it.kode_item || '',
+                            nama_item: it.nama_item || '',
+                            satuan: it.satuan || '',
+                            kesediaan: it.kesediaan || '',
+                            keterangan: it.keterangan || '',
+                        })),
+                    );
+                } else {
+                    setItems(getEmptyInitialItems());
+                }
+            } else {
+                resetToEmptyForm();
+
+                if (open) {
+                    setLookupOpen(true);
+                }
+            }
+        }, 0);
+
+        return () => clearTimeout(timer);
+    }, [open, initialData, resetToEmptyForm]);
 
     const handleSelectVendor = (v: VendorLookupItem) => {
         setVendorId(v.vendor_id || null);
         setVendorCode(v.kode_vendor || '');
         setVendorName(v.nama_vendor || '');
-        if (v.alamat) setAddress(v.alamat);
-        if (v.telepon) setPhone(v.telepon);
-        if (v.email) setEmail(v.email);
-        if (v.nama_pic) setPicName(v.nama_pic);
-        if (v.jenis_vendor) setVendorType(v.jenis_vendor);
-        if (v.status_badan_hukum) setLegalStatus(v.status_badan_hukum);
+
+        if (v.alamat) {
+            setAddress(v.alamat);
+        }
+
+        if (v.telepon) {
+            setPhone(v.telepon);
+        }
+
+        if (v.email) {
+            setEmail(v.email);
+        }
+
+        if (v.nama_pic) {
+            setPicName(v.nama_pic);
+        }
+
+        if (v.jenis_vendor) {
+            setVendorType(v.jenis_vendor);
+        }
+
+        if (v.status_badan_hukum) {
+            setLegalStatus(v.status_badan_hukum);
+        }
+
         if (v.items && v.items.length > 0) {
             setItems(
                 v.items.map((it, idx) => ({
@@ -387,6 +436,7 @@ export function PrakualifikasiFormModal({
                 })),
             );
         }
+
         toast.info(`Data vendor ${v.nama_vendor} berhasil dimuat.`);
     };
 
@@ -394,14 +444,7 @@ export function PrakualifikasiFormModal({
         setDocumentList((prev) => {
             const next = [...prev];
             next[index] = { ...next[index], ada: adaVal };
-            return next;
-        });
-    };
 
-    const handleDocKeteranganChange = (index: number, val: string) => {
-        setDocumentList((prev) => {
-            const next = [...prev];
-            next[index] = { ...next[index], keterangan: val };
             return next;
         });
     };
@@ -431,6 +474,7 @@ export function PrakualifikasiFormModal({
         setAdditionalDocuments((prev) => {
             const next = [...prev];
             next[index] = { ...next[index], [field]: val };
+
             return next;
         });
     };
@@ -453,8 +497,10 @@ export function PrakualifikasiFormModal({
     const handleRemoveItem = (index: number) => {
         if (items.length <= 1) {
             toast.error('Daftar item minimal memiliki 1 baris.');
+
             return;
         }
+
         setItems((prev) => prev.filter((_, i) => i !== index));
     };
 
@@ -466,6 +512,7 @@ export function PrakualifikasiFormModal({
         setItems((prev) => {
             const next = [...prev];
             next[index] = { ...next[index], [field]: value };
+
             return next;
         });
     };
@@ -477,6 +524,7 @@ export function PrakualifikasiFormModal({
             toast.error(
                 'Mohon lengkapi Kode Vendor/Supp dan Nama Vendor/Supp.',
             );
+
             return;
         }
 
@@ -512,6 +560,7 @@ export function PrakualifikasiFormModal({
         };
 
         setSubmitting(true);
+
         try {
             if (isEdit && initialData?.id) {
                 await api(`/prakualifikasi/${initialData.id}`, {
@@ -526,6 +575,7 @@ export function PrakualifikasiFormModal({
                 });
                 toast.success('Data prakualifikasi berhasil disimpan.');
             }
+
             onSuccess();
             onOpenChange(false);
         } catch (err) {
@@ -904,79 +954,72 @@ export function PrakualifikasiFormModal({
                                         </div>
                                     </CardHeader>
                                     <CardContent className="max-h-72 overflow-y-auto p-0">
-                                        <Table>
-                                            <TableHeader className="bg-muted/40 sticky top-0 z-10">
-                                                <TableRow className="h-7 text-xs">
-                                                    <TableHead className="w-10 text-center">
-                                                        No.
-                                                    </TableHead>
-                                                    <TableHead>
-                                                        Uraian
-                                                    </TableHead>
-                                                    <TableHead className="w-14 text-center">
-                                                        Ada
-                                                    </TableHead>
-                                                    <TableHead className="w-16 text-center">
-                                                        Tidak
-                                                    </TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {documentList.map(
-                                                    (doc, idx) => (
-                                                        <TableRow
-                                                            key={
-                                                                doc.nama_dokumen
-                                                            }
-                                                            className="h-7 text-xs"
-                                                        >
-                                                            <TableCell className="py-1 text-center font-mono">
-                                                                {idx + 1}
-                                                            </TableCell>
-                                                            <TableCell className="py-1 font-medium">
-                                                                {
+                                        <DataTable
+                                            scrollMode="inline"
+                                            showRowNumbers={false}
+                                            columns={standardDocColumns}
+                                            data={documentList}
+                                            getRowKey={(doc) =>
+                                                doc.nama_dokumen
+                                            }
+                                            renderRows={() => (
+                                                <>
+                                                    {documentList.map(
+                                                        (doc, idx) => (
+                                                            <TableRow
+                                                                key={
                                                                     doc.nama_dokumen
                                                                 }
-                                                            </TableCell>
-                                                            <TableCell className="py-1 text-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name={`doc-${idx}`}
-                                                                    checked={
-                                                                        doc.ada ===
-                                                                        true
+                                                                className="h-7 text-xs"
+                                                            >
+                                                                <TableCell className="py-1 text-center font-mono">
+                                                                    {idx + 1}
+                                                                </TableCell>
+                                                                <TableCell className="py-1 font-medium">
+                                                                    {
+                                                                        doc.nama_dokumen
                                                                     }
-                                                                    onChange={() =>
-                                                                        handleToggleDoc(
-                                                                            idx,
-                                                                            true,
-                                                                        )
-                                                                    }
-                                                                    className="text-primary h-3.5 w-3.5 cursor-pointer"
-                                                                />
-                                                            </TableCell>
-                                                            <TableCell className="py-1 text-center">
-                                                                <input
-                                                                    type="radio"
-                                                                    name={`doc-${idx}`}
-                                                                    checked={
-                                                                        doc.ada ===
-                                                                        false
-                                                                    }
-                                                                    onChange={() =>
-                                                                        handleToggleDoc(
-                                                                            idx,
-                                                                            false,
-                                                                        )
-                                                                    }
-                                                                    className="text-muted-foreground h-3.5 w-3.5 cursor-pointer"
-                                                                />
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ),
-                                                )}
-                                            </TableBody>
-                                        </Table>
+                                                                </TableCell>
+                                                                <TableCell className="py-1 text-center">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name={`doc-${idx}`}
+                                                                        checked={
+                                                                            doc.ada ===
+                                                                            true
+                                                                        }
+                                                                        onChange={() =>
+                                                                            handleToggleDoc(
+                                                                                idx,
+                                                                                true,
+                                                                            )
+                                                                        }
+                                                                        className="text-primary h-3.5 w-3.5 cursor-pointer"
+                                                                    />
+                                                                </TableCell>
+                                                                <TableCell className="py-1 text-center">
+                                                                    <input
+                                                                        type="radio"
+                                                                        name={`doc-${idx}`}
+                                                                        checked={
+                                                                            doc.ada ===
+                                                                            false
+                                                                        }
+                                                                        onChange={() =>
+                                                                            handleToggleDoc(
+                                                                                idx,
+                                                                                false,
+                                                                            )
+                                                                        }
+                                                                        className="text-muted-foreground h-3.5 w-3.5 cursor-pointer"
+                                                                    />
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        ),
+                                                    )}
+                                                </>
+                                            )}
+                                        />
                                     </CardContent>
                                 </Card>
 
@@ -1001,111 +1044,106 @@ export function PrakualifikasiFormModal({
                                             </div>
                                         </CardHeader>
                                         <CardContent className="max-h-36 overflow-y-auto p-0">
-                                            <Table>
-                                                <TableHeader className="bg-muted/40 sticky top-0 z-10">
-                                                    <TableRow className="h-7 text-xs">
-                                                        <TableHead className="w-10 text-center">
-                                                            No.
-                                                        </TableHead>
-                                                        <TableHead>
-                                                            Nama Dokumen
-                                                        </TableHead>
-                                                        <TableHead className="w-24">
-                                                            Ket.
-                                                        </TableHead>
-                                                        <TableHead className="w-10 text-center">
-                                                            Aksi
-                                                        </TableHead>
-                                                    </TableRow>
-                                                </TableHeader>
-                                                <TableBody>
-                                                    {additionalDocuments.length ===
-                                                    0 ? (
-                                                        <TableRow>
-                                                            <TableCell
-                                                                colSpan={4}
-                                                                className="text-muted-foreground py-4 text-center text-xs"
-                                                            >
-                                                                Belum ada
-                                                                dokumen
-                                                                tambahan. Klik
-                                                                Tambah Dokumen
-                                                                untuk mengisi.
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ) : (
-                                                        additionalDocuments.map(
-                                                            (doc, idx) => (
-                                                                <TableRow
-                                                                    key={idx}
-                                                                    className="h-7 text-xs"
+                                            <DataTable
+                                                scrollMode="inline"
+                                                showRowNumbers={false}
+                                                columns={additionalDocColumns}
+                                                data={additionalDocuments}
+                                                getRowKey={(_, idx) =>
+                                                    `extra-doc-${idx}`
+                                                }
+                                                renderRows={() => (
+                                                    <>
+                                                        {additionalDocuments.length ===
+                                                        0 ? (
+                                                            <TableRow>
+                                                                <TableCell
+                                                                    colSpan={4}
+                                                                    className="text-muted-foreground py-4 text-center text-xs"
                                                                 >
-                                                                    <TableCell className="py-1 text-center font-mono">
-                                                                        {idx +
-                                                                            1}
-                                                                    </TableCell>
-                                                                    <TableCell className="py-1">
-                                                                        <Input
-                                                                            value={
-                                                                                doc.nama_dokumen
-                                                                            }
-                                                                            onChange={(
-                                                                                e,
-                                                                            ) =>
-                                                                                handleExtraDocChange(
-                                                                                    idx,
-                                                                                    'nama_dokumen',
-                                                                                    e
-                                                                                        .target
-                                                                                        .value,
-                                                                                )
-                                                                            }
-                                                                            placeholder="Nama dokumen..."
-                                                                            className="h-6 text-xs"
-                                                                        />
-                                                                    </TableCell>
-                                                                    <TableCell className="py-1">
-                                                                        <Input
-                                                                            value={
-                                                                                doc.keterangan ||
-                                                                                ''
-                                                                            }
-                                                                            onChange={(
-                                                                                e,
-                                                                            ) =>
-                                                                                handleExtraDocChange(
-                                                                                    idx,
-                                                                                    'keterangan',
-                                                                                    e
-                                                                                        .target
-                                                                                        .value,
-                                                                                )
-                                                                            }
-                                                                            placeholder="Keterangan..."
-                                                                            className="h-6 text-xs"
-                                                                        />
-                                                                    </TableCell>
-                                                                    <TableCell className="py-1 text-center">
-                                                                        <Button
-                                                                            type="button"
-                                                                            variant="ghost"
-                                                                            size="sm"
-                                                                            onClick={() =>
-                                                                                handleRemoveExtraDoc(
-                                                                                    idx,
-                                                                                )
-                                                                            }
-                                                                            className="text-destructive hover:bg-destructive/10 h-6 w-6 p-0"
-                                                                        >
-                                                                            <Trash2 className="h-3 w-3" />
-                                                                        </Button>
-                                                                    </TableCell>
-                                                                </TableRow>
-                                                            ),
-                                                        )
-                                                    )}
-                                                </TableBody>
-                                            </Table>
+                                                                    Belum ada
+                                                                    dokumen
+                                                                    tambahan.
+                                                                    Klik Tambah
+                                                                    Dokumen
+                                                                    untuk
+                                                                    mengisi.
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        ) : (
+                                                            additionalDocuments.map(
+                                                                (doc, idx) => (
+                                                                    <TableRow
+                                                                        key={`extra-doc-${idx}`}
+                                                                        className="h-7 text-xs"
+                                                                    >
+                                                                        <TableCell className="py-1 text-center font-mono">
+                                                                            {idx +
+                                                                                1}
+                                                                        </TableCell>
+                                                                        <TableCell className="py-1">
+                                                                            <Input
+                                                                                value={
+                                                                                    doc.nama_dokumen
+                                                                                }
+                                                                                onChange={(
+                                                                                    e,
+                                                                                ) =>
+                                                                                    handleExtraDocChange(
+                                                                                        idx,
+                                                                                        'nama_dokumen',
+                                                                                        e
+                                                                                            .target
+                                                                                            .value,
+                                                                                    )
+                                                                                }
+                                                                                placeholder="Nama dokumen..."
+                                                                                className="h-6 text-xs"
+                                                                            />
+                                                                        </TableCell>
+                                                                        <TableCell className="py-1">
+                                                                            <Input
+                                                                                value={
+                                                                                    doc.keterangan ||
+                                                                                    ''
+                                                                                }
+                                                                                onChange={(
+                                                                                    e,
+                                                                                ) =>
+                                                                                    handleExtraDocChange(
+                                                                                        idx,
+                                                                                        'keterangan',
+                                                                                        e
+                                                                                            .target
+                                                                                            .value,
+                                                                                    )
+                                                                                }
+                                                                                placeholder="Keterangan..."
+                                                                                className="h-6 text-xs"
+                                                                            />
+                                                                        </TableCell>
+                                                                        <TableCell className="py-1 text-center">
+                                                                            <Button
+                                                                                type="button"
+                                                                                variant="ghost"
+                                                                                size="sm"
+                                                                                onClick={() =>
+                                                                                    handleRemoveExtraDoc(
+                                                                                        idx,
+                                                                                    )
+                                                                                }
+                                                                                className="text-destructive hover:bg-destructive/10 h-6 w-6 p-0"
+                                                                            >
+                                                                                <Trash2 className="h-3 w-3" />
+                                                                            </Button>
+                                                                        </TableCell>
+                                                                    </TableRow>
+                                                                ),
+                                                            )
+                                                        )}
+                                                    </>
+                                                )}
+                                            />
                                         </CardContent>
                                     </Card>
 
@@ -1149,143 +1187,127 @@ export function PrakualifikasiFormModal({
                                     </div>
                                 </CardHeader>
                                 <CardContent className="overflow-x-auto p-0">
-                                    <Table>
-                                        <TableHeader className="bg-muted/40">
-                                            <TableRow className="h-8 text-xs">
-                                                <TableHead className="w-12 text-center">
-                                                    No.
-                                                </TableHead>
-                                                <TableHead className="w-32 text-center">
-                                                    Jenis Item
-                                                </TableHead>
-                                                <TableHead className="w-32 text-center">
-                                                    Kode Item
-                                                </TableHead>
-                                                <TableHead className="text-center">
-                                                    Nama Item
-                                                </TableHead>
-                                                <TableHead className="w-28 text-center">
-                                                    Satuan
-                                                </TableHead>
-                                                <TableHead className="w-28 text-center">
-                                                    Kesediaan
-                                                </TableHead>
-                                                <TableHead className="w-12 text-center">
-                                                    Aksi
-                                                </TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {items.map((item, idx) => (
-                                                <TableRow
-                                                    key={idx}
-                                                    className="h-8 text-xs"
-                                                >
-                                                    <TableCell className="py-1 text-center font-mono">
-                                                        {idx + 1}
-                                                    </TableCell>
-                                                    <TableCell className="py-1">
-                                                        <Input
-                                                            value={
-                                                                item.jenis_item
-                                                            }
-                                                            onChange={(e) =>
-                                                                handleItemChange(
-                                                                    idx,
-                                                                    'jenis_item',
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                            placeholder="Obat / BMHP"
-                                                            className="h-7 text-center text-xs"
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell className="py-1">
-                                                        <Input
-                                                            value={
-                                                                item.kode_item
-                                                            }
-                                                            onChange={(e) =>
-                                                                handleItemChange(
-                                                                    idx,
-                                                                    'kode_item',
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                            placeholder="Kode..."
-                                                            className="h-7 text-center font-mono text-xs"
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell className="py-1">
-                                                        <Input
-                                                            value={
-                                                                item.nama_item
-                                                            }
-                                                            onChange={(e) =>
-                                                                handleItemChange(
-                                                                    idx,
-                                                                    'nama_item',
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                            placeholder="Nama item..."
-                                                            className="h-7 text-center text-xs font-medium"
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell className="py-1">
-                                                        <Input
-                                                            value={item.satuan}
-                                                            onChange={(e) =>
-                                                                handleItemChange(
-                                                                    idx,
-                                                                    'satuan',
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                            placeholder="Satuan..."
-                                                            className="h-7 text-center text-xs"
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell className="py-1">
-                                                        <Input
-                                                            value={
-                                                                item.kesediaan
-                                                            }
-                                                            onChange={(e) =>
-                                                                handleItemChange(
-                                                                    idx,
-                                                                    'kesediaan',
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                            placeholder="Kesediaan..."
-                                                            className="h-7 text-center font-mono text-xs"
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell className="py-1 text-center">
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                handleRemoveItem(
-                                                                    idx,
-                                                                )
-                                                            }
-                                                            className="text-destructive hover:bg-destructive/10 h-7 w-7 p-0"
-                                                        >
-                                                            <Trash2 className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
+                                    <DataTable
+                                        scrollMode="inline"
+                                        showRowNumbers={false}
+                                        columns={itemFormColumns}
+                                        data={items}
+                                        getRowKey={(_, idx) => `item-${idx}`}
+                                        renderRows={() => (
+                                            <>
+                                                {items.map((item, idx) => (
+                                                    <TableRow
+                                                        key={`item-${idx}`}
+                                                        className="h-8 text-xs"
+                                                    >
+                                                        <TableCell className="py-1 text-center font-mono">
+                                                            {idx + 1}
+                                                        </TableCell>
+                                                        <TableCell className="py-1">
+                                                            <Input
+                                                                value={
+                                                                    item.jenis_item
+                                                                }
+                                                                onChange={(e) =>
+                                                                    handleItemChange(
+                                                                        idx,
+                                                                        'jenis_item',
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                placeholder="Obat / BMHP"
+                                                                className="h-7 text-center text-xs"
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell className="py-1">
+                                                            <Input
+                                                                value={
+                                                                    item.kode_item
+                                                                }
+                                                                onChange={(e) =>
+                                                                    handleItemChange(
+                                                                        idx,
+                                                                        'kode_item',
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                placeholder="Kode..."
+                                                                className="h-7 text-center font-mono text-xs"
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell className="py-1">
+                                                            <Input
+                                                                value={
+                                                                    item.nama_item
+                                                                }
+                                                                onChange={(e) =>
+                                                                    handleItemChange(
+                                                                        idx,
+                                                                        'nama_item',
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                placeholder="Nama item..."
+                                                                className="h-7 text-center text-xs font-medium"
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell className="py-1">
+                                                            <Input
+                                                                value={
+                                                                    item.satuan
+                                                                }
+                                                                onChange={(e) =>
+                                                                    handleItemChange(
+                                                                        idx,
+                                                                        'satuan',
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                placeholder="Satuan..."
+                                                                className="h-7 text-center text-xs"
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell className="py-1">
+                                                            <Input
+                                                                value={
+                                                                    item.kesediaan
+                                                                }
+                                                                onChange={(e) =>
+                                                                    handleItemChange(
+                                                                        idx,
+                                                                        'kesediaan',
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                placeholder="Kesediaan..."
+                                                                className="h-7 text-center font-mono text-xs"
+                                                            />
+                                                        </TableCell>
+                                                        <TableCell className="py-1 text-center">
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    handleRemoveItem(
+                                                                        idx,
+                                                                    )
+                                                                }
+                                                                className="text-destructive hover:bg-destructive/10 h-7 w-7 p-0"
+                                                            >
+                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </>
+                                        )}
+                                    />
                                 </CardContent>
                             </Card>
                         </div>
