@@ -9,6 +9,5 @@ Route::get('metode-pembayaran', [MetodePembayaranController::class, 'index'])->n
 Route::post('metode-pembayaran', [MetodePembayaranController::class, 'store'])->name('procurement.metode-pembayaran.store');
 Route::get('metode-pembayaran/{id}', [MetodePembayaranController::class, 'show'])->name('procurement.metode-pembayaran.show');
 Route::put('metode-pembayaran/{id}', [MetodePembayaranController::class, 'update'])->name('procurement.metode-pembayaran.update');
-Route::patch('metode-pembayaran/{id}', [MetodePembayaranController::class, 'update']);
 Route::patch('metode-pembayaran/{id}/toggle-status', [MetodePembayaranController::class, 'toggleStatus'])->name('procurement.metode-pembayaran.toggle-status');
 Route::delete('metode-pembayaran/{id}', [MetodePembayaranController::class, 'destroy'])->name('procurement.metode-pembayaran.destroy');

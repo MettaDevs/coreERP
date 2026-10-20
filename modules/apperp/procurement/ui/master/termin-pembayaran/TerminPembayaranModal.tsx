@@ -1,16 +1,11 @@
+import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@apperp/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-} from '@apperp/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@apperp/ui/dialog';
 import { Input } from '@apperp/ui/input';
 import { Label } from '@apperp/ui/label';
 import { Textarea } from '@apperp/ui/textarea';
-import { Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
 import { api, toastSaveError } from '../../api';
 
 export type TerminPembayaranItem = {
@@ -42,29 +37,38 @@ export function TerminPembayaranModal({
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
-        if (editingItem) {
-            setKodeTermin(editingItem.kode_termin);
-            setNamaTerminBayar(editingItem.nama_termin_bayar);
-            setKeterangan(editingItem.keterangan || '');
-        } else {
-            setKodeTermin('');
-            setNamaTerminBayar('');
-            setKeterangan('');
-        }
+        const timer = setTimeout(() => {
+            if (editingItem) {
+                setKodeTermin(editingItem.kode_termin);
+                setNamaTerminBayar(editingItem.nama_termin_bayar);
+                setKeterangan(editingItem.keterangan || '');
+            } else {
+                setKodeTermin('');
+                setNamaTerminBayar('');
+                setKeterangan('');
+            }
+        }, 0);
+
+        return () => clearTimeout(timer);
     }, [editingItem, open]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
         if (!kodeTermin.trim()) {
             toast.error('Kode termin wajib diisi.');
+
             return;
         }
+
         if (!namaTerminBayar.trim()) {
             toast.error('Nama termin bayar wajib diisi.');
+
             return;
         }
 
         setSaving(true);
+
         try {
             if (editingItem) {
                 const res = await api<{
@@ -100,6 +104,7 @@ export function TerminPembayaranModal({
                 toast.success('Termin pembayaran berhasil ditambahkan.');
                 onSuccess(res.data, true);
             }
+
             onOpenChange(false);
         } catch (err) {
             toastSaveError(err, 'Gagal menyimpan termin pembayaran.');

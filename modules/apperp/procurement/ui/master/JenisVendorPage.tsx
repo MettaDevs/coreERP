@@ -1,22 +1,15 @@
+import {
+    Building,
+    Pencil,
+    Plus,
+    Power,
+    RefreshCw,
+    Search,
+    Trash2,
+    X,
+} from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { Badge } from '@apperp/ui/badge';
-import { Button } from '@apperp/ui/button';
-import { Card, CardContent, CardHeader } from '@apperp/ui/card';
-import {
-    Empty,
-    EmptyDescription,
-    EmptyHeader,
-    EmptyTitle,
-} from '@apperp/ui/empty';
-import { Input } from '@apperp/ui/input';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
+import { toast } from 'sonner';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -27,28 +20,31 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@apperp/ui/alert-dialog';
-
+import { Button } from '@apperp/ui/button';
+import { Card, CardContent, CardHeader } from '@apperp/ui/card';
+import { DataTable } from '@apperp/ui/data-table';
 import {
-    Building,
-    CheckCircle2,
-    MoreHorizontal,
-    Pencil,
-    Plus,
-    Power,
-    RefreshCw,
-    Search,
-    Trash2,
-    X,
-} from 'lucide-react';
-import { toast } from 'sonner';
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyTitle,
+} from '@apperp/ui/empty';
+import { Input } from '@apperp/ui/input';
+import { TableCell, TableRow } from '@apperp/ui/table';
 import { api, toastSaveError } from '../api';
-import {
-    JenisVendorModal,
-    type JenisVendorItem,
-} from './jenis-vendor/JenisVendorModal';
+import { JenisVendorModal } from './jenis-vendor/JenisVendorModal';
+import type { JenisVendorItem } from './jenis-vendor/JenisVendorModal';
+
+const jenisVendorColumns = [
+    { id: 'no', header: 'No', cell: () => null },
+    { id: 'kode_jenis', header: 'Kode Jenis', cell: () => null },
+    { id: 'nama_jenis_vendor', header: 'Nama Jenis Vendor', cell: () => null },
+    { id: 'keterangan', header: 'Keterangan', cell: () => null },
+    { id: 'aksi', header: 'Aksi', cell: () => null },
+];
 
 type PageProps = {
-    view: string;
+    view?: string;
     segments?: string[];
     permissions?: string[];
 };
@@ -60,11 +56,8 @@ type PaginationMeta = {
     total: number;
 };
 
-export default function JenisVendorPage({
-    view: _view,
-    segments: _segments,
-    permissions: _permissions,
-}: PageProps) {
+export default function JenisVendorPage(_props?: PageProps) {
+    void _props;
     const [items, setItems] = useState<JenisVendorItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -89,10 +82,14 @@ export default function JenisVendorPage({
     const fetchData = useCallback(
         async (page = 1) => {
             setLoading(true);
+
             try {
                 const params = new URLSearchParams();
                 params.set('page', String(page));
-                if (search.trim()) params.set('search', search.trim());
+
+                if (search.trim()) {
+                    params.set('search', search.trim());
+                }
 
                 const res = await api<{
                     status: string;
@@ -119,7 +116,11 @@ export default function JenisVendorPage({
     );
 
     useEffect(() => {
-        fetchData(1);
+        const timer = setTimeout(() => {
+            void fetchData(1);
+        }, 0);
+
+        return () => clearTimeout(timer);
     }, [fetchData]);
 
     const handleCreate = () => {
@@ -167,8 +168,12 @@ export default function JenisVendorPage({
     };
 
     const handleArchive = async () => {
-        if (!deleteId) return;
+        if (!deleteId) {
+            return;
+        }
+
         setDeleting(true);
+
         try {
             await api(`/jenis-vendor/${deleteId}`, {
                 method: 'DELETE',
@@ -203,19 +208,18 @@ export default function JenisVendorPage({
                         <span>Master Data</span>
                         <span>/</span>
                         <span className="text-foreground font-semibold">
-                            6. Jenis Vendor/Supplier
+                            6. Jenis Vendor
                         </span>
                     </div>
                     <div className="mt-1 flex items-center gap-2">
                         <Building className="text-primary h-6 w-6" />
                         <h1 className="text-foreground text-2xl font-bold tracking-tight">
-                            Jenis Vendor/Supplier
+                            Jenis Vendor / Supplier
                         </h1>
                     </div>
                     <p className="text-muted-foreground mt-0.5 text-xs">
-                        Klasifikasi bidang dan bentuk kemitraan rekanan
-                        pengadaan: Supplier, Distributor, Subkontraktor,
-                        Pabrikan, dll.
+                        Klasifikasi bidang dan kualifikasi usaha rekanan rekanan
+                        vendor serta mitra penyedia.
                     </p>
                 </div>
 
@@ -227,7 +231,7 @@ export default function JenisVendorPage({
                         className="bg-primary hover:bg-primary/90 text-primary-foreground h-9 font-medium shadow-sm"
                     >
                         <Plus className="mr-1.5 h-3.5 w-3.5" />
-                        Tambah Jenis Vendor
+                        Tambah Jenis
                     </Button>
                     <Button
                         variant="outline"
@@ -276,28 +280,14 @@ export default function JenisVendorPage({
 
                 <CardContent className="p-0">
                     {/* Tabel Daftar Jenis Vendor (5 Kolom) */}
-                    <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader className="bg-muted/40 border-b">
-                                <TableRow className="hover:bg-transparent">
-                                    <TableHead className="text-foreground w-12 border-r text-center text-xs font-bold">
-                                        No
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-48 border-r text-center text-xs font-bold">
-                                        Kode Jenis
-                                    </TableHead>
-                                    <TableHead className="text-foreground min-w-[200px] border-r text-center text-xs font-bold">
-                                        Nama Jenis Vendor
-                                    </TableHead>
-                                    <TableHead className="text-foreground min-w-[250px] border-r text-center text-xs font-bold">
-                                        Keterangan
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-72 text-center text-xs font-bold">
-                                        Aksi
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                    <DataTable
+                        scrollMode="inline"
+                        showRowNumbers={false}
+                        columns={jenisVendorColumns}
+                        data={items}
+                        getRowKey={(row) => row.id}
+                        renderRows={() => (
+                            <>
                                 {loading ? (
                                     <TableRow>
                                         <TableCell
@@ -421,9 +411,9 @@ export default function JenisVendorPage({
                                         </TableRow>
                                     ))
                                 )}
-                            </TableBody>
-                        </Table>
-                    </div>
+                            </>
+                        )}
+                    />
 
                     {/* Pagination Bar */}
                     {meta.last_page > 1 && (
@@ -463,7 +453,7 @@ export default function JenisVendorPage({
                 </CardContent>
             </Card>
 
-            {/* Modal Tambah/Ubah Jenis Vendor Sesuai Form Kanan Gambar */}
+            {/* Modal Tambah/Ubah Sesuai Form Kanan Gambar */}
             <JenisVendorModal
                 open={modalOpen}
                 onOpenChange={setModalOpen}
@@ -480,9 +470,9 @@ export default function JenisVendorPage({
                     <AlertDialogHeader>
                         <AlertDialogTitle>Hapus Jenis Vendor?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Apakah Anda yakin ingin menghapus jenis vendor ini?
-                            Data yang dihapus tidak akan tampil dalam pilihan
-                            klasifikasi rekanan baru.
+                            Apakah Anda yakin ingin menghapus data jenis vendor
+                            ini? Data yang dihapus tidak akan tampil dalam
+                            pilihan klasifikasi vendor baru.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

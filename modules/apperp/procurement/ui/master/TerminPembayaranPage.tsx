@@ -1,22 +1,15 @@
+import {
+    CalendarClock,
+    Pencil,
+    Plus,
+    Power,
+    RefreshCw,
+    Search,
+    Trash2,
+    X,
+} from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { Badge } from '@apperp/ui/badge';
-import { Button } from '@apperp/ui/button';
-import { Card, CardContent, CardHeader } from '@apperp/ui/card';
-import {
-    Empty,
-    EmptyDescription,
-    EmptyHeader,
-    EmptyTitle,
-} from '@apperp/ui/empty';
-import { Input } from '@apperp/ui/input';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
+import { toast } from 'sonner';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -27,27 +20,31 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@apperp/ui/alert-dialog';
-
+import { Button } from '@apperp/ui/button';
+import { Card, CardContent, CardHeader } from '@apperp/ui/card';
+import { DataTable } from '@apperp/ui/data-table';
 import {
-    CalendarClock,
-    MoreHorizontal,
-    Pencil,
-    Plus,
-    Power,
-    RefreshCw,
-    Search,
-    Trash2,
-    X,
-} from 'lucide-react';
-import { toast } from 'sonner';
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyTitle,
+} from '@apperp/ui/empty';
+import { Input } from '@apperp/ui/input';
+import { TableCell, TableRow } from '@apperp/ui/table';
 import { api, toastSaveError } from '../api';
-import {
-    TerminPembayaranModal,
-    type TerminPembayaranItem,
-} from './termin-pembayaran/TerminPembayaranModal';
+import { TerminPembayaranModal } from './termin-pembayaran/TerminPembayaranModal';
+import type { TerminPembayaranItem } from './termin-pembayaran/TerminPembayaranModal';
+
+const terminPembayaranColumns = [
+    { id: 'no', header: 'No', cell: () => null },
+    { id: 'kode_termin', header: 'Kode Termin', cell: () => null },
+    { id: 'nama_termin_bayar', header: 'Nama Termin Bayar', cell: () => null },
+    { id: 'keterangan', header: 'Keterangan', cell: () => null },
+    { id: 'aksi', header: 'Aksi', cell: () => null },
+];
 
 type PageProps = {
-    view: string;
+    view?: string;
     segments?: string[];
     permissions?: string[];
 };
@@ -59,11 +56,8 @@ type PaginationMeta = {
     total: number;
 };
 
-export default function TerminPembayaranPage({
-    view: _view,
-    segments: _segments,
-    permissions: _permissions,
-}: PageProps) {
+export default function TerminPembayaranPage(_props?: PageProps) {
+    void _props;
     const [items, setItems] = useState<TerminPembayaranItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -88,10 +82,14 @@ export default function TerminPembayaranPage({
     const fetchData = useCallback(
         async (page = 1) => {
             setLoading(true);
+
             try {
                 const params = new URLSearchParams();
                 params.set('page', String(page));
-                if (search.trim()) params.set('search', search.trim());
+
+                if (search.trim()) {
+                    params.set('search', search.trim());
+                }
 
                 const res = await api<{
                     status: string;
@@ -118,7 +116,11 @@ export default function TerminPembayaranPage({
     );
 
     useEffect(() => {
-        fetchData(1);
+        const timer = setTimeout(() => {
+            void fetchData(1);
+        }, 0);
+
+        return () => clearTimeout(timer);
     }, [fetchData]);
 
     const handleCreate = () => {
@@ -166,8 +168,12 @@ export default function TerminPembayaranPage({
     };
 
     const handleArchive = async () => {
-        if (!deleteId) return;
+        if (!deleteId) {
+            return;
+        }
+
         setDeleting(true);
+
         try {
             await api(`/termin-pembayaran/${deleteId}`, {
                 method: 'DELETE',
@@ -212,8 +218,8 @@ export default function TerminPembayaranPage({
                         </h1>
                     </div>
                     <p className="text-muted-foreground mt-0.5 text-xs">
-                        Jangka waktu, tahapan pembayaran uang muka (DP), dan
-                        jatuh tempo termin pelunasan rekanan.
+                        Ketentuan termin waktu jatuh tempo dan skema penagihan
+                        pelunasan komersial pengadaan.
                     </p>
                 </div>
 
@@ -225,7 +231,7 @@ export default function TerminPembayaranPage({
                         className="bg-primary hover:bg-primary/90 text-primary-foreground h-9 font-medium shadow-sm"
                     >
                         <Plus className="mr-1.5 h-3.5 w-3.5" />
-                        Tambah Termin Bayar
+                        Tambah Termin
                     </Button>
                     <Button
                         variant="outline"
@@ -274,28 +280,14 @@ export default function TerminPembayaranPage({
 
                 <CardContent className="p-0">
                     {/* Tabel Daftar Termin Pembayaran (5 Kolom) */}
-                    <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader className="bg-muted/40 border-b">
-                                <TableRow className="hover:bg-transparent">
-                                    <TableHead className="text-foreground w-12 border-r text-center text-xs font-bold">
-                                        No
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-48 border-r text-center text-xs font-bold">
-                                        Kode Termin
-                                    </TableHead>
-                                    <TableHead className="text-foreground min-w-[200px] border-r text-center text-xs font-bold">
-                                        Nama Termin Bayar
-                                    </TableHead>
-                                    <TableHead className="text-foreground min-w-[250px] border-r text-center text-xs font-bold">
-                                        Keterangan
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-72 text-center text-xs font-bold">
-                                        Aksi
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                    <DataTable
+                        scrollMode="inline"
+                        showRowNumbers={false}
+                        columns={terminPembayaranColumns}
+                        data={items}
+                        getRowKey={(row) => row.id}
+                        renderRows={() => (
+                            <>
                                 {loading ? (
                                     <TableRow>
                                         <TableCell
@@ -318,7 +310,7 @@ export default function TerminPembayaranPage({
                                                         Pembayaran
                                                     </EmptyTitle>
                                                     <EmptyDescription>
-                                                        Tambahkan termin
+                                                        Tambahkan skema termin
                                                         pembayaran baru dengan
                                                         menekan tombol{' '}
                                                         <strong>TAMBAH</strong>{' '}
@@ -332,7 +324,7 @@ export default function TerminPembayaranPage({
                                                         className="bg-blue-600 text-xs text-white hover:bg-blue-700"
                                                     >
                                                         <Plus className="mr-1.5 h-3.5 w-3.5" />
-                                                        Tambah Termin Bayar
+                                                        Tambah Termin
                                                     </Button>
                                                 </div>
                                             </Empty>
@@ -420,9 +412,9 @@ export default function TerminPembayaranPage({
                                         </TableRow>
                                     ))
                                 )}
-                            </TableBody>
-                        </Table>
-                    </div>
+                            </>
+                        )}
+                    />
 
                     {/* Pagination Bar */}
                     {meta.last_page > 1 && (
@@ -462,7 +454,7 @@ export default function TerminPembayaranPage({
                 </CardContent>
             </Card>
 
-            {/* Modal Tambah/Ubah Termin Bayar Sesuai Form Kanan Gambar */}
+            {/* Modal Tambah/Ubah Sesuai Form Kanan Gambar */}
             <TerminPembayaranModal
                 open={modalOpen}
                 onOpenChange={setModalOpen}
@@ -483,7 +475,7 @@ export default function TerminPembayaranPage({
                         <AlertDialogDescription>
                             Apakah Anda yakin ingin menghapus termin pembayaran
                             ini? Data yang dihapus tidak akan tampil dalam
-                            pilihan transaksi belanja pengadaan baru.
+                            pilihan transaksi pengadaan baru.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

@@ -1,22 +1,15 @@
+import {
+    FolderKanban,
+    Pencil,
+    Plus,
+    Power,
+    RefreshCw,
+    Search,
+    Trash2,
+    X,
+} from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { Badge } from '@apperp/ui/badge';
-import { Button } from '@apperp/ui/button';
-import { Card, CardContent, CardHeader } from '@apperp/ui/card';
-import {
-    Empty,
-    EmptyDescription,
-    EmptyHeader,
-    EmptyTitle,
-} from '@apperp/ui/empty';
-import { Input } from '@apperp/ui/input';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
+import { toast } from 'sonner';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -27,32 +20,35 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@apperp/ui/alert-dialog';
-
+import { Button } from '@apperp/ui/button';
+import { Card, CardContent, CardHeader } from '@apperp/ui/card';
+import { DataTable } from '@apperp/ui/data-table';
 import {
-    CheckCircle2,
-    FolderKanban,
-    MoreHorizontal,
-    Pencil,
-    Plus,
-    PlusCircle,
-    Power,
-    RefreshCw,
-    Search,
-    ToggleLeft,
-    ToggleRight,
-    Trash2,
-    X,
-    XCircle,
-} from 'lucide-react';
-import { toast } from 'sonner';
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyTitle,
+} from '@apperp/ui/empty';
+import { Input } from '@apperp/ui/input';
+import { TableCell, TableRow } from '@apperp/ui/table';
 import { api, toastSaveError } from '../api';
-import {
-    KategoriPengadaanModal,
-    type KategoriPengadaanItem,
-} from './kategori-pengadaan/KategoriPengadaanModal';
+import { KategoriPengadaanModal } from './kategori-pengadaan/KategoriPengadaanModal';
+import type { KategoriPengadaanItem } from './kategori-pengadaan/KategoriPengadaanModal';
+
+const kategoriPengadaanColumns = [
+    { id: 'no', header: 'No', cell: () => null },
+    { id: 'kode_pengadaan', header: 'Kode Pengadaan', cell: () => null },
+    {
+        id: 'kategori_pengadaan',
+        header: 'Kategori Pengadaan',
+        cell: () => null,
+    },
+    { id: 'keterangan', header: 'Keterangan', cell: () => null },
+    { id: 'aksi', header: 'Aksi', cell: () => null },
+];
 
 type PageProps = {
-    view: string;
+    view?: string;
     segments?: string[];
     permissions?: string[];
 };
@@ -64,11 +60,8 @@ type PaginationMeta = {
     total: number;
 };
 
-export default function KategoriPengadaanPage({
-    view: _view,
-    segments: _segments,
-    permissions: _permissions,
-}: PageProps) {
+export default function KategoriPengadaanPage(_props?: PageProps) {
+    void _props;
     const [items, setItems] = useState<KategoriPengadaanItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -92,10 +85,14 @@ export default function KategoriPengadaanPage({
     const fetchData = useCallback(
         async (page = 1) => {
             setLoading(true);
+
             try {
                 const params = new URLSearchParams();
                 params.set('page', String(page));
-                if (search.trim()) params.set('search', search.trim());
+
+                if (search.trim()) {
+                    params.set('search', search.trim());
+                }
 
                 const res = await api<{
                     status: string;
@@ -122,7 +119,11 @@ export default function KategoriPengadaanPage({
     );
 
     useEffect(() => {
-        fetchData(1);
+        const timer = setTimeout(() => {
+            void fetchData(1);
+        }, 0);
+
+        return () => clearTimeout(timer);
     }, [fetchData]);
 
     const handleCreate = () => {
@@ -170,8 +171,12 @@ export default function KategoriPengadaanPage({
     };
 
     const handleArchive = async () => {
-        if (!deleteId) return;
+        if (!deleteId) {
+            return;
+        }
+
         setDeleting(true);
+
         try {
             await api(`/kategori-pengadaan/${deleteId}`, {
                 method: 'DELETE',
@@ -278,28 +283,14 @@ export default function KategoriPengadaanPage({
 
                 <CardContent className="p-0">
                     {/* Tabel Daftar Kategori Pengadaan (5 Kolom) */}
-                    <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader className="bg-muted/40 border-b">
-                                <TableRow className="hover:bg-transparent">
-                                    <TableHead className="text-foreground w-12 border-r text-center text-xs font-bold">
-                                        No
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-48 border-r text-center text-xs font-bold">
-                                        Kode Pengadaan
-                                    </TableHead>
-                                    <TableHead className="text-foreground min-w-[200px] border-r text-center text-xs font-bold">
-                                        Kategori Pengadaan
-                                    </TableHead>
-                                    <TableHead className="text-foreground min-w-[250px] border-r text-center text-xs font-bold">
-                                        Keterangan
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-72 text-center text-xs font-bold">
-                                        Aksi
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                    <DataTable
+                        scrollMode="inline"
+                        showRowNumbers={false}
+                        columns={kategoriPengadaanColumns}
+                        data={items}
+                        getRowKey={(row) => row.id}
+                        renderRows={() => (
+                            <>
                                 {loading ? (
                                     <TableRow>
                                         <TableCell
@@ -424,9 +415,9 @@ export default function KategoriPengadaanPage({
                                         </TableRow>
                                     ))
                                 )}
-                            </TableBody>
-                        </Table>
-                    </div>
+                            </>
+                        )}
+                    />
 
                     {/* Pagination Bar */}
                     {meta.last_page > 1 && (
