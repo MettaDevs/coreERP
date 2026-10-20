@@ -9,6 +9,5 @@ Route::get('item-subkont', [ItemSubkontController::class, 'index'])->name('procu
 Route::post('item-subkont', [ItemSubkontController::class, 'store'])->name('procurement.item-subkont.store');
 Route::get('item-subkont/{id}', [ItemSubkontController::class, 'show'])->name('procurement.item-subkont.show');
 Route::put('item-subkont/{id}', [ItemSubkontController::class, 'update'])->name('procurement.item-subkont.update');
-Route::patch('item-subkont/{id}', [ItemSubkontController::class, 'update']);
 Route::patch('item-subkont/{id}/toggle-status', [ItemSubkontController::class, 'toggleStatus'])->name('procurement.item-subkont.toggle-status');
 Route::delete('item-subkont/{id}', [ItemSubkontController::class, 'destroy'])->name('procurement.item-subkont.destroy');

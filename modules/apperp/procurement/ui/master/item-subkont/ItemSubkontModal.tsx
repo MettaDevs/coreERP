@@ -1,11 +1,11 @@
+import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@apperp/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@apperp/ui/dialog';
 import { Input } from '@apperp/ui/input';
 import { Label } from '@apperp/ui/label';
 import { Textarea } from '@apperp/ui/textarea';
-import { Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
 import { api, toastSaveError } from '../../api';
 
 export type ItemSubkontRecord = {
@@ -39,35 +39,46 @@ export function ItemSubkontModal({
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
-        if (editingItem) {
-            setKodeSubkont(editingItem.kode_subkont);
-            setNamaSubkont(editingItem.nama_subkont);
-            setSatuan(editingItem.satuan);
-            setKeterangan(editingItem.keterangan || '');
-        } else {
-            setKodeSubkont('');
-            setNamaSubkont('');
-            setSatuan('');
-            setKeterangan('');
-        }
+        const timer = setTimeout(() => {
+            if (editingItem) {
+                setKodeSubkont(editingItem.kode_subkont);
+                setNamaSubkont(editingItem.nama_subkont);
+                setSatuan(editingItem.satuan);
+                setKeterangan(editingItem.keterangan || '');
+            } else {
+                setKodeSubkont('');
+                setNamaSubkont('');
+                setSatuan('');
+                setKeterangan('');
+            }
+        }, 0);
+
+        return () => clearTimeout(timer);
     }, [editingItem, open]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
         if (!kodeSubkont.trim()) {
             toast.error('Kode subkont wajib diisi.');
+
             return;
         }
+
         if (!namaSubkont.trim()) {
             toast.error('Nama subkont wajib diisi.');
+
             return;
         }
+
         if (!satuan.trim()) {
             toast.error('Satuan wajib diisi.');
+
             return;
         }
 
         setSaving(true);
+
         try {
             if (editingItem) {
                 const res = await api<{
@@ -105,6 +116,7 @@ export function ItemSubkontModal({
                 toast.success('Item subkontraktor berhasil ditambahkan.');
                 onSuccess(res.data, true);
             }
+
             onOpenChange(false);
         } catch (err) {
             toastSaveError(err, 'Gagal menyimpan item subkontraktor.');

@@ -1,3 +1,4 @@
+import { CheckCircle2, HardHat, Pencil, XCircle } from 'lucide-react';
 import { Button } from '@apperp/ui/button';
 import {
     Dialog,
@@ -5,7 +6,6 @@ import {
     DialogFooter,
     DialogTitle,
 } from '@apperp/ui/dialog';
-import { CheckCircle2, HardHat, Pencil, XCircle } from 'lucide-react';
 import type { ItemSubkontRecord } from './ItemSubkontModal';
 
 type Props = {
@@ -21,7 +21,9 @@ export function ItemSubkontDetailModal({
     item,
     onEdit,
 }: Props) {
-    if (!item) return null;
+    if (!item) {
+        return null;
+    }
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>

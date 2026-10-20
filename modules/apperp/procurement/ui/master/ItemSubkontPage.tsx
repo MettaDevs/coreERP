@@ -1,22 +1,16 @@
+import {
+    Eye,
+    HardHat,
+    Pencil,
+    Plus,
+    Power,
+    RefreshCw,
+    Search,
+    Trash2,
+    X,
+} from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { Badge } from '@apperp/ui/badge';
-import { Button } from '@apperp/ui/button';
-import { Card, CardContent, CardHeader } from '@apperp/ui/card';
-import {
-    Empty,
-    EmptyDescription,
-    EmptyHeader,
-    EmptyTitle,
-} from '@apperp/ui/empty';
-import { Input } from '@apperp/ui/input';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
+import { toast } from 'sonner';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -27,29 +21,32 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@apperp/ui/alert-dialog';
-
+import { Button } from '@apperp/ui/button';
+import { Card, CardContent, CardHeader } from '@apperp/ui/card';
+import { DataTable } from '@apperp/ui/data-table';
 import {
-    Eye,
-    HardHat,
-    MoreHorizontal,
-    Pencil,
-    Plus,
-    Power,
-    RefreshCw,
-    Search,
-    Trash2,
-    X,
-} from 'lucide-react';
-import { toast } from 'sonner';
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyTitle,
+} from '@apperp/ui/empty';
+import { Input } from '@apperp/ui/input';
+import { TableCell, TableRow } from '@apperp/ui/table';
 import { api, toastSaveError } from '../api';
-import {
-    ItemSubkontModal,
-    type ItemSubkontRecord,
-} from './item-subkont/ItemSubkontModal';
 import { ItemSubkontDetailModal } from './item-subkont/ItemSubkontDetailModal';
+import { ItemSubkontModal } from './item-subkont/ItemSubkontModal';
+import type { ItemSubkontRecord } from './item-subkont/ItemSubkontModal';
+
+const itemSubkontColumns = [
+    { id: 'no', header: 'No.', cell: () => null },
+    { id: 'kode_subkont', header: 'Kode Subkont', cell: () => null },
+    { id: 'nama_subkont', header: 'Nama Subkont', cell: () => null },
+    { id: 'satuan', header: 'Satuan', cell: () => null },
+    { id: 'aksi', header: 'Aksi', cell: () => null },
+];
 
 type PageProps = {
-    view: string;
+    view?: string;
     segments?: string[];
     permissions?: string[];
 };
@@ -61,11 +58,8 @@ type PaginationMeta = {
     total: number;
 };
 
-export default function ItemSubkontPage({
-    view: _view,
-    segments: _segments,
-    permissions: _permissions,
-}: PageProps) {
+export default function ItemSubkontPage(_props?: PageProps) {
+    void _props;
     const [items, setItems] = useState<ItemSubkontRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -96,10 +90,14 @@ export default function ItemSubkontPage({
     const fetchData = useCallback(
         async (page = 1) => {
             setLoading(true);
+
             try {
                 const params = new URLSearchParams();
                 params.set('page', String(page));
-                if (search.trim()) params.set('search', search.trim());
+
+                if (search.trim()) {
+                    params.set('search', search.trim());
+                }
 
                 const res = await api<{
                     status: string;
@@ -108,9 +106,14 @@ export default function ItemSubkontPage({
                 }>(`/item-subkont?${params.toString()}`);
 
                 setItems(res.data || []);
-                if (res.meta) {
-                    setMeta(res.meta);
-                }
+                setMeta(
+                    res.meta || {
+                        current_page: 1,
+                        last_page: 1,
+                        per_page: 15,
+                        total: res.data?.length || 0,
+                    },
+                );
             } catch (err) {
                 toastSaveError(err, 'Gagal memuat daftar item subkontraktor.');
             } finally {
@@ -122,8 +125,9 @@ export default function ItemSubkontPage({
 
     useEffect(() => {
         const timer = setTimeout(() => {
-            fetchData(1);
-        }, 250);
+            void fetchData(1);
+        }, 0);
+
         return () => clearTimeout(timer);
     }, [fetchData]);
 
@@ -172,8 +176,12 @@ export default function ItemSubkontPage({
     };
 
     const handleArchive = async () => {
-        if (!deleteId) return;
+        if (!deleteId) {
+            return;
+        }
+
         setDeleting(true);
+
         try {
             await api(`/item-subkont/${deleteId}`, {
                 method: 'DELETE',
@@ -290,155 +298,144 @@ export default function ItemSubkontPage({
                     </div>
 
                     {/* Tabel Daftar Item Subkont (5 Kolom) */}
-                    <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader className="bg-muted/40 border-b">
-                                <TableRow className="hover:bg-transparent">
-                                    <TableHead className="text-foreground w-12 border-r text-center text-xs font-bold">
-                                        No.
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-40 border-r text-center text-xs font-bold">
-                                        Kode Subkont
-                                    </TableHead>
-                                    <TableHead className="text-foreground min-w-[240px] border-r text-center text-xs font-bold">
-                                        Nama Subkont
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-28 border-r text-center text-xs font-bold">
-                                        Satuan
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-72 text-center text-xs font-bold">
-                                        Aksi
-                                    </TableHead>
+                    <DataTable
+                        scrollMode="inline"
+                        showRowNumbers={false}
+                        columns={itemSubkontColumns}
+                        data={items}
+                        getRowKey={(row) => row.id}
+                        renderRows={() =>
+                            loading ? (
+                                <TableRow>
+                                    <TableCell
+                                        colSpan={5}
+                                        className="text-muted-foreground py-12 text-center text-sm"
+                                    >
+                                        Memuat daftar item subkontraktor...
+                                    </TableCell>
                                 </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {loading ? (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={5}
-                                            className="text-muted-foreground py-12 text-center text-sm"
-                                        >
-                                            Memuat daftar item subkontraktor...
+                            ) : items.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="py-12">
+                                        <Empty>
+                                            <EmptyHeader>
+                                                <EmptyTitle>
+                                                    Belum Ada Item Subkontraktor
+                                                </EmptyTitle>
+                                                <EmptyDescription>
+                                                    Tambahkan item subkontraktor
+                                                    baru dengan menekan tombol{' '}
+                                                    <strong>Tambah</strong> di
+                                                    atas.
+                                                </EmptyDescription>
+                                            </EmptyHeader>
+                                            <div className="mt-4 flex justify-center">
+                                                <Button
+                                                    size="sm"
+                                                    onClick={handleCreate}
+                                                    className="bg-blue-600 text-xs text-white hover:bg-blue-700"
+                                                >
+                                                    <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                                    Tambah Item Subkont
+                                                </Button>
+                                            </div>
+                                        </Empty>
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                items.map((row, idx) => (
+                                    <TableRow
+                                        key={row.id}
+                                        className="hover:bg-muted/50 border-b text-xs transition-colors"
+                                    >
+                                        {/* 1. No */}
+                                        <TableCell className="text-muted-foreground border-r text-center font-medium">
+                                            {(meta.current_page - 1) *
+                                                meta.per_page +
+                                                idx +
+                                                1}
+                                        </TableCell>
+
+                                        {/* 2. Kode Subkont */}
+                                        <TableCell className="text-foreground border-r text-center font-mono font-medium">
+                                            {row.kode_subkont}
+                                        </TableCell>
+
+                                        {/* 3. Nama Subkont */}
+                                        <TableCell className="text-foreground border-r px-4 font-bold">
+                                            {row.nama_subkont}
+                                        </TableCell>
+
+                                        {/* 4. Satuan */}
+                                        <TableCell className="text-muted-foreground border-r text-center font-medium">
+                                            {row.satuan}
+                                        </TableCell>
+
+                                        {/* 5. Aksi (Lihat, Edit, Hapus, Aktif/Non Aktif) */}
+                                        <TableCell className="whitespace-nowrap p-2 text-center">
+                                            <div className="flex items-center justify-center gap-1.5">
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        handleView(row)
+                                                    }
+                                                    className="h-7 border-blue-200 px-2.5 text-xs font-medium text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-900 dark:hover:bg-blue-950"
+                                                >
+                                                    <Eye className="mr-1 h-3.5 w-3.5" />
+                                                    Lihat
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        handleEdit(row)
+                                                    }
+                                                    className="h-7 border-amber-200 px-2.5 text-xs font-medium text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:border-amber-900 dark:hover:bg-amber-950"
+                                                >
+                                                    <Pencil className="mr-1 h-3.5 w-3.5" />
+                                                    Edit
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        setDeleteId(row.id)
+                                                    }
+                                                    className="h-7 border-rose-200 px-2.5 text-xs font-medium text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:border-rose-900 dark:hover:bg-rose-950"
+                                                >
+                                                    <Trash2 className="mr-1 h-3.5 w-3.5" />
+                                                    Hapus
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        handleToggleStatus(row)
+                                                    }
+                                                    title={`Status: ${row.aktif ? 'Aktif' : 'Non Aktif'} (Klik untuk ubah status)`}
+                                                    className={`h-7 px-2.5 text-xs font-medium transition-colors ${
+                                                        row.aktif
+                                                            ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400'
+                                                            : 'border-slate-300 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400'
+                                                    }`}
+                                                >
+                                                    <Power className="mr-1 h-3.5 w-3.5" />
+                                                    {row.aktif
+                                                        ? 'Aktif'
+                                                        : 'Non Aktif'}
+                                                </Button>
+                                            </div>
                                         </TableCell>
                                     </TableRow>
-                                ) : items.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={5}
-                                            className="py-12"
-                                        >
-                                            <Empty>
-                                                <EmptyHeader>
-                                                    <EmptyTitle>
-                                                        Belum Ada Item
-                                                        Subkontraktor
-                                                    </EmptyTitle>
-                                                    <EmptyDescription>
-                                                        Tambahkan item
-                                                        subkontraktor baru
-                                                        dengan menekan tombol{' '}
-                                                        <strong>Tambah</strong>{' '}
-                                                        di atas.
-                                                    </EmptyDescription>
-                                                </EmptyHeader>
-                                                <div className="mt-4 flex justify-center">
-                                                    <Button
-                                                        size="sm"
-                                                        onClick={handleCreate}
-                                                        className="bg-blue-600 text-xs text-white hover:bg-blue-700"
-                                                    >
-                                                        <Plus className="mr-1.5 h-3.5 w-3.5" />
-                                                        Tambah Item Subkont
-                                                    </Button>
-                                                </div>
-                                            </Empty>
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    items.map((row, idx) => (
-                                        <TableRow
-                                            key={row.id}
-                                            className="hover:bg-muted/50 border-b text-xs transition-colors"
-                                        >
-                                            {/* 1. No */}
-                                            <TableCell className="text-muted-foreground border-r text-center font-medium">
-                                                {(meta.current_page - 1) *
-                                                    meta.per_page +
-                                                    idx +
-                                                    1}
-                                            </TableCell>
-
-                                            {/* 2. Kode Subkont */}
-                                            <TableCell className="text-foreground border-r text-center font-mono font-medium">
-                                                {row.kode_subkont}
-                                            </TableCell>
-
-                                            {/* 3. Nama Subkont */}
-                                            <TableCell className="text-foreground border-r px-4 font-bold">
-                                                {row.nama_subkont}
-                                            </TableCell>
-
-                                            {/* 4. Satuan */}
-                                            <TableCell className="text-muted-foreground border-r text-center font-medium">
-                                                {row.satuan}
-                                            </TableCell>
-
-                                            {/* 5. Aksi (Edit, Hapus, Aktif/Non Aktif) */}
-                                            <TableCell className="whitespace-nowrap p-2 text-center">
-                                                <div className="flex items-center justify-center gap-1.5">
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            handleEdit(row)
-                                                        }
-                                                        className="h-7 border-amber-200 px-2.5 text-xs font-medium text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:border-amber-900 dark:hover:bg-amber-950"
-                                                    >
-                                                        <Pencil className="mr-1 h-3.5 w-3.5" />
-                                                        Edit
-                                                    </Button>
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            setDeleteId(row.id)
-                                                        }
-                                                        className="h-7 border-rose-200 px-2.5 text-xs font-medium text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:border-rose-900 dark:hover:bg-rose-950"
-                                                    >
-                                                        <Trash2 className="mr-1 h-3.5 w-3.5" />
-                                                        Hapus
-                                                    </Button>
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            handleToggleStatus(
-                                                                row,
-                                                            )
-                                                        }
-                                                        title={`Status: ${row.aktif ? 'Aktif' : 'Non Aktif'} (Klik untuk ubah status)`}
-                                                        className={`h-7 px-2.5 text-xs font-medium transition-colors ${
-                                                            row.aktif
-                                                                ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400'
-                                                                : 'border-slate-300 bg-slate-50 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400'
-                                                        }`}
-                                                    >
-                                                        <Power className="mr-1 h-3.5 w-3.5" />
-                                                        {row.aktif
-                                                            ? 'Aktif'
-                                                            : 'Non Aktif'}
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </div>
+                                ))
+                            )
+                        }
+                    />
 
                     {/* Pagination Bar */}
                     {meta.last_page > 1 && (
@@ -478,7 +475,7 @@ export default function ItemSubkontPage({
                 </CardContent>
             </Card>
 
-            {/* Modal Tambah/Ubah Item Subkont Sesuai Form Kanan Gambar */}
+            {/* Modal Tambah/Ubah Item Subkont */}
             <ItemSubkontModal
                 open={formModalOpen}
                 onOpenChange={setFormModalOpen}
