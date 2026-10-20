@@ -38,15 +38,19 @@ import { PrakualifikasiFormModal } from './prakualifikasi/PrakualifikasiFormModa
 import type { PrakualifikasiFormData } from './prakualifikasi/PrakualifikasiFormModal';
 
 const prakualifikasiColumns = [
-    { id: 'no', header: 'No.' },
-    { id: 'info', header: 'Info Prakualifikasi' },
-    { id: 'kode_vendor', header: 'Kode Vendor/Supplier' },
-    { id: 'nama_vendor', header: 'Nama Vendor/Supplier' },
-    { id: 'pic', header: 'Contact Person' },
-    { id: 'telepon', header: 'Telp/HP' },
-    { id: 'alamat', header: 'Alamat Vendor/Supplier' },
-    { id: 'status_vendor', header: 'Status Vendor/Supplier' },
-    { id: 'status_kualifikasi', header: 'Status Kualifikasi' },
+    { id: 'no', header: 'No.', cell: () => null },
+    { id: 'info', header: 'Info Prakualifikasi', cell: () => null },
+    { id: 'kode_vendor', header: 'Kode Vendor/Supplier', cell: () => null },
+    { id: 'nama_vendor', header: 'Nama Vendor/Supplier', cell: () => null },
+    { id: 'pic', header: 'Contact Person', cell: () => null },
+    { id: 'telepon', header: 'Telp/HP', cell: () => null },
+    { id: 'alamat', header: 'Alamat Vendor/Supplier', cell: () => null },
+    { id: 'status_vendor', header: 'Status Vendor/Supplier', cell: () => null },
+    {
+        id: 'status_kualifikasi',
+        header: 'Status Kualifikasi',
+        cell: () => null,
+    },
 ];
 
 type PrakualifikasiRow = PrakualifikasiFormData & {
@@ -81,7 +85,14 @@ function formatDisplayDate(dateStr: string): string {
     return dateStr;
 }
 
-export default function PrakualifikasiPage() {
+type PageProps = {
+    view?: string;
+    segments?: string[];
+    permissions?: string[];
+};
+
+export default function PrakualifikasiPage(_props?: PageProps) {
+    void _props;
     const [items, setItems] = useState<PrakualifikasiRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -99,8 +110,9 @@ export default function PrakualifikasiPage() {
     const [editingItem, setEditingItem] =
         useState<PrakualifikasiFormData | null>(null);
     const [detailOpen, setDetailOpen] = useState(false);
-    const [viewingItem, setViewingItem] =
-        useState<PrakualifikasiFormData | null>(null);
+    const [viewingItem, setViewingItem] = useState<PrakualifikasiRow | null>(
+        null,
+    );
 
     // Archive / delete dialog
     const [deleteId, setDeleteId] = useState<string | null>(null);

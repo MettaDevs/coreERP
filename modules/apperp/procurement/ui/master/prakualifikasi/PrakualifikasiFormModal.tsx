@@ -30,27 +30,27 @@ import { VendorLookupModal } from './VendorLookupModal';
 import type { VendorLookupItem } from './VendorLookupModal';
 
 const standardDocColumns = [
-    { id: 'no', header: 'No.' },
-    { id: 'uraian', header: 'Uraian' },
-    { id: 'ada', header: 'Ada' },
-    { id: 'tidak', header: 'Tidak' },
+    { id: 'no', header: 'No.', cell: () => null },
+    { id: 'uraian', header: 'Uraian', cell: () => null },
+    { id: 'ada', header: 'Ada', cell: () => null },
+    { id: 'tidak', header: 'Tidak', cell: () => null },
 ];
 
 const additionalDocColumns = [
-    { id: 'no', header: 'No.' },
-    { id: 'nama_dokumen', header: 'Nama Dokumen' },
-    { id: 'keterangan', header: 'Ket.' },
-    { id: 'aksi', header: 'Aksi' },
+    { id: 'no', header: 'No.', cell: () => null },
+    { id: 'nama_dokumen', header: 'Nama Dokumen', cell: () => null },
+    { id: 'keterangan', header: 'Ket.', cell: () => null },
+    { id: 'aksi', header: 'Aksi', cell: () => null },
 ];
 
 const itemFormColumns = [
-    { id: 'no', header: 'No.' },
-    { id: 'jenis_item', header: 'Jenis Item' },
-    { id: 'kode_item', header: 'Kode Item' },
-    { id: 'nama_item', header: 'Nama Item' },
-    { id: 'satuan', header: 'Satuan' },
-    { id: 'kesediaan', header: 'Kesediaan' },
-    { id: 'aksi', header: 'Aksi' },
+    { id: 'no', header: 'No.', cell: () => null },
+    { id: 'jenis_item', header: 'Jenis Item', cell: () => null },
+    { id: 'kode_item', header: 'Kode Item', cell: () => null },
+    { id: 'nama_item', header: 'Nama Item', cell: () => null },
+    { id: 'satuan', header: 'Satuan', cell: () => null },
+    { id: 'kesediaan', header: 'Kesediaan', cell: () => null },
+    { id: 'aksi', header: 'Aksi', cell: () => null },
 ];
 
 export type PrakualifikasiDokumenForm = {
@@ -1049,8 +1049,10 @@ export function PrakualifikasiFormModal({
                                                 showRowNumbers={false}
                                                 columns={additionalDocColumns}
                                                 data={additionalDocuments}
-                                                getRowKey={(_, idx) =>
-                                                    `extra-doc-${idx}`
+                                                getRowKey={(doc) =>
+                                                    doc.id ||
+                                                    doc.nama_dokumen ||
+                                                    doc.urutan
                                                 }
                                                 renderRows={() => (
                                                     <>
@@ -1192,7 +1194,12 @@ export function PrakualifikasiFormModal({
                                         showRowNumbers={false}
                                         columns={itemFormColumns}
                                         data={items}
-                                        getRowKey={(_, idx) => `item-${idx}`}
+                                        getRowKey={(item) =>
+                                            item.id ||
+                                            item.kode_item ||
+                                            item.nama_item ||
+                                            item.urutan
+                                        }
                                         renderRows={() => (
                                             <>
                                                 {items.map((item, idx) => (
