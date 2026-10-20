@@ -128,7 +128,9 @@ export function errorMessage(caught: unknown, fallback: string): string {
 
 export function toastSaveError(caught: unknown, fallback: string): void {
     if (caught instanceof ApiError && caught.status >= 500) {
-        toast.error(`${fallback} Terjadi kendala sistem. Silakan coba kembali nanti.`);
+        toast.error(
+            `${fallback} Terjadi kendala sistem. Silakan coba kembali nanti.`,
+        );
         return;
     }
 

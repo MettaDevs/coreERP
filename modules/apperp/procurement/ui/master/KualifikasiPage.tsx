@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
-import {
-    Card,
-    CardContent,
-    CardHeader,
-} from '@apperp/ui/card';
+import { Card, CardContent, CardHeader } from '@apperp/ui/card';
 import {
     Empty,
     EmptyDescription,
@@ -149,13 +145,14 @@ export default function KualifikasiPage({
                         </span>
                     </div>
                     <div className="mt-1 flex items-center gap-2">
-                        <Award className="h-6 w-6 text-primary" />
-                        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                        <Award className="text-primary h-6 w-6" />
+                        <h1 className="text-foreground text-2xl font-bold tracking-tight">
                             Kualifikasi Vendor
                         </h1>
                     </div>
-                    <p className="text-muted-foreground text-xs mt-0.5">
-                        Daftar rekanan/supplier resmi yang telah diverifikasi dan dinyatakan memenuhi syarat kualifikasi.
+                    <p className="text-muted-foreground mt-0.5 text-xs">
+                        Daftar rekanan/supplier resmi yang telah diverifikasi
+                        dan dinyatakan memenuhi syarat kualifikasi.
                     </p>
                 </div>
 
@@ -180,24 +177,24 @@ export default function KualifikasiPage({
 
             {/* Container Card Tabel Kualifikasi */}
             <Card className="border shadow-sm">
-                <CardHeader className="p-4 border-b bg-card">
+                <CardHeader className="bg-card border-b p-4">
                     {/* Baris Pencarian Standar */}
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="relative min-w-[200px] max-w-xs">
-                            <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-muted-foreground">
+                            <div className="text-muted-foreground pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
                                 <Search className="h-3.5 w-3.5" />
                             </div>
                             <Input
                                 placeholder="Pencarian..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                className="h-8 pl-8 pr-7 text-xs bg-background border-input"
+                                className="bg-background border-input h-8 pl-8 pr-7 text-xs"
                             />
                             {search && (
                                 <button
                                     type="button"
                                     onClick={() => setSearch('')}
-                                    className="absolute inset-y-0 right-0 pr-2 flex items-center text-muted-foreground hover:text-foreground"
+                                    className="text-muted-foreground hover:text-foreground absolute inset-y-0 right-0 flex items-center pr-2"
                                 >
                                     <X className="h-3.5 w-3.5" />
                                 </button>
@@ -208,11 +205,11 @@ export default function KualifikasiPage({
 
                 <CardContent className="p-0">
                     {/* Header Strip: "Daftar Kualifikasi Vendor/Supplier" */}
-                    <div className="px-4 py-2 bg-muted/40 border-b flex items-center justify-between">
-                        <span className="text-xs font-semibold text-foreground">
+                    <div className="bg-muted/40 flex items-center justify-between border-b px-4 py-2">
+                        <span className="text-foreground text-xs font-semibold">
                             Daftar Kualifikasi Vendor/Supplier
                         </span>
-                        <span className="text-xs text-muted-foreground font-medium">
+                        <span className="text-muted-foreground text-xs font-medium">
                             Total: {meta.total} Rekanan Terkualifikasi
                         </span>
                     </div>
@@ -222,31 +219,31 @@ export default function KualifikasiPage({
                         <Table>
                             <TableHeader className="bg-muted/40 border-b">
                                 <TableRow className="hover:bg-transparent">
-                                    <TableHead className="w-12 text-center font-bold text-foreground border-r text-xs">
+                                    <TableHead className="text-foreground w-12 border-r text-center text-xs font-bold">
                                         No.
                                     </TableHead>
-                                    <TableHead className="w-44 text-center font-bold text-foreground border-r text-xs">
+                                    <TableHead className="text-foreground w-44 border-r text-center text-xs font-bold">
                                         Info Prakualifikasi
                                     </TableHead>
-                                    <TableHead className="w-36 text-center font-bold text-foreground border-r text-xs">
+                                    <TableHead className="text-foreground w-36 border-r text-center text-xs font-bold">
                                         Kode Vendor/Supplier
                                     </TableHead>
-                                    <TableHead className="min-w-[180px] text-center font-bold text-foreground border-r text-xs">
+                                    <TableHead className="text-foreground min-w-[180px] border-r text-center text-xs font-bold">
                                         Nama Vendor/Supplier
                                     </TableHead>
-                                    <TableHead className="w-36 text-center font-bold text-foreground border-r text-xs">
+                                    <TableHead className="text-foreground w-36 border-r text-center text-xs font-bold">
                                         Contact Person
                                     </TableHead>
-                                    <TableHead className="w-36 text-center font-bold text-foreground border-r text-xs">
+                                    <TableHead className="text-foreground w-36 border-r text-center text-xs font-bold">
                                         Telp/HP
                                     </TableHead>
-                                    <TableHead className="min-w-[200px] text-center font-bold text-foreground border-r text-xs">
+                                    <TableHead className="text-foreground min-w-[200px] border-r text-center text-xs font-bold">
                                         Alamat Vendor/Supplier
                                     </TableHead>
-                                    <TableHead className="w-36 text-center font-bold text-foreground border-r text-xs">
+                                    <TableHead className="text-foreground w-36 border-r text-center text-xs font-bold">
                                         Status Vendor/Supplier
                                     </TableHead>
-                                    <TableHead className="w-36 text-center font-bold text-foreground text-xs">
+                                    <TableHead className="text-foreground w-36 text-center text-xs font-bold">
                                         Status Kualifikasi
                                     </TableHead>
                                 </TableRow>
@@ -256,7 +253,7 @@ export default function KualifikasiPage({
                                     <TableRow>
                                         <TableCell
                                             colSpan={9}
-                                            className="py-12 text-center text-muted-foreground text-sm"
+                                            className="text-muted-foreground py-12 text-center text-sm"
                                         >
                                             Memuat daftar kualifikasi rekanan...
                                         </TableCell>
@@ -270,10 +267,20 @@ export default function KualifikasiPage({
                                             <Empty>
                                                 <EmptyHeader>
                                                     <EmptyTitle>
-                                                        Belum Ada Vendor Lolos Kualifikasi
+                                                        Belum Ada Vendor Lolos
+                                                        Kualifikasi
                                                     </EmptyTitle>
                                                     <EmptyDescription>
-                                                        Rekanan akan otomatis terdaftar di sini setelah melalui proses evaluasi pada menu <strong>2. Prakualifikasi</strong> dengan status kualifikasi <strong>Lolos</strong>.
+                                                        Rekanan akan otomatis
+                                                        terdaftar di sini
+                                                        setelah melalui proses
+                                                        evaluasi pada menu{' '}
+                                                        <strong>
+                                                            2. Prakualifikasi
+                                                        </strong>{' '}
+                                                        dengan status
+                                                        kualifikasi{' '}
+                                                        <strong>Lolos</strong>.
                                                     </EmptyDescription>
                                                 </EmptyHeader>
                                             </Empty>
@@ -283,10 +290,10 @@ export default function KualifikasiPage({
                                     items.map((row, idx) => (
                                         <TableRow
                                             key={row.id}
-                                            className="hover:bg-muted/50 transition-colors border-b text-xs"
+                                            className="hover:bg-muted/50 border-b text-xs transition-colors"
                                         >
                                             {/* 1. No */}
-                                            <TableCell className="text-center font-medium text-muted-foreground border-r">
+                                            <TableCell className="text-muted-foreground border-r text-center font-medium">
                                                 {(meta.current_page - 1) *
                                                     meta.per_page +
                                                     idx +
@@ -294,14 +301,14 @@ export default function KualifikasiPage({
                                             </TableCell>
 
                                             {/* 2. Info Prakualifikasi (Tanggal & No Prakualifikasi) */}
-                                            <TableCell className="text-center border-r font-mono">
+                                            <TableCell className="border-r text-center font-mono">
                                                 <div className="text-foreground font-medium">
                                                     {formatDisplayDate(
                                                         row.tanggal_prakualifikasi,
                                                     )}
                                                 </div>
                                                 <div
-                                                    className="text-primary hover:underline cursor-pointer font-semibold mt-0.5"
+                                                    className="text-primary mt-0.5 cursor-pointer font-semibold hover:underline"
                                                     onClick={() =>
                                                         handleView(row)
                                                     }
@@ -311,38 +318,39 @@ export default function KualifikasiPage({
                                             </TableCell>
 
                                             {/* 3. Kode Vendor/Supplier */}
-                                            <TableCell className="text-center font-mono font-medium border-r">
+                                            <TableCell className="border-r text-center font-mono font-medium">
                                                 {row.kode_vendor}
                                             </TableCell>
 
                                             {/* 4. Nama Vendor/Supplier */}
-                                            <TableCell className="font-bold text-foreground border-r">
+                                            <TableCell className="text-foreground border-r font-bold">
                                                 {row.nama_vendor}
                                             </TableCell>
 
                                             {/* 5. Contact Person */}
-                                            <TableCell className="text-center border-r">
+                                            <TableCell className="border-r text-center">
                                                 {row.nama_pic || '-'}
                                             </TableCell>
 
                                             {/* 6. Telp/HP */}
-                                            <TableCell className="text-center font-mono border-r">
+                                            <TableCell className="border-r text-center font-mono">
                                                 {row.telepon || '-'}
                                             </TableCell>
 
                                             {/* 7. Alamat Vendor/Supplier */}
-                                            <TableCell className="border-r max-w-xs">
+                                            <TableCell className="max-w-xs border-r">
                                                 {row.alamat || '-'}
                                             </TableCell>
 
                                             {/* 8. Status Vendor/Supplier */}
-                                            <TableCell className="text-center border-r font-medium text-foreground">
-                                                {row.status_vendor || 'Vendor Resmi'}
+                                            <TableCell className="text-foreground border-r text-center font-medium">
+                                                {row.status_vendor ||
+                                                    'Vendor Resmi'}
                                             </TableCell>
 
                                             {/* 9. Status Kualifikasi */}
                                             <TableCell className="text-center">
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                                                <span className="inline-flex items-center rounded border border-emerald-300 bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
                                                     <CheckCircle2 className="mr-1 h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                                                     Lolos
                                                 </span>
@@ -356,9 +364,10 @@ export default function KualifikasiPage({
 
                     {/* Pagination Bar */}
                     {meta.last_page > 1 && (
-                        <div className="px-4 py-3 border-t flex items-center justify-between">
-                            <span className="text-xs text-muted-foreground">
-                                Halaman {meta.current_page} dari {meta.last_page} (Total: {meta.total})
+                        <div className="flex items-center justify-between border-t px-4 py-3">
+                            <span className="text-muted-foreground text-xs">
+                                Halaman {meta.current_page} dari{' '}
+                                {meta.last_page} (Total: {meta.total})
                             </span>
                             <div className="flex gap-2">
                                 <Button

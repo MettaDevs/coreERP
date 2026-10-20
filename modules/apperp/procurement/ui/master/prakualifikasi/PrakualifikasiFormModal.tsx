@@ -111,8 +111,8 @@ export function PrakualifikasiFormModal({
     const [lookupOpen, setLookupOpen] = useState(false);
 
     // Form fields (Left column: 7 fields)
-    const [qualificationDate, setQualificationDate] = useState(() =>
-        new Date().toISOString().split('T')[0],
+    const [qualificationDate, setQualificationDate] = useState(
+        () => new Date().toISOString().split('T')[0],
     );
     const [vendorCode, setVendorCode] = useState('');
     const [vendorName, setVendorName] = useState('');
@@ -538,11 +538,11 @@ export function PrakualifikasiFormModal({
     return (
         <>
             <Dialog open={open} onOpenChange={onOpenChange}>
-                <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden border shadow-xl">
-                    <DialogHeader className="p-4 border-b shrink-0 bg-muted/20">
+                <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden border p-0 shadow-xl">
+                    <DialogHeader className="bg-muted/20 shrink-0 border-b p-4">
                         <div className="flex items-center justify-between">
                             <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-                                <Building2 className="h-5 w-5 text-primary" />
+                                <Building2 className="text-primary h-5 w-5" />
                                 Data Prakualifikasi
                             </DialogTitle>
                             <div className="flex items-center gap-1.5">
@@ -554,7 +554,7 @@ export function PrakualifikasiFormModal({
                                         resetToEmptyForm();
                                         toast.info('Form telah dikosongkan.');
                                     }}
-                                    className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                                    className="text-muted-foreground hover:text-foreground h-7 text-xs"
                                     title="Kosongkan form"
                                 >
                                     <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
@@ -566,30 +566,35 @@ export function PrakualifikasiFormModal({
                                     size="sm"
                                     onClick={() => {
                                         resetToSampleData();
-                                        toast.info('Data acuan contoh berhasil dimuat.');
+                                        toast.info(
+                                            'Data acuan contoh berhasil dimuat.',
+                                        );
                                     }}
-                                    className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                                    className="text-muted-foreground hover:text-foreground h-7 text-xs"
                                     title="Muat data contoh acuan seperti mockup"
                                 >
                                     Muat Contoh Acuan
                                 </Button>
                             </div>
                         </div>
-                        <DialogDescription className="text-xs text-muted-foreground">
+                        <DialogDescription className="text-muted-foreground text-xs">
                             Evaluasi kelengkapan berkas kualifikasi, profil
                             badan hukum, dan kesediaan item rekanan vendor.
                         </DialogDescription>
                     </DialogHeader>
 
-                    <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-                        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                    <form
+                        onSubmit={handleSubmit}
+                        className="flex flex-1 flex-col overflow-hidden"
+                    >
+                        <div className="flex-1 space-y-5 overflow-y-auto p-5">
                             {/* 1. INFORMASI UMUM & VENDOR (2 Kolom) */}
-                            <div className="rounded-lg border bg-card p-4 shadow-sm">
-                                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                            <div className="bg-card rounded-lg border p-4 shadow-sm">
+                                <div className="text-muted-foreground mb-3 text-xs font-semibold uppercase tracking-wider">
                                     Informasi Prakualifikasi & Identitas Rekanan
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                <div className="grid grid-cols-1 gap-4 text-xs md:grid-cols-2">
                                     {/* KOLOM KIRI (7 Baris) */}
                                     <div className="space-y-3">
                                         <div>
@@ -629,7 +634,7 @@ export function PrakualifikasiFormModal({
                                                     }
                                                     required
                                                     placeholder="Contoh: Supp-001..."
-                                                    className="h-8 text-xs font-mono font-medium"
+                                                    className="h-8 font-mono text-xs font-medium"
                                                 />
                                                 <Button
                                                     type="button"
@@ -638,14 +643,16 @@ export function PrakualifikasiFormModal({
                                                     onClick={() =>
                                                         setLookupOpen(true)
                                                     }
-                                                    className="h-8 text-xs shrink-0 font-medium"
+                                                    className="h-8 shrink-0 text-xs font-medium"
                                                 >
                                                     <Search className="mr-1 h-3.5 w-3.5" />
                                                     Cari Data
                                                 </Button>
                                             </div>
-                                            <p className="text-[10px] text-muted-foreground mt-1">
-                                                Bisa diketik manual atau dipilih otomatis dari Master Vendor via tombol &quot;Cari Data&quot;.
+                                            <p className="text-muted-foreground mt-1 text-[10px]">
+                                                Bisa diketik manual atau dipilih
+                                                otomatis dari Master Vendor via
+                                                tombol &quot;Cari Data&quot;.
                                             </p>
                                         </div>
 
@@ -659,7 +666,9 @@ export function PrakualifikasiFormModal({
                                             <Input
                                                 value={vendorName}
                                                 onChange={(e) =>
-                                                    setVendorName(e.target.value)
+                                                    setVendorName(
+                                                        e.target.value,
+                                                    )
                                                 }
                                                 required
                                                 placeholder="Nama vendor / rekanan"
@@ -674,7 +683,9 @@ export function PrakualifikasiFormModal({
                                             <Input
                                                 value={vendorType}
                                                 onChange={(e) =>
-                                                    setVendorType(e.target.value)
+                                                    setVendorType(
+                                                        e.target.value,
+                                                    )
                                                 }
                                                 placeholder="Contoh: Distributor / Pabrikan / Subkontraktor"
                                                 className="mt-1 h-8 text-xs font-medium"
@@ -707,7 +718,7 @@ export function PrakualifikasiFormModal({
                                                     )
                                                 }
                                                 placeholder="Nomor pokok wajib pajak / KTP"
-                                                className="mt-1 h-8 text-xs font-mono"
+                                                className="mt-1 h-8 font-mono text-xs"
                                             />
                                         </div>
 
@@ -721,7 +732,7 @@ export function PrakualifikasiFormModal({
                                                     setPhone(e.target.value)
                                                 }
                                                 placeholder="Nomor kontak / HP rekanan"
-                                                className="mt-1 h-8 text-xs font-mono"
+                                                className="mt-1 h-8 font-mono text-xs"
                                             />
                                         </div>
                                     </div>
@@ -740,7 +751,7 @@ export function PrakualifikasiFormModal({
                                                     )
                                                 }
                                                 placeholder="Otomatis (contoh: Pra/VIII/26/0001)"
-                                                className="mt-1 h-8 text-xs font-mono font-medium"
+                                                className="mt-1 h-8 font-mono text-xs font-medium"
                                             />
                                         </div>
 
@@ -789,187 +800,110 @@ export function PrakualifikasiFormModal({
                                             />
                                         </div>
 
-                                    <div>
-                                        <Label className="text-xs font-medium">
-                                            Status Badan Hukum
-                                        </Label>
-                                        <select
-                                            value={legalStatus}
-                                            onChange={(e) =>
-                                                setLegalStatus(e.target.value)
-                                            }
-                                            className="mt-1 flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                        >
-                                            <option value="Badan Hukum">
-                                                Badan Hukum
-                                            </option>
-                                            <option value="Bukan Badan Hukum">
-                                                Bukan Badan Hukum
-                                            </option>
-                                            <option value="PT">PT</option>
-                                            <option value="CV">CV</option>
-                                        </select>
-                                    </div>
+                                        <div>
+                                            <Label className="text-xs font-medium">
+                                                Status Badan Hukum
+                                            </Label>
+                                            <select
+                                                value={legalStatus}
+                                                onChange={(e) =>
+                                                    setLegalStatus(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className="border-input bg-background focus-visible:ring-ring mt-1 flex h-8 w-full rounded-md border px-3 py-1 text-xs shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1"
+                                            >
+                                                <option value="Badan Hukum">
+                                                    Badan Hukum
+                                                </option>
+                                                <option value="Bukan Badan Hukum">
+                                                    Bukan Badan Hukum
+                                                </option>
+                                                <option value="PT">PT</option>
+                                                <option value="CV">CV</option>
+                                            </select>
+                                        </div>
 
-                                    <div>
-                                        <Label className="text-xs font-medium">
-                                            Waktu Kesediaan Item
-                                        </Label>
-                                        <Input
-                                            value={leadTime}
-                                            onChange={(e) =>
-                                                setLeadTime(e.target.value)
-                                            }
-                                            placeholder="Contoh: 7 Hari"
-                                            className="mt-1 h-8 text-xs"
-                                        />
-                                    </div>
+                                        <div>
+                                            <Label className="text-xs font-medium">
+                                                Waktu Kesediaan Item
+                                            </Label>
+                                            <Input
+                                                value={leadTime}
+                                                onChange={(e) =>
+                                                    setLeadTime(e.target.value)
+                                                }
+                                                placeholder="Contoh: 7 Hari"
+                                                className="mt-1 h-8 text-xs"
+                                            />
+                                        </div>
 
-                                    <div>
-                                        <Label className="text-xs font-medium">
-                                            Jumlah Karyawan yg dimiliki
-                                        </Label>
-                                        <Input
-                                            type="number"
-                                            value={employeeCount}
-                                            onChange={(e) =>
-                                                setEmployeeCount(e.target.value)
-                                            }
-                                            placeholder="Contoh: 45"
-                                            className="mt-1 h-8 text-xs font-mono"
-                                        />
-                                    </div>
+                                        <div>
+                                            <Label className="text-xs font-medium">
+                                                Jumlah Karyawan yg dimiliki
+                                            </Label>
+                                            <Input
+                                                type="number"
+                                                value={employeeCount}
+                                                onChange={(e) =>
+                                                    setEmployeeCount(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                placeholder="Contoh: 45"
+                                                className="mt-1 h-8 font-mono text-xs"
+                                            />
+                                        </div>
 
-                                    <div>
-                                        <Label className="text-xs font-medium">
-                                            Status Kualifikasi
-                                        </Label>
-                                        <select
-                                            value={qualificationStatus}
-                                            onChange={(e) =>
-                                                setQualificationStatus(
-                                                    e.target.value,
-                                                )
-                                            }
-                                            className="mt-1 flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-medium"
-                                        >
-                                            <option value="Lolos">Lolos</option>
-                                            <option value="Batal">Batal</option>
-                                        </select>
+                                        <div>
+                                            <Label className="text-xs font-medium">
+                                                Status Kualifikasi
+                                            </Label>
+                                            <select
+                                                value={qualificationStatus}
+                                                onChange={(e) =>
+                                                    setQualificationStatus(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className="border-input bg-background focus-visible:ring-ring mt-1 flex h-8 w-full rounded-md border px-3 py-1 text-xs font-medium shadow-sm focus-visible:outline-none focus-visible:ring-1"
+                                            >
+                                                <option value="Lolos">
+                                                    Lolos
+                                                </option>
+                                                <option value="Batal">
+                                                    Batal
+                                                </option>
+                                            </select>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* 2. DOKUMEN & CATATAN (2 Kolom Bersisian) */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* KIRI: Kelengkapan Dokumen (10 Dokumen Acuan) */}
-                            <Card className="shadow-sm">
-                                <CardHeader className="py-3 px-4 border-b bg-muted/20">
-                                    <div className="flex items-center justify-between">
-                                        <CardTitle className="text-xs font-semibold flex items-center gap-1.5">
-                                            <FileText className="h-4 w-4 text-primary" />
-                                            Kelengkapan Dokumen
-                                        </CardTitle>
-                                        <Badge
-                                            variant="secondary"
-                                            className="text-[11px] font-normal"
-                                        >
-                                            {documentList.filter((d) => d.ada)
-                                                .length}{' '}
-                                            / {documentList.length} Ada
-                                        </Badge>
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="p-0 max-h-72 overflow-y-auto">
-                                    <Table>
-                                        <TableHeader className="bg-muted/40 sticky top-0 z-10">
-                                            <TableRow className="h-7 text-xs">
-                                                <TableHead className="w-10 text-center">
-                                                    No.
-                                                </TableHead>
-                                                <TableHead>Uraian</TableHead>
-                                                <TableHead className="w-14 text-center">
-                                                    Ada
-                                                </TableHead>
-                                                <TableHead className="w-16 text-center">
-                                                    Tidak
-                                                </TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {documentList.map((doc, idx) => (
-                                                <TableRow
-                                                    key={doc.nama_dokumen}
-                                                    className="h-7 text-xs"
-                                                >
-                                                    <TableCell className="text-center font-mono py-1">
-                                                        {idx + 1}
-                                                    </TableCell>
-                                                    <TableCell className="font-medium py-1">
-                                                        {doc.nama_dokumen}
-                                                    </TableCell>
-                                                    <TableCell className="text-center py-1">
-                                                        <input
-                                                            type="radio"
-                                                            name={`doc-${idx}`}
-                                                            checked={
-                                                                doc.ada === true
-                                                            }
-                                                            onChange={() =>
-                                                                handleToggleDoc(
-                                                                    idx,
-                                                                    true,
-                                                                )
-                                                            }
-                                                            className="h-3.5 w-3.5 text-primary cursor-pointer"
-                                                        />
-                                                    </TableCell>
-                                                    <TableCell className="text-center py-1">
-                                                        <input
-                                                            type="radio"
-                                                            name={`doc-${idx}`}
-                                                            checked={
-                                                                doc.ada ===
-                                                                false
-                                                            }
-                                                            onChange={() =>
-                                                                handleToggleDoc(
-                                                                    idx,
-                                                                    false,
-                                                                )
-                                                            }
-                                                            className="h-3.5 w-3.5 text-muted-foreground cursor-pointer"
-                                                        />
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </CardContent>
-                            </Card>
-
-                            {/* KANAN: Dokumen Lainnya & Catatan */}
-                            <div className="space-y-4">
+                            {/* 2. DOKUMEN & CATATAN (2 Kolom Bersisian) */}
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                {/* KIRI: Kelengkapan Dokumen (10 Dokumen Acuan) */}
                                 <Card className="shadow-sm">
-                                    <CardHeader className="py-2.5 px-4 border-b bg-muted/20">
+                                    <CardHeader className="bg-muted/20 border-b px-4 py-3">
                                         <div className="flex items-center justify-between">
-                                            <CardTitle className="text-xs font-semibold">
-                                                Dokumen Lainnya (Sebutkan)
+                                            <CardTitle className="flex items-center gap-1.5 text-xs font-semibold">
+                                                <FileText className="text-primary h-4 w-4" />
+                                                Kelengkapan Dokumen
                                             </CardTitle>
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={handleAddExtraDoc}
-                                                className="h-6 text-[11px] px-2"
+                                            <Badge
+                                                variant="secondary"
+                                                className="text-[11px] font-normal"
                                             >
-                                                <Plus className="mr-1 h-3 w-3" />
-                                                Tambah Dokumen
-                                            </Button>
+                                                {
+                                                    documentList.filter(
+                                                        (d) => d.ada,
+                                                    ).length
+                                                }{' '}
+                                                / {documentList.length} Ada
+                                            </Badge>
                                         </div>
                                     </CardHeader>
-                                    <CardContent className="p-0 max-h-36 overflow-y-auto">
+                                    <CardContent className="max-h-72 overflow-y-auto p-0">
                                         <Table>
                                             <TableHeader className="bg-muted/40 sticky top-0 z-10">
                                                 <TableRow className="h-7 text-xs">
@@ -977,276 +911,387 @@ export function PrakualifikasiFormModal({
                                                         No.
                                                     </TableHead>
                                                     <TableHead>
-                                                        Nama Dokumen
+                                                        Uraian
                                                     </TableHead>
-                                                    <TableHead className="w-24">
-                                                        Ket.
+                                                    <TableHead className="w-14 text-center">
+                                                        Ada
                                                     </TableHead>
-                                                    <TableHead className="w-10 text-center">
-                                                        Aksi
+                                                    <TableHead className="w-16 text-center">
+                                                        Tidak
                                                     </TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                {additionalDocuments.length ===
-                                                0 ? (
-                                                    <TableRow>
-                                                        <TableCell
-                                                            colSpan={4}
-                                                            className="text-center py-4 text-muted-foreground text-xs"
+                                                {documentList.map(
+                                                    (doc, idx) => (
+                                                        <TableRow
+                                                            key={
+                                                                doc.nama_dokumen
+                                                            }
+                                                            className="h-7 text-xs"
                                                         >
-                                                            Belum ada dokumen
-                                                            tambahan. Klik
-                                                            Tambah Dokumen untuk
-                                                            mengisi.
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ) : (
-                                                    additionalDocuments.map(
-                                                        (doc, idx) => (
-                                                            <TableRow
-                                                                key={idx}
-                                                                className="h-7 text-xs"
-                                                            >
-                                                                <TableCell className="text-center font-mono py-1">
-                                                                    {idx + 1}
-                                                                </TableCell>
-                                                                <TableCell className="py-1">
-                                                                    <Input
-                                                                        value={
-                                                                            doc.nama_dokumen
-                                                                        }
-                                                                        onChange={(
-                                                                            e,
-                                                                        ) =>
-                                                                            handleExtraDocChange(
-                                                                                idx,
-                                                                                'nama_dokumen',
-                                                                                e
-                                                                                    .target
-                                                                                    .value,
-                                                                            )
-                                                                        }
-                                                                        placeholder="Nama dokumen..."
-                                                                        className="h-6 text-xs"
-                                                                    />
-                                                                </TableCell>
-                                                                <TableCell className="py-1">
-                                                                    <Input
-                                                                        value={
-                                                                            doc.keterangan ||
-                                                                            ''
-                                                                        }
-                                                                        onChange={(
-                                                                            e,
-                                                                        ) =>
-                                                                            handleExtraDocChange(
-                                                                                idx,
-                                                                                'keterangan',
-                                                                                e
-                                                                                    .target
-                                                                                    .value,
-                                                                            )
-                                                                        }
-                                                                        placeholder="Keterangan..."
-                                                                        className="h-6 text-xs"
-                                                                    />
-                                                                </TableCell>
-                                                                <TableCell className="text-center py-1">
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="ghost"
-                                                                        size="sm"
-                                                                        onClick={() =>
-                                                                            handleRemoveExtraDoc(
-                                                                                idx,
-                                                                            )
-                                                                        }
-                                                                        className="h-6 w-6 p-0 text-destructive hover:bg-destructive/10"
-                                                                    >
-                                                                        <Trash2 className="h-3 w-3" />
-                                                                    </Button>
-                                                                </TableCell>
-                                                            </TableRow>
-                                                        ),
-                                                    )
+                                                            <TableCell className="py-1 text-center font-mono">
+                                                                {idx + 1}
+                                                            </TableCell>
+                                                            <TableCell className="py-1 font-medium">
+                                                                {
+                                                                    doc.nama_dokumen
+                                                                }
+                                                            </TableCell>
+                                                            <TableCell className="py-1 text-center">
+                                                                <input
+                                                                    type="radio"
+                                                                    name={`doc-${idx}`}
+                                                                    checked={
+                                                                        doc.ada ===
+                                                                        true
+                                                                    }
+                                                                    onChange={() =>
+                                                                        handleToggleDoc(
+                                                                            idx,
+                                                                            true,
+                                                                        )
+                                                                    }
+                                                                    className="text-primary h-3.5 w-3.5 cursor-pointer"
+                                                                />
+                                                            </TableCell>
+                                                            <TableCell className="py-1 text-center">
+                                                                <input
+                                                                    type="radio"
+                                                                    name={`doc-${idx}`}
+                                                                    checked={
+                                                                        doc.ada ===
+                                                                        false
+                                                                    }
+                                                                    onChange={() =>
+                                                                        handleToggleDoc(
+                                                                            idx,
+                                                                            false,
+                                                                        )
+                                                                    }
+                                                                    className="text-muted-foreground h-3.5 w-3.5 cursor-pointer"
+                                                                />
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ),
                                                 )}
                                             </TableBody>
                                         </Table>
                                     </CardContent>
                                 </Card>
 
-                                <div>
-                                    <Label className="text-xs font-semibold mb-1 block">
-                                        Catatan :
-                                    </Label>
-                                    <Textarea
-                                        value={notes}
-                                        onChange={(e) =>
-                                            setNotes(e.target.value)
-                                        }
-                                        rows={3}
-                                        placeholder="Catatan evaluasi kualifikasi vendor..."
-                                        className="text-xs"
-                                    />
+                                {/* KANAN: Dokumen Lainnya & Catatan */}
+                                <div className="space-y-4">
+                                    <Card className="shadow-sm">
+                                        <CardHeader className="bg-muted/20 border-b px-4 py-2.5">
+                                            <div className="flex items-center justify-between">
+                                                <CardTitle className="text-xs font-semibold">
+                                                    Dokumen Lainnya (Sebutkan)
+                                                </CardTitle>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={handleAddExtraDoc}
+                                                    className="h-6 px-2 text-[11px]"
+                                                >
+                                                    <Plus className="mr-1 h-3 w-3" />
+                                                    Tambah Dokumen
+                                                </Button>
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent className="max-h-36 overflow-y-auto p-0">
+                                            <Table>
+                                                <TableHeader className="bg-muted/40 sticky top-0 z-10">
+                                                    <TableRow className="h-7 text-xs">
+                                                        <TableHead className="w-10 text-center">
+                                                            No.
+                                                        </TableHead>
+                                                        <TableHead>
+                                                            Nama Dokumen
+                                                        </TableHead>
+                                                        <TableHead className="w-24">
+                                                            Ket.
+                                                        </TableHead>
+                                                        <TableHead className="w-10 text-center">
+                                                            Aksi
+                                                        </TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {additionalDocuments.length ===
+                                                    0 ? (
+                                                        <TableRow>
+                                                            <TableCell
+                                                                colSpan={4}
+                                                                className="text-muted-foreground py-4 text-center text-xs"
+                                                            >
+                                                                Belum ada
+                                                                dokumen
+                                                                tambahan. Klik
+                                                                Tambah Dokumen
+                                                                untuk mengisi.
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ) : (
+                                                        additionalDocuments.map(
+                                                            (doc, idx) => (
+                                                                <TableRow
+                                                                    key={idx}
+                                                                    className="h-7 text-xs"
+                                                                >
+                                                                    <TableCell className="py-1 text-center font-mono">
+                                                                        {idx +
+                                                                            1}
+                                                                    </TableCell>
+                                                                    <TableCell className="py-1">
+                                                                        <Input
+                                                                            value={
+                                                                                doc.nama_dokumen
+                                                                            }
+                                                                            onChange={(
+                                                                                e,
+                                                                            ) =>
+                                                                                handleExtraDocChange(
+                                                                                    idx,
+                                                                                    'nama_dokumen',
+                                                                                    e
+                                                                                        .target
+                                                                                        .value,
+                                                                                )
+                                                                            }
+                                                                            placeholder="Nama dokumen..."
+                                                                            className="h-6 text-xs"
+                                                                        />
+                                                                    </TableCell>
+                                                                    <TableCell className="py-1">
+                                                                        <Input
+                                                                            value={
+                                                                                doc.keterangan ||
+                                                                                ''
+                                                                            }
+                                                                            onChange={(
+                                                                                e,
+                                                                            ) =>
+                                                                                handleExtraDocChange(
+                                                                                    idx,
+                                                                                    'keterangan',
+                                                                                    e
+                                                                                        .target
+                                                                                        .value,
+                                                                                )
+                                                                            }
+                                                                            placeholder="Keterangan..."
+                                                                            className="h-6 text-xs"
+                                                                        />
+                                                                    </TableCell>
+                                                                    <TableCell className="py-1 text-center">
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="ghost"
+                                                                            size="sm"
+                                                                            onClick={() =>
+                                                                                handleRemoveExtraDoc(
+                                                                                    idx,
+                                                                                )
+                                                                            }
+                                                                            className="text-destructive hover:bg-destructive/10 h-6 w-6 p-0"
+                                                                        >
+                                                                            <Trash2 className="h-3 w-3" />
+                                                                        </Button>
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                            ),
+                                                        )
+                                                    )}
+                                                </TableBody>
+                                            </Table>
+                                        </CardContent>
+                                    </Card>
+
+                                    <div>
+                                        <Label className="mb-1 block text-xs font-semibold">
+                                            Catatan :
+                                        </Label>
+                                        <Textarea
+                                            value={notes}
+                                            onChange={(e) =>
+                                                setNotes(e.target.value)
+                                            }
+                                            rows={3}
+                                            placeholder="Catatan evaluasi kualifikasi vendor..."
+                                            className="text-xs"
+                                        />
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        {/* 3. DAFTAR LIST ITEM YANG TERSEDIA (Tabel Interaktif Manual) */}
-                        <Card className="shadow-sm">
-                            <CardHeader className="py-3 px-4 border-b bg-muted/20">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <Package className="h-4 w-4 text-primary" />
-                                        <CardTitle className="text-xs font-semibold">
-                                            Daftar List Item yang tersedia
-                                        </CardTitle>
+                            {/* 3. DAFTAR LIST ITEM YANG TERSEDIA (Tabel Interaktif Manual) */}
+                            <Card className="shadow-sm">
+                                <CardHeader className="bg-muted/20 border-b px-4 py-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Package className="text-primary h-4 w-4" />
+                                            <CardTitle className="text-xs font-semibold">
+                                                Daftar List Item yang tersedia
+                                            </CardTitle>
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleAddItem}
+                                            className="h-7 text-xs"
+                                        >
+                                            <Plus className="mr-1 h-3.5 w-3.5" />
+                                            Tambah Item
+                                        </Button>
                                     </div>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={handleAddItem}
-                                        className="h-7 text-xs"
-                                    >
-                                        <Plus className="mr-1 h-3.5 w-3.5" />
-                                        Tambah Item
-                                    </Button>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="p-0 overflow-x-auto">
-                                <Table>
-                                    <TableHeader className="bg-muted/40">
-                                        <TableRow className="h-8 text-xs">
-                                            <TableHead className="w-12 text-center">
-                                                No.
-                                            </TableHead>
-                                            <TableHead className="w-32 text-center">
-                                                Jenis Item
-                                            </TableHead>
-                                            <TableHead className="w-32 text-center">
-                                                Kode Item
-                                            </TableHead>
-                                            <TableHead className="text-center">
-                                                Nama Item
-                                            </TableHead>
-                                            <TableHead className="w-28 text-center">
-                                                Satuan
-                                            </TableHead>
-                                            <TableHead className="w-28 text-center">
-                                                Kesediaan
-                                            </TableHead>
-                                            <TableHead className="w-12 text-center">
-                                                Aksi
-                                            </TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {items.map((item, idx) => (
-                                            <TableRow
-                                                key={idx}
-                                                className="h-8 text-xs"
-                                            >
-                                                <TableCell className="text-center font-mono py-1">
-                                                    {idx + 1}
-                                                </TableCell>
-                                                <TableCell className="py-1">
-                                                    <Input
-                                                        value={item.jenis_item}
-                                                        onChange={(e) =>
-                                                            handleItemChange(
-                                                                idx,
-                                                                'jenis_item',
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        placeholder="Obat / BMHP"
-                                                        className="h-7 text-xs text-center"
-                                                    />
-                                                </TableCell>
-                                                <TableCell className="py-1">
-                                                    <Input
-                                                        value={item.kode_item}
-                                                        onChange={(e) =>
-                                                            handleItemChange(
-                                                                idx,
-                                                                'kode_item',
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        placeholder="Kode..."
-                                                        className="h-7 text-xs font-mono text-center"
-                                                    />
-                                                </TableCell>
-                                                <TableCell className="py-1">
-                                                    <Input
-                                                        value={item.nama_item}
-                                                        onChange={(e) =>
-                                                            handleItemChange(
-                                                                idx,
-                                                                'nama_item',
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        placeholder="Nama item..."
-                                                        className="h-7 text-xs font-medium text-center"
-                                                    />
-                                                </TableCell>
-                                                <TableCell className="py-1">
-                                                    <Input
-                                                        value={item.satuan}
-                                                        onChange={(e) =>
-                                                            handleItemChange(
-                                                                idx,
-                                                                'satuan',
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        placeholder="Satuan..."
-                                                        className="h-7 text-xs text-center"
-                                                    />
-                                                </TableCell>
-                                                <TableCell className="py-1">
-                                                    <Input
-                                                        value={item.kesediaan}
-                                                        onChange={(e) =>
-                                                            handleItemChange(
-                                                                idx,
-                                                                'kesediaan',
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        placeholder="Kesediaan..."
-                                                        className="h-7 text-xs font-mono text-center"
-                                                    />
-                                                </TableCell>
-                                                <TableCell className="text-center py-1">
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            handleRemoveItem(
-                                                                idx,
-                                                            )
-                                                        }
-                                                        className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
-                                                    >
-                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                    </Button>
-                                                </TableCell>
+                                </CardHeader>
+                                <CardContent className="overflow-x-auto p-0">
+                                    <Table>
+                                        <TableHeader className="bg-muted/40">
+                                            <TableRow className="h-8 text-xs">
+                                                <TableHead className="w-12 text-center">
+                                                    No.
+                                                </TableHead>
+                                                <TableHead className="w-32 text-center">
+                                                    Jenis Item
+                                                </TableHead>
+                                                <TableHead className="w-32 text-center">
+                                                    Kode Item
+                                                </TableHead>
+                                                <TableHead className="text-center">
+                                                    Nama Item
+                                                </TableHead>
+                                                <TableHead className="w-28 text-center">
+                                                    Satuan
+                                                </TableHead>
+                                                <TableHead className="w-28 text-center">
+                                                    Kesediaan
+                                                </TableHead>
+                                                <TableHead className="w-12 text-center">
+                                                    Aksi
+                                                </TableHead>
                                             </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </CardContent>
-                        </Card>
-
+                                        </TableHeader>
+                                        <TableBody>
+                                            {items.map((item, idx) => (
+                                                <TableRow
+                                                    key={idx}
+                                                    className="h-8 text-xs"
+                                                >
+                                                    <TableCell className="py-1 text-center font-mono">
+                                                        {idx + 1}
+                                                    </TableCell>
+                                                    <TableCell className="py-1">
+                                                        <Input
+                                                            value={
+                                                                item.jenis_item
+                                                            }
+                                                            onChange={(e) =>
+                                                                handleItemChange(
+                                                                    idx,
+                                                                    'jenis_item',
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            placeholder="Obat / BMHP"
+                                                            className="h-7 text-center text-xs"
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell className="py-1">
+                                                        <Input
+                                                            value={
+                                                                item.kode_item
+                                                            }
+                                                            onChange={(e) =>
+                                                                handleItemChange(
+                                                                    idx,
+                                                                    'kode_item',
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            placeholder="Kode..."
+                                                            className="h-7 text-center font-mono text-xs"
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell className="py-1">
+                                                        <Input
+                                                            value={
+                                                                item.nama_item
+                                                            }
+                                                            onChange={(e) =>
+                                                                handleItemChange(
+                                                                    idx,
+                                                                    'nama_item',
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            placeholder="Nama item..."
+                                                            className="h-7 text-center text-xs font-medium"
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell className="py-1">
+                                                        <Input
+                                                            value={item.satuan}
+                                                            onChange={(e) =>
+                                                                handleItemChange(
+                                                                    idx,
+                                                                    'satuan',
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            placeholder="Satuan..."
+                                                            className="h-7 text-center text-xs"
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell className="py-1">
+                                                        <Input
+                                                            value={
+                                                                item.kesediaan
+                                                            }
+                                                            onChange={(e) =>
+                                                                handleItemChange(
+                                                                    idx,
+                                                                    'kesediaan',
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            placeholder="Kesediaan..."
+                                                            className="h-7 text-center font-mono text-xs"
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell className="py-1 text-center">
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() =>
+                                                                handleRemoveItem(
+                                                                    idx,
+                                                                )
+                                                            }
+                                                            className="text-destructive hover:bg-destructive/10 h-7 w-7 p-0"
+                                                        >
+                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </CardContent>
+                            </Card>
                         </div>
 
                         {/* TOMBOL AKSI SESUAI ACUAN DIAGRAM: Kembali, Batal, Simpan */}
-                        <DialogFooter className="border-t p-3 px-5 bg-card shrink-0 flex items-center justify-end gap-2">
+                        <DialogFooter className="bg-card flex shrink-0 items-center justify-end gap-2 border-t p-3 px-5">
                             <Button
                                 type="button"
                                 variant="outline"
@@ -1264,14 +1309,14 @@ export function PrakualifikasiFormModal({
                                     setLookupOpen(true);
                                 }}
                                 disabled={submitting}
-                                className="h-8 text-xs text-muted-foreground hover:text-foreground font-medium"
+                                className="text-muted-foreground hover:text-foreground h-8 text-xs font-medium"
                             >
                                 Batal
                             </Button>
                             <Button
                                 type="submit"
                                 disabled={submitting || !vendorCode}
-                                className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium h-8 text-xs shadow-sm"
+                                className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 text-xs font-medium shadow-sm"
                             >
                                 {submitting
                                     ? 'Menyimpan...'
