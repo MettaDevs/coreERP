@@ -1,22 +1,16 @@
+import {
+    Briefcase,
+    Eye,
+    Pencil,
+    Plus,
+    Power,
+    RefreshCw,
+    Search,
+    Trash2,
+    X,
+} from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { Badge } from '@apperp/ui/badge';
-import { Button } from '@apperp/ui/button';
-import { Card, CardContent, CardHeader } from '@apperp/ui/card';
-import {
-    Empty,
-    EmptyDescription,
-    EmptyHeader,
-    EmptyTitle,
-} from '@apperp/ui/empty';
-import { Input } from '@apperp/ui/input';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
+import { toast } from 'sonner';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -27,27 +21,32 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@apperp/ui/alert-dialog';
-
+import { Button } from '@apperp/ui/button';
+import { Card, CardContent, CardHeader } from '@apperp/ui/card';
+import { DataTable } from '@apperp/ui/data-table';
 import {
-    Briefcase,
-    Eye,
-    MoreHorizontal,
-    Pencil,
-    Plus,
-    Power,
-    RefreshCw,
-    Search,
-    Trash2,
-    Wrench,
-    X,
-} from 'lucide-react';
-import { toast } from 'sonner';
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyTitle,
+} from '@apperp/ui/empty';
+import { Input } from '@apperp/ui/input';
+import { TableCell, TableRow } from '@apperp/ui/table';
 import { api, toastSaveError } from '../api';
-import { ItemJasaModal, type ItemJasaRecord } from './item-jasa/ItemJasaModal';
 import { ItemJasaDetailModal } from './item-jasa/ItemJasaDetailModal';
+import { ItemJasaModal } from './item-jasa/ItemJasaModal';
+import type { ItemJasaRecord } from './item-jasa/ItemJasaModal';
+
+const itemJasaColumns = [
+    { id: 'no', header: 'No.', cell: () => null },
+    { id: 'kode_upah', header: 'Kode Upah', cell: () => null },
+    { id: 'nama_upah', header: 'Nama Upah', cell: () => null },
+    { id: 'satuan', header: 'Satuan', cell: () => null },
+    { id: 'aksi', header: 'Aksi', cell: () => null },
+];
 
 type PageProps = {
-    view: string;
+    view?: string;
     segments?: string[];
     permissions?: string[];
 };
@@ -59,11 +58,8 @@ type PaginationMeta = {
     total: number;
 };
 
-export default function ItemJasaPage({
-    view: _view,
-    segments: _segments,
-    permissions: _permissions,
-}: PageProps) {
+export default function ItemJasaPage(_props?: PageProps) {
+    void _props;
     const [items, setItems] = useState<ItemJasaRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -90,10 +86,14 @@ export default function ItemJasaPage({
     const fetchData = useCallback(
         async (page = 1) => {
             setLoading(true);
+
             try {
                 const params = new URLSearchParams();
                 params.set('page', String(page));
-                if (search.trim()) params.set('search', search.trim());
+
+                if (search.trim()) {
+                    params.set('search', search.trim());
+                }
 
                 const res = await api<{
                     status: string;
@@ -120,7 +120,11 @@ export default function ItemJasaPage({
     );
 
     useEffect(() => {
-        fetchData(1);
+        const timer = setTimeout(() => {
+            void fetchData(1);
+        }, 0);
+
+        return () => clearTimeout(timer);
     }, [fetchData]);
 
     const handleCreate = () => {
@@ -173,8 +177,12 @@ export default function ItemJasaPage({
     };
 
     const handleArchive = async () => {
-        if (!deleteId) return;
+        if (!deleteId) {
+            return;
+        }
+
         setDeleting(true);
+
         try {
             await api(`/item-jasa/${deleteId}`, {
                 method: 'DELETE',
@@ -213,14 +221,14 @@ export default function ItemJasaPage({
                         </span>
                     </div>
                     <div className="mt-1 flex items-center gap-2">
-                        <Wrench className="text-primary h-6 w-6" />
+                        <Briefcase className="text-primary h-6 w-6" />
                         <h1 className="text-foreground text-2xl font-bold tracking-tight">
-                            Item Jasa & Upah
+                            Item Jasa & Upah Kerja
                         </h1>
                     </div>
                     <p className="text-muted-foreground mt-0.5 text-xs">
-                        Katalog biaya tenaga kerja, jasa servis, instalasi, dan
-                        upah pekerjaan teknis.
+                        Katalog master klasifikasi lingkup jasa servis, tenaga
+                        kerja, serta biaya upah operasional.
                     </p>
                 </div>
 
@@ -232,7 +240,7 @@ export default function ItemJasaPage({
                         className="bg-primary hover:bg-primary/90 text-primary-foreground h-9 font-medium shadow-sm"
                     >
                         <Plus className="mr-1.5 h-3.5 w-3.5" />
-                        Tambah Item Jasa
+                        Tambah Item
                     </Button>
                     <Button
                         variant="outline"
@@ -251,7 +259,7 @@ export default function ItemJasaPage({
                 </div>
             </div>
 
-            {/* Container Card Tabel Item Upah */}
+            {/* Container Card Tabel Item Jasa */}
             <Card className="border shadow-sm">
                 <CardHeader className="bg-card border-b p-4">
                     {/* Baris Pencarian Standar */}
@@ -291,28 +299,14 @@ export default function ItemJasaPage({
                     </div>
 
                     {/* Tabel Daftar Item Upah (5 Kolom) */}
-                    <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader className="bg-muted/40 border-b">
-                                <TableRow className="hover:bg-transparent">
-                                    <TableHead className="text-foreground w-12 border-r text-center text-xs font-bold">
-                                        No.
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-40 border-r text-center text-xs font-bold">
-                                        Kode Upah
-                                    </TableHead>
-                                    <TableHead className="text-foreground min-w-[240px] border-r text-center text-xs font-bold">
-                                        Nama Upah
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-28 border-r text-center text-xs font-bold">
-                                        Satuan
-                                    </TableHead>
-                                    <TableHead className="text-foreground w-72 text-center text-xs font-bold">
-                                        Aksi
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
+                    <DataTable
+                        scrollMode="inline"
+                        showRowNumbers={false}
+                        columns={itemJasaColumns}
+                        data={items}
+                        getRowKey={(row) => row.id}
+                        renderRows={() => (
+                            <>
                                 {loading ? (
                                     <TableRow>
                                         <TableCell
@@ -384,9 +378,21 @@ export default function ItemJasaPage({
                                                 {row.satuan}
                                             </TableCell>
 
-                                            {/* 5. Aksi (Edit, Hapus, Aktif/Non Aktif) */}
+                                            {/* 5. Aksi (Lihat, Edit, Hapus, Aktif/Non Aktif) */}
                                             <TableCell className="whitespace-nowrap p-2 text-center">
                                                 <div className="flex items-center justify-center gap-1.5">
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            handleView(row)
+                                                        }
+                                                        className="h-7 border-blue-200 px-2.5 text-xs font-medium text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:border-blue-900 dark:hover:bg-blue-950"
+                                                    >
+                                                        <Eye className="mr-1 h-3.5 w-3.5" />
+                                                        Lihat
+                                                    </Button>
                                                     <Button
                                                         type="button"
                                                         variant="outline"
@@ -437,9 +443,9 @@ export default function ItemJasaPage({
                                         </TableRow>
                                     ))
                                 )}
-                            </TableBody>
-                        </Table>
-                    </div>
+                            </>
+                        )}
+                    />
 
                     {/* Pagination Bar */}
                     {meta.last_page > 1 && (
@@ -479,7 +485,7 @@ export default function ItemJasaPage({
                 </CardContent>
             </Card>
 
-            {/* Modal Tambah/Ubah Item Upah Sesuai Form Kanan Gambar */}
+            {/* Modal Tambah/Ubah Form Item Upah */}
             <ItemJasaModal
                 open={formModalOpen}
                 onOpenChange={setFormModalOpen}
@@ -487,7 +493,7 @@ export default function ItemJasaPage({
                 onSuccess={handleSuccess}
             />
 
-            {/* Modal Detail Item Upah (1. View icon mata) */}
+            {/* Modal Detail Item Upah */}
             <ItemJasaDetailModal
                 open={detailModalOpen}
                 onOpenChange={setDetailModalOpen}
@@ -502,13 +508,11 @@ export default function ItemJasaPage({
             >
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>
-                            Hapus Item Upah / Jasa?
-                        </AlertDialogTitle>
+                        <AlertDialogTitle>Hapus Item Upah?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Apakah Anda yakin ingin menghapus item upah ini?
-                            Data yang dihapus tidak akan tampil dalam pilihan
-                            transaksi belanja pengadaan baru.
+                            Apakah Anda yakin ingin menghapus data item
+                            upah/jasa ini? Data yang dihapus tidak akan tampil
+                            dalam pilihan transaksi pengadaan baru.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

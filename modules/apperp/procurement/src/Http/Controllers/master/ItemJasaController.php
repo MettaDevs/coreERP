@@ -5,101 +5,20 @@ declare(strict_types=1);
 namespace Modules\Apperp\Procurement\Http\Controllers\master;
 
 use App\Platform\Modules\Contracts\TenantContext;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Modules\Apperp\Procurement\Models\master\ItemJasa;
 
 final class ItemJasaController extends Controller
 {
     /**
-     * Pastikan tabel dan data acuan item jasa/upah tersedia.
-     */
-    private function ensureTablesExist(string $tenantId): void
-    {
-        if (! Schema::hasTable('procurement_item_jasa')) {
-            Schema::create('procurement_item_jasa', function (Blueprint $blueprint): void {
-                $blueprint->ulid('id')->primary();
-                $blueprint->ulid('tenant_id')->index();
-                $blueprint->string('creation_key', 160)->nullable();
-                $blueprint->string('kode_upah', 100);
-                $blueprint->string('nama_upah', 255);
-                $blueprint->string('satuan', 50);
-                $blueprint->text('keterangan')->nullable();
-                $blueprint->boolean('aktif')->default(true);
-                $blueprint->softDeletes();
-                $blueprint->timestamps();
-
-                $blueprint->unique(['tenant_id', 'id']);
-                $blueprint->unique(['tenant_id', 'kode_upah']);
-                $blueprint->index(['tenant_id', 'aktif']);
-            });
-        }
-
-        // Jika data kosong, sediakan sampel acuan sesuai diagram persis
-        if (ItemJasa::where('tenant_id', $tenantId)->count() === 0) {
-            $samples = [
-                [
-                    'kode_upah' => 'Upah.0001',
-                    'nama_upah' => 'Upah Pembersihan Alat & Mesin',
-                    'satuan' => 'Unit',
-                    'keterangan' => '-',
-                    'aktif' => true,
-                ],
-                [
-                    'kode_upah' => 'Upah.0002',
-                    'nama_upah' => 'Upah Perbaikan & Servis Mesin',
-                    'satuan' => 'Kegiatan',
-                    'keterangan' => 'Biaya jasa perbaikan teknis dan pergantian sparepart',
-                    'aktif' => true,
-                ],
-                [
-                    'kode_upah' => 'Upah.0003',
-                    'nama_upah' => 'Jasa Instalasi & Pemasangan Alat',
-                    'satuan' => 'Titik',
-                    'keterangan' => 'Pemasangan perangkat baru dan pengujian instalasi',
-                    'aktif' => true,
-                ],
-                [
-                    'kode_upah' => 'Upah.0004',
-                    'nama_upah' => 'Jasa Kalibrasi Instrumen Medis',
-                    'satuan' => 'Alat',
-                    'keterangan' => 'Kalibrasi dan sertifikasi kelayakan alat ukur medis',
-                    'aktif' => true,
-                ],
-                [
-                    'kode_upah' => 'Upah.0005',
-                    'nama_upah' => 'Upah Bongkar Muat Barang',
-                    'satuan' => 'Rit',
-                    'keterangan' => 'Tenaga kerja bongkar muat logistik dan pengiriman',
-                    'aktif' => true,
-                ],
-            ];
-
-            foreach ($samples as $sample) {
-                ItemJasa::create([
-                    'tenant_id' => $tenantId,
-                    'creation_key' => (string) Str::uuid(),
-                    'kode_upah' => $sample['kode_upah'],
-                    'nama_upah' => $sample['nama_upah'],
-                    'satuan' => $sample['satuan'],
-                    'keterangan' => $sample['keterangan'],
-                    'aktif' => $sample['aktif'],
-                ]);
-            }
-        }
-    }
-
-    /**
      * Tampilkan daftar seluruh item jasa/upah.
      */
     public function index(Request $request, TenantContext $context): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $query = ItemJasa::query()
             ->where('tenant_id', $tenantId)
@@ -139,7 +58,6 @@ final class ItemJasaController extends Controller
     public function show(string $id, TenantContext $context): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $record = ItemJasa::where('tenant_id', $tenantId)
             ->where('id', $id)
@@ -157,7 +75,6 @@ final class ItemJasaController extends Controller
     public function store(Request $request, TenantContext $context): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $validated = $request->validate([
             'kode_upah' => ['required', 'string', 'max:100'],
@@ -205,7 +122,6 @@ final class ItemJasaController extends Controller
     public function update(Request $request, string $id, TenantContext $context): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $record = ItemJasa::where('tenant_id', $tenantId)
             ->where('id', $id)
@@ -256,7 +172,6 @@ final class ItemJasaController extends Controller
     public function toggleStatus(string $id, TenantContext $context): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $record = ItemJasa::where('tenant_id', $tenantId)
             ->where('id', $id)
@@ -278,7 +193,6 @@ final class ItemJasaController extends Controller
     public function destroy(string $id, TenantContext $context): JsonResponse
     {
         $tenantId = $context->tenantId();
-        $this->ensureTablesExist($tenantId);
 
         $record = ItemJasa::where('tenant_id', $tenantId)
             ->where('id', $id)
