@@ -42,10 +42,10 @@ type VendorLookupModalProps = {
 };
 
 const lookupColumns = [
-    { id: 'select', header: '' },
-    { id: 'kode_vendor', header: 'Kode Vendor/Supplier' },
-    { id: 'nama_vendor', header: 'Nama Vendor/Supplier' },
-    { id: 'alamat', header: 'Alamat Vendor/Supplier' },
+    { id: 'select', header: '', cell: () => null },
+    { id: 'kode_vendor', header: 'Kode Vendor/Supplier', cell: () => null },
+    { id: 'nama_vendor', header: 'Nama Vendor/Supplier', cell: () => null },
+    { id: 'alamat', header: 'Alamat Vendor/Supplier', cell: () => null },
 ];
 
 export function VendorLookupModal({

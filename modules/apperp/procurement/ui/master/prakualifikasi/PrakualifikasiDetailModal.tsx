@@ -26,19 +26,19 @@ import { TableCell, TableRow } from '@apperp/ui/table';
 import type { PrakualifikasiFormData } from './PrakualifikasiFormModal';
 
 const docColumns = [
-    { id: 'no', header: 'No.' },
-    { id: 'nama_dokumen', header: 'Uraian Dokumen' },
-    { id: 'status', header: 'Status' },
-    { id: 'keterangan', header: 'Keterangan' },
+    { id: 'no', header: 'No.', cell: () => null },
+    { id: 'nama_dokumen', header: 'Uraian Dokumen', cell: () => null },
+    { id: 'status', header: 'Status', cell: () => null },
+    { id: 'keterangan', header: 'Keterangan', cell: () => null },
 ];
 
 const itemColumns = [
-    { id: 'no', header: 'No.' },
-    { id: 'jenis_item', header: 'Jenis Item' },
-    { id: 'kode_item', header: 'Kode Item' },
-    { id: 'nama_item', header: 'Nama Item' },
-    { id: 'satuan', header: 'Satuan' },
-    { id: 'kesediaan', header: 'Kesediaan' },
+    { id: 'no', header: 'No.', cell: () => null },
+    { id: 'jenis_item', header: 'Jenis Item', cell: () => null },
+    { id: 'kode_item', header: 'Kode Item', cell: () => null },
+    { id: 'nama_item', header: 'Nama Item', cell: () => null },
+    { id: 'satuan', header: 'Satuan', cell: () => null },
+    { id: 'kesediaan', header: 'Kesediaan', cell: () => null },
 ];
 
 type Props = {
@@ -254,7 +254,9 @@ export function PrakualifikasiDetailModal({
                                 showRowNumbers={false}
                                 columns={docColumns}
                                 data={data.dokumen || []}
-                                getRowKey={(_, idx) => idx}
+                                getRowKey={(doc) =>
+                                    doc.id || doc.nama_dokumen || doc.urutan
+                                }
                                 renderRows={() => (
                                     <>
                                         {!data.dokumen ||
@@ -328,7 +330,12 @@ export function PrakualifikasiDetailModal({
                                 showRowNumbers={false}
                                 columns={itemColumns}
                                 data={data.items || []}
-                                getRowKey={(_, idx) => idx}
+                                getRowKey={(item) =>
+                                    item.id ||
+                                    item.kode_item ||
+                                    item.nama_item ||
+                                    item.urutan
+                                }
                                 renderRows={() => (
                                     <>
                                         {!data.items ||
