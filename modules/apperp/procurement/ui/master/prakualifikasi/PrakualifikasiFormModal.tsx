@@ -521,21 +521,6 @@ export function PrakualifikasiFormModal({
                                     <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
                                     Kosongkan
                                 </Button>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                        resetToSampleData();
-                                        toast.info(
-                                            'Data acuan contoh berhasil dimuat.',
-                                        );
-                                    }}
-                                    className="text-muted-foreground hover:text-foreground h-7 text-xs"
-                                    title="Muat data contoh acuan seperti mockup"
-                                >
-                                    Muat Contoh Acuan
-                                </Button>
                             </div>
                         </div>
                         <DialogDescription className="text-muted-foreground text-xs">
