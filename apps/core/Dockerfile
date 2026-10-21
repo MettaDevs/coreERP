@@ -186,6 +186,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends libcap2-bin "po
     && install-php-extensions bcmath gd intl pdo_pgsql pgsql zip pcntl opcache \
     && if [ "$PASANG_OTEL" = "1" ]; then install-php-extensions opentelemetry-1.2.1; fi \
     && setcap CAP_NET_BIND_SERVICE=+eip /usr/local/bin/frankenphp \
+    && mkdir -p /config /data \
     && chown -R www-data:www-data /config /data \
     && rm -rf /var/lib/apt/lists/*
 
