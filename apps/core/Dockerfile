@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 # Konteks pembangunan adalah AKAR REPO, bukan folder app ini.
 #
 # Module hidup di `modules/` pada akar repo, dan Composer memasangnya lewat repositori
@@ -182,11 +183,30 @@ ARG VERSI_KLIEN_PG=17
 #
 # `pcntl` dipakai `octane:frankenphp` untuk meneruskan SIGTERM ke server saat container dihentikan.
 RUN apt-get update && apt-get install -y --no-install-recommends libcap2-bin "postgresql-client-${VERSI_KLIEN_PG}" \
-    && install-php-extensions bcmath gd intl pdo_pgsql pgsql redis zip pcntl opcache \
+    && install-php-extensions bcmath gd intl pdo_pgsql pgsql zip pcntl opcache \
     && if [ "$PASANG_OTEL" = "1" ]; then install-php-extensions opentelemetry-1.2.1; fi \
     && setcap CAP_NET_BIND_SERVICE=+eip /usr/local/bin/frankenphp \
     && chown -R www-data:www-data /config /data \
     && rm -rf /var/lib/apt/lists/*
+
+ADD --checksum=sha256:79ecabd899e50a6efa56d9fc28a987a25d78deecc32fdd0fa9840b1b3d83740e https://codeload.github.com/phpredis/phpredis/tar.gz/df4fab2de7fc327c54c94a13af2b9542e4fbd720 /tmp/phpredis-6.3.0.tar.gz
+ADD --checksum=sha256:8e425b5bf7a569543e29cb4a16a913445d80c4efe83b371760ca798ca9b819ed https://codeload.github.com/nemequ/liblzf/tar.gz/fb25820c3c0aeafd127956ae6c115063b47e459a /tmp/liblzf.tar.gz
+RUN set -eu; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends $PHPIZE_DEPS liblz4-1 liblz4-dev libzstd1 libzstd-dev; \
+    apt-mark manual liblz4-1 libzstd1; \
+    mkdir -p /tmp/phpredis /tmp/liblzf; \
+    tar -xzf /tmp/phpredis-6.3.0.tar.gz -C /tmp/phpredis --strip-components=1; \
+    tar -xzf /tmp/liblzf.tar.gz -C /tmp/liblzf --strip-components=1; \
+    cp -a /tmp/liblzf/. /tmp/phpredis/liblzf/; \
+    cd /tmp/phpredis; \
+    phpize; \
+    ./configure --with-php-config=/usr/local/bin/php-config --enable-redis-lzf --enable-redis-zstd --enable-redis-lz4 --with-liblz4; \
+    make -j"$(nproc)"; \
+    make install; \
+    docker-php-ext-enable redis; \
+    apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false $PHPIZE_DEPS liblz4-dev libzstd-dev; \
+    rm -rf /var/lib/apt/lists/* /tmp/phpredis /tmp/liblzf /tmp/phpredis-6.3.0.tar.gz /tmp/liblzf.tar.gz
 # Batas unggah PHP mengikuti batas lampiran dokumen, 10 MB (`coreerp.attachments.max_kb`, K-22 analisa gap
 # BC). Bawaan PHP 2 MB menolak berkas yang lebih besar sebelum validasi Laravel berjalan, dengan pesan yang
 # tidak menyebut batasnya. `post_max_size` sedikit di atasnya untuk isian form lain di permintaan yang sama.
