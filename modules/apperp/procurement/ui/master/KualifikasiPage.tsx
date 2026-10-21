@@ -284,7 +284,7 @@ export default function KualifikasiPage(_props?: PageProps) {
             <PrakualifikasiDetailModal
                 open={detailOpen}
                 onOpenChange={setDetailOpen}
-                item={viewingItem}
+                data={viewingItem}
             />
         </div>
     );
