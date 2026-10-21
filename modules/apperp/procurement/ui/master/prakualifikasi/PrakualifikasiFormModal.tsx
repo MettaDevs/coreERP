@@ -274,32 +274,6 @@ export function PrakualifikasiFormModal({
         setItems(getEmptyInitialItems());
     }, []);
 
-    function resetToSampleData() {
-        setQualificationDate('2026-08-05');
-        setQualificationNumber('Pra/VIII/26/0001');
-        setVendorId(null);
-        setVendorCode('Supp-001');
-        setVendorName('PT. ABCD');
-        setVendorType('Distributor Utama');
-        setPicName('Bpk. A');
-        setTaxOrIdNumber('01.234.567.8-901.000');
-        setPhone('0361 - xxxxxxx');
-        setEmail('kontak@pt-abcd.co.id');
-        setSocialMedia('www.pt-abcd.co.id');
-        setAddress('Jln. Kusuma Bangsa II, No. 11');
-        setLegalStatus('Badan Hukum');
-        setVendorStatus('Vendor Resmi');
-        setQualificationStatus('Lolos');
-        setLeadTime('7 Hari');
-        setEmployeeCount('45');
-        setNotes(
-            'Berkas kelengkapan legalitas dan referensi keagenan telah diverifikasi lengkap dan valid.',
-        );
-        setDocumentList(getDefaultStandardDocs());
-        setAdditionalDocuments([]);
-        setItems(getDefaultSampleItems());
-    }
-
     useEffect(() => {
         if (!open) {
             return;

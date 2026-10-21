@@ -1,9 +1,10 @@
-import { Calculator, Pencil, RefreshCw, Search, X } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
-import { toast } from 'sonner';
-import { Button } from '@apperp/ui/button';
-import { Card, CardContent, CardHeader } from '@apperp/ui/card';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
 import { DataTable } from '@apperp/ui/data-table';
+import type {
+    DataTableColumn,
+    DataTableRowAction,
+} from '@apperp/ui/data-table';
 import {
     Empty,
     EmptyDescription,
@@ -11,7 +12,6 @@ import {
     EmptyTitle,
 } from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
-import { TableCell, TableRow } from '@apperp/ui/table';
 import { api, toastSaveError } from '../api';
 import {
     HargaPerkiraanEditModal,
@@ -19,18 +19,6 @@ import {
     formatRupiah,
 } from './harga-perkiraan/HargaPerkiraanEditModal';
 import type { HargaPerkiraanItem } from './harga-perkiraan/HargaPerkiraanEditModal';
-
-const hargaPerkiraanColumns = [
-    { id: 'no', header: 'No.', cell: () => null },
-    { id: 'group_item', header: 'Group Item', cell: () => null },
-    { id: 'jenis_item', header: 'Jenis Item', cell: () => null },
-    { id: 'kode_item', header: 'Kode Item', cell: () => null },
-    { id: 'nama_item', header: 'Nama Item', cell: () => null },
-    { id: 'satuan', header: 'Satuan', cell: () => null },
-    { id: 'harga_perkiraan', header: 'Harga Per Satuan', cell: () => null },
-    { id: 'tanggal_update', header: 'Tgl Update', cell: () => null },
-    { id: 'aksi', header: 'Aksi', cell: () => null },
-];
 
 type PageProps = {
     view?: string;
@@ -54,7 +42,7 @@ export default function HargaPerkiraanPage(_props?: PageProps) {
     const [meta, setMeta] = useState<PaginationMeta>({
         current_page: 1,
         last_page: 1,
-        per_page: 15,
+        per_page: 20,
         total: 0,
     });
 
@@ -87,7 +75,7 @@ export default function HargaPerkiraanPage(_props?: PageProps) {
                     res.meta || {
                         current_page: 1,
                         last_page: 1,
-                        per_page: 15,
+                        per_page: 20,
                         total: res.data?.length || 0,
                     },
                 );
@@ -113,259 +101,154 @@ export default function HargaPerkiraanPage(_props?: PageProps) {
         setEditModalOpen(true);
     };
 
-    const handleUpdateSuccess = (updated: HargaPerkiraanItem) => {
+    const handleUpdateSuccess = (updatedItem: HargaPerkiraanItem) => {
         setItems((prev) =>
-            prev.map((it) =>
-                it.id === updated.id ? { ...it, ...updated } : it,
-            ),
+            prev.map((it) => (it.id === updatedItem.id ? updatedItem : it)),
         );
     };
 
-    const handleRefresh = () => {
-        fetchData(meta.current_page);
-        toast.info('Data harga perkiraan diperbarui.');
-    };
+    const columns: DataTableColumn<HargaPerkiraanItem>[] = useMemo(
+        () => [
+            {
+                id: 'item',
+                header: 'Item Barang / Jasa',
+                cell: (row) => (
+                    <div className="space-y-0.5">
+                        <div className="text-xs font-semibold">
+                            {row.nama_item}
+                        </div>
+                        <div className="text-muted-foreground font-mono text-[11px]">
+                            {row.kode_item}
+                        </div>
+                    </div>
+                ),
+                width: 250,
+            },
+            {
+                id: 'group_item',
+                header: 'Group & Jenis Item',
+                cell: (row) => (
+                    <div className="space-y-0.5 text-xs">
+                        <div className="font-medium">{row.group_item}</div>
+                        <div className="text-muted-foreground text-[11px]">
+                            {row.jenis_item}
+                        </div>
+                    </div>
+                ),
+                width: 180,
+            },
+            {
+                id: 'satuan',
+                header: 'Satuan',
+                cell: (row) => (
+                    <span className="text-muted-foreground text-xs">
+                        {row.satuan}
+                    </span>
+                ),
+                width: 100,
+            },
+            {
+                id: 'harga_perkiraan',
+                header: 'Harga Estimasi (HPS)',
+                cell: (row) => (
+                    <span className="font-mono text-xs font-bold">
+                        {formatRupiah(row.harga_perkiraan)}
+                    </span>
+                ),
+                width: 180,
+            },
+            {
+                id: 'tanggal_update',
+                header: 'Tgl Pembaruan',
+                cell: (row) => (
+                    <span className="text-muted-foreground text-xs">
+                        {row.tanggal_update
+                            ? formatIndonesianDate(row.tanggal_update)
+                            : '—'}
+                    </span>
+                ),
+                width: 150,
+            },
+        ],
+        [],
+    );
+
+    const rowActions: DataTableRowAction[] = useMemo(
+        () => [{ id: 'edit', label: 'Ubah' }],
+        [],
+    );
 
     return (
-        <div className="space-y-6 p-6">
-            {/* Breadcrumb & Header Title */}
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <div className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
-                        <span>Pengadaan</span>
-                        <span>/</span>
-                        <span>Master Data</span>
-                        <span>/</span>
-                        <span className="text-foreground font-semibold">
-                            4. Harga Perkiraan (HPS)
-                        </span>
-                    </div>
-                    <div className="mt-1 flex items-center gap-2">
-                        <Calculator className="text-primary h-6 w-6" />
-                        <h1 className="text-foreground text-2xl font-bold tracking-tight">
-                            Harga Perkiraan
-                        </h1>
-                    </div>
-                    <p className="text-muted-foreground mt-0.5 text-xs">
-                        Daftar acuan estimasi harga satuan bahan, upah, asset,
-                        subkontraktor, dan biaya overhead.
-                    </p>
-                </div>
-
-                <div className="flex items-center gap-2 self-start sm:self-auto">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleRefresh}
-                        disabled={loading}
-                        className="h-8 gap-1.5 text-xs font-medium"
-                    >
-                        <RefreshCw
-                            className={`h-3.5 w-3.5 ${
-                                loading ? 'animate-spin' : ''
-                            }`}
-                        />
-                        Refresh
-                    </Button>
-                </div>
-            </div>
-
-            {/* Container Card Tabel Harga Perkiraan */}
-            <Card className="border shadow-sm">
-                <CardHeader className="bg-card border-b p-4">
-                    <div className="flex items-center justify-between gap-4">
-                        <div className="relative max-w-sm flex-1">
-                            <div className="text-muted-foreground pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
-                                <Search className="h-3.5 w-3.5" />
-                            </div>
-                            <Input
-                                placeholder="Pencarian harga perkiraan..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className="bg-background border-input h-8 pl-8 pr-7 text-xs"
-                            />
-                            {search && (
-                                <button
-                                    type="button"
-                                    onClick={() => setSearch('')}
-                                    className="text-muted-foreground hover:text-foreground absolute inset-y-0 right-0 flex items-center pr-2"
-                                >
-                                    <X className="h-3.5 w-3.5" />
-                                </button>
-                            )}
-                        </div>
-                    </div>
+        <div className="h-full min-h-0 overflow-hidden">
+            <Card
+                aria-labelledby="list-title"
+                className="flex h-full min-h-0 flex-col overflow-hidden rounded-none border-0 shadow-none"
+            >
+                <CardHeader className="min-h-0 shrink-0 border-b">
+                    <CardTitle id="list-title">Harga Perkiraan</CardTitle>
                 </CardHeader>
 
-                <CardContent className="p-0">
-                    {/* Header Strip Hijau: "Daftar Harga Perkiraan" Sesuai Mockup */}
-                    <div className="flex items-center justify-between border-b border-emerald-200/60 bg-emerald-50 px-4 py-2 dark:border-emerald-900/40 dark:bg-emerald-950/30">
-                        <div className="inline-flex items-center gap-1.5 rounded border border-emerald-300/80 bg-emerald-100/90 px-3 py-1 text-xs font-bold tracking-wide text-emerald-900 dark:border-emerald-700/60 dark:bg-emerald-900/50 dark:text-emerald-200">
-                            <span>Daftar Harga Perkiraan</span>
+                <CardContent className="flex min-h-0 flex-1 flex-col px-0">
+                    <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end sm:justify-between">
+                        <div className="space-y-1">
+                            <p className="text-sm font-semibold">
+                                Daftar Harga Perkiraan Sendiri (HPS)
+                            </p>
+                            <p className="text-muted-foreground text-xs">
+                                {meta.total} data dimuat
+                            </p>
                         </div>
-                        <span className="text-muted-foreground text-xs font-medium">
-                            Total: {meta.total} Item Harga Perkiraan
-                        </span>
+                        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                            <Input
+                                className="h-8 w-full text-xs sm:w-64"
+                                type="search"
+                                placeholder="Cari item, kode, atau group..."
+                                aria-label="Cari harga perkiraan"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
+                        </div>
                     </div>
 
-                    {/* Tabel Daftar Harga Perkiraan (9 Kolom Persis Mockup Gambar) */}
-                    <DataTable
-                        scrollMode="inline"
-                        showRowNumbers={false}
-                        columns={hargaPerkiraanColumns}
-                        data={items}
-                        getRowKey={(row) => row.id}
-                        renderRows={() => (
-                            <>
-                                {loading ? (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={9}
-                                            className="text-muted-foreground py-12 text-center text-sm"
-                                        >
-                                            Memuat daftar harga perkiraan...
-                                        </TableCell>
-                                    </TableRow>
-                                ) : items.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={9}
-                                            className="py-12"
-                                        >
-                                            <Empty>
-                                                <EmptyHeader>
-                                                    <EmptyTitle>
-                                                        Belum Ada Data Harga
-                                                        Perkiraan
-                                                    </EmptyTitle>
-                                                    <EmptyDescription>
-                                                        Item barang dan jasa
-                                                        yang masuk pengadaan
-                                                        akan ditampilkan di sini
-                                                        beserta nilai estimasi
-                                                        HPS.
-                                                    </EmptyDescription>
-                                                </EmptyHeader>
-                                            </Empty>
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    items.map((row, idx) => (
-                                        <TableRow
-                                            key={row.id}
-                                            className="hover:bg-muted/50 cursor-pointer border-b text-xs transition-colors"
-                                        >
-                                            {/* 1. No */}
-                                            <TableCell className="text-muted-foreground border-r text-center font-medium">
-                                                {(meta.current_page - 1) *
-                                                    meta.per_page +
-                                                    idx +
-                                                    1}
-                                            </TableCell>
-
-                                            {/* 2. Group Item */}
-                                            <TableCell className="text-foreground border-r text-center font-medium">
-                                                {row.group_item}
-                                            </TableCell>
-
-                                            {/* 3. Jenis Item */}
-                                            <TableCell className="text-muted-foreground border-r text-center">
-                                                {row.jenis_item}
-                                            </TableCell>
-
-                                            {/* 4. Kode Item */}
-                                            <TableCell className="text-foreground border-r text-center font-mono font-medium">
-                                                {row.kode_item}
-                                            </TableCell>
-
-                                            {/* 5. Nama Item */}
-                                            <TableCell className="text-foreground border-r font-bold">
-                                                {row.nama_item}
-                                            </TableCell>
-
-                                            {/* 6. Satuan */}
-                                            <TableCell className="text-muted-foreground border-r text-center">
-                                                {row.satuan}
-                                            </TableCell>
-
-                                            {/* 7. Harga Per Satuan */}
-                                            <TableCell className="text-foreground border-r px-4 text-right font-mono font-bold">
-                                                {formatRupiah(
-                                                    row.harga_perkiraan,
-                                                )}
-                                            </TableCell>
-
-                                            {/* 8. Tgl Update */}
-                                            <TableCell className="text-muted-foreground border-r text-center">
-                                                {row.tanggal_update
-                                                    ? formatIndonesianDate(
-                                                          row.tanggal_update,
-                                                      )
-                                                    : '-'}
-                                            </TableCell>
-
-                                            {/* 9. Aksi (Tombol Langsung) */}
-                                            <TableCell className="whitespace-nowrap p-2 text-center">
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        handleEdit(row)
-                                                    }
-                                                    className="h-7 border-amber-300 bg-amber-50 px-3 text-xs font-medium text-amber-700 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
-                                                >
-                                                    <Pencil className="mr-1 h-3.5 w-3.5" />
-                                                    Edit
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </>
-                        )}
-                    />
-
-                    {/* Pagination Bar */}
-                    {meta.last_page > 1 && (
-                        <div className="flex items-center justify-between border-t px-4 py-3">
-                            <span className="text-muted-foreground text-xs">
-                                Halaman {meta.current_page} dari{' '}
-                                {meta.last_page} (Total: {meta.total})
-                            </span>
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={meta.current_page <= 1}
-                                    onClick={() =>
-                                        fetchData(meta.current_page - 1)
-                                    }
-                                    className="h-8 text-xs"
-                                >
-                                    Sebelumnya
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={
-                                        meta.current_page >= meta.last_page
-                                    }
-                                    onClick={() =>
-                                        fetchData(meta.current_page + 1)
-                                    }
-                                    className="h-8 text-xs"
-                                >
-                                    Berikutnya
-                                </Button>
-                            </div>
-                        </div>
+                    {loading && !items.length ? (
+                        <Empty>
+                            <EmptyDescription>
+                                Memuat data harga perkiraan…
+                            </EmptyDescription>
+                        </Empty>
+                    ) : items.length === 0 ? (
+                        <Empty>
+                            <EmptyHeader>
+                                <EmptyTitle>
+                                    Belum ada data harga perkiraan
+                                </EmptyTitle>
+                                <EmptyDescription>
+                                    Item barang dan jasa yang masuk pengadaan
+                                    akan ditampilkan di sini beserta nilai
+                                    estimasi HPS.
+                                </EmptyDescription>
+                            </EmptyHeader>
+                        </Empty>
+                    ) : (
+                        <DataTable
+                            scrollMode="viewport"
+                            className="min-h-0 flex-1"
+                            columns={columns}
+                            data={items}
+                            getRowKey={(row) => row.id}
+                            getRowLabel={(row) => row.nama_item}
+                            actions={rowActions}
+                            onRowAction={(actionId, row) => {
+                                if (actionId === 'edit') {
+                                    handleEdit(row);
+                                }
+                            }}
+                        />
                     )}
                 </CardContent>
             </Card>
 
-            {/* Modal Ubah Data Harga Perkiraan Sesuai Form Kanan Gambar */}
+            {/* Modal Ubah Data Harga Perkiraan */}
             <HargaPerkiraanEditModal
                 open={editModalOpen}
                 onOpenChange={setEditModalOpen}
