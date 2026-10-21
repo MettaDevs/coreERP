@@ -1,15 +1,6 @@
-import {
-    CheckCircle2,
-    ClipboardCheck,
-    Clock,
-    Filter,
-    Plus,
-    RefreshCw,
-    Search,
-    XCircle,
-} from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { ActionButton } from '@apperp/ui/action-button';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -20,9 +11,19 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@apperp/ui/alert-dialog';
-import { Button } from '@apperp/ui/button';
-import { Card, CardContent, CardHeader } from '@apperp/ui/card';
+import { Badge } from '@apperp/ui/badge';
+import {
+    Card,
+    CardAction,
+    CardContent,
+    CardHeader,
+    CardTitle,
+} from '@apperp/ui/card';
 import { DataTable } from '@apperp/ui/data-table';
+import type {
+    DataTableColumn,
+    DataTableRowAction,
+} from '@apperp/ui/data-table';
 import {
     Empty,
     EmptyDescription,
@@ -30,28 +31,11 @@ import {
     EmptyTitle,
 } from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
-import { TableCell, TableRow } from '@apperp/ui/table';
-
+import { Select } from '@apperp/ui/select';
 import { api, toastSaveError } from '../api';
 import { PrakualifikasiDetailModal } from './prakualifikasi/PrakualifikasiDetailModal';
 import { PrakualifikasiFormModal } from './prakualifikasi/PrakualifikasiFormModal';
 import type { PrakualifikasiFormData } from './prakualifikasi/PrakualifikasiFormModal';
-
-const prakualifikasiColumns = [
-    { id: 'no', header: 'No.', cell: () => null },
-    { id: 'info', header: 'Info Prakualifikasi', cell: () => null },
-    { id: 'kode_vendor', header: 'Kode Vendor/Supplier', cell: () => null },
-    { id: 'nama_vendor', header: 'Nama Vendor/Supplier', cell: () => null },
-    { id: 'pic', header: 'Contact Person', cell: () => null },
-    { id: 'telepon', header: 'Telp/HP', cell: () => null },
-    { id: 'alamat', header: 'Alamat Vendor/Supplier', cell: () => null },
-    { id: 'status_vendor', header: 'Status Vendor/Supplier', cell: () => null },
-    {
-        id: 'status_kualifikasi',
-        header: 'Status Kualifikasi',
-        cell: () => null,
-    },
-];
 
 type PrakualifikasiRow = PrakualifikasiFormData & {
     id: string;
@@ -69,7 +53,7 @@ type PaginationMeta = {
 
 function formatDisplayDate(dateStr: string): string {
     if (!dateStr) {
-        return '';
+        return '—';
     }
 
     if (dateStr.includes('/')) {
@@ -101,20 +85,22 @@ export default function PrakualifikasiPage(_props?: PageProps) {
     const [meta, setMeta] = useState<PaginationMeta>({
         current_page: 1,
         last_page: 1,
-        per_page: 15,
+        per_page: 20,
         total: 0,
     });
 
-    // Modals
-    const [formOpen, setFormOpen] = useState(false);
+    // Form Modal (Tambah / Edit)
+    const [formModalOpen, setFormModalOpen] = useState(false);
     const [editingItem, setEditingItem] =
         useState<PrakualifikasiFormData | null>(null);
-    const [detailOpen, setDetailOpen] = useState(false);
-    const [viewingItem, setViewingItem] = useState<PrakualifikasiRow | null>(
+
+    // Detail Modal (View)
+    const [detailModalOpen, setDetailModalOpen] = useState(false);
+    const [selectedItem, setSelectedItem] = useState<PrakualifikasiRow | null>(
         null,
     );
 
-    // Archive / delete dialog
+    // Delete / Archive Confirmation
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [deleting, setDeleting] = useState(false);
 
@@ -145,12 +131,15 @@ export default function PrakualifikasiPage(_props?: PageProps) {
                     res.meta || {
                         current_page: 1,
                         last_page: 1,
-                        per_page: 15,
+                        per_page: 20,
                         total: res.data?.length || 0,
                     },
                 );
             } catch (err) {
-                toastSaveError(err, 'Gagal memuat daftar prakualifikasi.');
+                toastSaveError(
+                    err,
+                    'Gagal memuat daftar prakualifikasi vendor.',
+                );
             } finally {
                 setLoading(false);
             }
@@ -160,7 +149,7 @@ export default function PrakualifikasiPage(_props?: PageProps) {
 
     useEffect(() => {
         const timer = setTimeout(() => {
-            fetchData(1);
+            void fetchData(1);
         }, 0);
 
         return () => clearTimeout(timer);
@@ -168,17 +157,28 @@ export default function PrakualifikasiPage(_props?: PageProps) {
 
     const handleCreate = () => {
         setEditingItem(null);
-        setFormOpen(true);
+        setFormModalOpen(true);
     };
 
     const handleEdit = (item: PrakualifikasiRow) => {
         setEditingItem(item);
-        setFormOpen(true);
+        setFormModalOpen(true);
     };
 
     const handleView = (item: PrakualifikasiRow) => {
-        setViewingItem(item);
-        setDetailOpen(true);
+        setSelectedItem(item);
+        setDetailModalOpen(true);
+    };
+
+    const handleSuccess = (saved: PrakualifikasiRow, isNew: boolean) => {
+        if (isNew) {
+            setItems((prev) => [saved, ...prev]);
+            setMeta((prev) => ({ ...prev, total: prev.total + 1 }));
+        } else {
+            setItems((prev) =>
+                prev.map((it) => (it.id === saved.id ? saved : it)),
+            );
+        }
     };
 
     const handleArchive = async () => {
@@ -193,370 +193,237 @@ export default function PrakualifikasiPage(_props?: PageProps) {
                 method: 'DELETE',
             });
             toast.success('Data prakualifikasi berhasil diarsipkan.');
+            setItems((prev) => prev.filter((it) => it.id !== deleteId));
+            setMeta((prev) => ({
+                ...prev,
+                total: Math.max(0, prev.total - 1),
+            }));
             setDeleteId(null);
-            fetchData(meta.current_page);
         } catch (err) {
-            toastSaveError(err, 'Gagal mengarsipkan data prakualifikasi.');
+            toastSaveError(err, 'Gagal menghapus data prakualifikasi.');
         } finally {
             setDeleting(false);
         }
     };
 
-    const getStatusBadge = (status: string) => {
-        if (
-            status === 'Lolos' ||
-            status === 'Memenuhi Syarat' ||
-            status === '1. Lolos'
-        ) {
-            return (
-                <span className="inline-flex items-center rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-                    <CheckCircle2 className="mr-1 h-3 w-3" />
-                    Lolos
-                </span>
-            );
-        }
+    const columns: DataTableColumn<PrakualifikasiRow>[] = useMemo(
+        () => [
+            {
+                id: 'nomor_prakualifikasi',
+                header: 'No. Dokumen',
+                cell: (row) => (
+                    <div className="space-y-0.5">
+                        <span className="font-mono text-xs font-semibold">
+                            {row.nomor_prakualifikasi}
+                        </span>
+                        <div className="text-muted-foreground text-[11px]">
+                            {formatDisplayDate(row.tanggal_prakualifikasi)}
+                        </div>
+                    </div>
+                ),
+                width: 170,
+            },
+            {
+                id: 'vendor',
+                header: 'Vendor / Rekanan',
+                cell: (row) => (
+                    <div className="space-y-0.5">
+                        <div className="text-xs font-semibold">
+                            {row.nama_vendor}
+                        </div>
+                        <div className="text-muted-foreground font-mono text-[11px]">
+                            {row.kode_vendor}
+                        </div>
+                    </div>
+                ),
+                width: 220,
+            },
+            {
+                id: 'pic',
+                header: 'Kontak / PIC',
+                cell: (row) => (
+                    <div className="space-y-0.5 text-xs">
+                        <div>{row.nama_pic || '—'}</div>
+                        <div className="text-muted-foreground font-mono text-[11px]">
+                            {row.telepon || '—'}
+                        </div>
+                    </div>
+                ),
+                width: 160,
+            },
+            {
+                id: 'alamat',
+                header: 'Alamat',
+                cell: (row) => (
+                    <span className="text-muted-foreground line-clamp-2 text-xs">
+                        {row.alamat || '—'}
+                    </span>
+                ),
+                width: 240,
+            },
+            {
+                id: 'status_vendor',
+                header: 'Status Rekanan',
+                cell: (row) => (
+                    <Badge variant="secondary" className="text-[11px]">
+                        {row.status_vendor || 'Vendor Resmi'}
+                    </Badge>
+                ),
+                width: 140,
+            },
+            {
+                id: 'status_kualifikasi',
+                header: 'Hasil Evaluasi',
+                cell: (row) => {
+                    const status = row.status_kualifikasi || 'Lolos';
+                    const isLolos = status.toLowerCase() === 'lolos';
 
-        if (
-            status === 'Batal' ||
-            status === 'Tidak Memenuhi Syarat' ||
-            status === '2. Batal'
-        ) {
-            return (
-                <span className="inline-flex items-center rounded bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-800 dark:bg-rose-900/40 dark:text-rose-300">
-                    <XCircle className="mr-1 h-3 w-3" />
-                    Batal
-                </span>
-            );
-        }
+                    return (
+                        <Badge
+                            variant={isLolos ? 'default' : 'destructive'}
+                            className="text-[11px]"
+                        >
+                            {status}
+                        </Badge>
+                    );
+                },
+                width: 130,
+            },
+        ],
+        [],
+    );
 
-        return (
-            <span className="inline-flex items-center rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                <Clock className="mr-1 h-3 w-3" />
-                {status || 'Dalam Proses'}
-            </span>
-        );
-    };
+    const rowActions: DataTableRowAction[] = useMemo(
+        () => [
+            { id: 'view', label: 'Lihat Detail' },
+            { id: 'edit', label: 'Ubah' },
+            {
+                id: 'archive',
+                label: 'Delete',
+                destructive: true,
+                separatorBefore: true,
+            },
+        ],
+        [],
+    );
 
     return (
-        <div className="space-y-6 p-6">
-            {/* Header & Action Bar Sesuai Acuan Mockup */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <div className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
-                        <span>Pengadaan</span>
-                        <span>/</span>
-                        <span>Master Data</span>
-                        <span>/</span>
-                        <span className="text-foreground font-semibold">
-                            Prakualifikasi
-                        </span>
-                    </div>
-                    <h1 className="text-foreground mt-1 text-2xl font-bold tracking-tight">
-                        Prakualifikasi Vendor/Supplier
-                    </h1>
-                </div>
+        <div className="h-full min-h-0 overflow-hidden">
+            <Card
+                aria-labelledby="list-title"
+                className="flex h-full min-h-0 flex-col overflow-hidden rounded-none border-0 shadow-none"
+            >
+                <CardHeader className="min-h-0 shrink-0 border-b">
+                    <CardTitle id="list-title">Prakualifikasi Vendor</CardTitle>
+                    <CardAction>
+                        <ActionButton action="create" onClick={handleCreate} />
+                    </CardAction>
+                </CardHeader>
 
-                {/* Tombol Aksi: Proses Prakualifikasi & Refresh */}
-                <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                        size="sm"
-                        onClick={handleCreate}
-                        className="bg-primary hover:bg-primary/90 text-primary-foreground h-9 font-medium shadow-sm"
-                    >
-                        <ClipboardCheck className="mr-1.5 h-3.5 w-3.5" />
-                        Proses Prakualifikasi
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => fetchData(meta.current_page)}
-                        disabled={loading}
-                        className="h-9 font-medium"
-                    >
-                        <RefreshCw
-                            className={`mr-1.5 h-3.5 w-3.5 ${
-                                loading ? 'animate-spin' : ''
-                            }`}
-                        />
-                        Refresh
-                    </Button>
-                </div>
-            </div>
-
-            {/* Kotak Filter & Pencarian */}
-            <Card className="border shadow-sm">
-                <CardHeader className="bg-muted/20 border-b px-4 pb-3 pt-4">
-                    <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
-                        <div className="flex max-w-md flex-1 items-center gap-2">
-                            <span className="text-muted-foreground whitespace-nowrap text-xs font-semibold">
-                                Pencarian:
-                            </span>
-                            <div className="relative flex-1">
-                                <Search className="text-muted-foreground absolute left-2.5 top-2.5 h-4 w-4" />
-                                <Input
-                                    placeholder="Cari nomor, kode, nama vendor, atau kontak..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className="h-9 pl-8 text-xs"
+                <CardContent className="flex min-h-0 flex-1 flex-col px-0">
+                    <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end sm:justify-between">
+                        <div className="space-y-1">
+                            <p className="text-sm font-semibold">
+                                Daftar Prakualifikasi
+                            </p>
+                            <p className="text-muted-foreground text-xs">
+                                {meta.total} data dimuat
+                            </p>
+                        </div>
+                        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                            <Input
+                                className="h-8 w-full text-xs sm:w-64"
+                                type="search"
+                                placeholder="Cari nomor, kode, atau vendor..."
+                                aria-label="Cari prakualifikasi"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
+                            <div className="w-full sm:w-44">
+                                <Select
+                                    items={['Semua status', 'Lolos', 'Batal']}
+                                    value={
+                                        statusFilter === 'semua'
+                                            ? 'Semua status'
+                                            : statusFilter
+                                    }
+                                    searchPlaceholder="Cari status"
+                                    emptyMessage="Status tidak ditemukan."
+                                    ariaLabel="Saring berdasarkan status kualifikasi"
+                                    onValueChange={(val) => {
+                                        setStatusFilter(
+                                            val === 'Semua status'
+                                                ? 'semua'
+                                                : val,
+                                        );
+                                    }}
                                 />
                             </div>
                         </div>
+                    </div>
 
-                        <div className="flex flex-wrap items-center gap-2">
-                            <div className="text-muted-foreground flex items-center gap-1.5 text-xs font-medium">
-                                <Filter className="h-3.5 w-3.5" />
-                                Status Kualifikasi:
-                            </div>
-                            <select
-                                className="border-input bg-background focus-visible:ring-ring h-9 rounded-md border px-3 py-1 text-xs shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1"
-                                value={statusFilter}
-                                onChange={(e) =>
-                                    setStatusFilter(e.target.value)
+                    {loading && !items.length ? (
+                        <Empty>
+                            <EmptyDescription>
+                                Memuat data prakualifikasi…
+                            </EmptyDescription>
+                        </Empty>
+                    ) : items.length === 0 ? (
+                        <Empty>
+                            <EmptyHeader>
+                                <EmptyTitle>
+                                    Belum ada data prakualifikasi
+                                </EmptyTitle>
+                                <EmptyDescription>
+                                    Pilih Baru untuk memulai proses
+                                    prakualifikasi vendor pertama.
+                                </EmptyDescription>
+                            </EmptyHeader>
+                        </Empty>
+                    ) : (
+                        <DataTable
+                            scrollMode="viewport"
+                            className="min-h-0 flex-1"
+                            columns={columns}
+                            data={items}
+                            getRowKey={(row) => row.id}
+                            getRowLabel={(row) => row.nomor_prakualifikasi}
+                            actions={rowActions}
+                            onRowAction={(actionId, row) => {
+                                if (actionId === 'view') {
+                                    handleView(row);
                                 }
-                            >
-                                <option value="semua">Semua Status</option>
-                                <option value="Lolos">Lolos</option>
-                                <option value="Batal">Batal</option>
-                            </select>
 
-                            {(search || statusFilter !== 'semua') && (
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                        setSearch('');
-                                        setStatusFilter('semua');
-                                    }}
-                                    className="h-9 text-xs"
-                                >
-                                    Reset
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-                </CardHeader>
+                                if (actionId === 'edit') {
+                                    handleEdit(row);
+                                }
 
-                <CardContent className="p-0">
-                    <div className="bg-muted/30 flex items-center justify-between border-b px-4 py-2.5">
-                        <span className="text-foreground text-xs font-semibold uppercase tracking-wide">
-                            Daftar Prakualifikasi Vendor/Supplier
-                        </span>
-                        <span className="text-muted-foreground text-xs">
-                            Total: {meta.total} Data
-                        </span>
-                    </div>
-
-                    <DataTable
-                        scrollMode="inline"
-                        showRowNumbers={false}
-                        columns={prakualifikasiColumns}
-                        data={items}
-                        getRowKey={(row) => row.id}
-                        renderRows={() => (
-                            <>
-                                {loading ? (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={9}
-                                            className="text-muted-foreground py-12 text-center text-sm"
-                                        >
-                                            Memuat daftar prakualifikasi
-                                            vendor/supplier...
-                                        </TableCell>
-                                    </TableRow>
-                                ) : items.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={9}
-                                            className="py-12"
-                                        >
-                                            <Empty>
-                                                <EmptyHeader>
-                                                    <EmptyTitle>
-                                                        Belum Ada Data
-                                                        Prakualifikasi
-                                                    </EmptyTitle>
-                                                    <EmptyDescription>
-                                                        Mulai masukkan data
-                                                        prakualifikasi vendor
-                                                        baru dengan menekan
-                                                        tombol{' '}
-                                                        <strong>
-                                                            Proses
-                                                            Prakualifikasi
-                                                        </strong>{' '}
-                                                        di atas.
-                                                    </EmptyDescription>
-                                                </EmptyHeader>
-                                                <div className="mt-4 flex justify-center">
-                                                    <Button
-                                                        size="sm"
-                                                        onClick={handleCreate}
-                                                        className="bg-blue-600 text-white hover:bg-blue-700"
-                                                    >
-                                                        <Plus className="mr-1.5 h-4 w-4" />
-                                                        Proses Prakualifikasi
-                                                    </Button>
-                                                </div>
-                                            </Empty>
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    items.map((row, idx) => (
-                                        <TableRow
-                                            key={row.id}
-                                            onClick={() => handleView(row)}
-                                            className="hover:bg-muted/50 cursor-pointer border-b text-xs transition-colors"
-                                        >
-                                            {/* 1. No */}
-                                            <TableCell className="text-muted-foreground border-r text-center font-medium">
-                                                {(meta.current_page - 1) *
-                                                    meta.per_page +
-                                                    idx +
-                                                    1}
-                                            </TableCell>
-
-                                            {/* 2. Info Prakualifikasi */}
-                                            <TableCell className="border-r text-center font-mono">
-                                                <div className="text-foreground font-medium">
-                                                    {formatDisplayDate(
-                                                        row.tanggal_prakualifikasi,
-                                                    )}
-                                                </div>
-                                                <div
-                                                    className="text-primary mt-0.5 cursor-pointer font-semibold hover:underline"
-                                                    onClick={() =>
-                                                        handleView(row)
-                                                    }
-                                                >
-                                                    {row.nomor_prakualifikasi}
-                                                </div>
-                                            </TableCell>
-
-                                            {/* 3. Kode Vendor/Supplier */}
-                                            <TableCell className="border-r text-center font-mono font-medium">
-                                                {row.kode_vendor}
-                                            </TableCell>
-
-                                            {/* 4. Nama Vendor/Supplier */}
-                                            <TableCell className="text-foreground border-r font-bold">
-                                                {row.nama_vendor}
-                                            </TableCell>
-
-                                            {/* 5. Contact Person */}
-                                            <TableCell className="border-r text-center">
-                                                {row.nama_pic || '-'}
-                                            </TableCell>
-
-                                            {/* 6. Telp/HP */}
-                                            <TableCell className="border-r text-center font-mono">
-                                                {row.telepon || '-'}
-                                            </TableCell>
-
-                                            {/* 7. Alamat Vendor/Supplier */}
-                                            <TableCell className="max-w-xs border-r">
-                                                {row.alamat || '-'}
-                                            </TableCell>
-
-                                            {/* 8. Status Vendor/Supplier */}
-                                            <TableCell className="border-r text-center font-medium">
-                                                {row.status_vendor ||
-                                                    'Vendor Resmi'}
-                                            </TableCell>
-
-                                            {/* 9. Status Kualifikasi */}
-                                            <TableCell className="text-center">
-                                                {getStatusBadge(
-                                                    row.status_kualifikasi,
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </>
-                        )}
-                    />
-
-                    {/* Pagination */}
-                    {meta.total > 0 && (
-                        <div className="text-muted-foreground flex items-center justify-between border-t px-6 py-3 text-xs">
-                            <div>
-                                Menampilkan{' '}
-                                <strong className="text-foreground">
-                                    {(meta.current_page - 1) * meta.per_page +
-                                        1}
-                                </strong>{' '}
-                                -{' '}
-                                <strong className="text-foreground">
-                                    {Math.min(
-                                        meta.current_page * meta.per_page,
-                                        meta.total,
-                                    )}
-                                </strong>{' '}
-                                dari{' '}
-                                <strong className="text-foreground">
-                                    {meta.total}
-                                </strong>{' '}
-                                vendor/supplier
-                            </div>
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={meta.current_page <= 1}
-                                    onClick={() =>
-                                        fetchData(meta.current_page - 1)
-                                    }
-                                    className="h-8 text-xs"
-                                >
-                                    Sebelumnya
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={
-                                        meta.current_page >= meta.last_page
-                                    }
-                                    onClick={() =>
-                                        fetchData(meta.current_page + 1)
-                                    }
-                                    className="h-8 text-xs"
-                                >
-                                    Berikutnya
-                                </Button>
-                            </div>
-                        </div>
+                                if (actionId === 'archive') {
+                                    setDeleteId(row.id);
+                                }
+                            }}
+                        />
                     )}
                 </CardContent>
             </Card>
 
-            {/* Modal Form Prakualifikasi */}
+            {/* Modal Form Tambah / Ubah */}
             <PrakualifikasiFormModal
-                open={formOpen}
-                onOpenChange={setFormOpen}
+                open={formModalOpen}
+                onOpenChange={setFormModalOpen}
                 initialData={editingItem}
-                onSuccess={() => fetchData(meta.current_page)}
+                onSuccess={handleSuccess}
             />
 
-            {/* Modal Detail Prakualifikasi */}
+            {/* Modal Detail */}
             <PrakualifikasiDetailModal
-                open={detailOpen}
-                onOpenChange={setDetailOpen}
-                data={viewingItem}
-                onEdit={() => {
-                    if (viewingItem) {
-                        handleEdit(viewingItem);
-                    }
-                }}
-                onDelete={() => {
-                    if (viewingItem?.id) {
-                        setDeleteId(viewingItem.id);
-                    }
-                }}
+                open={detailModalOpen}
+                onOpenChange={setDetailModalOpen}
+                item={selectedItem}
+                onEdit={handleEdit}
             />
 
-            {/* Alert Konfirmasi Arsip */}
+            {/* Dialog Konfirmasi Hapus */}
             <AlertDialog
                 open={Boolean(deleteId)}
                 onOpenChange={(open) => !open && setDeleteId(null)}
@@ -564,12 +431,13 @@ export default function PrakualifikasiPage(_props?: PageProps) {
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>
-                            Arsipkan Prakualifikasi Vendor?
+                            Hapus Data Prakualifikasi?
                         </AlertDialogTitle>
                         <AlertDialogDescription>
-                            Tindakan ini akan mengarsipkan data evaluasi
-                            vendor/supplier bersangkutan. Rekam data tidak
-                            dihapus permanen demi kebutuhan riwayat audit.
+                            Apakah Anda yakin ingin menghapus data
+                            prakualifikasi ini? Tindakan ini akan mengarsipkan
+                            dokumen dan data tidak akan tampil di transaksi
+                            baru.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -581,7 +449,7 @@ export default function PrakualifikasiPage(_props?: PageProps) {
                             disabled={deleting}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                            {deleting ? 'Mengarsipkan...' : 'Arsipkan'}
+                            {deleting ? 'Menghapus…' : 'Hapus'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
