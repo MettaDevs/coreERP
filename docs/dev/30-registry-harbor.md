@@ -147,6 +147,7 @@ SaaS dev menarik dengan cara yang sama tetapi dari `deploy/saas/pasang-rilis.sh`
 ### PHP runtime pada image aplikasi
 
 Image CoreERP memakai PHP 8.4.27 ZTS dari image resmi `php:8.4.27-zts-trixie`. FrankenPHP 1.12.7 menyediakan server dan pemasang ekstensi; `libwatcher` disalin bersama servernya, sedangkan pustaka PHP yang melayani request berasal dari base PHP 8.4.27. Image konsol dan API modul Manajemen Aset memakai `php:8.4.27-apache-trixie`. Versi patch PHP ditulis eksplisit agar rilis berikutnya tidak kembali ke runtime yang belum ditambal.
+PhpRedis 6.3.0 dibangun dari commit upstream yang dipin; proses build tidak bergantung pada index PECL yang sempat timeout. Source LZF ikut dipin, dan dukungan kompresi LZF, Zstandard, serta LZ4 dipertahankan.
 
 `deploy/perakit/rakit.sh` satu-satunya yang mendorong ke project `coreerp`. Aturannya:
 
