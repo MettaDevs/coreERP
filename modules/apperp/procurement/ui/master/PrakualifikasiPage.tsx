@@ -170,15 +170,8 @@ export default function PrakualifikasiPage(_props?: PageProps) {
         setDetailModalOpen(true);
     };
 
-    const handleSuccess = (saved: PrakualifikasiRow, isNew: boolean) => {
-        if (isNew) {
-            setItems((prev) => [saved, ...prev]);
-            setMeta((prev) => ({ ...prev, total: prev.total + 1 }));
-        } else {
-            setItems((prev) =>
-                prev.map((it) => (it.id === saved.id ? saved : it)),
-            );
-        }
+    const handleSuccess = () => {
+        void fetchData(meta.current_page);
     };
 
     const handleArchive = async () => {
@@ -352,7 +345,7 @@ export default function PrakualifikasiPage(_props?: PageProps) {
                                     ariaLabel="Saring berdasarkan status kualifikasi"
                                     onValueChange={(val) => {
                                         setStatusFilter(
-                                            val === 'Semua status'
+                                            !val || val === 'Semua status'
                                                 ? 'semua'
                                                 : val,
                                         );
@@ -419,8 +412,12 @@ export default function PrakualifikasiPage(_props?: PageProps) {
             <PrakualifikasiDetailModal
                 open={detailModalOpen}
                 onOpenChange={setDetailModalOpen}
-                item={selectedItem}
-                onEdit={handleEdit}
+                data={selectedItem}
+                onEdit={() => {
+                    if (selectedItem) {
+                        handleEdit(selectedItem);
+                    }
+                }}
             />
 
             {/* Dialog Konfirmasi Hapus */}
