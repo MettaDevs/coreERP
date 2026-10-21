@@ -84,7 +84,15 @@ RUN npm run build
 # Ekstensi yang dipasang di sini ditambah yang sudah dikompilasi ke dalam PHP resmi (curl, mbstring, xml,
 # sqlite3, readline, sodium) sama dengan yang dulu datang dari paket Debian; `uji-image.sh` menagihnya.
 # `pcntl` dipakai `octane:frankenphp` untuk meneruskan SIGTERM ke server saat container dihentikan.
-FROM dunglas/frankenphp:1.12.7-php8.4-trixie AS php
+# PHP ZTS dan libphp berasal dari image resmi 8.4.27. Image FrankenPHP 1.12.7 hanya menyediakan
+# binari server, pemasang ekstensi, dan libwatcher; pustaka PHP 8.4.26-nya tidak ikut disalin.
+# FrankenPHP memuat libphp saat berjalan, dan kompatibilitas ABI patch 8.4 sudah diperiksa.
+FROM dunglas/frankenphp:1.12.7-php8.4-trixie@sha256:035fcb2fab91aacf77d70ee555d51b9bb084d057b16cf8a644bf1f93e28d4e3e AS frankenphp-assets
+FROM php:8.4.27-zts-trixie@sha256:1687b8117a59cc4ae1f73ff2f039f799e574c4b558c9e1148da1a72dc46169ca AS php
+COPY --from=frankenphp-assets /usr/local/bin/frankenphp /usr/local/bin/frankenphp
+COPY --from=frankenphp-assets /usr/local/bin/install-php-extensions /usr/local/bin/install-php-extensions
+COPY --from=frankenphp-assets /usr/local/lib/libwatcher-c.so* /usr/local/lib/
+RUN ldconfig
 RUN install-php-extensions bcmath gd intl pdo_pgsql pgsql redis zip pcntl opcache opentelemetry-1.2.1
 # Paket Debian pemilik setiap pustaka yang dibutuhkan binari, libphp, dan ekstensi. Pustaka di /usr/local
 # bukan milik paket mana pun; ia disalin langsung ke tahap akhir.
