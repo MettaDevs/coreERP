@@ -186,69 +186,6 @@ export function PrakualifikasiFormModal({
         ];
     }
 
-    function getDefaultStandardDocs(): PrakualifikasiDokumenForm[] {
-        // Status awal persis gambar acuan: Ada untuk baris 1, 5, 6, 7, 8, 9, 10; Tidak Ada untuk baris 2, 3, 4
-        const checkedIndices = [0, 4, 5, 6, 7, 8, 9];
-
-        return STANDARD_DOCUMENTS.map((name, idx) => ({
-            kategori: 'wajib',
-            urutan: idx + 1,
-            nama_dokumen: name,
-            ada: checkedIndices.includes(idx),
-            keterangan: '',
-        }));
-    }
-
-    function getDefaultSampleItems(): PrakualifikasiItemForm[] {
-        return [
-            {
-                urutan: 1,
-                jenis_item: 'Obat',
-                kode_item: 'Bahan 001',
-                nama_item: 'Obat A',
-                satuan: 'Tablet',
-                kesediaan: '1.000',
-                keterangan: '',
-            },
-            {
-                urutan: 2,
-                jenis_item: 'Obat',
-                kode_item: 'Bahan 02',
-                nama_item: 'Obat B',
-                satuan: 'Botol',
-                kesediaan: '2.000',
-                keterangan: '',
-            },
-            {
-                urutan: 3,
-                jenis_item: 'BMHP',
-                kode_item: 'Bahan 03',
-                nama_item: 'BMHP1',
-                satuan: 'Pcs',
-                kesediaan: '3.000',
-                keterangan: '',
-            },
-            {
-                urutan: 4,
-                jenis_item: 'BMHP',
-                kode_item: 'Bahan 04',
-                nama_item: 'BMHP2',
-                satuan: 'Box',
-                kesediaan: '200',
-                keterangan: '',
-            },
-            {
-                urutan: 5,
-                jenis_item: 'BMHP',
-                kode_item: 'Bahan 05',
-                nama_item: 'BMHP3',
-                satuan: 'Set',
-                kesediaan: '150',
-                keterangan: '',
-            },
-        ];
-    }
-
     const resetToEmptyForm = useCallback(() => {
         const today = new Date().toISOString().split('T')[0];
         setQualificationDate(today);
