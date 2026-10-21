@@ -1,9 +1,11 @@
-import { Award, CheckCircle2, RefreshCw, Search, X } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
-import { toast } from 'sonner';
-import { Button } from '@apperp/ui/button';
-import { Card, CardContent, CardHeader } from '@apperp/ui/card';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Badge } from '@apperp/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
 import { DataTable } from '@apperp/ui/data-table';
+import type {
+    DataTableColumn,
+    DataTableRowAction,
+} from '@apperp/ui/data-table';
 import {
     Empty,
     EmptyDescription,
@@ -11,27 +13,9 @@ import {
     EmptyTitle,
 } from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
-import { TableCell, TableRow } from '@apperp/ui/table';
-
 import { api, toastSaveError } from '../api';
 import { PrakualifikasiDetailModal } from './prakualifikasi/PrakualifikasiDetailModal';
 import type { PrakualifikasiFormData } from './prakualifikasi/PrakualifikasiFormModal';
-
-const kualifikasiColumns = [
-    { id: 'no', header: 'No.', cell: () => null },
-    { id: 'info', header: 'Info Prakualifikasi', cell: () => null },
-    { id: 'kode_vendor', header: 'Kode Vendor/Supplier', cell: () => null },
-    { id: 'nama_vendor', header: 'Nama Vendor/Supplier', cell: () => null },
-    { id: 'pic', header: 'Contact Person', cell: () => null },
-    { id: 'telepon', header: 'Telp/HP', cell: () => null },
-    { id: 'alamat', header: 'Alamat Vendor/Supplier', cell: () => null },
-    { id: 'status_vendor', header: 'Status Vendor/Supplier', cell: () => null },
-    {
-        id: 'status_kualifikasi',
-        header: 'Status Kualifikasi',
-        cell: () => null,
-    },
-];
 
 type KualifikasiRow = PrakualifikasiFormData & {
     id: string;
@@ -49,7 +33,7 @@ type PaginationMeta = {
 
 function formatDisplayDate(dateStr: string): string {
     if (!dateStr) {
-        return '';
+        return '—';
     }
 
     if (dateStr.includes('/')) {
@@ -80,7 +64,7 @@ export default function KualifikasiPage(_props?: PageProps) {
     const [meta, setMeta] = useState<PaginationMeta>({
         current_page: 1,
         last_page: 1,
-        per_page: 15,
+        per_page: 20,
         total: 0,
     });
 
@@ -100,6 +84,8 @@ export default function KualifikasiPage(_props?: PageProps) {
                     params.set('search', search.trim());
                 }
 
+                params.set('status_kualifikasi', 'Lolos');
+
                 const res = await api<{
                     status: string;
                     data: KualifikasiRow[];
@@ -111,12 +97,15 @@ export default function KualifikasiPage(_props?: PageProps) {
                     res.meta || {
                         current_page: 1,
                         last_page: 1,
-                        per_page: 15,
+                        per_page: 20,
                         total: res.data?.length || 0,
                     },
                 );
             } catch (err) {
-                toastSaveError(err, 'Gagal memuat daftar kualifikasi rekanan.');
+                toastSaveError(
+                    err,
+                    'Gagal memuat daftar rekanan lolos kualifikasi.',
+                );
             } finally {
                 setLoading(false);
             }
@@ -126,7 +115,7 @@ export default function KualifikasiPage(_props?: PageProps) {
 
     useEffect(() => {
         const timer = setTimeout(() => {
-            fetchData(1);
+            void fetchData(1);
         }, 0);
 
         return () => clearTimeout(timer);
@@ -137,251 +126,156 @@ export default function KualifikasiPage(_props?: PageProps) {
         setDetailOpen(true);
     };
 
-    const handleRefresh = () => {
-        fetchData(meta.current_page);
-        toast.info('Data kualifikasi vendor diperbarui.');
-    };
+    const columns: DataTableColumn<KualifikasiRow>[] = useMemo(
+        () => [
+            {
+                id: 'nomor_prakualifikasi',
+                header: 'No. Dokumen',
+                cell: (row) => (
+                    <div className="space-y-0.5">
+                        <span className="font-mono text-xs font-semibold">
+                            {row.nomor_prakualifikasi}
+                        </span>
+                        <div className="text-muted-foreground text-[11px]">
+                            {formatDisplayDate(row.tanggal_prakualifikasi)}
+                        </div>
+                    </div>
+                ),
+                width: 170,
+            },
+            {
+                id: 'vendor',
+                header: 'Vendor / Rekanan',
+                cell: (row) => (
+                    <div className="space-y-0.5">
+                        <div className="text-xs font-semibold">
+                            {row.nama_vendor}
+                        </div>
+                        <div className="text-muted-foreground font-mono text-[11px]">
+                            {row.kode_vendor}
+                        </div>
+                    </div>
+                ),
+                width: 220,
+            },
+            {
+                id: 'pic',
+                header: 'Kontak / PIC',
+                cell: (row) => (
+                    <div className="space-y-0.5 text-xs">
+                        <div>{row.nama_pic || '—'}</div>
+                        <div className="text-muted-foreground font-mono text-[11px]">
+                            {row.telepon || '—'}
+                        </div>
+                    </div>
+                ),
+                width: 160,
+            },
+            {
+                id: 'alamat',
+                header: 'Alamat',
+                cell: (row) => (
+                    <span className="text-muted-foreground line-clamp-2 text-xs">
+                        {row.alamat || '—'}
+                    </span>
+                ),
+                width: 240,
+            },
+            {
+                id: 'status_vendor',
+                header: 'Status Rekanan',
+                cell: (row) => (
+                    <Badge variant="secondary" className="text-[11px]">
+                        {row.status_vendor || 'Vendor Resmi'}
+                    </Badge>
+                ),
+                width: 140,
+            },
+            {
+                id: 'status_kualifikasi',
+                header: 'Hasil Evaluasi',
+                cell: (row) => (
+                    <Badge variant="default" className="text-[11px]">
+                        {row.status_kualifikasi || 'Lolos'}
+                    </Badge>
+                ),
+                width: 130,
+            },
+        ],
+        [],
+    );
+
+    const rowActions: DataTableRowAction[] = useMemo(
+        () => [{ id: 'view', label: 'Lihat Detail' }],
+        [],
+    );
 
     return (
-        <div className="space-y-6 p-6">
-            {/* Breadcrumb & Header Title */}
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <div className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
-                        <span>Pengadaan</span>
-                        <span>/</span>
-                        <span>Master Data</span>
-                        <span>/</span>
-                        <span className="text-foreground font-semibold">
-                            3. Kualifikasi
-                        </span>
-                    </div>
-                    <div className="mt-1 flex items-center gap-2">
-                        <Award className="text-primary h-6 w-6" />
-                        <h1 className="text-foreground text-2xl font-bold tracking-tight">
-                            Kualifikasi Vendor
-                        </h1>
-                    </div>
-                    <p className="text-muted-foreground mt-0.5 text-xs">
-                        Daftar rekanan/supplier resmi yang telah diverifikasi
-                        dan dinyatakan memenuhi syarat kualifikasi.
-                    </p>
-                </div>
-
-                {/* Tombol Aksi: Refresh */}
-                <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleRefresh}
-                        disabled={loading}
-                        className="h-9 font-medium"
-                    >
-                        <RefreshCw
-                            className={`mr-1.5 h-3.5 w-3.5 ${
-                                loading ? 'animate-spin' : ''
-                            }`}
-                        />
-                        Refresh
-                    </Button>
-                </div>
-            </div>
-
-            {/* Container Card Tabel Kualifikasi */}
-            <Card className="border shadow-sm">
-                <CardHeader className="bg-card border-b p-4">
-                    {/* Baris Pencarian Standar */}
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="relative min-w-[200px] max-w-xs">
-                            <div className="text-muted-foreground pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
-                                <Search className="h-3.5 w-3.5" />
-                            </div>
-                            <Input
-                                placeholder="Pencarian..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className="bg-background border-input h-8 pl-8 pr-7 text-xs"
-                            />
-                            {search && (
-                                <button
-                                    type="button"
-                                    onClick={() => setSearch('')}
-                                    className="text-muted-foreground hover:text-foreground absolute inset-y-0 right-0 flex items-center pr-2"
-                                >
-                                    <X className="h-3.5 w-3.5" />
-                                </button>
-                            )}
-                        </div>
-                    </div>
+        <div className="h-full min-h-0 overflow-hidden">
+            <Card
+                aria-labelledby="list-title"
+                className="flex h-full min-h-0 flex-col overflow-hidden rounded-none border-0 shadow-none"
+            >
+                <CardHeader className="min-h-0 shrink-0 border-b">
+                    <CardTitle id="list-title">Kualifikasi Vendor</CardTitle>
                 </CardHeader>
 
-                <CardContent className="p-0">
-                    {/* Header Strip: "Daftar Kualifikasi Vendor/Supplier" */}
-                    <div className="bg-muted/40 flex items-center justify-between border-b px-4 py-2">
-                        <span className="text-foreground text-xs font-semibold">
-                            Daftar Kualifikasi Vendor/Supplier
-                        </span>
-                        <span className="text-muted-foreground text-xs font-medium">
-                            Total: {meta.total} Rekanan Terkualifikasi
-                        </span>
+                <CardContent className="flex min-h-0 flex-1 flex-col px-0">
+                    <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end sm:justify-between">
+                        <div className="space-y-1">
+                            <p className="text-sm font-semibold">
+                                Daftar Rekanan Terkualifikasi
+                            </p>
+                            <p className="text-muted-foreground text-xs">
+                                {meta.total} rekanan lolos
+                            </p>
+                        </div>
+                        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                            <Input
+                                className="h-8 w-full text-xs sm:w-64"
+                                type="search"
+                                placeholder="Cari nomor, kode, atau vendor..."
+                                aria-label="Cari rekanan terkualifikasi"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
+                        </div>
                     </div>
 
-                    {/* Tabel Daftar Kualifikasi Vendor (9 Kolom) */}
-                    <DataTable
-                        scrollMode="inline"
-                        showRowNumbers={false}
-                        columns={kualifikasiColumns}
-                        data={items}
-                        getRowKey={(row) => row.id}
-                        renderRows={() => (
-                            <>
-                                {loading ? (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={9}
-                                            className="text-muted-foreground py-12 text-center text-sm"
-                                        >
-                                            Memuat daftar kualifikasi rekanan...
-                                        </TableCell>
-                                    </TableRow>
-                                ) : items.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={9}
-                                            className="py-12"
-                                        >
-                                            <Empty>
-                                                <EmptyHeader>
-                                                    <EmptyTitle>
-                                                        Belum Ada Vendor Lolos
-                                                        Kualifikasi
-                                                    </EmptyTitle>
-                                                    <EmptyDescription>
-                                                        Rekanan akan otomatis
-                                                        terdaftar di sini
-                                                        setelah melalui proses
-                                                        evaluasi pada menu{' '}
-                                                        <strong>
-                                                            2. Prakualifikasi
-                                                        </strong>{' '}
-                                                        dengan status
-                                                        kualifikasi{' '}
-                                                        <strong>Lolos</strong>.
-                                                    </EmptyDescription>
-                                                </EmptyHeader>
-                                            </Empty>
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    items.map((row, idx) => (
-                                        <TableRow
-                                            key={row.id}
-                                            className="hover:bg-muted/50 border-b text-xs transition-colors"
-                                        >
-                                            {/* 1. No */}
-                                            <TableCell className="text-muted-foreground border-r text-center font-medium">
-                                                {(meta.current_page - 1) *
-                                                    meta.per_page +
-                                                    idx +
-                                                    1}
-                                            </TableCell>
-
-                                            {/* 2. Info Prakualifikasi (Tanggal & No Prakualifikasi) */}
-                                            <TableCell className="border-r text-center font-mono">
-                                                <div className="text-foreground font-medium">
-                                                    {formatDisplayDate(
-                                                        row.tanggal_prakualifikasi,
-                                                    )}
-                                                </div>
-                                                <div
-                                                    className="text-primary mt-0.5 cursor-pointer font-semibold hover:underline"
-                                                    onClick={() =>
-                                                        handleView(row)
-                                                    }
-                                                >
-                                                    {row.nomor_prakualifikasi}
-                                                </div>
-                                            </TableCell>
-
-                                            {/* 3. Kode Vendor/Supplier */}
-                                            <TableCell className="border-r text-center font-mono font-medium">
-                                                {row.kode_vendor}
-                                            </TableCell>
-
-                                            {/* 4. Nama Vendor/Supplier */}
-                                            <TableCell className="text-foreground border-r font-bold">
-                                                {row.nama_vendor}
-                                            </TableCell>
-
-                                            {/* 5. Contact Person */}
-                                            <TableCell className="border-r text-center">
-                                                {row.nama_pic || '-'}
-                                            </TableCell>
-
-                                            {/* 6. Telp/HP */}
-                                            <TableCell className="border-r text-center font-mono">
-                                                {row.telepon || '-'}
-                                            </TableCell>
-
-                                            {/* 7. Alamat Vendor/Supplier */}
-                                            <TableCell className="max-w-xs border-r">
-                                                {row.alamat || '-'}
-                                            </TableCell>
-
-                                            {/* 8. Status Vendor/Supplier */}
-                                            <TableCell className="text-foreground border-r text-center font-medium">
-                                                {row.status_vendor ||
-                                                    'Vendor Resmi'}
-                                            </TableCell>
-
-                                            {/* 9. Status Kualifikasi */}
-                                            <TableCell className="text-center">
-                                                <span className="inline-flex items-center rounded border border-emerald-300 bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                                                    <CheckCircle2 className="mr-1 h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                                                    Lolos
-                                                </span>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </>
-                        )}
-                    />
-
-                    {/* Pagination Bar */}
-                    {meta.last_page > 1 && (
-                        <div className="flex items-center justify-between border-t px-4 py-3">
-                            <span className="text-muted-foreground text-xs">
-                                Halaman {meta.current_page} dari{' '}
-                                {meta.last_page} (Total: {meta.total})
-                            </span>
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={meta.current_page <= 1}
-                                    onClick={() =>
-                                        fetchData(meta.current_page - 1)
-                                    }
-                                    className="h-8 text-xs"
-                                >
-                                    Sebelumnya
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={
-                                        meta.current_page >= meta.last_page
-                                    }
-                                    onClick={() =>
-                                        fetchData(meta.current_page + 1)
-                                    }
-                                    className="h-8 text-xs"
-                                >
-                                    Berikutnya
-                                </Button>
-                            </div>
-                        </div>
+                    {loading && !items.length ? (
+                        <Empty>
+                            <EmptyDescription>
+                                Memuat daftar rekanan terkualifikasi…
+                            </EmptyDescription>
+                        </Empty>
+                    ) : items.length === 0 ? (
+                        <Empty>
+                            <EmptyHeader>
+                                <EmptyTitle>
+                                    Belum ada rekanan lolos kualifikasi
+                                </EmptyTitle>
+                                <EmptyDescription>
+                                    Rekanan akan otomatis terdaftar di sini
+                                    setelah dievaluasi pada menu Prakualifikasi
+                                    dengan status Lolos.
+                                </EmptyDescription>
+                            </EmptyHeader>
+                        </Empty>
+                    ) : (
+                        <DataTable
+                            scrollMode="viewport"
+                            className="min-h-0 flex-1"
+                            columns={columns}
+                            data={items}
+                            getRowKey={(row) => row.id}
+                            getRowLabel={(row) => row.nomor_prakualifikasi}
+                            actions={rowActions}
+                            onRowAction={(actionId, row) => {
+                                if (actionId === 'view') {
+                                    handleView(row);
+                                }
+                            }}
+                        />
                     )}
                 </CardContent>
             </Card>
@@ -390,7 +284,7 @@ export default function KualifikasiPage(_props?: PageProps) {
             <PrakualifikasiDetailModal
                 open={detailOpen}
                 onOpenChange={setDetailOpen}
-                data={viewingItem}
+                item={viewingItem}
             />
         </div>
     );
