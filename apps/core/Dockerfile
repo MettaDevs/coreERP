@@ -125,10 +125,15 @@ RUN npm run build
 # `config/octane.php` dan peran `web` di `docker/entrypoint.sh`). Sampai 3 Oktober 2026 tahap ini
 # `php:8.4-apache` dengan prefork + mod_php, yang mem-boot ulang Laravel di setiap permintaan.
 #
-# Image ini turunan image `php` resmi varian ZTS, jadi perkakas `docker-php-ext-*` dan $PHPIZE_DEPS-nya
-# sama dengan sebelumnya; `install-php-extensions` bawaannya dipakai karena ia juga menangani `pecl`.
-# Versinya dipin karena alasan yang sama dengan opentelemetry di bawah.
-FROM dunglas/frankenphp:1.12.7-php8.4-trixie
+# PHP ZTS dan libphp berasal dari image resmi 8.4.27. Image FrankenPHP 1.12.7 hanya menyediakan
+# binari server, pemasang ekstensi, dan libwatcher; pustaka PHP 8.4.26-nya tidak ikut disalin.
+# FrankenPHP memuat libphp saat berjalan, dan kompatibilitas ABI patch 8.4 sudah diperiksa.
+FROM dunglas/frankenphp:1.12.7-php8.4-trixie@sha256:035fcb2fab91aacf77d70ee555d51b9bb084d057b16cf8a644bf1f93e28d4e3e AS frankenphp-assets
+FROM php:8.4.27-zts-trixie@sha256:1687b8117a59cc4ae1f73ff2f039f799e574c4b558c9e1148da1a72dc46169ca AS php
+COPY --from=frankenphp-assets /usr/local/bin/frankenphp /usr/local/bin/frankenphp
+COPY --from=frankenphp-assets /usr/local/bin/install-php-extensions /usr/local/bin/install-php-extensions
+COPY --from=frankenphp-assets /usr/local/lib/libwatcher-c.so* /usr/local/lib/
+RUN ldconfig
 # gd dibutuhkan PhpSpreadsheet (layout Excel laporan); zip oleh PhpWord dan PhpSpreadsheet.
 #
 # `opentelemetry` tidak dibundel PHP, jadi ia dikompilasi lewat `pecl` (oleh
