@@ -1,3 +1,5 @@
+import { FormErrorHeader } from '@/components/form-error-header';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import { Button } from '@apperp/ui/button';
 import { Input } from '@apperp/ui/input';
 import { Head, useForm } from '@inertiajs/react';
@@ -96,6 +98,9 @@ function LicenseTermsForm({
 }: {
     terms: { validDays: number; renewBeforeDays: number };
 }) {
+    const { wrap: wrapLocalForm0Request, summary: localForm0RequestSummary } =
+        useInertiaFeedback();
+
     const { data, setData, patch, processing, errors } = useForm({
         valid_days: String(terms.validDays),
         renew_before_days: String(terms.renewBeforeDays),
@@ -110,12 +115,21 @@ function LicenseTermsForm({
 
     return (
         <form
+            noValidate
             className="space-y-4"
             onSubmit={(e: FormEvent) => {
                 e.preventDefault();
-                patch('/pengaturan/lisensi', { preserveScroll: true });
+                patch(
+                    '/pengaturan/lisensi',
+                    wrapLocalForm0Request({ preserveScroll: true }),
+                );
             }}
         >
+            <>
+                {localForm0RequestSummary}
+                <FormErrorHeader errors={errors} />
+            </>
+
             <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                     <Input

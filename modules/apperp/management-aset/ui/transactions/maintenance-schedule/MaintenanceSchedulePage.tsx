@@ -10,6 +10,7 @@ import type {
     DataTableColumn,
     DataTableRowAction,
 } from '@apperp/ui/data-table';
+import { DatePicker } from '@apperp/ui/date-picker';
 import {
     DialogClose,
     Dialog,
@@ -27,13 +28,15 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
-import { Input } from '@apperp/ui/input';
+import { FormControl } from '@apperp/ui/form-control';
 import { RadioGroup, RadioGroupItem } from '@apperp/ui/radio-group';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
-import { api, toastSaveError } from '../../api';
+import { RecordLookup } from '../../_shared/RecordLookup';
+import { api } from '../../api';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import { useRecordList } from '../../use-record-list';
+import { useSaveFeedback } from '../../use-save-feedback';
 
 type ScheduleLine = {
     id: string;
@@ -125,6 +128,17 @@ export default function MaintenanceSchedulePage({
     };
     permissions: string[];
 }) {
+    const {
+        scopeRef: pageFeedbackScopeRef,
+        feedbackSummary: pageFeedbackSummary,
+        reportSaveError: pageFeedbackReportSaveError,
+        clearSaveFeedback: pageFeedbackClearSaveFeedback,
+    } = useSaveFeedback();
+    const pageFeedback = {
+        reportSaveError: pageFeedbackReportSaveError,
+        clearSaveFeedback: pageFeedbackClearSaveFeedback,
+    };
+
     const today = useToday();
     const canRun = permissions.includes(
         'management-aset.jadwal-pemeliharaan.run',
@@ -146,6 +160,16 @@ export default function MaintenanceSchedulePage({
     const [discarding, setDiscarding] = useState<ScheduleLine | null>(null);
     const [busy, setBusy] = useState(false);
     const runRef = useRef<HTMLDivElement>(null);
+    const {
+        feedbackSummary: runFeedbackSummary,
+        reportSaveError: runFeedbackReportSaveError,
+        clearSaveFeedback: runFeedbackClearSaveFeedback,
+    } = useSaveFeedback(runRef, running ? 'run' : 'closed');
+    const runFeedback = {
+        reportSaveError: runFeedbackReportSaveError,
+        clearSaveFeedback: runFeedbackClearSaveFeedback,
+    };
+
     const plans = useMasterOptions(running ? 'rencana-pemeliharaan' : null);
 
     const list = useRecordList<ScheduleLine>('/jadwal-pemeliharaan', '', {
@@ -173,6 +197,7 @@ export default function MaintenanceSchedulePage({
                 }),
             });
             const { dibuat, dibersihkan } = result.data;
+            runFeedback.clearSaveFeedback();
             toast.success(
                 dibuat === 0 && dibersihkan === 0
                     ? 'Jadwal sudah terkini. Tidak ada usulan baru.'
@@ -181,7 +206,7 @@ export default function MaintenanceSchedulePage({
             setRunning(false);
             refresh();
         } catch (caught) {
-            toastSaveError(caught, 'Jadwal belum dapat dihitung.');
+            runFeedback.reportSaveError(caught, 'Jadwal belum dapat dihitung.');
         } finally {
             setBusy(false);
         }
@@ -205,6 +230,7 @@ export default function MaintenanceSchedulePage({
                 }),
             });
             const numbers = result.data.work_orders.map((wo) => wo.kode);
+            pageFeedback.clearSaveFeedback();
             toast.success(
                 numbers.length === 1
                     ? `Work order ${numbers[0]} dibuat.`
@@ -213,7 +239,10 @@ export default function MaintenanceSchedulePage({
             setConverting(false);
             refresh();
         } catch (caught) {
-            toastSaveError(caught, 'Work order belum dapat dibuat.');
+            pageFeedback.reportSaveError(
+                caught,
+                'Work order belum dapat dibuat.',
+            );
             refresh();
         } finally {
             setBusy(false);
@@ -228,10 +257,14 @@ export default function MaintenanceSchedulePage({
                 method: 'POST',
                 body: JSON.stringify({ version: line.version }),
             });
+            pageFeedback.clearSaveFeedback();
             toast.success('Usulan diabaikan.');
             refresh();
         } catch (caught) {
-            toastSaveError(caught, 'Usulan belum dapat diabaikan.');
+            pageFeedback.reportSaveError(
+                caught,
+                'Usulan belum dapat diabaikan.',
+            );
             refresh();
         }
     }
@@ -317,8 +350,11 @@ export default function MaintenanceSchedulePage({
     const selectable = status === 'usulan' && canCreateWorkOrder;
 
     return (
-        <div className="space-y-0">
-            <RecordActionBar title="Jadwal pemeliharaan">
+        <div ref={pageFeedbackScopeRef} className="space-y-0">
+            <RecordActionBar
+                feedback={pageFeedbackSummary}
+                title="Jadwal pemeliharaan"
+            >
                 {canRun && (
                     <Button type="button" onClick={() => setRunning(true)}>
                         Hitung jadwal
@@ -339,15 +375,17 @@ export default function MaintenanceSchedulePage({
 
             <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end">
                 <div className="w-full sm:w-52">
-                    <Select
-                        label="Status"
-                        items={STATUS_FILTER}
-                        value={status}
-                        ariaLabel="Saring berdasarkan status"
-                        onValueChange={(value) => {
-                            setStatus(value ?? 'usulan');
-                        }}
-                    />
+                    <FormControl>
+                        <Select
+                            label="Status"
+                            items={STATUS_FILTER}
+                            value={status}
+                            ariaLabel="Saring berdasarkan status"
+                            onValueChange={(value) => {
+                                setStatus(value ?? 'usulan');
+                            }}
+                        />
+                    </FormControl>
                 </div>
             </div>
 
@@ -407,32 +445,40 @@ export default function MaintenanceSchedulePage({
                             dua kali.
                         </DialogDescription>
                     </DialogHeader>
+                    {runFeedbackSummary}
                     <DialogBody className="space-y-4">
-                        <Input
-                            label="Hitung sampai tanggal"
-                            type="date"
-                            required
-                            min={today}
-                            max={addDays(today, 366)}
-                            value={until}
-                            onChange={(event) => setUntil(event.target.value)}
-                        />
-                        <Select
-                            {...plans.selectProps}
-                            label="Rencana"
-                            items={[
-                                { value: '', label: 'Semua rencana aktif' },
-                                ...plans.options.map((plan) => ({
-                                    value: plan.id,
-                                    label: optionLabel(plan),
-                                })),
-                            ]}
-                            value={planId || null}
-                            placeholder="Semua rencana aktif"
-                            ariaLabel="Rencana"
-                            portalContainer={runRef}
-                            onValueChange={(value) => setPlanId(value ?? '')}
-                        />
+                        <FormControl>
+                            <DatePicker
+                                portalContainer={runRef}
+                                label="Hitung sampai tanggal"
+
+                                required
+                                min={today}
+                                max={addDays(today, 366)}
+                                value={until}
+                                onValueChange={(value) => setUntil(value)}
+                            />
+                        </FormControl>
+                        <FormControl>
+                            <RecordLookup
+                                source={plans}
+                                label="Rencana"
+                                items={[
+                                    { value: '', label: 'Semua rencana aktif' },
+                                    ...plans.options.map((plan) => ({
+                                        value: plan.id,
+                                        label: optionLabel(plan),
+                                    })),
+                                ]}
+                                value={planId || null}
+                                placeholder="Semua rencana aktif"
+                                ariaLabel="Rencana"
+                                portalContainer={runRef}
+                                onValueChange={(value) =>
+                                    setPlanId(value ?? '')
+                                }
+                            />
+                        </FormControl>
                     </DialogBody>
                     <DialogFooter>
                         <DialogAction

@@ -3,9 +3,11 @@ import { ActionButton } from '@apperp/ui/action-button';
 
 import { DialogToolbar } from '@apperp/ui/dialog';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
+import { FormControl } from '@apperp/ui/form-control';
 import { TransferList } from '@apperp/ui/transfer-list';
 import type { TransferListItem } from '@apperp/ui/transfer-list';
 import { api, errorMessage } from '../../api';
+import { useSaveFeedback } from '../../use-save-feedback';
 
 type Choice = { id: string; kode: string; nama: string; aktif: boolean };
 
@@ -31,6 +33,13 @@ export default function AssetTypeConditions({
     const [selected, setSelected] = useState<TransferListItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const {
+        scopeRef: feedbackScopeRef,
+        feedbackSummary,
+        reportSaveError,
+        clearSaveFeedback,
+        fieldError,
+    } = useSaveFeedback(undefined, assetTypeId);
     const [error, setError] = useState('');
     const [saved, setSaved] = useState(false);
 
@@ -70,6 +79,7 @@ export default function AssetTypeConditions({
     }, [assetTypeId]);
 
     async function save() {
+        clearSaveFeedback();
         setSaving(true);
         setError('');
 
@@ -87,7 +97,7 @@ export default function AssetTypeConditions({
             onVersionChange(result.version);
             setSaved(true);
         } catch (caught) {
-            setError(errorMessage(caught, 'Kondisi belum dapat disimpan.'));
+            reportSaveError(caught, 'Kondisi belum dapat disimpan.');
         } finally {
             setSaving(false);
         }
@@ -113,7 +123,8 @@ export default function AssetTypeConditions({
     }
 
     return (
-        <div className="space-y-4">
+        <div ref={feedbackScopeRef} className="space-y-4">
+            {feedbackSummary}
             {canEdit && (
                 <DialogToolbar className="px-0">
                     <ActionButton
@@ -129,20 +140,25 @@ export default function AssetTypeConditions({
                 Pilih kondisi yang boleh dipakai pada aset jenis ini. Jika belum
                 ada yang dipilih, semua kondisi aktif dapat dipakai.
             </p>
-            <TransferList
-                remaining={remaining}
-                selected={selected}
-                onChange={(next) => {
-                    setRemaining(next.remaining);
-                    setSelected(next.selected);
-                    setSaved(false);
-                }}
-                remainingTitle="Kondisi tersisa"
-                selectedTitle="Kondisi terpilih"
-                disabled={!canEdit || saving}
-                remainingEmptyLabel="Semua kondisi sudah terpilih."
-                selectedEmptyLabel="Belum ada kondisi yang dipilih."
-            />
+            <FormControl
+                data-error-field="condition_ids"
+                error={fieldError('condition_ids')}
+            >
+                <TransferList
+                    remaining={remaining}
+                    selected={selected}
+                    onChange={(next) => {
+                        setRemaining(next.remaining);
+                        setSelected(next.selected);
+                        setSaved(false);
+                    }}
+                    remainingTitle="Kondisi tersisa"
+                    selectedTitle="Kondisi terpilih"
+                    disabled={!canEdit || saving}
+                    remainingEmptyLabel="Semua kondisi sudah terpilih."
+                    selectedEmptyLabel="Belum ada kondisi yang dipilih."
+                />
+            </FormControl>
 
             {saved && (
                 <p className="text-muted-foreground text-sm">

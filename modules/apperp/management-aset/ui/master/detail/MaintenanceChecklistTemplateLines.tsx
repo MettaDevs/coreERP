@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActionButton } from '@apperp/ui/action-button';
 
 import { Checkbox } from '@apperp/ui/checkbox';
@@ -6,13 +6,16 @@ import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
 import { Field, FieldError, FieldLabel } from '@apperp/ui/field';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
 import { TableCell, TableRow } from '@apperp/ui/table';
 import { Textarea } from '@apperp/ui/textarea';
+import RecordLookup from '../../_shared/RecordLookup';
 import { ApiError, api, errorMessage } from '../../api';
 import { useRecordOptions } from '../../use-record-list';
+import { useSaveFeedback } from '../../use-save-feedback';
 
 type Line = {
     id?: string;
@@ -126,10 +129,23 @@ export default function MaintenanceChecklistTemplateLines({
     version: number;
     onVersionChange: (version: number) => void;
 }) {
+    const portal = useRef<HTMLDivElement | null>(null);
     const [lines, setLines] = useState<Line[]>([]);
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
     const [checkedIndexes, setCheckedIndexes] = useState<number[]>([]);
     const [saving, setSaving] = useState(false);
+    const {
+        scopeRef: feedbackScopeRef,
+        feedbackSummary,
+        reportSaveError,
+        clearSaveFeedback,
+    } = useSaveFeedback(undefined, templateId, (field) => {
+        const match = /^lines\.(\d+)\./.exec(field);
+
+        if (match) {
+            setSelectedIndex(Number(match[1]));
+        }
+    });
     const [error, setError] = useState('');
     const [saved, setSaved] = useState(false);
     const [lineErrors, setLineErrors] = useState<LineErrors>({});
@@ -239,6 +255,7 @@ export default function MaintenanceChecklistTemplateLines({
                 ? (line.unit ?? '—')
                 : '—';
     async function save() {
+        clearSaveFeedback();
         setSaving(true);
         setError('');
         setLineErrors({});
@@ -252,6 +269,7 @@ export default function MaintenanceChecklistTemplateLines({
             setLines(result.data);
             setSaved(true);
         } catch (caught) {
+            reportSaveError(caught, 'Baris checklist belum dapat disimpan.');
             const nextErrors = lineErrorsFrom(caught);
             setLineErrors(nextErrors);
             const firstErrorIndex = Object.keys(nextErrors)
@@ -311,7 +329,17 @@ export default function MaintenanceChecklistTemplateLines({
     const someChecked = checkedIndexes.length > 0 && !allChecked;
 
     return (
-        <div className="space-y-3">
+        <div
+            ref={(node) => {
+                feedbackScopeRef.current = node;
+                portal.current =
+                    node?.closest<HTMLDivElement>(
+                        '[data-slot="page-dialog-contents"]',
+                    ) ?? null;
+            }}
+            className="space-y-3"
+        >
+            {feedbackSummary}
             <div className="flex items-center justify-between">
                 <h3 className="font-semibold">Baris checklist maintenance</h3>
                 {canEdit && (
@@ -382,6 +410,7 @@ export default function MaintenanceChecklistTemplateLines({
                         (typeof sdkRows)[number]
                     >[] = [
                         {
+                            content: 'control',
                             id: 'column-0',
                             header: '',
                             width: 48,
@@ -512,6 +541,10 @@ export default function MaintenanceChecklistTemplateLines({
                                                 <TableCell>
                                                     {canEdit ? (
                                                         <Input
+                                                            name={`lines.${index}.line_number`}
+                                                            aria-invalid={
+                                                                !!rowError.line_number
+                                                            }
                                                             aria-label={`Nomor baris ${index + 1}`}
                                                             type="number"
                                                             min="1"
@@ -536,10 +569,14 @@ export default function MaintenanceChecklistTemplateLines({
                                                 <TableCell>
                                                     {canEdit ? (
                                                         <Select
+                                                            portalContainer={
+                                                                portal
+                                                            }
                                                             items={types}
                                                             value={typeLabel(
                                                                 item.type,
                                                             )}
+                                                            data-error-field={`lines.${index}.type`}
                                                             ariaLabel={`Jenis baris ${index + 1}`}
                                                             onValueChange={(
                                                                 value,
@@ -576,6 +613,7 @@ export default function MaintenanceChecklistTemplateLines({
                                                     {canEdit ? (
                                                         <div className="space-y-1">
                                                             <Input
+                                                                name={`lines.${index}.nama`}
                                                                 aria-label={`Nama baris ${index + 1}`}
                                                                 aria-invalid={
                                                                     nameError
@@ -627,6 +665,8 @@ export default function MaintenanceChecklistTemplateLines({
             {selected && selectedIndex !== null && (
                 <LineDetails
                     line={selected}
+                    fieldPrefix={`lines.${selectedIndex}`}
+                    errors={lineErrors[selectedIndex] ?? {}}
                     canEdit={canEdit}
                     variableSource={variableSource}
                     templateSource={templateSource}
@@ -647,6 +687,8 @@ export default function MaintenanceChecklistTemplateLines({
 
 function LineDetails({
     line,
+    fieldPrefix,
+    errors,
     canEdit,
     variableSource,
     templateSource,
@@ -655,6 +697,8 @@ function LineDetails({
     onChange,
 }: {
     line: Line;
+    fieldPrefix: string;
+    errors: Record<string, string>;
     canEdit: boolean;
     variableSource: ReturnType<typeof useRecordOptions<Option>>;
     templateSource: ReturnType<typeof useRecordOptions<Option>>;
@@ -678,25 +722,42 @@ function LineDetails({
         required = false,
     ) =>
         canEdit ? (
-            <Select
-                {...(items === variables
-                    ? variableSource
-                    : items === units
-                      ? unitSource
-                      : templateSource
-                ).selectProps}
-                label={fieldLabel}
-                required={required}
-                items={items.map(label)}
-                value={pick(items, id) ? label(pick(items, id)!) : null}
-                placeholder={placeholder}
-                ariaLabel={fieldLabel}
-                onValueChange={(value) =>
-                    change(
-                        items.find((item) => label(item) === value)?.id ?? null,
-                    )
+            <FormControl
+                data-error-field={`${fieldPrefix}.${items === variables ? 'variable_id' : items === templates ? 'nested_template_id' : 'unit_id'}`}
+                error={
+                    errors[
+                        items === variables
+                            ? 'variable_id'
+                            : items === templates
+                              ? 'nested_template_id'
+                              : 'unit_id'
+                    ]
                 }
-            />
+            >
+                <RecordLookup
+                    source={
+                        items === variables
+                            ? variableSource
+                            : items === units
+                              ? unitSource
+                              : templateSource
+                    }
+                    filterKey={items === templates ? templateId : undefined}
+                    filterRecord={(item) =>
+                        items !== templates || item.id !== templateId
+                    }
+                    label={fieldLabel}
+                    required={required}
+                    items={items.map((item) => ({
+                        value: item.id,
+                        label: label(item),
+                    }))}
+                    value={id}
+                    placeholder={placeholder}
+                    ariaLabel={fieldLabel}
+                    onValueChange={change}
+                />
+            </FormControl>
         ) : (
             <p className="text-sm">
                 {pick(items, id)?.nama ?? 'Belum dipilih'}
@@ -725,7 +786,7 @@ function LineDetails({
                 </div>
             )}
             {line.type === 'measurement' && (
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <FormGrid>
                     <DetailSwitch
                         line={line}
                         canEdit={canEdit}
@@ -749,12 +810,16 @@ function LineDetails({
                     </div>
                     <DetailNumber
                         label="Nilai minimum"
+                        field={`${fieldPrefix}.min_value`}
+                        error={errors.min_value}
                         value={line.min_value}
                         canEdit={canEdit}
                         onChange={(min_value) => onChange({ min_value })}
                     />
                     <DetailNumber
                         label="Nilai maksimum"
+                        field={`${fieldPrefix}.max_value`}
+                        error={errors.max_value}
                         value={line.max_value}
                         canEdit={canEdit}
                         onChange={(max_value) => onChange({ max_value })}
@@ -764,10 +829,10 @@ function LineDetails({
                         canEdit={canEdit}
                         onChange={onChange}
                     />
-                </div>
+                </FormGrid>
             )}
             {line.type === 'variable' && (
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <FormGrid>
                     <DetailSwitch
                         line={line}
                         canEdit={canEdit}
@@ -788,10 +853,10 @@ function LineDetails({
                         canEdit={canEdit}
                         onChange={onChange}
                     />
-                </div>
+                </FormGrid>
             )}
             {line.type === 'text' && (
-                <div className="grid gap-4 md:grid-cols-2">
+                <FormGrid>
                     <DetailSwitch
                         line={line}
                         canEdit={canEdit}
@@ -802,7 +867,7 @@ function LineDetails({
                         canEdit={canEdit}
                         onChange={onChange}
                     />
-                </div>
+                </FormGrid>
             )}
         </section>
     );
@@ -841,29 +906,35 @@ function DetailSwitch({
 }
 function DetailNumber({
     label,
+    field,
+    error,
     value,
     canEdit,
     onChange,
 }: {
     label: string;
+    field: string;
+    error?: string;
     value: number | null;
     canEdit: boolean;
     onChange: (value: number | null) => void;
 }) {
     return canEdit ? (
-        <Input
-            label={label}
-            type="number"
-            step="any"
-            value={value ?? ''}
-            onChange={(event) =>
-                onChange(
-                    event.target.value === ''
-                        ? null
-                        : Number(event.target.value),
-                )
-            }
-        />
+        <FormControl data-error-field={field} error={error}>
+            <Input
+                label={label}
+                type="number"
+                step="any"
+                value={value ?? ''}
+                onChange={(event) =>
+                    onChange(
+                        event.target.value === ''
+                            ? null
+                            : Number(event.target.value),
+                    )
+                }
+            />
+        </FormControl>
     ) : (
         <p className="text-sm">{value ?? 'Tidak dibatasi'}</p>
     );
@@ -878,15 +949,17 @@ function DetailInstruction({
     onChange: (changes: Partial<Line>) => void;
 }) {
     return canEdit ? (
-        <Textarea
-            label="Instruksi"
-            rows={3}
-            placeholder="Cara melakukan pemeriksaan ini"
-            value={line.instruksi ?? ''}
-            onChange={(event) =>
-                onChange({ instruksi: event.target.value || null })
-            }
-        />
+        <FormControl>
+            <Textarea
+                label="Instruksi"
+                rows={3}
+                placeholder="Cara melakukan pemeriksaan ini"
+                value={line.instruksi ?? ''}
+                onChange={(event) =>
+                    onChange({ instruksi: event.target.value || null })
+                }
+            />
+        </FormControl>
     ) : (
         <p className="text-sm">{line.instruksi ?? '—'}</p>
     );

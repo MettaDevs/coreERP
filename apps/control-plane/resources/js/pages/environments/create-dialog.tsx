@@ -1,3 +1,5 @@
+import { FormErrorHeader } from '@/components/form-error-header';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import { Button } from '@apperp/ui/button';
 import {
     Dialog,
@@ -93,6 +95,9 @@ export default function CreateDialog({
     tenant: { id: string; name: string }[];
     kinds: string[];
 }) {
+    const { wrap: wrapLocalForm0Request, summary: localForm0RequestSummary } =
+        useInertiaFeedback();
+
     const [open, setOpen] = useState(false);
     const { data, setData, post, processing, errors, reset, transform } =
         useForm({
@@ -113,12 +118,15 @@ export default function CreateDialog({
             ...values,
             hosting: values.kind === 'production' ? values.hosting : 'provider',
         }));
-        post('/lingkungan', {
-            onSuccess: () => {
-                reset();
-                setOpen(false);
-            },
-        });
+        post(
+            '/lingkungan',
+            wrapLocalForm0Request({
+                onSuccess: () => {
+                    reset();
+                    setOpen(false);
+                },
+            }),
+        );
     }
 
     return (
@@ -127,7 +135,7 @@ export default function CreateDialog({
                 <Button disabled={tenant.length === 0}>Buat lingkungan</Button>
             </DialogTrigger>
             <DialogContent>
-                <form onSubmit={submit}>
+                <form noValidate onSubmit={submit}>
                     <DialogHeader>
                         <DialogTitle>Buat lingkungan</DialogTitle>
                         <DialogDescription>
@@ -135,6 +143,10 @@ export default function CreateDialog({
                             dulu.
                         </DialogDescription>
                     </DialogHeader>
+                    <>
+                        {localForm0RequestSummary}
+                        <FormErrorHeader errors={errors} />
+                    </>
 
                     <div className="space-y-4 py-4">
                         <div className="space-y-2">

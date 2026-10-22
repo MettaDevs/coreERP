@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ActionButton } from '@apperp/ui/action-button';
 
@@ -6,9 +6,9 @@ import {
     Field,
     FieldDescription,
     FieldError,
-    FieldGroup,
     FieldLabel,
 } from '@apperp/ui/field';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import type { PageDialogNavigation } from '@apperp/ui/page-dialog';
 import {
@@ -17,16 +17,17 @@ import {
     PageDialogToolbar,
     PageDialogBody,
 } from '@apperp/ui/page-dialog';
-import { Select } from '@apperp/ui/select';
 
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
-import { api, errorMessage, newIdempotencyKey } from '../../api';
+import RecordLookup from '../../_shared/RecordLookup';
+import { api, newIdempotencyKey } from '../../api';
 import {
     RecordCardHeader,
     recordQueryUrl,
 } from '../../transactions/_shared/record-card';
 import { useRecordCardDirty } from '../../transactions/_shared/use-record-card-dirty';
+import { useSaveFeedback } from '../../use-save-feedback';
 import type { MasterRecord, ParentSummary } from '../masters';
 import { useMasterOptions } from '../useMasterOptions';
 import type { PabrikanModelRecord } from './pabrikanAsetDetail';
@@ -77,18 +78,13 @@ export default function ModelAsetFormSheet({
         return () => onBusyChange?.(false);
     }, [saving, onBusyChange]);
     const sheetContentRef = useRef<HTMLDivElement>(null);
+    const { feedbackSummary, reportSaveError, clearSaveFeedback, fieldError } =
+        useSaveFeedback(sheetContentRef, value?.id);
     const creationKey = useRef(newIdempotencyKey());
-
-    const jenisLabel = useMemo(() => {
-        const selected = jenisOptions.find(
-            (option) => option.id === jenisAsetId,
-        );
-
-        return selected ? optionLabel(selected) : 'Tidak ditentukan';
-    }, [jenisAsetId, jenisOptions]);
 
     async function submit(event: FormEvent) {
         event.preventDefault();
+        clearSaveFeedback();
         setSaving(true);
         setError('');
 
@@ -109,7 +105,7 @@ export default function ModelAsetFormSheet({
             });
             await onSaved();
         } catch (caught) {
-            setError(errorMessage(caught, 'Model belum dapat disimpan.'));
+            reportSaveError(caught, 'Model belum dapat disimpan.');
         } finally {
             setSaving(false);
         }
@@ -144,6 +140,7 @@ export default function ModelAsetFormSheet({
                     onDelete={value ? onDelete : undefined}
                 />
                 <form
+                    noValidate
                     className="flex min-h-0 flex-1 flex-col"
                     onSubmit={submit}
                 >
@@ -161,16 +158,20 @@ export default function ModelAsetFormSheet({
                             onClick={onClose}
                         />
                     </PageDialogToolbar>
+                    {feedbackSummary}
                     <PageDialogBody className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-                        <FieldGroup>
-                            <Field>
+                        <FormGrid columns={1}>
+                            <FormControl>
                                 <Input
                                     label="Pabrikan"
                                     value={`${manufacturer.kode} — ${manufacturer.nama}`}
                                     disabled
                                 />
-                            </Field>
-                            <Field>
+                            </FormControl>
+                            <FormControl
+                                data-error-field={'nama'}
+                                error={fieldError('nama')}
+                            >
                                 <Input
                                     label="Model"
                                     autoFocus
@@ -180,34 +181,39 @@ export default function ModelAsetFormSheet({
                                     onChange={(event) =>
                                         setNama(event.target.value)
                                     }
+                                    aria-invalid={!!fieldError('nama')}
                                 />
-                            </Field>
+                            </FormControl>
                             {canReadJenis ? (
-                                <Field data-invalid={Boolean(jenisError)}>
-                                    <Select
-                                        {...jenisSource.selectProps}
+                                <FormControl
+                                    data-error-field="jenis_aset_id"
+                                    error={fieldError('jenis_aset_id')}
+                                    data-invalid={Boolean(
+                                        jenisError ||
+                                        fieldError('jenis_aset_id'),
+                                    )}
+                                >
+                                    <RecordLookup
+                                        source={jenisSource}
                                         label="Jenis aset"
                                         items={[
-                                            'Tidak ditentukan',
-                                            ...jenisOptions.map(optionLabel),
+                                            {
+                                                value: '',
+                                                label: 'Tidak ditentukan',
+                                            },
+                                            ...jenisOptions.map((item) => ({
+                                                value: item.id,
+                                                label: optionLabel(item),
+                                            })),
                                         ]}
-                                        value={jenisLabel}
+                                        value={jenisAsetId || ''}
                                         placeholder="Pilih jenis aset"
                                         searchPlaceholder="Cari jenis aset"
-                                        emptyMessage="Jenis aset tidak ditemukan."
+
                                         ariaLabel="Pilih jenis aset"
                                         portalContainer={sheetContentRef}
                                         onValueChange={(item) =>
-                                            setJenisAsetId(
-                                                item === 'Tidak ditentukan'
-                                                    ? ''
-                                                    : (jenisOptions.find(
-                                                          (option) =>
-                                                              optionLabel(
-                                                                  option,
-                                                              ) === item,
-                                                      )?.id ?? ''),
-                                            )
+                                            setJenisAsetId(item ?? '')
                                         }
                                     />
                                     {jenisError && (
@@ -215,21 +221,26 @@ export default function ModelAsetFormSheet({
                                             {jenisError}
                                         </FieldDescription>
                                     )}
-                                </Field>
+                                </FormControl>
                             ) : (
-                                <Field>
+                                <FormControl
+                                    hint={
+                                        <>
+                                            Jenis aset tidak ditampilkan karena
+                                            Anda belum memiliki akses untuk
+                                            membacanya.
+                                        </>
+                                    }
+                                >
                                     <FieldLabel>Jenis aset</FieldLabel>
-                                    <FieldDescription>
-                                        Jenis aset tidak ditampilkan karena Anda
-                                        belum memiliki akses untuk membacanya.
-                                    </FieldDescription>
-                                </Field>
+                                </FormControl>
                             )}
-                            <Field>
-                                <FieldLabel htmlFor="model-description">
-                                    Keterangan
-                                </FieldLabel>
+                            <FormControl
+                                data-error-field={'keterangan'}
+                                error={fieldError('keterangan')}
+                            >
                                 <Textarea
+                                    label="Keterangan"
                                     id="model-description"
                                     rows={4}
                                     maxLength={2000}
@@ -238,7 +249,7 @@ export default function ModelAsetFormSheet({
                                         setKeterangan(event.target.value)
                                     }
                                 />
-                            </Field>
+                            </FormControl>
                             <Field orientation="horizontal">
                                 <Switch
                                     id="model-active"
@@ -250,7 +261,7 @@ export default function ModelAsetFormSheet({
                                 </FieldLabel>
                             </Field>
                             {error && <FieldError>{error}</FieldError>}
-                        </FieldGroup>
+                        </FormGrid>
                     </PageDialogBody>
                 </form>
             </PageDialogContent>

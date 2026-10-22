@@ -12,7 +12,8 @@ import { Textarea } from '@apperp/ui/textarea';
 import { Trash2, Upload } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { apiJson, apiRequest, errorText, toastSaveError } from '@/lib/core-api';
+import { useSaveFeedback } from '@/hooks/use-save-feedback';
+import { apiJson, apiRequest, errorText } from '@/lib/core-api';
 
 type Logo = {
     id: string;
@@ -96,6 +97,12 @@ export function PrintIdentitySection({
     onBusyChange: (busy: boolean) => void;
 }) {
     const base = `/api/v1/organizations/${organizationId}/print-identity`;
+    const {
+        report: saveReport,
+        clear: saveClear,
+        summary: saveSummary,
+        scopeRef: saveScopeRef,
+    } = useSaveFeedback<HTMLDivElement>(organizationId);
     const [identity, setIdentity] = useState<Identity | null>(null);
     const [form, setForm] = useState<Form>(toForm(null));
     const [dirty, setDirty] = useState(false);
@@ -166,6 +173,8 @@ export function PrintIdentitySection({
         body.append('position', position);
         body.append('version', String(identity?.version ?? 0));
 
+        saveClear();
+
         try {
             const result = await apiJson<{ data: Identity }>(`${base}/logos`, {
                 method: 'POST',
@@ -174,7 +183,7 @@ export function PrintIdentitySection({
             acceptIdentity(result.data);
             toast.success('Logo ditambahkan.');
         } catch (caught) {
-            toastSaveError(caught, 'Logo belum dapat diunggah.');
+            saveReport(caught, 'Logo belum dapat diunggah.');
         } finally {
             writingLogo.current = false;
             onBusyChange(false);
@@ -196,6 +205,8 @@ export function PrintIdentitySection({
         writingLogo.current = true;
         onBusyChange(true);
 
+        saveClear();
+
         try {
             const result = await apiJson<{ data: Identity }>(
                 `${base}/logos/${logo.id}`,
@@ -209,7 +220,7 @@ export function PrintIdentitySection({
             );
             acceptIdentity(result.data);
         } catch (caught) {
-            toastSaveError(caught, 'Logo belum dapat diubah.');
+            saveReport(caught, 'Logo belum dapat diubah.');
         } finally {
             writingLogo.current = false;
             onBusyChange(false);
@@ -224,6 +235,8 @@ export function PrintIdentitySection({
         writingLogo.current = true;
         onBusyChange(true);
 
+        saveClear();
+
         try {
             const response = await apiRequest(`${base}/logos/${logo.id}`, {
                 method: 'DELETE',
@@ -233,7 +246,7 @@ export function PrintIdentitySection({
             acceptIdentity(result.data);
             toast.success('Logo dihapus.');
         } catch (caught) {
-            toastSaveError(caught, 'Logo belum dapat dihapus.');
+            saveReport(caught, 'Logo belum dapat dihapus.');
         } finally {
             writingLogo.current = false;
             onBusyChange(false);
@@ -264,7 +277,8 @@ export function PrintIdentitySection({
     );
 
     return (
-        <div className="space-y-6">
+        <div ref={saveScopeRef} className="space-y-6">
+            {saveSummary}
             {error && <p className="text-sm text-destructive">{error}</p>}
             <p className="text-sm text-muted-foreground">
                 Isi ini dipakai pada kop dan footer dokumen yang dicetak atas

@@ -1,4 +1,4 @@
-import { toast } from 'sonner';
+import { createSaveFeedback } from '@apperp/ui/form-feedback';
 
 export type ApiValidationErrors = Record<string, string[]>;
 
@@ -173,40 +173,30 @@ async function request<T>(
 }
 
 export function errorMessage(caught: unknown, fallback: string): string {
-    return caught instanceof Error ? caught.message : fallback;
+    if (caught instanceof ApiError) {
+        return caught.status >= 500
+            ? `${fallback} Terjadi gangguan sistem. Hubungi pengelola aplikasi.`
+            : caught.message || fallback;
+    }
+
+    return fallback;
 }
 
 export function saveErrorMessage(caught: unknown, fallback: string): string {
     return caught instanceof ApiError && caught.status >= 500
         ? `${fallback} Terjadi kesalahan sistem. Hubungi pengelola aplikasi agar dapat diperiksa.`
-        : errorMessage(caught, fallback);
+        : caught instanceof ApiError
+          ? caught.message
+          : fallback;
 }
 
-/**
- * Toast untuk kegagalan menyimpan. Versi basi mendapat tombol muat ulang penuh: isian form
- * harus kembali ke data terbaru supaya pengguna melihat perubahan orang lain lebih dulu.
- */
-export function toastSaveError(caught: unknown, fallback: string): void {
-    if (caught instanceof ApiError && caught.status >= 500) {
-        toast.error(saveErrorMessage(caught, fallback), {
-            duration: Infinity,
-            closeButton: true,
-        });
-
-        return;
-    }
-
-    if (caught instanceof ApiError && caught.code === 'stale_version') {
-        toast.error(caught.message, {
-            duration: Infinity,
-            action: {
-                label: 'Muat ulang',
-                onClick: () => window.location.reload(),
-            },
-        });
-
-        return;
-    }
-
-    toast.error(errorMessage(caught, fallback));
+export function saveErrorFeedback(caught: unknown, operation: string) {
+    return createSaveFeedback({
+        operation,
+        message: caught instanceof ApiError ? caught.message : operation,
+        status: caught instanceof ApiError ? caught.status : undefined,
+        code: caught instanceof ApiError ? caught.code : null,
+        errors: caught instanceof ApiError ? caught.validationErrors : {},
+        details: `${operation}\n${caught instanceof ApiError ? `Status: ${caught.status}\nKode: ${caught.code ?? '-'}` : 'Jenis gangguan belum diketahui.'}`,
+    });
 }

@@ -1,6 +1,7 @@
-import { CircleAlert } from 'lucide-react';
-import type { ReactNode, RefObject } from 'react';
-import { Field, FieldHint, FieldLabel } from '@apperp/ui/field';
+import type { RefObject } from 'react';
+import { DatePicker } from '@apperp/ui/date-picker';
+import { FieldLabel } from '@apperp/ui/field';
+import { FormControl } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
@@ -9,43 +10,7 @@ import EditShield from '../_shared/EditShield';
 import type { FieldConfig, FieldValue } from './fields';
 import MasterSelect from './MasterSelect';
 
-/**
- * Satu komponen untuk seluruh field yang dideklarasikan lewat `FieldConfig`.
- * Tidak memuat logika domain apa pun: apa yang dirender ditentukan konfigurasi,
- * sehingga sumber konfigurasi boleh berupa daftar statis milik master maupun definisi
- * atribut yang datang dari server.
- */
-
-/**
- * Menaruh ikon bantuan kecil di sebelah kontrolnya, bukan membungkus seluruh kontrol
- * sebagai target hover.
- *
- * Percobaan pertama membungkus seluruh field terasa aneh saat dipakai sungguhan: kursor
- * yang lewat begitu saja di atas Select atau Input memicu tooltip padahal pengguna cuma
- * mau mengklik nilainya. Ikon terpisah kembali dipakai justru karena ia TIDAK bertumpang
- * tindih dengan area yang dipakai untuk berinteraksi dengan kontrolnya.
- */
-function wrapHint(control: ReactNode, help: string | undefined) {
-    if (!help) {
-        return control;
-    }
-
-    return (
-        <div className="flex items-center gap-1.5">
-            <div className="min-w-0 flex-1">{control}</div>
-            <FieldHint hint={help}>
-                <button
-                    type="button"
-                    aria-label="Lihat penjelasan"
-                    className="text-muted-foreground hover:text-foreground shrink-0"
-                >
-                    <CircleAlert className="size-4" />
-                </button>
-            </FieldHint>
-        </div>
-    );
-}
-
+/** Konfigurasi menentukan kontrol; SDK menentukan susunan field dan bantuannya. */
 export default function DynamicField({
     config,
     value,
@@ -54,7 +19,9 @@ export default function DynamicField({
     readOnly = false,
     onRequestEdit,
     referenceQuery,
+    error,
 }: {
+    error?: string;
     referenceQuery?: string;
     config: FieldConfig;
     value: FieldValue;
@@ -66,9 +33,10 @@ export default function DynamicField({
     onRequestEdit?: (name: string) => void;
 }) {
     const requestEdit = () => onRequestEdit?.(config.name);
-    /** Ditempel pada setiap Field agar mode sunting dapat menaruh fokus di field yang diklik. */
+    /** Ditempel pada setiap kontrol agar mode sunting dapat menaruh fokus di field yang diklik. */
     const anchor = {
         'data-field-name': config.name,
+        'data-error-field': config.name,
         'data-readonly': readOnly || undefined,
     };
     // `Select` merender penanda required merahnya sendiri. Jangan memasukkan `*`
@@ -78,56 +46,50 @@ export default function DynamicField({
 
     if (config.type === 'reference') {
         return (
-            <Field {...anchor}>
-                {wrapHint(
-                    <EditShield
-                        active={readOnly}
-                        label={config.label}
-                        onActivate={requestEdit}
-                    >
-                        <MasterSelect
-                            resource={config.resource ?? ''}
-                            label={label}
-                            required={config.required}
-                            value={String(value ?? '')}
-                            onValueChange={onChange}
-                            query={referenceQuery}
-                            placeholder={
-                                config.placeholder ??
-                                `Pilih ${config.label.toLowerCase()}`
-                            }
-                            portalContainer={portalContainer}
-                        />
-                    </EditShield>,
-                    config.help,
-                )}
-            </Field>
+            <FormControl hint={config.help} error={error} {...anchor}>
+                <EditShield
+                    active={readOnly}
+                    label={config.label}
+                    onActivate={requestEdit}
+                >
+                    <MasterSelect
+                        resource={config.resource ?? ''}
+                        label={label}
+                        required={config.required}
+                        value={String(value ?? '')}
+                        onValueChange={onChange}
+                        query={referenceQuery}
+                        placeholder={
+                            config.placeholder ??
+                            `Pilih ${config.label.toLowerCase()}`
+                        }
+                        portalContainer={portalContainer}
+                    />
+                </EditShield>
+            </FormControl>
         );
     }
 
     if (config.type === 'boolean') {
         return (
-            <Field orientation="horizontal" {...anchor}>
-                {wrapHint(
-                    <div className="flex items-center gap-2">
-                        <EditShield
-                            active={readOnly}
-                            label={config.label}
-                            onActivate={requestEdit}
-                        >
-                            <Switch
-                                id={config.name}
-                                checked={Boolean(value)}
-                                onCheckedChange={onChange}
-                            />
-                        </EditShield>
-                        <FieldLabel htmlFor={config.name}>
-                            {config.label}
-                        </FieldLabel>
-                    </div>,
-                    config.help,
-                )}
-            </Field>
+            <FormControl hint={config.help} error={error} {...anchor}>
+                <div className="flex items-center gap-2">
+                    <EditShield
+                        active={readOnly}
+                        label={config.label}
+                        onActivate={requestEdit}
+                    >
+                        <Switch
+                            id={config.name}
+                            checked={Boolean(value)}
+                            onCheckedChange={onChange}
+                        />
+                    </EditShield>
+                    <FieldLabel htmlFor={config.name}>
+                        {config.label}
+                    </FieldLabel>
+                </div>
+            </FormControl>
         );
     }
 
@@ -136,38 +98,34 @@ export default function DynamicField({
         const selected = options.find((option) => option.value === value);
 
         return (
-            <Field {...anchor}>
-                {wrapHint(
-                    <EditShield
-                        active={readOnly}
-                        label={config.label}
-                        onActivate={requestEdit}
-                    >
-                        <Select
-                            label={label}
-                            required={config.required}
-                            items={options.map((option) => option.label)}
-                            value={selected ? selected.label : undefined}
-                            placeholder={
-                                config.placeholder ??
-                                `Pilih ${config.label.toLowerCase()}`
-                            }
-                            searchPlaceholder={`Cari ${config.label.toLowerCase()}`}
-                            emptyMessage={`${config.label} tidak ditemukan.`}
-                            ariaLabel={`Pilih ${config.label.toLowerCase()}`}
-                            portalContainer={portalContainer}
-                            onValueChange={(item) =>
-                                onChange(
-                                    options.find(
-                                        (option) => option.label === item,
-                                    )?.value ?? '',
-                                )
-                            }
-                        />
-                    </EditShield>,
-                    config.help,
-                )}
-            </Field>
+            <FormControl hint={config.help} error={error} {...anchor}>
+                <EditShield
+                    active={readOnly}
+                    label={config.label}
+                    onActivate={requestEdit}
+                >
+                    <Select
+                        label={label}
+                        required={config.required}
+                        items={options.map((option) => option.label)}
+                        value={selected ? selected.label : undefined}
+                        placeholder={
+                            config.placeholder ??
+                            `Pilih ${config.label.toLowerCase()}`
+                        }
+                        searchPlaceholder={`Cari ${config.label.toLowerCase()}`}
+                        emptyMessage={`${config.label} tidak ditemukan.`}
+                        ariaLabel={`Pilih ${config.label.toLowerCase()}`}
+                        portalContainer={portalContainer}
+                        onValueChange={(item) =>
+                            onChange(
+                                options.find((option) => option.label === item)
+                                    ?.value ?? '',
+                            )
+                        }
+                    />
+                </EditShield>
+            </FormControl>
         );
     }
 
@@ -176,97 +134,95 @@ export default function DynamicField({
         const chosen = Array.isArray(value) ? value : [];
 
         return (
-            <Field {...anchor}>
+            <FormControl hint={config.help} error={error} {...anchor}>
                 <FieldLabel>{inputLabel}</FieldLabel>
                 {/* Satu perisai untuk seluruh baris, bukan per pilihan: empat tombol
                     transparan berjajar hanya akan menambah empat perhentian tab kosong. */}
-                {wrapHint(
-                    <EditShield
-                        active={readOnly}
-                        label={config.label}
-                        onActivate={requestEdit}
-                    >
-                        <div className="flex flex-wrap gap-3">
-                            {options.map((option) => (
-                                <label
-                                    key={option.value}
-                                    className="flex items-center gap-2 text-sm"
-                                >
-                                    <Switch
-                                        id={`${config.name}-${option.value}`}
-                                        checked={chosen.includes(option.value)}
-                                        onCheckedChange={(checked) =>
-                                            onChange(
-                                                checked
-                                                    ? [...chosen, option.value]
-                                                    : chosen.filter(
-                                                          (item) =>
-                                                              item !==
-                                                              option.value,
-                                                      ),
-                                            )
-                                        }
-                                    />
-                                    {option.label}
-                                </label>
-                            ))}
-                        </div>
-                    </EditShield>,
-                    config.help,
-                )}
-            </Field>
+                <EditShield
+                    active={readOnly}
+                    label={config.label}
+                    onActivate={requestEdit}
+                >
+                    <div className="flex flex-wrap gap-3">
+                        {options.map((option) => (
+                            <label
+                                key={option.value}
+                                className="flex items-center gap-2 text-sm"
+                            >
+                                <Switch
+                                    id={`${config.name}-${option.value}`}
+                                    checked={chosen.includes(option.value)}
+                                    onCheckedChange={(checked) =>
+                                        onChange(
+                                            checked
+                                                ? [...chosen, option.value]
+                                                : chosen.filter(
+                                                      (item) =>
+                                                          item !== option.value,
+                                                  ),
+                                        )
+                                    }
+                                />
+                                {option.label}
+                            </label>
+                        ))}
+                    </div>
+                </EditShield>
+            </FormControl>
         );
     }
 
     if (config.type === 'textarea') {
         return (
-            <Field {...anchor}>
-                <FieldLabel htmlFor={config.name}>{inputLabel}</FieldLabel>
-                {wrapHint(
-                    <Textarea
-                        id={config.name}
-                        rows={4}
-                        required={config.required}
-                        placeholder={config.placeholder}
-                        readOnly={readOnly}
-                        value={String(value ?? '')}
-                        onChange={(event) => onChange(event.target.value)}
-                    />,
-                    config.help,
-                )}
-            </Field>
-        );
-    }
-
-    return (
-        <Field {...anchor}>
-            {/* Input sungguhan yang dibuat `readOnly`, bukan teks biasa. Karena elemennya
-                tidak pernah dilepas, kursor hasil klik tetap berada di huruf yang diklik
-                ketika mode berpindah — tidak ada fokus yang perlu dipulihkan. */}
-            {wrapHint(
-                <Input
+            <FormControl hint={config.help} error={error} {...anchor}>
+                <Textarea
+                    label={label}
                     id={config.name}
-                    label={
-                        config.suffix ? `${label} (${config.suffix})` : label
-                    }
-                    type={
-                        config.type === 'number'
-                            ? 'number'
-                            : config.type === 'date'
-                              ? 'date'
-                              : 'text'
-                    }
+                    rows={4}
                     required={config.required}
-                    min={config.min}
-                    max={config.max}
-                    step={config.step}
                     placeholder={config.placeholder}
                     readOnly={readOnly}
                     value={String(value ?? '')}
                     onChange={(event) => onChange(event.target.value)}
-                />,
-                config.help,
-            )}
-        </Field>
+                />
+            </FormControl>
+        );
+    }
+
+    if (config.type === 'date') {
+        return (
+            <FormControl hint={config.help} error={error} {...anchor}>
+                <DatePicker
+                    id={config.name}
+                    label={label}
+                    required={config.required}
+                    readOnly={readOnly}
+                    value={String(value ?? '')}
+                    onValueChange={onChange}
+                    portalContainer={portalContainer}
+                />
+            </FormControl>
+        );
+    }
+
+    return (
+        <FormControl hint={config.help} error={error} {...anchor}>
+            {/* Input sungguhan yang dibuat `readOnly`, bukan teks biasa. Karena elemennya
+                tidak pernah dilepas, kursor hasil klik tetap berada di huruf yang diklik
+                ketika mode berpindah — tidak ada fokus yang perlu dipulihkan. */}
+            <Input
+                id={config.name}
+                label={config.suffix ? `${label} (${config.suffix})` : label}
+                type={config.type === 'number' ? 'number' : 'text'}
+                required={config.required}
+                min={config.min}
+                max={config.max}
+                step={config.step}
+                placeholder={config.placeholder}
+                readOnly={readOnly}
+                value={String(value ?? '')}
+                onChange={(event) => onChange(event.target.value)}
+            />
+        </FormControl>
     );
 }

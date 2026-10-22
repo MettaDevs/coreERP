@@ -1,16 +1,5 @@
 import { useMemo } from 'react';
 import type { DataTableColumn } from '@apperp/ui/data-table';
-import { ReportFilterBar } from './_shared/ReportFilterBar';
-import {
-    AssetFilter,
-    AssetGroupFilter,
-    AssetTypeFilter,
-    ConditionFilter,
-    DateFilter,
-    DepreciationBookFilter,
-    FiscalClassificationFilter,
-    LocationFilter,
-} from './_shared/ReportFilters';
 import { ReportPageLayout } from './_shared/ReportPageLayout';
 import { useReportData } from './_shared/useReportData';
 
@@ -47,20 +36,8 @@ const moneyColumn = (
 });
 
 export default function LaporanPenjualanAsetPage() {
-    const {
-        filters,
-        bindFilter,
-        bindMultiFilter,
-        presets,
-        additional,
-        hasActiveFilters,
-        resetFilters,
-        rows,
-        fields,
-        loading,
-        error,
-        refetch,
-    } = useReportData<SaleReportRow>('laporan-penjualan-aset');
+    const { filterState, rows, fields, loading, error, refetch } =
+        useReportData<SaleReportRow>('laporan-penjualan-aset');
 
     const columns: DataTableColumn<SaleReportRow>[] = useMemo(
         () => [
@@ -122,32 +99,8 @@ export default function LaporanPenjualanAsetPage() {
         <ReportPageLayout<SaleReportRow>
             title="Laporan penjualan aset"
             description="Aset yang dijual dalam rentang tanggal, beserta nilai penjualan, nilai buku saat dijual, dan laba/ruginya."
-            reportCode="laporan-penjualan-aset"
-            filters={filters}
-            filterBar={
-                <ReportFilterBar
-                    canReset={hasActiveFilters}
-                    onReset={resetFilters}
-                    presets={presets}
-                    additional={additional}
-                    dates={{ from: 'dari', to: 'sampai' }}
-                >
-                    <DateFilter label="Dari tanggal" {...bindFilter('dari')} />
-                    <DateFilter
-                        label="Sampai tanggal"
-                        {...bindFilter('sampai')}
-                    />
-                    <DepreciationBookFilter {...bindFilter('buku_id')} />
-                    <AssetGroupFilter {...bindMultiFilter('group_aset_id')} />
-                    <FiscalClassificationFilter
-                        {...bindMultiFilter('kelompok_harta_fiskal_id')}
-                    />
-                    <AssetTypeFilter {...bindMultiFilter('jenis_aset_id')} />
-                    <LocationFilter {...bindMultiFilter('lokasi_aset_id')} />
-                    <ConditionFilter {...bindMultiFilter('kondisi_aset_id')} />
-                    <AssetFilter {...bindFilter('asset_id')} />
-                </ReportFilterBar>
-            }
+            filterState={filterState}
+
             columns={columns}
             rows={rows}
             loading={loading}

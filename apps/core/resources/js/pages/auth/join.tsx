@@ -3,8 +3,10 @@ import { Field, FieldError, FieldGroup } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { Spinner } from '@apperp/ui/spinner';
 import { Form, Head } from '@inertiajs/react';
+import { FormErrorHeader } from '@/components/form-error-header';
 import PasswordInput from '@/components/password-input';
 import TextLink from '@/components/text-link';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 
 type Props = {
     passwordRules: string;
@@ -40,6 +42,11 @@ export default function Join({
     tenantName,
     ssoError,
 }: Props) {
+    const { wrap: wrapFormResponse1, summary: formResponse1Summary } =
+        useInertiaFeedback();
+    const { wrap: wrapFormResponse2, summary: formResponse2Summary } =
+        useInertiaFeedback();
+
     if (mode === 'sso') {
         return (
             <>
@@ -68,12 +75,19 @@ export default function Join({
                         </p>
                     </div>
                     <Form
+                        noValidate
                         action="/sso/gabung"
                         method="post"
                         disableWhileProcessing
+                        {...wrapFormResponse1({})}
                     >
-                        {({ processing }) => (
+                        {({ processing, errors }) => (
                             <>
+                                <>
+                                    {formResponse1Summary}
+                                    <FormErrorHeader errors={errors} />
+                                </>
+
                                 <input
                                     type="hidden"
                                     name="code"
@@ -107,14 +121,24 @@ export default function Join({
                 </p>
             )}
             <Form
+                noValidate
                 action="/join"
                 method="post"
                 resetOnSuccess={['password', 'password_confirmation']}
                 disableWhileProcessing
+                {...wrapFormResponse2({})}
             >
                 {({ processing, errors }) => (
                     <FieldGroup>
-                        <Field data-invalid={Boolean(errors.code)}>
+                        <>
+                            {formResponse2Summary}
+                            <FormErrorHeader errors={errors} />
+                        </>
+
+                        <Field
+                            data-invalid={Boolean(errors.code)}
+                            data-error-field={'code'}
+                        >
                             <Input
                                 id="code"
                                 label="Kode akses"
@@ -128,7 +152,10 @@ export default function Join({
                         </Field>
                         {!authenticated && (
                             <>
-                                <Field data-invalid={Boolean(errors.name)}>
+                                <Field
+                                    data-invalid={Boolean(errors.name)}
+                                    data-error-field={'name'}
+                                >
                                     <Input
                                         id="name"
                                         label="Nama lengkap"
@@ -137,7 +164,10 @@ export default function Join({
                                     />
                                     <FieldError>{errors.name}</FieldError>
                                 </Field>
-                                <Field data-invalid={Boolean(errors.email)}>
+                                <Field
+                                    data-invalid={Boolean(errors.email)}
+                                    data-error-field={'email'}
+                                >
                                     <Input
                                         id="email"
                                         label="Email"
@@ -148,7 +178,10 @@ export default function Join({
                                     />
                                     <FieldError>{errors.email}</FieldError>
                                 </Field>
-                                <Field data-invalid={Boolean(errors.password)}>
+                                <Field
+                                    data-invalid={Boolean(errors.password)}
+                                    data-error-field={'password'}
+                                >
                                     <PasswordInput
                                         id="password"
                                         label="Password"
@@ -163,6 +196,7 @@ export default function Join({
                                     data-invalid={Boolean(
                                         errors.password_confirmation,
                                     )}
+                                    data-error-field={'password_confirmation'}
                                 >
                                     <PasswordInput
                                         id="password_confirmation"

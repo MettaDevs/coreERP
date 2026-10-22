@@ -16,6 +16,7 @@ import { Checkbox } from '@apperp/ui/checkbox';
 import { DataTable, DataTableText } from '@apperp/ui/data-table';
 import {
     Field,
+    FieldError,
     FieldGroup,
     FieldLabel,
     FieldLegend,
@@ -56,7 +57,8 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { apiJson, apiRequest, errorText, toastSaveError } from '@/lib/core-api';
+import { useSaveFeedback } from '@/hooks/use-save-feedback';
+import { apiJson, apiRequest, CoreApiError, errorText } from '@/lib/core-api';
 import { loadLookupItems } from '@/lib/lookup-loader';
 import { AddressBookHint } from '../../address-book/components/address-book-hint';
 
@@ -449,10 +451,25 @@ export function OrganizationAddressesSection({
                 reload: draft.retry,
             }
           : storedList;
+    const {
+        report: saveReport,
+        clear: saveClear,
+        summary: saveSummary,
+        scopeRef: saveScopeRef,
+    } = useSaveFeedback<HTMLDivElement>(base);
+    const {
+        report: formReport,
+        clear: formClear,
+        summary: formSummary,
+        scopeRef: formScopeRef,
+    } = useSaveFeedback(base);
     const [editing, setEditing] = useState<Location | 'new' | null>(null);
     const [form, setForm] = useState<LocationForm>(emptyLocation(countryCode));
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState('');
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>(
+        {},
+    );
     const [sharable, setSharable] = useState<SharableLocation[]>([]);
 
     const loadSharedLocations = useCallback<LookupLoader<SharedLocationChoice>>(
@@ -670,10 +687,15 @@ export function OrganizationAddressesSection({
                 : locationToForm(target),
         );
         setFormError('');
+        formClear();
+        setFieldErrors({});
         setEditing(target);
     };
 
     const save = async () => {
+        formClear();
+        setFieldErrors({});
+
         if (!chosenShared && (regionsLoading || regionError)) {
             setFormError('Tunggu sampai pilihan wilayah berhasil dimuat.');
 
@@ -725,6 +747,8 @@ export function OrganizationAddressesSection({
 
         setSaving(true);
 
+        saveClear();
+
         try {
             if (editing === 'new') {
                 await apiJson(base, {
@@ -770,7 +794,11 @@ export function OrganizationAddressesSection({
             setEditing(null);
             list.reload();
         } catch (caught) {
-            setFormError(errorText(caught, 'Alamat belum dapat disimpan.'));
+            if (caught instanceof CoreApiError) {
+                setFieldErrors(caught.errors);
+            }
+
+            formReport(caught, 'Alamat belum dapat disimpan.');
         } finally {
             setSaving(false);
         }
@@ -798,6 +826,8 @@ export function OrganizationAddressesSection({
             return;
         }
 
+        saveClear();
+
         try {
             await apiRequest(`${base}/${location.id}`, {
                 method: 'DELETE',
@@ -806,7 +836,7 @@ export function OrganizationAddressesSection({
             toast.success('Alamat diarsipkan.');
             list.reload();
         } catch (caught) {
-            toastSaveError(caught, 'Alamat belum dapat diarsipkan.');
+            saveReport(caught, 'Alamat belum dapat diarsipkan.');
         }
     };
 
@@ -823,6 +853,8 @@ export function OrganizationAddressesSection({
             return;
         }
 
+        saveClear();
+
         try {
             await apiJson(base, {
                 method: 'POST',
@@ -835,7 +867,7 @@ export function OrganizationAddressesSection({
             toast.success('Alamat utama diganti.');
             list.reload();
         } catch (caught) {
-            toastSaveError(caught, 'Alamat utama belum dapat diganti.');
+            saveReport(caught, 'Alamat utama belum dapat diganti.');
         }
     };
 
@@ -847,9 +879,14 @@ export function OrganizationAddressesSection({
         label: string,
         placeholder?: string,
     ) => (
-        <Field key={key}>
+        <Field
+            key={key}
+            data-error-field={key}
+            data-invalid={Boolean(fieldErrors[key])}
+        >
             <Input
                 label={label}
+                aria-invalid={Boolean(fieldErrors[key])}
                 placeholder={placeholder}
                 value={form[key]}
                 onChange={(event) =>
@@ -875,6 +912,7 @@ export function OrganizationAddressesSection({
                     }))
                 }
             />
+            <FieldError>{fieldErrors[key]?.[0]}</FieldError>
         </Field>
     );
 
@@ -883,11 +921,11 @@ export function OrganizationAddressesSection({
     }
 
     return (
-        <div className="space-y-3">
+        <div ref={saveScopeRef} className="space-y-3">
             {list.error && (
                 <p className="text-sm text-destructive">{list.error}</p>
             )}
-            <RecordActionBar>
+            <RecordActionBar feedback={saveSummary}>
                 {canManage && (
                     <ActionButton
                         action="create"
@@ -1085,6 +1123,8 @@ export function OrganizationAddressesSection({
                     }
                 >
                     <form
+                        noValidate
+                        ref={formScopeRef}
                         className="flex min-h-0 flex-1 flex-col"
                         onSubmit={(event) => {
                             // Dialog dirender lewat portal di dalam form organisasi; React
@@ -1125,6 +1165,7 @@ export function OrganizationAddressesSection({
                                 onClick={() => setEditing(null)}
                             />
                         </PageDialogToolbar>
+                        {formSummary}
                         <DialogBody className="space-y-4 py-3">
                             {editing === 'new' &&
                                 (!draft || organizationId !== '') && (
@@ -1480,6 +1521,18 @@ export function OrganizationContactsSection({
             }
           : storedList;
     // Kontak menempel ke alamat; daftar alamat dibaca saat form dibuka.
+    const {
+        report: saveReport,
+        clear: saveClear,
+        summary: saveSummary,
+        scopeRef: saveScopeRef,
+    } = useSaveFeedback<HTMLDivElement>(base);
+    const {
+        report: formReport,
+        clear: formClear,
+        summary: formSummary,
+        scopeRef: formScopeRef,
+    } = useSaveFeedback(base);
     const [editing, setEditing] = useState<Contact | 'new' | null>(null);
     const [form, setForm] = useState<ContactForm>({
         type: 'phone',
@@ -1491,6 +1544,9 @@ export function OrganizationContactsSection({
 
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState('');
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>(
+        {},
+    );
     useEffect(() => {
         if (editing === null) {
             return;
@@ -1564,10 +1620,15 @@ export function OrganizationContactsSection({
                   },
         );
         setFormError('');
+        formClear();
+        setFieldErrors({});
         setEditing(target);
     };
 
     const save = async () => {
+        formClear();
+        setFieldErrors({});
+
         if (draft && editing) {
             const id = editing === 'new' ? newPartyDraftKey() : editing.id;
             const isPrimary =
@@ -1608,6 +1669,8 @@ export function OrganizationContactsSection({
 
         setSaving(true);
 
+        saveClear();
+
         try {
             const body = JSON.stringify({
                 ...form,
@@ -1632,7 +1695,11 @@ export function OrganizationContactsSection({
             setEditing(null);
             list.reload();
         } catch (caught) {
-            setFormError(errorText(caught, 'Kontak belum dapat disimpan.'));
+            if (caught instanceof CoreApiError) {
+                setFieldErrors(caught.errors);
+            }
+
+            formReport(caught, 'Kontak belum dapat disimpan.');
         } finally {
             setSaving(false);
         }
@@ -1659,6 +1726,8 @@ export function OrganizationContactsSection({
             return;
         }
 
+        saveClear();
+
         try {
             await apiRequest(`${base}/${contact.id}`, {
                 method: 'DELETE',
@@ -1667,7 +1736,7 @@ export function OrganizationContactsSection({
             toast.success('Kontak diarsipkan.');
             list.reload();
         } catch (caught) {
-            toastSaveError(caught, 'Kontak belum dapat diarsipkan.');
+            saveReport(caught, 'Kontak belum dapat diarsipkan.');
         }
     };
 
@@ -1685,6 +1754,8 @@ export function OrganizationContactsSection({
             return;
         }
 
+        saveClear();
+
         try {
             await apiJson(`${base}/${contact.id}`, {
                 method: 'PUT',
@@ -1699,7 +1770,7 @@ export function OrganizationContactsSection({
             toast.success('Kontak utama diganti.');
             list.reload();
         } catch (caught) {
-            toastSaveError(caught, 'Kontak utama belum dapat diganti.');
+            saveReport(caught, 'Kontak utama belum dapat diganti.');
         }
     };
 
@@ -1712,11 +1783,11 @@ export function OrganizationContactsSection({
     }
 
     return (
-        <div className="space-y-3">
+        <div ref={saveScopeRef} className="space-y-3">
             {list.error && (
                 <p className="text-sm text-destructive">{list.error}</p>
             )}
-            <RecordActionBar>
+            <RecordActionBar feedback={saveSummary}>
                 {canManage && (
                     <ActionButton
                         action="create"
@@ -1755,8 +1826,11 @@ export function OrganizationContactsSection({
                     }
                     onRowAction={(action, contact) => {
                         if (!contact.is_location_owner) {
-                            toast.error(
-                                'Kontak bersama hanya dapat diubah melalui pihak pemilik alamat di buku alamat.',
+                            saveReport(
+                                new Error(
+                                    'Kontak bersama hanya dapat diubah melalui pihak pemilik alamat di buku alamat.',
+                                ),
+                                'Kontak belum dapat diubah.',
                             );
 
                             return;
@@ -1894,6 +1968,8 @@ export function OrganizationContactsSection({
                     }
                 >
                     <form
+                        noValidate
+                        ref={formScopeRef}
                         className="flex min-h-0 flex-1 flex-col"
                         onSubmit={(event) => {
                             // Dialog dirender lewat portal di dalam form organisasi; React
@@ -1934,6 +2010,7 @@ export function OrganizationContactsSection({
                                 onClick={() => setEditing(null)}
                             />
                         </PageDialogToolbar>
+                        {formSummary}
                         <DialogBody className="space-y-4 py-3">
                             <FieldGroup>
                                 {' '}
@@ -1975,6 +2052,10 @@ export function OrganizationContactsSection({
                                 </Field>
                                 <Field>
                                     <Input
+                                        data-error-field="value"
+                                        aria-invalid={Boolean(
+                                            fieldErrors.value,
+                                        )}
                                         label={
                                             TYPE_VALUE_LABEL[form.type] ??
                                             'Nomor / alamat'
@@ -1998,6 +2079,9 @@ export function OrganizationContactsSection({
                                             }))
                                         }
                                     />
+                                    <FieldError>
+                                        {fieldErrors.value?.[0]}
+                                    </FieldError>
                                 </Field>
                                 <Field>
                                     <div className="flex items-center gap-2">

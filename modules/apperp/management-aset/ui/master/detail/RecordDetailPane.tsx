@@ -6,13 +6,15 @@ import {
     CollapsibleSectionGroup,
 } from '@apperp/ui/collapsible-section';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
-import { Field, FieldDescription, FieldError } from '@apperp/ui/field';
+import { FieldDescription, FieldError } from '@apperp/ui/field';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { usePageDialogRecord } from '@apperp/ui/page-dialog';
 import { RecordEditBoundary } from '@apperp/ui/record-edit-boundary';
 import type { ApiValidationErrors } from '../../api';
 import { api, ApiError, errorMessage, newIdempotencyKey } from '../../api';
 import { recordQueryUrl } from '../../transactions/_shared/record-card';
+import { useSaveFeedback } from '../../use-save-feedback';
 import type {
     DraftMasterDetailsValue,
     DraftSectionKey,
@@ -104,6 +106,15 @@ export default function RecordDetailPane({
     const [error, setError] = useState('');
     const creationKey = useRef(newIdempotencyKey());
     const formRef = useRef<HTMLFormElement>(null);
+    const [openSections, setOpenSections] = useState(
+        sections
+            .filter((section) => section.defaultOpen)
+            .map((section) => section.id),
+    );
+    const { feedbackSummary, reportSaveError, clearSaveFeedback, fieldError } =
+        useSaveFeedback(formRef, record?.id, () =>
+            setOpenSections(sections.map((section) => section.id)),
+        );
     /**
      * Field yang menunggu fokus setelah perisai sunting hilang. Disimpan pada ref, bukan
      * state, karena tidak ikut menentukan tampilan apa pun: ia hanya dibaca sekali oleh
@@ -268,10 +279,17 @@ export default function RecordDetailPane({
 
     async function submit(event: FormEvent) {
         event.preventDefault();
+        clearSaveFeedback();
 
         if (mode === 'create' && (numberPolicy.loading || numberPolicy.error)) {
-            setError(
-                numberPolicy.error || 'Tunggu pengaturan kode selesai dimuat.',
+            reportSaveError(
+                new ApiError(
+                    numberPolicy.error ||
+                        'Tunggu pengaturan kode selesai dimuat.',
+                    {},
+                    422,
+                ),
+                'Data belum dapat disimpan.',
             );
 
             return;
@@ -332,7 +350,8 @@ export default function RecordDetailPane({
                 setDetailErrors(caught.validationErrors);
             }
 
-            setError(errorMessage(caught, 'Data belum dapat disimpan.'));
+            reportSaveError(caught, 'Data belum dapat disimpan.');
+            setOpenSections(sections.map((section) => section.id));
         } finally {
             onSavingChange(false);
         }
@@ -411,13 +430,14 @@ export default function RecordDetailPane({
                         loading={pabrikanAsetDetailLoading}
                         error={pabrikanAsetDetailError}
                     />
-                    <div className="grid gap-5 pt-1 sm:grid-cols-2">
+                    <FormGrid>
                         {section.fields
                             .filter((field) => isVisible(field, values))
                             .map((field) => (
                                 <DynamicField
                                     key={field.name}
                                     config={field}
+                                    error={fieldError(field.name)}
                                     value={values[field.name]}
                                     readOnly={readOnly}
                                     onRequestEdit={enterEdit}
@@ -430,7 +450,7 @@ export default function RecordDetailPane({
                                     }}
                                 />
                             ))}
-                    </div>
+                    </FormGrid>
                 </div>
             );
         }
@@ -615,7 +635,7 @@ export default function RecordDetailPane({
                 {section.counters && (
                     <JenisAsetCounters detail={jenisAsetDetail} />
                 )}
-                <div className="grid gap-5 pt-1 sm:grid-cols-2">
+                <FormGrid>
                     {section.fields
                         .filter((field) => isVisible(field, values))
                         .map((field) =>
@@ -623,6 +643,7 @@ export default function RecordDetailPane({
                             field.name === 'useful_life_periods' ? (
                                 <ServiceLifeFields
                                     key={field.name}
+                                    error={fieldError(field.name)}
                                     value={values[field.name]}
                                     frequency={values.frequency}
                                     required={field.required}
@@ -639,6 +660,7 @@ export default function RecordDetailPane({
                                 <DynamicField
                                     key={field.name}
                                     config={field}
+                                    error={fieldError(field.name)}
                                     value={values[field.name]}
                                     readOnly={readOnly}
                                     onRequestEdit={enterEdit}
@@ -661,7 +683,7 @@ export default function RecordDetailPane({
                                 />
                             ),
                         )}
-                </div>
+                </FormGrid>
             </div>
         );
     }
@@ -674,16 +696,19 @@ export default function RecordDetailPane({
             className="flex h-full min-h-0 min-w-0 flex-col"
         >
             <form
+                noValidate
                 id={formId}
                 ref={formRef}
                 onSubmit={submit}
                 className="[&_[data-readonly]:hover]:bg-muted/40 flex min-h-0 flex-col [&_[data-readonly]]:rounded-md [&_[data-readonly]]:transition-colors"
             >
+                {feedbackSummary}
                 <div className="shrink-0 border-b px-6 py-4">
                     <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
-                        <div className="w-60">
+                        <div className="w-60" data-error-field="kode">
                             <Input
                                 id="kode"
+                                aria-invalid={!!fieldError('kode')}
                                 label={config.kodeLabel}
                                 value={
                                     record?.kode ??
@@ -707,6 +732,9 @@ export default function RecordDetailPane({
                                     markDirty();
                                 }}
                             />
+                            {fieldError('kode') && (
+                                <FieldError>{fieldError('kode')}</FieldError>
+                            )}
                             {!record && numberPolicy.allowManual && (
                                 <FieldDescription>
                                     {numberPolicy.allowAutomatic
@@ -719,10 +747,12 @@ export default function RecordDetailPane({
                         <div
                             className="min-w-64 flex-1"
                             data-field-name="nama"
+                            data-error-field="nama"
                             data-readonly={readOnly || undefined}
                         >
                             <Input
                                 id="nama"
+                                aria-invalid={!!fieldError('nama')}
                                 label={config.namaLabel}
                                 required
                                 maxLength={150}
@@ -733,6 +763,9 @@ export default function RecordDetailPane({
                                     setNama(event.target.value);
                                 }}
                             />
+                            {fieldError('nama') && (
+                                <FieldError>{fieldError('nama')}</FieldError>
+                            )}
                         </div>
                         <Badge variant={values.aktif ? 'default' : 'secondary'}>
                             {values.aktif ? 'Aktif' : 'Tidak aktif'}
@@ -745,18 +778,17 @@ export default function RecordDetailPane({
                     className="min-h-0 flex-1 overflow-y-auto px-6 py-4"
                 >
                     {(config.parents?.length ?? 0) > 0 && (
-                        <Field data-invalid="true" className="mb-4">
+                        <FormControl data-invalid="true" className="mb-4">
                             <FieldError>
                                 Master ini memiliki induk, dan panel detail
                                 belum merendernya. Pakai tampilan daftar sampai
                                 dukungan induk ditambahkan.
                             </FieldError>
-                        </Field>
+                        </FormControl>
                     )}
                     <CollapsibleSectionGroup
-                        defaultValue={sections
-                            .filter((section) => section.defaultOpen)
-                            .map((section) => section.id)}
+                        value={openSections}
+                        onValueChange={setOpenSections}
                     >
                         {sections.map((section) => (
                             <CollapsibleSection

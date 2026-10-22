@@ -25,8 +25,10 @@ import {
     EmptyTitle,
 } from '@apperp/ui/empty';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
-import { api, errorMessage } from '../../api';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
+import { api } from '../../api';
 import { useRecordList } from '../../use-record-list';
+import { useSaveFeedback } from '../../use-save-feedback';
 import type { MasterRecord, ParentSummary } from '../masters';
 import ModelAsetFormSheet from './ModelAsetFormSheet';
 import type { PabrikanModelRecord } from './pabrikanAsetDetail';
@@ -52,26 +54,26 @@ export default function PabrikanModels({
 }) {
     const [modelBusy, setModelBusy] = useState(false);
     const [modelDirty, setModelDirty] = useState(false);
-    const discardModel = () =>
-        !modelDirty || window.confirm('Buang perubahan yang belum disimpan?');
+    const {
+        request: requestModelTransition,
+        confirmation: modelTransitionConfirmation,
+    } = useRecordTransition(modelDirty, modelBusy);
     const closeModel = () => {
-        if (!modelBusy && discardModel()) {
+        requestModelTransition(() => {
             setEditing(undefined);
             setModelDirty(false);
-        }
+        });
     };
     const createModel = () => {
-        if (!modelBusy && discardModel()) {
+        requestModelTransition(() => {
             setEditing(null);
             setModelDirty(false);
-        }
+        });
     };
-    const [error, setError] = useState('');
     // Effect adalah satu-satunya pemilik pengambilan data; pemuatan ulang setelah
     // simpan atau arsip dinyatakan dengan menaikkan penanda ini.
     const [versiMuat, setVersiMuat] = useState(0);
     const muatUlang = () => {
-        setError('');
         setVersiMuat((versi) => versi + 1);
     };
     const [editing, setEditing] = useState<
@@ -80,6 +82,13 @@ export default function PabrikanModels({
     const [archiving, setArchiving] = useState<PabrikanModelRecord | null>(
         null,
     );
+    const [archiveBusy, setArchiveBusy] = useState(false);
+    const {
+        scopeRef: archiveScopeRef,
+        feedbackSummary: archiveFeedback,
+        reportSaveError: reportArchiveError,
+        clearSaveFeedback: clearArchiveFeedback,
+    } = useSaveFeedback(undefined, archiving?.id);
 
     const list = useRecordList<PabrikanModelRecord>(
         '/model-aset',
@@ -107,9 +116,12 @@ export default function PabrikanModels({
         disabled: modelBusy || modelDirty,
     });
     async function archive() {
-        if (!archiving) {
+        if (!archiving || archiveBusy) {
             return;
         }
+
+        clearArchiveFeedback();
+        setArchiveBusy(true);
 
         try {
             await api(`/model-aset/${archiving.id}`, {
@@ -123,7 +135,9 @@ export default function PabrikanModels({
             muatUlang();
             onChanged();
         } catch (caught) {
-            setError(errorMessage(caught, 'Model belum dapat diarsipkan.'));
+            reportArchiveError(caught, 'Model belum dapat diarsipkan.');
+        } finally {
+            setArchiveBusy(false);
         }
     }
 
@@ -202,6 +216,7 @@ export default function PabrikanModels({
 
     return (
         <div className="space-y-3">
+            {modelTransitionConfirmation}
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                     <p className="font-semibold">Model</p>
@@ -224,13 +239,11 @@ export default function PabrikanModels({
                 <Empty>
                     <EmptyDescription>Memuat model…</EmptyDescription>
                 </Empty>
-            ) : error || list.error ? (
+            ) : list.error ? (
                 <Empty>
                     <EmptyHeader>
                         <EmptyTitle>Model belum dapat ditampilkan</EmptyTitle>
-                        <EmptyDescription>
-                            {error || list.error}
-                        </EmptyDescription>
+                        <EmptyDescription>{list.error}</EmptyDescription>
                     </EmptyHeader>
                     <Button variant="outline" onClick={muatUlang}>
                         Coba lagi
@@ -293,9 +306,11 @@ export default function PabrikanModels({
 
             <AlertDialog
                 open={archiving !== null}
-                onOpenChange={(open) => !open && setArchiving(null)}
+                onOpenChange={(open) =>
+                    !open && !archiveBusy && setArchiving(null)
+                }
             >
-                <AlertDialogContent>
+                <AlertDialogContent ref={archiveScopeRef}>
                     <AlertDialogHeader>
                         <AlertDialogTitle>
                             Delete {archiving?.nama}?
@@ -305,13 +320,23 @@ export default function PabrikanModels({
                             Aset yang sudah memakainya tidak berubah.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
+                    {archiveFeedback}
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Batal</AlertDialogCancel>
+                        <AlertDialogCancel disabled={archiveBusy}>
+                            Batal
+                        </AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={() => void archive()}
+                            onClick={(event) => {
+                                event.preventDefault();
+                                void archive();
+                            }}
                             asChild
                         >
-                            <ActionButton action="archive" />
+                            <ActionButton
+                                action="archive"
+                                pending={archiveBusy}
+                                disabled={archiveBusy}
+                            />
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

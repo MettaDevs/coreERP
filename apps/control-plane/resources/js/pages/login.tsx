@@ -1,3 +1,5 @@
+import { FormErrorHeader } from '@/components/form-error-header';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import { Button } from '@apperp/ui/button';
 import { Input } from '@apperp/ui/input';
 import { Head, useForm } from '@inertiajs/react';
@@ -22,6 +24,9 @@ export default function Login({
     passwordLoginOpen,
     ssoError,
 }: Props) {
+    const { wrap: wrapLocalForm0Request, summary: localForm0RequestSummary } =
+        useInertiaFeedback();
+
     const [showPassword, setShowPassword] = useState(
         !ssoAvailable || passwordLoginOpen,
     );
@@ -32,7 +37,7 @@ export default function Login({
 
     function submit(e: FormEvent) {
         e.preventDefault();
-        post('/login');
+        post('/login', wrapLocalForm0Request());
     }
 
     return (
@@ -75,7 +80,12 @@ export default function Login({
                 )}
 
                 {showPassword && (
-                    <form onSubmit={submit} className="space-y-5">
+                    <form noValidate onSubmit={submit} className="space-y-5">
+                        <>
+                            {localForm0RequestSummary}
+                            <FormErrorHeader errors={errors} />
+                        </>
+
                         {ssoAvailable && (
                             <div className="flex items-center gap-3 text-xs text-muted-foreground">
                                 <span className="h-px flex-1 bg-border" />

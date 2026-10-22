@@ -20,6 +20,7 @@ import {
     useQueryPreview,
 } from '@/components/analytics/use-query-preview';
 import { VisualPicker } from '@/components/analytics/visual-picker';
+import { useSaveFeedback } from '@/hooks/use-save-feedback';
 import {
     createWidget,
     fetchDashboards,
@@ -40,7 +41,7 @@ import {
     isDataWidgetType,
     suggestedTitle,
 } from '@/lib/analytics/visual';
-import { CoreApiError, toastSaveError } from '@/lib/core-api';
+import { CoreApiError } from '@/lib/core-api';
 
 /** Baris terbanyak pratinjau; bagian yang disimpan tetap menghitung semua baris dalam batas server. */
 const PREVIEW_ROWS = 50;
@@ -75,6 +76,12 @@ export function WidgetBuilder({
     onSaved: (widget: DashboardWidget) => void;
 }) {
     const contentRef = useRef<HTMLDivElement>(null);
+    const {
+        report: saveReport,
+        clear: saveClear,
+        summary: saveSummary,
+        scopeRef: saveScopeRef,
+    } = useSaveFeedback(widget?.id ?? dashboard?.id ?? 'new');
     const [query, setQuery] = useState<AnalyticsQuery>(
         () => widget?.query ?? initial?.query ?? emptyQuery(),
     );
@@ -136,6 +143,7 @@ export function WidgetBuilder({
             return;
         }
 
+        saveClear();
         setSaving(true);
         setErrors({});
 
@@ -157,7 +165,7 @@ export function WidgetBuilder({
                 setErrors(caught.errors);
             }
 
-            toastSaveError(caught, 'Bagian belum disimpan.');
+            saveReport(caught, 'Bagian belum disimpan.');
         } finally {
             setSaving(false);
         }
@@ -214,8 +222,11 @@ export function WidgetBuilder({
                         onClick={onClose}
                     />
                 </PageDialogToolbar>
+                {saveSummary}
                 <PageDialogBody>
                     <form
+                        noValidate
+                        ref={saveScopeRef}
                         id="widget-builder-form"
 
                         onSubmit={(event) => {
@@ -290,7 +301,10 @@ export function WidgetBuilder({
                                         value={type}
                                         onChange={setChosenType}
                                     />
-                                    <Field data-invalid={Boolean(errors.title)}>
+                                    <Field
+                                        data-error-field="title"
+                                        data-invalid={Boolean(errors.title)}
+                                    >
                                         <Input
                                             label="Judul"
                                             required

@@ -1,4 +1,5 @@
 import AppShell from '@/components/app-shell';
+import { FormErrorHeader } from '@/components/form-error-header';
 import { SidebarInset } from '@apperp/ui/sidebar';
 import { usePage } from '@inertiajs/react';
 import { useState } from 'react';
@@ -25,7 +26,7 @@ export default function Shell({
     actions?: ReactNode;
     children: ReactNode;
 }) {
-    const { message } = usePage().props;
+    const { message, errors } = usePage().props;
     const [scrolled, setScrolled] = useState(false);
 
     return (
@@ -67,6 +68,10 @@ export default function Shell({
                                 </div>
                             )}
 
+                            <FormErrorHeader
+                                message={Object.values(errors ?? {}).join(' ')}
+                                operation="Tindakan belum berhasil"
+                            />
                             {children}
                         </div>
                     </div>

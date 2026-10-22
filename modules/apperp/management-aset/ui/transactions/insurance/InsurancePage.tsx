@@ -7,6 +7,7 @@ import { Badge } from '@apperp/ui/badge';
 import { Checkbox } from '@apperp/ui/checkbox';
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
+import { DatePicker } from '@apperp/ui/date-picker';
 import {
     DialogClose,
     Dialog,
@@ -22,7 +23,8 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
-import { Field, FieldDescription } from '@apperp/ui/field';
+import { FieldError } from '@apperp/ui/field';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import {
     PageDialog,
@@ -32,22 +34,18 @@ import {
     PageDialogClose,
 } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
-import { Select } from '@apperp/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@apperp/ui/tabs';
 import { Textarea } from '@apperp/ui/textarea';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
 import { day, money } from '../../_shared/format';
+import { RecordLookup } from '../../_shared/RecordLookup';
 import type { Vendor } from '../../_shared/useVendors';
 import { useVendors } from '../../_shared/useVendors';
-import {
-    ApiError,
-    api,
-    errorMessage,
-    newIdempotencyKey,
-    toastSaveError,
-} from '../../api';
+import { ApiError, api, errorMessage, newIdempotencyKey } from '../../api';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import { useRecordList } from '../../use-record-list';
+import { useSaveFeedback } from '../../use-save-feedback';
 import { RecordCardHeader, recordQueryUrl } from '../_shared/record-card';
 import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
 import { useRecordQueryTarget } from '../_shared/use-record-query-target';
@@ -105,6 +103,17 @@ export default function InsurancePage({
     context: { legal_entity_id: string | null };
     permissions: string[];
 }) {
+    const {
+        scopeRef: pageFeedbackScopeRef,
+        feedbackSummary: pageFeedbackSummary,
+        reportSaveError: pageFeedbackReportSaveError,
+        clearSaveFeedback: pageFeedbackClearSaveFeedback,
+    } = useSaveFeedback();
+    const pageFeedback = {
+        reportSaveError: pageFeedbackReportSaveError,
+        clearSaveFeedback: pageFeedbackClearSaveFeedback,
+    };
+
     const canCreate = permissions.includes(
         'management-aset.polis-asuransi.create',
     );
@@ -134,7 +143,27 @@ export default function InsurancePage({
         editing ? context.legal_entity_id : null,
     );
     const editRef = useRef<HTMLDivElement>(null);
+    const {
+        feedbackSummary: editFeedbackSummary,
+        reportSaveError: editFeedbackReportSaveError,
+        clearSaveFeedback: editFeedbackClearSaveFeedback,
+    } = useSaveFeedback(editRef, editing ? 'editing' : 'closed');
+    const editFeedback = {
+        reportSaveError: editFeedbackReportSaveError,
+        clearSaveFeedback: editFeedbackClearSaveFeedback,
+    };
+
     const actionRef = useRef<HTMLDivElement>(null);
+    const {
+        feedbackSummary: actionFeedbackSummary,
+        reportSaveError: actionFeedbackReportSaveError,
+        clearSaveFeedback: actionFeedbackClearSaveFeedback,
+    } = useSaveFeedback(actionRef, action?.kind ?? 'closed');
+    const actionFeedback = {
+        reportSaveError: actionFeedbackReportSaveError,
+        clearSaveFeedback: actionFeedbackClearSaveFeedback,
+    };
+
     const vendors = vendorsSource.options;
     const message = (field: string) => errors[field]?.[0];
 
@@ -173,6 +202,8 @@ export default function InsurancePage({
     const shown = opened && opened.id === openId ? opened : null;
 
     function startEdit(policy: Policy | null) {
+        editFeedback.clearSaveFeedback();
+
         setErrors({});
         setEditing({
             id: policy?.id ?? null,
@@ -238,6 +269,7 @@ export default function InsurancePage({
                       headers: { 'Idempotency-Key': newIdempotencyKey() },
                       body: JSON.stringify(body),
                   });
+            editFeedback.clearSaveFeedback();
             toast.success(id ? 'Polis disimpan.' : 'Polis dibuat.');
             setEditing(null);
             setOpened(result.data);
@@ -248,7 +280,7 @@ export default function InsurancePage({
                 setErrors(caught.validationErrors);
             }
 
-            toastSaveError(caught, 'Polis belum dapat disimpan.');
+            editFeedback.reportSaveError(caught, 'Polis belum dapat disimpan.');
         } finally {
             setBusy(false);
         }
@@ -262,12 +294,16 @@ export default function InsurancePage({
                 method: 'DELETE',
                 body: JSON.stringify({ version: policy.version }),
             });
+            pageFeedback.clearSaveFeedback();
             toast.success('Polis diarsipkan.');
             clearRecordTarget();
             setOpenId(null);
             refresh();
         } catch (caught) {
-            toastSaveError(caught, 'Polis belum dapat diarsipkan.');
+            pageFeedback.reportSaveError(
+                caught,
+                'Polis belum dapat diarsipkan.',
+            );
         } finally {
             setBusy(false);
         }
@@ -327,13 +363,17 @@ export default function InsurancePage({
             setOpened(result.data);
             setAction(null);
             refresh();
+            actionFeedback.clearSaveFeedback();
             toast.success('Pertanggungan disimpan.');
         } catch (caught) {
             if (caught instanceof ApiError) {
                 setErrors(caught.validationErrors);
             }
 
-            toastSaveError(caught, 'Pertanggungan belum dapat disimpan.');
+            actionFeedback.reportSaveError(
+                caught,
+                'Pertanggungan belum dapat disimpan.',
+            );
         } finally {
             setBusy(false);
         }
@@ -354,9 +394,13 @@ export default function InsurancePage({
             );
             setOpened(result.data);
             refresh();
+            pageFeedback.clearSaveFeedback();
             toast.success('Pertanggungan diarsipkan.');
         } catch (caught) {
-            toastSaveError(caught, 'Pertanggungan belum dapat diarsipkan.');
+            pageFeedback.reportSaveError(
+                caught,
+                'Pertanggungan belum dapat diarsipkan.',
+            );
         }
     }
 
@@ -468,19 +512,21 @@ export default function InsurancePage({
         editing &&
         setEditing({ ...editing, draft: { ...editing.draft, ...change } });
 
-    const discardPolicy = () =>
-        !policyDirty || window.confirm('Buang perubahan yang belum disimpan?');
+    const {
+        request: requestPolicyTransition,
+        confirmation: policyTransitionConfirmation,
+    } = useRecordTransition(policyDirty, busy);
     const newPolicy = () => {
-        if (!busy && discardPolicy()) {
+        requestPolicyTransition(() => {
             clearRecordTarget();
             startEdit(null);
-        }
+        });
     };
     const closePolicyEdit = () => {
-        if (!busy && discardPolicy()) {
+        requestPolicyTransition(() => {
             clearRecordTarget();
             setEditing(null);
-        }
+        });
     };
     useRecordCardDirty({
         value: editing?.draft,
@@ -515,8 +561,12 @@ export default function InsurancePage({
     });
 
     return (
-        <Tabs defaultValue="polis">
-            <RecordActionBar title="Asuransi aset">
+        <Tabs ref={pageFeedbackScopeRef} defaultValue="polis">
+            {policyTransitionConfirmation}
+            <RecordActionBar
+                feedback={pageFeedbackSummary}
+                title="Asuransi aset"
+            >
                 {canCreate && (
                     <ActionButton
                         action="create"
@@ -794,18 +844,27 @@ export default function InsurancePage({
                             <ActionButton action="cancel" type="button" />
                         </PageDialogClose>
                     </PageDialogToolbar>
+                    {editFeedbackSummary}
                     {editing && (
                         <PageDialogBody className="space-y-4">
-                            <Input
-                                label="Nama polis"
-                                required
-                                maxLength={150}
-                                value={editing.draft.nama}
-                                onChange={(event) =>
-                                    setDraft({ nama: event.target.value })
+                            <FormControl data-error-field="draft">
+                                <Input
+                                    label="Nama polis"
+                                    required
+                                    maxLength={150}
+                                    value={editing.draft.nama}
+                                    onChange={(event) =>
+                                        setDraft({ nama: event.target.value })
+                                    }
+                                />
+                            </FormControl>
+                            <FormControl
+                                data-error-field="draft"
+                                error={message('nomor_polis')}
+                                hint={
+                                    'Nomor yang tertera pada dokumen polis dari perusahaan asuransi.'
                                 }
-                            />
-                            <Field>
+                            >
                                 <Input
                                     label="Nomor polis"
                                     required
@@ -817,14 +876,10 @@ export default function InsurancePage({
                                         })
                                     }
                                 />
-                                <FieldDescription>
-                                    {message('nomor_polis') ??
-                                        'Nomor yang tertera pada dokumen polis dari perusahaan asuransi.'}
-                                </FieldDescription>
-                            </Field>
-                            <Field>
-                                <Select
-                                    {...vendorsSource.selectProps}
+                            </FormControl>
+                            <FormControl data-error-field="draft">
+                                <RecordLookup
+                                    source={vendorsSource}
                                     label="Penanggung"
                                     items={vendorChoices}
                                     value={editing.draft.vendor_id || null}
@@ -837,49 +892,61 @@ export default function InsurancePage({
                                     }
                                 />
                                 {message('vendor_id') && (
-                                    <FieldDescription>
+                                    <FieldError>
                                         {message('vendor_id')}
-                                    </FieldDescription>
+                                    </FieldError>
                                 )}
-                            </Field>
-                            <Select
-                                {...types.selectProps}
-                                label="Jenis asuransi"
-                                items={types.options.map((option) => ({
-                                    value: option.id,
-                                    label: optionLabel(option),
-                                }))}
-                                value={editing.draft.jenis_asuransi_id || null}
-                                placeholder="Pilih jenis asuransi"
-                                ariaLabel="Jenis asuransi"
-                                portalContainer={editRef}
-                                onValueChange={(value) =>
-                                    setDraft({ jenis_asuransi_id: value ?? '' })
-                                }
-                            />
-                            <div className="grid grid-cols-2 gap-3">
-                                <Input
-                                    label="Berlaku mulai"
-                                    type="date"
-                                    required
-                                    value={editing.draft.berlaku_mulai}
-                                    onChange={(event) =>
+                            </FormControl>
+                            <FormControl data-error-field="draft">
+                                <RecordLookup
+                                    source={types}
+                                    label="Jenis asuransi"
+                                    items={types.options.map((option) => ({
+                                        value: option.id,
+                                        label: optionLabel(option),
+                                    }))}
+                                    value={
+                                        editing.draft.jenis_asuransi_id || null
+                                    }
+                                    placeholder="Pilih jenis asuransi"
+                                    ariaLabel="Jenis asuransi"
+                                    portalContainer={editRef}
+                                    onValueChange={(value) =>
                                         setDraft({
-                                            berlaku_mulai: event.target.value,
+                                            jenis_asuransi_id: value ?? '',
                                         })
                                     }
                                 />
-                                <Input
-                                    label="Berlaku sampai"
-                                    type="date"
-                                    value={editing.draft.berlaku_sampai}
-                                    onChange={(event) =>
-                                        setDraft({
-                                            berlaku_sampai: event.target.value,
-                                        })
-                                    }
-                                />
-                            </div>
+                            </FormControl>
+                            <FormGrid>
+                                <FormControl data-error-field="draft">
+                                    <DatePicker
+                                        portalContainer={editRef}
+                                        label="Berlaku mulai"
+
+                                        required
+                                        value={editing.draft.berlaku_mulai}
+                                        onValueChange={(value) =>
+                                            setDraft({
+                                                berlaku_mulai: value,
+                                            })
+                                        }
+                                    />
+                                </FormControl>
+                                <FormControl data-error-field="draft">
+                                    <DatePicker
+                                        portalContainer={editRef}
+                                        label="Berlaku sampai"
+
+                                        value={editing.draft.berlaku_sampai}
+                                        onValueChange={(value) =>
+                                            setDraft({
+                                                berlaku_sampai: value,
+                                            })
+                                        }
+                                    />
+                                </FormControl>
+                            </FormGrid>
                             {(message('berlaku_mulai') ??
                                 message('berlaku_sampai')) && (
                                 <p className="text-destructive text-sm">
@@ -887,20 +954,32 @@ export default function InsurancePage({
                                         message('berlaku_sampai')}
                                 </p>
                             )}
-                            <div className="grid grid-cols-2 gap-3">
-                                <Input
-                                    label="Premi tahunan"
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    value={editing.draft.premi_tahunan}
-                                    onChange={(event) =>
-                                        setDraft({
-                                            premi_tahunan: event.target.value,
-                                        })
+                            <FormGrid>
+                                <FormControl data-error-field="draft">
+                                    <Input
+                                        label="Premi tahunan"
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={editing.draft.premi_tahunan}
+                                        onChange={(event) =>
+                                            setDraft({
+                                                premi_tahunan:
+                                                    event.target.value,
+                                            })
+                                        }
+                                    />
+                                </FormControl>
+                                <FormControl
+                                    data-error-field="draft"
+                                    hint={
+                                        <>
+                                            Batas tanggungan polis, dibandingkan
+                                            dengan jumlah nilai aset yang
+                                            ditanggungnya.
+                                        </>
                                     }
-                                />
-                                <Field>
+                                >
                                     <Input
                                         label="Nilai pertanggungan polis"
                                         type="number"
@@ -916,13 +995,8 @@ export default function InsurancePage({
                                             })
                                         }
                                     />
-                                    <FieldDescription>
-                                        Batas tanggungan polis, dibandingkan
-                                        dengan jumlah nilai aset yang
-                                        ditanggungnya.
-                                    </FieldDescription>
-                                </Field>
-                            </div>
+                                </FormControl>
+                            </FormGrid>
                             <label className="flex items-start gap-2 text-sm">
                                 <Checkbox
                                     checked={editing.draft.diblokir}
@@ -939,15 +1013,19 @@ export default function InsurancePage({
                                     </span>
                                 </span>
                             </label>
-                            <Textarea
-                                rows={2}
-                                maxLength={2000}
-                                placeholder="Keterangan"
-                                value={editing.draft.keterangan}
-                                onChange={(event) =>
-                                    setDraft({ keterangan: event.target.value })
-                                }
-                            />
+                            <FormControl data-error-field="draft">
+                                <Textarea
+                                    rows={2}
+                                    maxLength={2000}
+                                    placeholder="Keterangan"
+                                    value={editing.draft.keterangan}
+                                    onChange={(event) =>
+                                        setDraft({
+                                            keterangan: event.target.value,
+                                        })
+                                    }
+                                />
+                            </FormControl>
                         </PageDialogBody>
                     )}
                 </PageDialogContent>
@@ -967,12 +1045,13 @@ export default function InsurancePage({
                                   : 'Ganti nilai pertanggungan'}
                         </DialogTitle>
                     </DialogHeader>
+                    {actionFeedbackSummary}
                     {action && (
                         <DialogBody className="space-y-4">
                             {action.kind === 'tambah' ? (
-                                <Field>
-                                    <Select
-                                        {...assetSource.selectProps}
+                                <FormControl data-error-field="aset_id">
+                                    <RecordLookup
+                                        source={assetSource}
                                         label="Aset"
                                         required
                                         items={assets.map((asset) => ({
@@ -992,11 +1071,11 @@ export default function InsurancePage({
                                         }
                                     />
                                     {message('aset_id') && (
-                                        <FieldDescription>
+                                        <FieldError>
                                             {message('aset_id')}
-                                        </FieldDescription>
+                                        </FieldError>
                                     )}
-                                </Field>
+                                </FormControl>
                             ) : (
                                 <p className="text-sm">
                                     {action.coverage?.aset_kode} ·{' '}
@@ -1007,75 +1086,79 @@ export default function InsurancePage({
                                 </p>
                             )}
                             {action.kind !== 'akhiri' && (
-                                <Input
-                                    label={
-                                        action.kind === 'tambah'
-                                            ? 'Nilai pertanggungan'
-                                            : 'Nilai baru'
-                                    }
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    required
-                                    value={action.nilai}
-                                    onChange={(event) =>
-                                        setAction({
-                                            ...action,
-                                            nilai: event.target.value,
-                                        })
-                                    }
-                                />
+                                <FormControl>
+                                    <Input
+                                        label={
+                                            action.kind === 'tambah'
+                                                ? 'Nilai pertanggungan'
+                                                : 'Nilai baru'
+                                        }
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        required
+                                        value={action.nilai}
+                                        onChange={(event) =>
+                                            setAction({
+                                                ...action,
+                                                nilai: event.target.value,
+                                            })
+                                        }
+                                    />
+                                </FormControl>
                             )}
-                            <div className="grid grid-cols-2 gap-3">
+                            <FormGrid>
                                 {action.kind !== 'akhiri' && (
-                                    <Field>
-                                        <Input
+                                    <FormControl
+                                        hint={
+                                            action.kind === 'ganti-nilai'
+                                                ? 'Nilai lama berakhir sehari sebelumnya dan tetap tercatat.'
+                                                : undefined
+                                        }
+                                    >
+                                        <DatePicker
+                                            portalContainer={actionRef}
                                             label={
                                                 action.kind === 'tambah'
                                                     ? 'Berlaku mulai'
                                                     : 'Nilai baru berlaku mulai'
                                             }
-                                            type="date"
+
                                             required
                                             value={action.mulai}
-                                            onChange={(event) =>
+                                            onValueChange={(value) =>
                                                 setAction({
                                                     ...action,
-                                                    mulai: event.target.value,
+                                                    mulai: value,
                                                 })
                                             }
                                         />
-                                        {action.kind === 'ganti-nilai' && (
-                                            <FieldDescription>
-                                                Nilai lama berakhir sehari
-                                                sebelumnya dan tetap tercatat.
-                                            </FieldDescription>
-                                        )}
-                                    </Field>
+                                    </FormControl>
                                 )}
                                 {action.kind !== 'ganti-nilai' && (
-                                    <Field>
-                                        <Input
+                                    <FormControl
+                                        hint={
+                                            action.kind === 'tambah'
+                                                ? 'Kosongkan untuk mengikuti masa berlaku polis.'
+                                                : undefined
+                                        }
+                                    >
+                                        <DatePicker
+                                            portalContainer={actionRef}
                                             label="Berlaku sampai"
-                                            type="date"
+
                                             required={action.kind === 'akhiri'}
                                             value={action.sampai}
-                                            onChange={(event) =>
+                                            onValueChange={(value) =>
                                                 setAction({
                                                     ...action,
-                                                    sampai: event.target.value,
+                                                    sampai: value,
                                                 })
                                             }
                                         />
-                                        {action.kind === 'tambah' && (
-                                            <FieldDescription>
-                                                Kosongkan untuk mengikuti masa
-                                                berlaku polis.
-                                            </FieldDescription>
-                                        )}
-                                    </Field>
+                                    </FormControl>
                                 )}
-                            </div>
+                            </FormGrid>
                             {(message('berlaku_mulai') ??
                                 message('berlaku_sampai') ??
                                 message('nilai_pertanggungan')) && (
@@ -1086,17 +1169,19 @@ export default function InsurancePage({
                                 </p>
                             )}
                             {action.kind !== 'akhiri' && (
-                                <Input
-                                    label="Keterangan"
-                                    maxLength={2000}
-                                    value={action.keterangan}
-                                    onChange={(event) =>
-                                        setAction({
-                                            ...action,
-                                            keterangan: event.target.value,
-                                        })
-                                    }
-                                />
+                                <FormControl>
+                                    <Input
+                                        label="Keterangan"
+                                        maxLength={2000}
+                                        value={action.keterangan}
+                                        onChange={(event) =>
+                                            setAction({
+                                                ...action,
+                                                keterangan: event.target.value,
+                                            })
+                                        }
+                                    />
+                                </FormControl>
                             )}
                         </DialogBody>
                     )}

@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActionButton } from '@apperp/ui/action-button';
 import type { DataTableColumn } from '@apperp/ui/data-table';
 import { DataTable } from '@apperp/ui/data-table';
 
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
+import { FormControl } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
 
 import { api, errorMessage } from '../../api';
+import { useSaveFeedback } from '../../use-save-feedback';
 
 type Value = {
     id?: string;
@@ -28,8 +30,16 @@ export default function MaintenanceChecklistVariableValues({
     version: number;
     onVersionChange: (version: number) => void;
 }) {
+    const portal = useRef<HTMLDivElement | null>(null);
     const [values, setValues] = useState<Value[]>([]);
     const [saving, setSaving] = useState(false);
+    const {
+        scopeRef: feedbackScopeRef,
+        feedbackSummary,
+        reportSaveError,
+        clearSaveFeedback,
+        fieldError,
+    } = useSaveFeedback(undefined, variableId);
     const [error, setError] = useState('');
     const [saved, setSaved] = useState(false);
     useEffect(() => {
@@ -52,6 +62,7 @@ export default function MaintenanceChecklistVariableValues({
         );
     }
     async function save() {
+        clearSaveFeedback();
         setSaving(true);
         setError('');
 
@@ -63,9 +74,7 @@ export default function MaintenanceChecklistVariableValues({
             onVersionChange(result.version);
             setSaved(true);
         } catch (caught) {
-            setError(
-                errorMessage(caught, 'Nilai checklist belum dapat disimpan.'),
-            );
+            reportSaveError(caught, 'Nilai checklist belum dapat disimpan.');
         } finally {
             setSaving(false);
         }
@@ -81,7 +90,17 @@ export default function MaintenanceChecklistVariableValues({
         label === 'Lulus' ? 'pass' : label === 'Gagal' ? 'fail' : 'none';
 
     return (
-        <div className="space-y-3">
+        <div
+            ref={(node) => {
+                feedbackScopeRef.current = node;
+                portal.current =
+                    node?.closest<HTMLDivElement>(
+                        '[data-slot="page-dialog-contents"]',
+                    ) ?? null;
+            }}
+            className="space-y-3"
+        >
+            {feedbackSummary}
             <div className="flex items-center justify-between">
                 <h3 className="font-semibold">Nilai checklist</h3>
                 {canEdit && (
@@ -125,24 +144,37 @@ export default function MaintenanceChecklistVariableValues({
                         (typeof sdkRows)[number]
                     >[] = [
                         {
+                            content: 'control',
                             id: 'column-0',
                             header: 'Nomor baris',
                             cell: ({ item, index }) => (
                                 <>
                                     {canEdit ? (
-                                        <Input
-                                            aria-label={`Nomor baris ${index + 1}`}
-                                            type="number"
-                                            min="1"
-                                            value={item.line_number}
-                                            onChange={(event) =>
-                                                update(index, {
-                                                    line_number: Number(
-                                                        event.target.value,
-                                                    ),
-                                                })
-                                            }
-                                        />
+                                        <FormControl
+                                            data-error-field={`values.${index}.line_number`}
+                                            error={fieldError(
+                                                `values.${index}.line_number`,
+                                            )}
+                                        >
+                                            <Input
+                                                aria-label={`Nomor baris ${index + 1}`}
+                                                type="number"
+                                                min="1"
+                                                value={item.line_number}
+                                                onChange={(event) =>
+                                                    update(index, {
+                                                        line_number: Number(
+                                                            event.target.value,
+                                                        ),
+                                                    })
+                                                }
+                                                aria-invalid={
+                                                    !!fieldError(
+                                                        `values.${index}.line_number`,
+                                                    )
+                                                }
+                                            />
+                                        </FormControl>
                                     ) : (
                                         item.line_number
                                     )}
@@ -150,20 +182,34 @@ export default function MaintenanceChecklistVariableValues({
                             ),
                         } satisfies DataTableColumn<(typeof sdkRows)[number]>,
                         {
+                            content: 'control',
                             id: 'column-1',
                             header: 'Nilai',
                             cell: ({ item, index }) => (
                                 <>
                                     {canEdit ? (
-                                        <Input
-                                            aria-label={`Nilai baris ${index + 1}`}
-                                            value={item.value}
-                                            onChange={(event) =>
-                                                update(index, {
-                                                    value: event.target.value,
-                                                })
-                                            }
-                                        />
+                                        <FormControl
+                                            data-error-field={`values.${index}.value`}
+                                            error={fieldError(
+                                                `values.${index}.value`,
+                                            )}
+                                        >
+                                            <Input
+                                                aria-label={`Nilai baris ${index + 1}`}
+                                                value={item.value}
+                                                onChange={(event) =>
+                                                    update(index, {
+                                                        value: event.target
+                                                            .value,
+                                                    })
+                                                }
+                                                aria-invalid={
+                                                    !!fieldError(
+                                                        `values.${index}.value`,
+                                                    )
+                                                }
+                                            />
+                                        </FormControl>
                                     ) : (
                                         item.value
                                     )}
@@ -171,26 +217,37 @@ export default function MaintenanceChecklistVariableValues({
                             ),
                         } satisfies DataTableColumn<(typeof sdkRows)[number]>,
                         {
+                            content: 'control',
                             id: 'column-2',
                             header: 'Hasil',
                             cell: ({ item, index }) => (
                                 <>
                                     {canEdit ? (
-                                        <Select
-                                            items={[
-                                                'Lulus',
-                                                'Gagal',
-                                                'Tidak dinilai',
-                                            ]}
-                                            value={labelHasil(item.result_code)}
-                                            ariaLabel={`Hasil baris ${index + 1}`}
-                                            onValueChange={(value) =>
-                                                update(index, {
-                                                    result_code:
-                                                        kodeHasil(value),
-                                                })
-                                            }
-                                        />
+                                        <FormControl
+                                            data-error-field={`values.${index}.result_code`}
+                                            error={fieldError(
+                                                `values.${index}.result_code`,
+                                            )}
+                                        >
+                                            <Select
+                                                portalContainer={portal}
+                                                items={[
+                                                    'Lulus',
+                                                    'Gagal',
+                                                    'Tidak dinilai',
+                                                ]}
+                                                value={labelHasil(
+                                                    item.result_code,
+                                                )}
+                                                ariaLabel={`Hasil baris ${index + 1}`}
+                                                onValueChange={(value) =>
+                                                    update(index, {
+                                                        result_code:
+                                                            kodeHasil(value),
+                                                    })
+                                                }
+                                            />
+                                        </FormControl>
                                     ) : (
                                         labelHasil(item.result_code)
                                     )}

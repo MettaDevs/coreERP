@@ -18,13 +18,14 @@ import {
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
 import { useState } from 'react';
+import { useSaveFeedback } from '@/hooks/use-save-feedback';
 import { createSavedQuery } from '@/lib/analytics/api';
 import type {
     AnalyticsQuery,
     DashboardAbilities,
     SavedQuery,
 } from '@/lib/analytics/types';
-import { CoreApiError, toastSaveError } from '@/lib/core-api';
+import { CoreApiError } from '@/lib/core-api';
 
 /**
  * Menyimpan analisis penjelajah sebagai analisis tersimpan (`POST api/v1/analytics/saved-queries`, area 8.5):
@@ -44,6 +45,12 @@ export function SavedQuerySheet({
     onClose: () => void;
     onSaved: (saved: SavedQuery) => void;
 }) {
+    const {
+        report: saveReport,
+        clear: saveClear,
+        summary: saveSummary,
+        scopeRef: saveScopeRef,
+    } = useSaveFeedback();
     const [name, setName] = useState(suggestedName);
     const [description, setDescription] = useState('');
     const [shared, setShared] = useState(false);
@@ -51,6 +58,7 @@ export function SavedQuerySheet({
     const [saving, setSaving] = useState(false);
 
     const save = async () => {
+        saveClear();
         setSaving(true);
         setErrors({});
 
@@ -69,7 +77,7 @@ export function SavedQuerySheet({
                 setErrors(caught.errors);
             }
 
-            toastSaveError(caught, 'Analisis belum disimpan.');
+            saveReport(caught, 'Analisis belum disimpan.');
         } finally {
             setSaving(false);
         }
@@ -113,8 +121,11 @@ export function SavedQuerySheet({
                         onClick={onClose}
                     />
                 </PageDialogToolbar>
+                {saveSummary}
                 <PageDialogBody>
                     <form
+                        noValidate
+                        ref={saveScopeRef}
                         id="saved-query-form"
 
                         onSubmit={(event) => {
@@ -123,7 +134,10 @@ export function SavedQuerySheet({
                         }}
                     >
                         <FieldGroup>
-                            <Field data-invalid={Boolean(errors.name)}>
+                            <Field
+                                data-error-field="name"
+                                data-invalid={Boolean(errors.name)}
+                            >
                                 <Input
                                     label="Nama"
                                     required
@@ -136,7 +150,10 @@ export function SavedQuerySheet({
                                 />
                                 <FieldError>{errors.name?.[0]}</FieldError>
                             </Field>
-                            <Field data-invalid={Boolean(errors.description)}>
+                            <Field
+                                data-error-field="description"
+                                data-invalid={Boolean(errors.description)}
+                            >
                                 <Textarea
                                     label="Keterangan"
                                     maxLength={1000}
@@ -151,7 +168,10 @@ export function SavedQuerySheet({
                                 </FieldError>
                             </Field>
                             {abilities.share && (
-                                <Field data-invalid={Boolean(errors.shared)}>
+                                <Field
+                                    data-error-field="shared"
+                                    data-invalid={Boolean(errors.shared)}
+                                >
                                     <div className="flex items-center gap-3">
                                         <Switch
                                             id="saved-query-shared"

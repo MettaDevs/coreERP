@@ -8,6 +8,7 @@ use App\Platform\Access\Support\LinkedWorkerResolverRegistry;
 use App\Platform\AddressBook\ModuleServices\AddressDirectoryCore;
 use App\Platform\Analytics\Datasets\DatasetRegistry;
 use App\Platform\Analytics\Datasets\SharedDimensionRegistry;
+use App\Platform\Attachments\ModuleServices\RecordDocumentsCore;
 use App\Platform\Attachments\Support\AttachmentRecordTypeRegistry;
 use App\Platform\ChangeLog\ModuleServices\ChangeHistoryCore;
 use App\Platform\ChangeLog\Support\ChangeLogValueResolverRegistry;
@@ -28,6 +29,7 @@ use App\Platform\Modules\Contracts\NumberSequenceIssuer;
 use App\Platform\Modules\Contracts\OrganizationDirectory;
 use App\Platform\Modules\Contracts\PostingAccountResolvers;
 use App\Platform\Modules\Contracts\PostingFeed;
+use App\Platform\Modules\Contracts\RecordDocuments;
 use App\Platform\Modules\Contracts\ReportFormatter;
 use App\Platform\Modules\Contracts\RequestContext;
 use App\Platform\Modules\Contracts\TenantContext;
@@ -69,6 +71,7 @@ final class CoreServices
     public const BINDINGS = [
         OrganizationDirectory::class => OrganizationDirectoryCore::class,
         TenantContext::class => TenantContextCore::class,
+        RecordDocuments::class => RecordDocumentsCore::class,
         // Berdiri sendiri di samping TenantContext, tidak digabung ke dalamnya. Tenant
         // menjawab "di mana boleh membaca", konteks permintaan menjawab "apa yang boleh
         // dilakukan"; menggabungkannya membuat satu antarmuka punya dua sumber data —

@@ -4,13 +4,14 @@ import { useToday } from '@/hooks/use-work-date';
 import { Badge } from '@apperp/ui/badge';
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
+import { DatePicker } from '@apperp/ui/date-picker';
 import {
     Empty,
     EmptyDescription,
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
-import { Input } from '@apperp/ui/input';
+import { FormControl } from '@apperp/ui/form-control';
 import { Select } from '@apperp/ui/select';
 import { money } from '../../_shared/format';
 import { api, errorMessage } from '../../api';
@@ -152,23 +153,27 @@ export default function InsuranceSummary() {
         <div>
             <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
                 <div className="w-full sm:w-72">
-                    <Select
-                        label="Tampilkan"
-                        items={FILTERS}
-                        value={status}
-                        ariaLabel="Saring status asuransi"
-                        onValueChange={(value) =>
-                            setStatus(value ?? 'bermasalah')
-                        }
-                    />
+                    <FormControl>
+                        <Select
+                            label="Tampilkan"
+                            items={FILTERS}
+                            value={status}
+                            ariaLabel="Saring status asuransi"
+                            onValueChange={(value) =>
+                                setStatus(value ?? 'bermasalah')
+                            }
+                        />
+                    </FormControl>
                 </div>
                 <div className="w-full sm:w-48">
-                    <Input
-                        label="Per tanggal"
-                        type="date"
-                        value={date || today}
-                        onChange={(event) => setDate(event.target.value)}
-                    />
+                    <FormControl>
+                        <DatePicker
+                            label="Per tanggal"
+
+                            value={date || today}
+                            onValueChange={(value) => setDate(value)}
+                        />
+                    </FormControl>
                 </div>
                 {current?.cut && (
                     <p className="text-muted-foreground text-sm">

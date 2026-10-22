@@ -1,7 +1,8 @@
 import { router } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import type { RefObject } from 'react';
-import { FieldDescription } from '@apperp/ui/field';
+import { FieldError } from '@apperp/ui/field';
+
 import { api } from '../../api';
 import DynamicField from '../../master/DynamicField';
 import type { FieldConfig, FieldValue } from '../../master/fields';
@@ -412,10 +413,10 @@ export function DepreciationPreview({ groupId }: { groupId: string }) {
                     </div>
                 );
             })}
-            <FieldDescription>
+            <FieldError>
                 Buku dibentuk otomatis saat aset disimpan. Aturannya disalin,
                 jadi perubahan matriks kelak tidak mengubah aset ini.
-            </FieldDescription>
+            </FieldError>
         </div>
     );
 }

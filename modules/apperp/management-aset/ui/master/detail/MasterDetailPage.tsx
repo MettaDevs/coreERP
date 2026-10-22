@@ -15,6 +15,7 @@ import { MasterDetailLayout } from '@apperp/ui/master-detail-layout';
 import { api, errorMessage } from '../../api';
 import { useRecordQueryTarget } from '../../transactions/_shared/use-record-query-target';
 import { useRecordList } from '../../use-record-list';
+import { useSaveFeedback } from '../../use-save-feedback';
 import type {
     MasterAction,
     MasterConfig,
@@ -45,6 +46,8 @@ export default function MasterDetailPage({
     const [snapshot, setSnapshot] = useState<MasterRecord | null>(null);
 
     const [selectedId, setSelectedId] = useState<string | null>(null);
+    const { scopeRef, feedbackSummary, reportSaveError, clearSaveFeedback } =
+        useSaveFeedback(undefined, selectedId);
     const [mode, setMode] = useState<DetailMode>('view');
     const [dirty, setDirty] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -129,6 +132,8 @@ export default function MasterDetailPage({
     }
 
     async function toggleStatus() {
+        clearSaveFeedback();
+
         if (!selected) {
             return;
         }
@@ -149,11 +154,13 @@ export default function MasterDetailPage({
             load();
             setFormNonce((current) => current + 1);
         } catch (caught) {
-            setError(errorMessage(caught, 'Status belum dapat diubah.'));
+            reportSaveError(caught, 'Status belum dapat diubah.');
         }
     }
 
     async function archive() {
+        clearSaveFeedback();
+
         if (!selected) {
             return;
         }
@@ -167,7 +174,7 @@ export default function MasterDetailPage({
             setSelectedId(null);
             load();
         } catch (caught) {
-            setError(errorMessage(caught, 'Data belum dapat diarsipkan.'));
+            reportSaveError(caught, 'Data belum dapat diarsipkan.');
         } finally {
             setArchiving(false);
         }
@@ -219,7 +226,10 @@ export default function MasterDetailPage({
     const editing = mode !== 'view';
 
     return (
-        <div className="flex h-full min-h-0 flex-col overflow-hidden">
+        <div
+            ref={scopeRef}
+            className="flex h-full min-h-0 flex-col overflow-hidden"
+        >
             <div className="bg-background sticky top-0 z-20 flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2">
                 <span className="mr-2 font-semibold">{config.title}</span>
                 {editing ? (
@@ -284,6 +294,7 @@ export default function MasterDetailPage({
                 )}
             </div>
 
+            {feedbackSummary}
             <MasterDetailLayout
                 detailOpen={showDetail}
                 onDetailOpenChange={(open) => {

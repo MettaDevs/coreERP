@@ -22,10 +22,12 @@ import {
 } from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
+import { useConfirmation } from '@apperp/ui/use-confirmation';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
-import { api, errorMessage } from '../api';
+import { ApiError, api, errorMessage } from '../api';
 import { useRecordQueryTarget } from '../transactions/_shared/use-record-query-target';
 import { useRecordList } from '../use-record-list';
+import { useSaveFeedback } from '../use-save-feedback';
 import GroupBookMatrix from './GroupBookMatrix';
 import MasterForm from './MasterForm';
 import type {
@@ -90,6 +92,9 @@ export default function MasterPage({
     config: MasterConfig;
     permissions: Permission[];
 }) {
+    const { confirm: confirmAction, confirmation: actionConfirmation } =
+        useConfirmation();
+
     const parents = useMemo(() => config.parents ?? [], [config.parents]);
     const can = (action: MasterAction) =>
         permissions.includes(permission(config.resource, action));
@@ -103,6 +108,12 @@ export default function MasterPage({
     const [masterBusy, setMasterBusy] = useState(false);
     const [masterDirty, setMasterDirty] = useState(false);
     const [error, setError] = useState('');
+    const {
+        scopeRef: mutationScopeRef,
+        feedbackSummary: mutationFeedback,
+        reportSaveError: reportMutationError,
+        clearSaveFeedback: clearMutationFeedback,
+    } = useSaveFeedback(undefined, config.resource);
     const [picked, setPicked] = useState<string[]>([]);
 
     const query = useMemo(() => {
@@ -176,6 +187,8 @@ export default function MasterPage({
     );
 
     async function toggle(item: MasterRecord) {
+        clearMutationFeedback();
+
         try {
             await api(`/${config.resource}/${item.id}`, {
                 method: 'PATCH',
@@ -186,15 +199,21 @@ export default function MasterPage({
             });
             load();
         } catch (caught) {
-            setError(errorMessage(caught, 'Status belum dapat diubah.'));
+            reportMutationError(caught, 'Status belum dapat diubah.');
         }
     }
 
     async function archive(item: MasterRecord) {
+        clearMutationFeedback();
+
         if (
-            !window.confirm(
-                `Delete ${item.nama}? Data ini tidak lagi tampil pada daftar pilihan.`,
-            )
+            !(await confirmAction({
+                title: `Delete ${item.nama}? Data ini tidak lagi tampil pada daftar pilihan.`,
+                description:
+                    'Data yang dihapus tidak lagi tampil pada daftar pilihan.',
+                confirmLabel: 'Delete',
+                destructive: true,
+            }))
         ) {
             return;
         }
@@ -209,11 +228,12 @@ export default function MasterPage({
             );
             load();
         } catch (caught) {
-            setError(errorMessage(caught, 'Data belum dapat diarsipkan.'));
+            reportMutationError(caught, 'Data belum dapat diarsipkan.');
         }
     }
 
     async function changeSelected(aktif: boolean) {
+        clearMutationFeedback();
         const selected = items.filter(
             (item) => selectedIds.includes(item.id) && item.aktif !== aktif,
         );
@@ -224,7 +244,15 @@ export default function MasterPage({
 
         const action = aktif ? 'Aktifkan' : 'Nonaktifkan';
 
-        if (!window.confirm(`${action} ${selected.length} data terpilih?`)) {
+        if (
+            !(await confirmAction({
+                title: `${action} ${selected.length} data terpilih?`,
+                description:
+                    'Status data terpilih akan diubah sesuai pilihanmu.',
+                confirmLabel: action,
+                destructive: false,
+            }))
+        ) {
             return;
         }
 
@@ -242,20 +270,32 @@ export default function MasterPage({
         setPicked([]);
 
         if (failed) {
-            setError(`${failed} data belum dapat diubah.`);
+            reportMutationError(
+                new ApiError(
+                    `${selected.length - failed} data berhasil diubah. ${failed} data belum dapat diubah. Periksa status data sebelum mengulang.`,
+                    {},
+                    422,
+                ),
+                'Sebagian data belum dapat diubah.',
+            );
         }
 
         load();
     }
 
     async function archiveSelected() {
+        clearMutationFeedback();
         const selected = items.filter((item) => selectedIds.includes(item.id));
 
         if (
             !selected.length ||
-            !window.confirm(
-                `Delete ${selected.length} data terpilih? Data ini tidak lagi tampil pada daftar pilihan.`,
-            )
+            !(await confirmAction({
+                title: `Delete ${selected.length} data terpilih? Data ini tidak lagi tampil pada daftar pilihan.`,
+                description:
+                    'Data yang dihapus tidak lagi tampil pada daftar pilihan.',
+                confirmLabel: 'Delete',
+                destructive: true,
+            }))
         ) {
             return;
         }
@@ -274,7 +314,14 @@ export default function MasterPage({
         setPicked([]);
 
         if (failed) {
-            setError(`${failed} data belum dapat diarsipkan.`);
+            reportMutationError(
+                new ApiError(
+                    `${selected.length - failed} data berhasil dihapus. ${failed} data belum dapat dihapus. Periksa daftar sebelum mengulang.`,
+                    {},
+                    422,
+                ),
+                'Sebagian data belum dapat dihapus.',
+            );
         }
 
         load();
@@ -402,13 +449,16 @@ export default function MasterPage({
     }
 
     return (
-        <div className="h-full min-h-0 overflow-hidden">
+        <div ref={mutationScopeRef} className="h-full min-h-0 overflow-hidden">
+            {actionConfirmation}
+
             <Card
                 aria-labelledby="list-title"
                 className="flex h-full min-h-0 flex-col overflow-hidden rounded-none border-0 shadow-none"
             >
                 <CardHeader className="min-h-0 shrink-0 border-b">
                     <CardTitle id="list-title">{config.title}</CardTitle>
+                    {mutationFeedback}
                     {can('create') && (
                         <CardAction>
                             <ActionButton

@@ -26,6 +26,7 @@ import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
 import { useEffect, useRef, useState } from 'react';
+import { FormErrorHeader } from '@/components/form-error-header';
 import { apiJson, CoreApiError, errorText } from '@/lib/core-api';
 import {
     OrganizationAddressesSection,
@@ -117,6 +118,8 @@ export function PartyForm({
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const [errors, setErrors] = useState<Record<string, string[]>>({});
+    const formScope = useRef<HTMLFormElement>(null);
+    const [openSections, setOpenSections] = useState(['general']);
     const creationKey = useRef(newPartyDraftKey());
     const set = (key: string, value: string | number | null) =>
         setForm((current) => ({ ...current, [key]: value }));
@@ -181,6 +184,15 @@ export function PartyForm({
 
             if (caught instanceof CoreApiError) {
                 setErrors(caught.errors);
+                setOpenSections([
+                    'general',
+                    'profile',
+                    'additional',
+                    'books',
+                    'addresses',
+                    'contacts',
+                    'roles',
+                ]);
             }
         } finally {
             setBusy(false);
@@ -190,7 +202,7 @@ export function PartyForm({
     const fields = (items: ProfileField[]) => (
         <div className="grid gap-4 sm:grid-cols-2">
             {items.map((field) => (
-                <Field key={field.key}>
+                <Field key={field.key} data-error-field={field.key}>
                     {field.type === 'select' ? (
                         <NativeSelect
                             label={field.label}
@@ -266,7 +278,14 @@ export function PartyForm({
                     onClick={onClose}
                 />
             </RecordActionBar>
+            <FormErrorHeader
+                errors={errors}
+                message={error}
+                scopeRef={formScope}
+            />
             <form
+                noValidate
+                ref={formScope}
                 id="party-form"
                 onSubmit={(event) => void save(event)}
                 className="min-h-0 flex-1 overflow-y-auto p-4"
@@ -276,7 +295,10 @@ export function PartyForm({
                         {error}
                     </p>
                 )}
-                <CollapsibleSectionGroup defaultValue={['general']}>
+                <CollapsibleSectionGroup
+                    value={openSections}
+                    onValueChange={setOpenSections}
+                >
                     <CollapsibleSection
                         value="general"
                         title="General"
@@ -293,7 +315,7 @@ export function PartyForm({
                                     readOnly
                                 />
                             </Field>
-                            <Field>
+                            <Field data-error-field={'type'}>
                                 {party ? (
                                     <Input
                                         label="Jenis pihak"
@@ -333,7 +355,7 @@ export function PartyForm({
                                 <FieldError>{errors.type?.[0]}</FieldError>
                             </Field>
                             {form.type !== 'person' && (
-                                <Field>
+                                <Field data-error-field={'organization_number'}>
                                     <Input
                                         label="NIB (Nomor Induk Berusaha)"
                                         value={String(
@@ -352,7 +374,7 @@ export function PartyForm({
                                     </FieldError>
                                 </Field>
                             )}
-                            <Field>
+                            <Field data-error-field={'name'}>
                                 <div className="flex items-center gap-2">
                                     <Input
                                         label={
@@ -377,7 +399,7 @@ export function PartyForm({
                                 </div>
                                 <FieldError>{errors.name?.[0]}</FieldError>
                             </Field>
-                            <Field>
+                            <Field data-error-field={'tax_number'}>
                                 <Input
                                     label="NPWP"
                                     maxLength={32}
@@ -392,7 +414,7 @@ export function PartyForm({
                                     {errors.tax_number?.[0]}
                                 </FieldError>
                             </Field>
-                            <Field>
+                            <Field data-error-field={'search_name'}>
                                 <Input
                                     label="Nama pencarian"
                                     value={String(form.search_name ?? '')}

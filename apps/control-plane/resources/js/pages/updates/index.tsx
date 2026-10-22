@@ -1,3 +1,4 @@
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import { Button } from '@apperp/ui/button';
 import {
     Table,
@@ -77,6 +78,9 @@ export default function Index({
     environments: Row[];
     unreachable: string | null;
 }) {
+    const { wrapRouter: wrapRouterRequest, summary: routerRequestSummary } =
+        useInertiaFeedback();
+
     const [sending, setSending] = useState(false);
     const upgradeError = usePage().props.errors.upgrade;
 
@@ -120,11 +124,11 @@ export default function Index({
         router.post(
             environmentId ? `/pembaruan/${environmentId}` : '/pembaruan',
             {},
-            {
+            wrapRouterRequest({
                 preserveScroll: true,
                 onStart: () => setSending(true),
                 onFinish: () => setSending(false),
-            },
+            }),
         );
     }
 
@@ -143,6 +147,7 @@ export default function Index({
                 </Button>
             }
         >
+            {routerRequestSummary}
             <Head title="Pembaruan" />
 
             {/*

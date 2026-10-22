@@ -37,6 +37,8 @@ import {
 import { Head, Link, router } from '@inertiajs/react';
 import { AlertCircle, CalendarCheck, Clock, Copy } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { FormErrorHeader } from '@/components/form-error-header';
+import { withInertiaErrors } from '@/hooks/use-inertia-feedback';
 import { cn } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types/navigation';
 
@@ -146,7 +148,7 @@ export default function WorkingTimeCalendars({
                 base_calendar_id: formBaseId || null,
                 standard_work_hours: formHours,
             },
-            {
+            withInertiaErrors({
                 preserveScroll: true,
                 onSuccess: () => {
                     setIsCreateOpen(false);
@@ -155,7 +157,7 @@ export default function WorkingTimeCalendars({
                     setFormErrors(err);
                 },
                 onFinish: () => setIsSubmitting(false),
-            },
+            }),
         );
     };
 
@@ -176,7 +178,7 @@ export default function WorkingTimeCalendars({
                 standard_work_hours: formHours,
                 version: selectedCalendar.version,
             },
-            {
+            withInertiaErrors({
                 preserveScroll: true,
                 onSuccess: () => {
                     setIsEditOpen(false);
@@ -185,7 +187,7 @@ export default function WorkingTimeCalendars({
                     setFormErrors(err);
                 },
                 onFinish: () => setIsSubmitting(false),
-            },
+            }),
         );
     };
 
@@ -197,7 +199,7 @@ export default function WorkingTimeCalendars({
         setIsDeleting(true);
         router.delete(
             `/settings/working-time-calendars/${selectedCalendar.id}`,
-            {
+            withInertiaErrors({
                 data: { version: selectedCalendar.version },
                 preserveScroll: true,
                 onSuccess: () => {
@@ -206,7 +208,7 @@ export default function WorkingTimeCalendars({
                 },
                 onError: (errors) => setFormErrors(errors),
                 onFinish: () => setIsDeleting(false),
-            },
+            }),
         );
     };
 
@@ -223,7 +225,7 @@ export default function WorkingTimeCalendars({
                 code: copyTargetCode.toUpperCase().trim(),
                 name: copyTargetName.trim(),
             },
-            {
+            withInertiaErrors({
                 preserveScroll: true,
                 onSuccess: () => {
                     setIsCopyOpen(false);
@@ -232,7 +234,7 @@ export default function WorkingTimeCalendars({
                     setFormErrors(err);
                 },
                 onFinish: () => setIsSubmitting(false),
-            },
+            }),
         );
     };
 
@@ -466,6 +468,8 @@ export default function WorkingTimeCalendars({
                             tersedia.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
+                    <FormErrorHeader errors={formErrors} />
+
                     {Object.values(formErrors).map((message, index) => (
                         <p
                             key={index}
@@ -523,6 +527,7 @@ export default function WorkingTimeCalendars({
                             />
                         </DialogClose>
                     </PageDialogToolbar>
+                    <FormErrorHeader errors={formErrors} />
 
                     <DialogBody className="space-y-4 py-2">
                         <CalendarFormFields
@@ -572,6 +577,7 @@ export default function WorkingTimeCalendars({
                             />
                         </DialogClose>
                     </PageDialogToolbar>
+                    <FormErrorHeader errors={formErrors} />
 
                     <DialogBody className="space-y-4 py-2">
                         <CalendarFormFields
@@ -632,9 +638,13 @@ export default function WorkingTimeCalendars({
                             />
                         </DialogClose>
                     </PageDialogToolbar>
+                    <FormErrorHeader errors={formErrors} />
 
                     <DialogBody className="space-y-4 py-2">
-                        <Field data-invalid={Boolean(formErrors.code)}>
+                        <Field
+                            data-invalid={Boolean(formErrors.code)}
+                            data-error-field={'code'}
+                        >
                             <Input
                                 label="Kode kalender baru"
                                 required
@@ -651,7 +661,10 @@ export default function WorkingTimeCalendars({
                             )}
                         </Field>
 
-                        <Field data-invalid={Boolean(formErrors.name)}>
+                        <Field
+                            data-invalid={Boolean(formErrors.name)}
+                            data-error-field={'name'}
+                        >
                             <Input
                                 label="Nama kalender baru"
                                 required
@@ -710,7 +723,10 @@ function CalendarFormFields({
                 </Alert>
             )}
 
-            <Field data-invalid={Boolean(errors.code)}>
+            <Field
+                data-invalid={Boolean(errors.code)}
+                data-error-field={'code'}
+            >
                 <Input
                     label="Kode kalender"
                     required
@@ -728,7 +744,10 @@ function CalendarFormFields({
                 )}
             </Field>
 
-            <Field data-invalid={Boolean(errors.name)}>
+            <Field
+                data-invalid={Boolean(errors.name)}
+                data-error-field={'name'}
+            >
                 <Input
                     label="Nama kalender"
                     required
@@ -738,7 +757,10 @@ function CalendarFormFields({
                 {errors.name && <FieldError>{errors.name}</FieldError>}
             </Field>
 
-            <Field data-invalid={Boolean(errors.base_calendar_id)}>
+            <Field
+                data-invalid={Boolean(errors.base_calendar_id)}
+                data-error-field={'base_calendar_id'}
+            >
                 <NativeSelect
                     label="Kalender dasar"
                     value={baseId}
@@ -758,7 +780,10 @@ function CalendarFormFields({
                 )}
             </Field>
 
-            <Field data-invalid={Boolean(errors.standard_work_hours)}>
+            <Field
+                data-invalid={Boolean(errors.standard_work_hours)}
+                data-error-field={'standard_work_hours'}
+            >
                 <Input
                     label="Jam kerja standar per hari"
                     type="number"

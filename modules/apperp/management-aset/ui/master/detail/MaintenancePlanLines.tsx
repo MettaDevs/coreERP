@@ -1,16 +1,17 @@
-import { CircleAlert } from 'lucide-react';
-import type { ReactNode } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import { Checkbox } from '@apperp/ui/checkbox';
 import { DialogToolbar } from '@apperp/ui/dialog';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
-import { Field, FieldHint, FieldLabel } from '@apperp/ui/field';
+
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
+import RecordLookup from '../../_shared/RecordLookup';
 import { api, errorMessage } from '../../api';
+import { useSaveFeedback } from '../../use-save-feedback';
 import type { MasterOption } from '../useMasterOptions';
 import { optionLabel, useMasterOptions } from '../useMasterOptions';
 
@@ -166,24 +167,6 @@ function describe(line: Line): string {
     return `Setiap ${line.interval} ${line.satuan_interval}, ${basis}`;
 }
 
-/** Ikon bantuan di sebelah kontrol, pola yang sama dengan `DynamicField`. */
-function hinted(control: ReactNode, help: string) {
-    return (
-        <div className="flex items-center gap-1.5">
-            <div className="min-w-0 flex-1">{control}</div>
-            <FieldHint hint={help}>
-                <button
-                    type="button"
-                    aria-label="Lihat penjelasan"
-                    className="text-muted-foreground hover:text-foreground shrink-0"
-                >
-                    <CircleAlert className="size-4" />
-                </button>
-            </FieldHint>
-        </div>
-    );
-}
-
 const items = (options: MasterOption[]) =>
     options.map((option) => ({ value: option.id, label: optionLabel(option) }));
 
@@ -212,9 +195,17 @@ export default function MaintenancePlanLines({
     version: number;
     onVersionChange: (version: number) => void;
 }) {
+    const portal = useRef<HTMLDivElement | null>(null);
     const [lines, setLines] = useState<Line[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const {
+        scopeRef: feedbackScopeRef,
+        feedbackSummary,
+        reportSaveError,
+        clearSaveFeedback,
+        fieldError,
+    } = useSaveFeedback(undefined, planId);
     const [error, setError] = useState('');
     const [saved, setSaved] = useState(false);
     const jobTypes = useMasterOptions(
@@ -283,6 +274,7 @@ export default function MaintenancePlanLines({
     }
 
     async function save() {
+        clearSaveFeedback();
         setSaving(true);
         setError('');
 
@@ -301,9 +293,7 @@ export default function MaintenancePlanLines({
             onVersionChange(result.version);
             setSaved(true);
         } catch (caught) {
-            setError(
-                errorMessage(caught, 'Baris rencana belum dapat disimpan.'),
-            );
+            reportSaveError(caught, 'Baris rencana belum dapat disimpan.');
         } finally {
             setSaving(false);
         }
@@ -351,7 +341,17 @@ export default function MaintenancePlanLines({
     }
 
     return (
-        <div className="space-y-4">
+        <div
+            ref={(node) => {
+                feedbackScopeRef.current = node;
+                portal.current =
+                    node?.closest<HTMLDivElement>(
+                        '[data-slot="page-dialog-contents"]',
+                    ) ?? null;
+            }}
+            className="space-y-4"
+        >
+            {feedbackSummary}
             <DialogToolbar className="px-0">
                 <ActionButton
                     action="save"
@@ -402,31 +402,40 @@ export default function MaintenancePlanLines({
                             Keluarkan
                         </Button>
                     </div>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <Field>
-                            <FieldLabel>Dasar jatuh tempo</FieldLabel>
-                            {hinted(
-                                <Select
-                                    items={BASIS}
-                                    value={line.dasar}
-                                    ariaLabel={`Dasar jatuh tempo baris ${index + 1}`}
-                                    onValueChange={(value) =>
-                                        value &&
-                                        update(index, { dasar: value as Basis })
-                                    }
-                                />,
+                    <FormGrid>
+                        <FormControl
+                            hint={
                                 line.dasar === 'tanggal_mulai'
                                     ? 'Jatuh tempo pada tanggal mulai lalu setiap interval, tidak peduli kapan pekerjaan terakhir selesai.'
                                     : line.dasar === 'work_order_terakhir'
                                       ? 'Interval dihitung dari tanggal selesai work order terakhir untuk aset dan pekerjaan yang sama. Cocok untuk kalibrasi.'
-                                      : 'Jatuh tempo setiap kelipatan interval dari total counter aset.',
-                            )}
-                        </Field>
+                                      : 'Jatuh tempo setiap kelipatan interval dari total counter aset.'
+                            }
+                            data-error-field={`lines.${index}.dasar`}
+                            error={fieldError(`lines.${index}.dasar`)}
+                        >
+                            <Select
+                                portalContainer={portal}
+                                label="Dasar jatuh tempo"
+                                items={BASIS}
+                                value={line.dasar}
+                                ariaLabel={`Dasar jatuh tempo baris ${index + 1}`}
+                                onValueChange={(value) =>
+                                    value &&
+                                    update(index, { dasar: value as Basis })
+                                }
+                            />
+                        </FormControl>
                         {line.dasar === 'nilai_counter' ? (
-                            <Field>
-                                <FieldLabel>Jenis counter</FieldLabel>
-                                <Select
-                                    {...counters.selectProps}
+                            <FormControl
+                                data-error-field={`lines.${index}.jenis_counter_id`}
+                                error={fieldError(
+                                    `lines.${index}.jenis_counter_id`,
+                                )}
+                            >
+                                <RecordLookup
+                                    label="Jenis counter"
+                                    source={counters}
                                     items={items(counters.options)}
                                     value={line.jenis_counter_id || null}
                                     placeholder="Pilih counter"
@@ -437,12 +446,17 @@ export default function MaintenancePlanLines({
                                         })
                                     }
                                 />
-                            </Field>
+                            </FormControl>
                         ) : (
-                            <div className="grid grid-cols-[1fr_1fr] gap-2">
-                                <Field>
-                                    <FieldLabel>Setiap</FieldLabel>
+                            <>
+                                <FormControl
+                                    data-error-field={`lines.${index}.interval`}
+                                    error={fieldError(
+                                        `lines.${index}.interval`,
+                                    )}
+                                >
                                     <Input
+                                        label="Setiap"
                                         type="number"
                                         min="1"
                                         aria-label={`Interval baris ${index + 1}`}
@@ -452,11 +466,22 @@ export default function MaintenancePlanLines({
                                                 interval: event.target.value,
                                             })
                                         }
+                                        aria-invalid={
+                                            !!fieldError(
+                                                `lines.${index}.interval`,
+                                            )
+                                        }
                                     />
-                                </Field>
-                                <Field>
-                                    <FieldLabel>Satuan</FieldLabel>
+                                </FormControl>
+                                <FormControl
+                                    data-error-field={`lines.${index}.satuan_interval`}
+                                    error={fieldError(
+                                        `lines.${index}.satuan_interval`,
+                                    )}
+                                >
                                     <Select
+                                        portalContainer={portal}
+                                        label="Satuan"
                                         items={UNITS}
                                         value={line.satuan_interval}
                                         ariaLabel={`Satuan interval baris ${index + 1}`}
@@ -467,16 +492,19 @@ export default function MaintenancePlanLines({
                                             })
                                         }
                                     />
-                                </Field>
-                            </div>
+                                </FormControl>
+                            </>
                         )}
                         {line.dasar === 'nilai_counter' && (
-                            <div className="grid grid-cols-[1fr_1fr] gap-2 sm:col-span-2">
-                                <Field>
-                                    <FieldLabel>
-                                        Setiap (nilai counter)
-                                    </FieldLabel>
+                            <>
+                                <FormControl
+                                    data-error-field={`lines.${index}.interval_counter`}
+                                    error={fieldError(
+                                        `lines.${index}.interval_counter`,
+                                    )}
+                                >
                                     <Input
+                                        label="Setiap (nilai counter)"
                                         type="number"
                                         min="0"
                                         step="any"
@@ -487,32 +515,52 @@ export default function MaintenancePlanLines({
                                                     event.target.value,
                                             })
                                         }
+                                        aria-invalid={
+                                            !!fieldError(
+                                                `lines.${index}.interval_counter`,
+                                            )
+                                        }
                                     />
-                                </Field>
-                                <Field>
-                                    <FieldLabel>Toleransi counter</FieldLabel>
-                                    {hinted(
-                                        <Input
-                                            type="number"
-                                            min="0"
-                                            step="any"
-                                            value={line.toleransi_counter}
-                                            onChange={(event) =>
-                                                update(index, {
-                                                    toleransi_counter:
-                                                        event.target.value,
-                                                })
-                                            }
-                                        />,
-                                        'Usulan muncul lebih awal, saat total counter kurang sebanyak ini dari batasnya.',
+                                </FormControl>
+                                <FormControl
+                                    hint={
+                                        'Usulan muncul lebih awal, saat total counter kurang sebanyak ini dari batasnya.'
+                                    }
+                                    data-error-field={`lines.${index}.toleransi_counter`}
+                                    error={fieldError(
+                                        `lines.${index}.toleransi_counter`,
                                     )}
-                                </Field>
-                            </div>
+                                >
+                                    <Input
+                                        label="Toleransi counter"
+                                        type="number"
+                                        min="0"
+                                        step="any"
+                                        value={line.toleransi_counter}
+                                        onChange={(event) =>
+                                            update(index, {
+                                                toleransi_counter:
+                                                    event.target.value,
+                                            })
+                                        }
+                                        aria-invalid={
+                                            !!fieldError(
+                                                `lines.${index}.toleransi_counter`,
+                                            )
+                                        }
+                                    />
+                                </FormControl>
+                            </>
                         )}
-                        <Field>
-                            <FieldLabel>Jenis pekerjaan</FieldLabel>
-                            <Select
-                                {...jobTypes.selectProps}
+                        <FormControl
+                            data-error-field={`lines.${index}.maintenance_job_type_id`}
+                            error={fieldError(
+                                `lines.${index}.maintenance_job_type_id`,
+                            )}
+                        >
+                            <RecordLookup
+                                label="Jenis pekerjaan"
+                                source={jobTypes}
                                 items={items(jobTypes.options)}
                                 value={line.maintenance_job_type_id || null}
                                 placeholder="Pilih jenis pekerjaan"
@@ -523,11 +571,16 @@ export default function MaintenancePlanLines({
                                     })
                                 }
                             />
-                        </Field>
-                        <Field>
-                            <FieldLabel>Tipe work order</FieldLabel>
-                            <Select
-                                {...tipe.selectProps}
+                        </FormControl>
+                        <FormControl
+                            data-error-field={`lines.${index}.tipe_work_order_id`}
+                            error={fieldError(
+                                `lines.${index}.tipe_work_order_id`,
+                            )}
+                        >
+                            <RecordLookup
+                                label="Tipe work order"
+                                source={tipe}
                                 items={items(tipe.options)}
                                 value={line.tipe_work_order_id || null}
                                 placeholder="Pilih tipe work order"
@@ -538,11 +591,14 @@ export default function MaintenancePlanLines({
                                     })
                                 }
                             />
-                        </Field>
-                        <Field>
-                            <FieldLabel>Bidang keahlian</FieldLabel>
-                            <Select
-                                {...trades.selectProps}
+                        </FormControl>
+                        <FormControl
+                            data-error-field={`lines.${index}.trade_id`}
+                            error={fieldError(`lines.${index}.trade_id`)}
+                        >
+                            <RecordLookup
+                                label="Bidang keahlian"
+                                source={trades}
                                 items={optional(
                                     trades.options,
                                     'Tidak ditentukan',
@@ -554,11 +610,16 @@ export default function MaintenancePlanLines({
                                     update(index, { trade_id: value ?? '' })
                                 }
                             />
-                        </Field>
-                        <Field>
-                            <FieldLabel>Tingkat layanan</FieldLabel>
-                            <Select
-                                {...layanan.selectProps}
+                        </FormControl>
+                        <FormControl
+                            data-error-field={`lines.${index}.tingkat_layanan_id`}
+                            error={fieldError(
+                                `lines.${index}.tingkat_layanan_id`,
+                            )}
+                        >
+                            <RecordLookup
+                                label="Tingkat layanan"
+                                source={layanan}
                                 items={optional(
                                     layanan.options,
                                     'Tidak ditentukan',
@@ -572,27 +633,39 @@ export default function MaintenancePlanLines({
                                     })
                                 }
                             />
-                        </Field>
-                        <Field>
-                            <FieldLabel>Selesai dalam (hari)</FieldLabel>
-                            {hinted(
-                                <Input
-                                    type="number"
-                                    min="0"
-                                    value={line.selesai_dalam_hari}
-                                    onChange={(event) =>
-                                        update(index, {
-                                            selesai_dalam_hari:
-                                                event.target.value,
-                                        })
-                                    }
-                                />,
-                                'Target selesai work order dihitung dari tanggal jatuh tempo ditambah angka ini.',
+                        </FormControl>
+                        <FormControl
+                            hint={
+                                'Target selesai work order dihitung dari tanggal jatuh tempo ditambah angka ini.'
+                            }
+                            data-error-field={`lines.${index}.selesai_dalam_hari`}
+                            error={fieldError(
+                                `lines.${index}.selesai_dalam_hari`,
                             )}
-                        </Field>
-                        <Field>
-                            <FieldLabel>Keterangan work order</FieldLabel>
+                        >
                             <Input
+                                label="Selesai dalam (hari)"
+                                type="number"
+                                min="0"
+                                value={line.selesai_dalam_hari}
+                                onChange={(event) =>
+                                    update(index, {
+                                        selesai_dalam_hari: event.target.value,
+                                    })
+                                }
+                                aria-invalid={
+                                    !!fieldError(
+                                        `lines.${index}.selesai_dalam_hari`,
+                                    )
+                                }
+                            />
+                        </FormControl>
+                        <FormControl
+                            data-error-field={`lines.${index}.deskripsi`}
+                            error={fieldError(`lines.${index}.deskripsi`)}
+                        >
+                            <Input
+                                label="Keterangan work order"
                                 value={line.deskripsi}
                                 maxLength={2000}
                                 onChange={(event) =>
@@ -600,8 +673,11 @@ export default function MaintenancePlanLines({
                                         deskripsi: event.target.value,
                                     })
                                 }
+                                aria-invalid={
+                                    !!fieldError(`lines.${index}.deskripsi`)
+                                }
                             />
-                        </Field>
+                        </FormControl>
                         <label className="flex items-center gap-2 text-sm">
                             <Checkbox
                                 checked={line.aktif}
@@ -611,7 +687,7 @@ export default function MaintenancePlanLines({
                             />
                             Baris aktif dan ikut dihitung
                         </label>
-                    </div>
+                    </FormGrid>
                 </div>
             ))}
 

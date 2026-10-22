@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActionButton } from '@apperp/ui/action-button';
 
-import { Field } from '@apperp/ui/field';
+import { FormControl } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { api, errorMessage } from '../api';
+import { useSaveFeedback } from '../use-save-feedback';
 
 type Row = { nilai: string };
 
@@ -26,6 +27,13 @@ export default function TipeAtributNilai({
     const [rows, setRows] = useState<Row[]>([]);
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
+    const {
+        scopeRef: feedbackScopeRef,
+        feedbackSummary,
+        reportSaveError,
+        clearSaveFeedback,
+        fieldError,
+    } = useSaveFeedback(undefined, tipeAtributId);
     const [saved, setSaved] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -59,7 +67,13 @@ export default function TipeAtributNilai({
         };
     }, [tipeAtributId]);
 
+    const valueField = (index: number) =>
+        rows[index]?.nilai.trim()
+            ? `rows.${rows.slice(0, index).filter((item) => item.nilai.trim()).length}.nilai`
+            : `empty-values.${index}`;
+
     async function save() {
+        clearSaveFeedback();
         setSaving(true);
         setError('');
         setSaved(false);
@@ -85,16 +99,21 @@ export default function TipeAtributNilai({
             onVersionChange(result.version);
             setSaved(true);
         } catch (caught) {
-            setError(
-                errorMessage(caught, 'Pilihan nilai belum dapat disimpan.'),
-            );
+            reportSaveError(caught, 'Pilihan nilai belum dapat disimpan.');
         } finally {
             setSaving(false);
         }
     }
 
     return (
-        <div ref={containerRef} className="space-y-3 border-t px-5 py-4">
+        <div
+            ref={(node) => {
+                containerRef.current = node;
+                feedbackScopeRef.current = node;
+            }}
+            className="space-y-3 border-t px-5 py-4"
+        >
+            {feedbackSummary}
             <div>
                 <p className="font-semibold">Pilihan nilai</p>
                 <p className="text-muted-foreground text-sm">
@@ -111,7 +130,11 @@ export default function TipeAtributNilai({
 
             {rows.map((row, index) => (
                 <div key={index} className="flex items-end gap-2">
-                    <Field className="flex-1">
+                    <FormControl
+                        className="flex-1"
+                        data-error-field={valueField(index)}
+                        error={fieldError(valueField(index))}
+                    >
                         <Input
                             id={`nilai-${index}`}
                             label={`Pilihan ${index + 1}`}
@@ -127,8 +150,9 @@ export default function TipeAtributNilai({
                                     ),
                                 )
                             }
+                            aria-invalid={!!fieldError(valueField(index))}
                         />
-                    </Field>
+                    </FormControl>
                     {canEdit && (
                         <ActionButton
                             action="delete"

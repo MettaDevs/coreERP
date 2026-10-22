@@ -1,3 +1,4 @@
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import { Spinner } from '@apperp/ui/spinner';
@@ -32,6 +33,9 @@ export default function DnsStatus({
     serverAddress: string | null;
     revoked?: boolean;
 }) {
+    const { wrapRouter: wrapRouterRequest, summary: routerRequestSummary } =
+        useInertiaFeedback();
+
     const [syncing, setSyncing] = useState(false);
     const error = usePage().props.errors.dns;
 
@@ -58,16 +62,17 @@ export default function DnsStatus({
         router.post(
             `/situs/${siteId}/dns`,
             {},
-            {
+            wrapRouterRequest({
                 preserveScroll: true,
                 onStart: () => setSyncing(true),
                 onFinish: () => setSyncing(false),
-            },
+            }),
         );
     }
 
     return (
         <div className="space-y-2" data-test="dns-status">
+            {routerRequestSummary}
             {appUrl && (
                 <a
                     href={appUrl}

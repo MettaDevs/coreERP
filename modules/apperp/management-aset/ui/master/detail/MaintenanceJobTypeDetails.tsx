@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { ActionButton } from '@apperp/ui/action-button';
 import type { DataTableColumn } from '@apperp/ui/data-table';
 import { DataTable } from '@apperp/ui/data-table';
@@ -9,7 +9,9 @@ import { Input } from '@apperp/ui/input';
 
 import { TransferList } from '@apperp/ui/transfer-list';
 import type { TransferListItem } from '@apperp/ui/transfer-list';
-import { api, errorMessage, newIdempotencyKey } from '../../api';
+import { useConfirmation } from '@apperp/ui/use-confirmation';
+import { ApiError, api, errorMessage, newIdempotencyKey } from '../../api';
+import { useSaveFeedback } from '../../use-save-feedback';
 
 type Variant = {
     id: string;
@@ -37,12 +39,19 @@ export default function MaintenanceJobTypeDetails({
     version: number;
     onVersionChange: (version: number) => void;
 }) {
+    const { confirm: confirmAction, confirmation: actionConfirmation } =
+        useConfirmation();
+
     const [variants, setVariants] = useState<Variant[]>([]);
     const [remaining, setRemaining] = useState<TransferListItem[]>([]);
     const [selected, setSelected] = useState<TransferListItem[]>([]);
     const [variantName, setVariantName] = useState('');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
+    const { scopeRef, feedbackSummary, reportSaveError, clearSaveFeedback } =
+        useSaveFeedback(undefined, jobTypeId);
+    const [variantError, setVariantError] = useState('');
+    const variantErrorId = useId();
     const [saved, setSaved] = useState(false);
 
     // Effect adalah satu-satunya pemilik pengambilan data; menambah atau mengarsipkan
@@ -97,7 +106,20 @@ export default function MaintenanceJobTypeDetails({
     }, [jobTypeId, versiMuat]);
 
     async function addVariant() {
+        clearSaveFeedback();
+        setVariantError('');
+
         if (!variantName.trim()) {
+            setVariantError('Isi nama varian.');
+            reportSaveError(
+                new ApiError(
+                    'Isi nama varian.',
+                    { nama: ['Isi nama varian.'] },
+                    422,
+                ),
+                'Varian belum dapat ditambahkan.',
+            );
+
             return;
         }
 
@@ -116,16 +138,36 @@ export default function MaintenanceJobTypeDetails({
             setVariantName('');
             muatUlang();
         } catch (caught) {
-            setError(errorMessage(caught, 'Varian belum dapat ditambahkan.'));
+            if (caught instanceof ApiError) {
+                setVariantError(caught.validationErrors.nama?.[0] ?? '');
+            }
+
+            reportSaveError(caught, 'Varian belum dapat ditambahkan.');
         } finally {
             setBusy(false);
         }
     }
 
     async function removeVariant(variant: Variant) {
-        if (!window.confirm('Delete varian ini?')) {
+        if (busy) {
             return;
         }
+
+        clearSaveFeedback();
+
+        if (
+            !(await confirmAction({
+                title: 'Delete varian ini?',
+                description:
+                    'Data yang dihapus tidak lagi tampil pada daftar pilihan.',
+                confirmLabel: 'Delete',
+                destructive: true,
+            }))
+        ) {
+            return;
+        }
+
+        setBusy(true);
 
         try {
             await api(`/maintenance-job-type-variants/${variant.id}`, {
@@ -134,11 +176,14 @@ export default function MaintenanceJobTypeDetails({
             });
             muatUlang();
         } catch (caught) {
-            setError(errorMessage(caught, 'Varian belum dapat diarsipkan.'));
+            reportSaveError(caught, 'Varian belum dapat diarsipkan.');
+        } finally {
+            setBusy(false);
         }
     }
 
     async function saveAsetTypes() {
+        clearSaveFeedback();
         setBusy(true);
         setError('');
 
@@ -156,9 +201,7 @@ export default function MaintenanceJobTypeDetails({
             onVersionChange(result.version);
             setSaved(true);
         } catch (caught) {
-            setError(
-                errorMessage(caught, 'Relasi jenis aset belum dapat disimpan.'),
-            );
+            reportSaveError(caught, 'Relasi jenis aset belum dapat disimpan.');
         } finally {
             setBusy(false);
         }
@@ -174,7 +217,10 @@ export default function MaintenanceJobTypeDetails({
     }
 
     return (
-        <div className="space-y-7">
+        <div ref={scopeRef} className="space-y-7">
+            {actionConfirmation}
+            {feedbackSummary}
+
             <section className="space-y-3">
                 <div className="flex items-center justify-between">
                     <h3 className="font-semibold">
@@ -182,14 +228,32 @@ export default function MaintenanceJobTypeDetails({
                     </h3>
                     {canEdit && (
                         <div className="flex gap-2">
-                            <Input
-                                aria-label="Nama varian baru"
-                                placeholder="Nama varian"
-                                value={variantName}
-                                onChange={(event) =>
-                                    setVariantName(event.target.value)
-                                }
-                            />
+                            <div className="flex flex-col gap-1">
+                                <Input
+                                    aria-label="Nama varian baru"
+                                    name="nama"
+                                    aria-invalid={!!variantError}
+                                    aria-describedby={
+                                        variantError
+                                            ? variantErrorId
+                                            : undefined
+                                    }
+                                    placeholder="Nama varian"
+                                    value={variantName}
+                                    onChange={(event) =>
+                                        setVariantName(event.target.value)
+                                    }
+                                />
+                                {variantError && (
+                                    <p
+                                        id={variantErrorId}
+                                        role="alert"
+                                        className="text-destructive text-sm"
+                                    >
+                                        {variantError}
+                                    </p>
+                                )}
+                            </div>
                             <ActionButton
                                 action="add"
                                 type="button"
