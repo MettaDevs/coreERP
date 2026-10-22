@@ -1,9 +1,8 @@
 import { usePage } from '@inertiajs/react';
 import { TriangleAlert } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { lazy, Suspense, useCallback, useState } from 'react';
 import type { RefObject } from 'react';
 import { PostingCheck } from '@/components/finance/posting-check';
-import { VendorCreateCard } from '@/pages/foundation/vendor/vendors';
 import type { Auth } from '@/types';
 import { FormControl } from '@apperp/ui/form-control';
 import { InlineLookup } from '@apperp/ui/inline-lookup';
@@ -15,6 +14,12 @@ import type {
     StatusPosting,
     VendorRingkas,
 } from './penerimaan';
+
+const VendorCreateCard = lazy(() =>
+    import('@/pages/foundation/vendor/vendors').then((module) => ({
+        default: module.VendorCreateCard,
+    })),
+);
 
 /**
  * Vendor dan jurnal perolehan pada dokumen penerimaan (feed posting finance, TODO 9.3).
@@ -143,33 +148,35 @@ export function VendorPicker({
                 )}
             </FormControl>
             {creating && legalEntityId && canCreate && (
-                <VendorCreateCard
-                    key={legalEntityId}
-                    legalEntityId={legalEntityId}
-                    onClose={() => setCreating(false)}
-                    onCreated={(vendor) => {
-                        if (
-                            vendor.legal_entity_id !== legalEntityId ||
-                            vendor.status !== 'active'
-                        ) {
-                            throw new Error(
-                                'Pilih akun vendor aktif untuk perusahaan penerimaan ini.',
-                            );
-                        }
+                <Suspense fallback={<p role="status">Membuka form vendor…</p>}>
+                    <VendorCreateCard
+                        key={legalEntityId}
+                        legalEntityId={legalEntityId}
+                        onClose={() => setCreating(false)}
+                        onCreated={(vendor) => {
+                            if (
+                                vendor.legal_entity_id !== legalEntityId ||
+                                vendor.status !== 'active'
+                            ) {
+                                throw new Error(
+                                    'Pilih akun vendor aktif untuk perusahaan penerimaan ini.',
+                                );
+                            }
 
-                        setSelected({
-                            scope: legalEntityId,
-                            item: {
-                                id: vendor.id,
-                                number: vendor.number,
-                                name: vendor.name,
-                                status: vendor.status,
-                            },
-                        });
-                        onChange(vendor.id);
-                        setCreating(false);
-                    }}
-                />
+                            setSelected({
+                                scope: legalEntityId,
+                                item: {
+                                    id: vendor.id,
+                                    number: vendor.number,
+                                    name: vendor.name,
+                                    status: vendor.status,
+                                },
+                            });
+                            onChange(vendor.id);
+                            setCreating(false);
+                        }}
+                    />
+                </Suspense>
             )}
         </>
     );
