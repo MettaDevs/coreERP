@@ -101,7 +101,9 @@ class ReportScreenCodeTest extends TestCase
         preg_match_all('/<ReportPageLayout(?:<[^>]+>)?\s(.*?)\/>/s', $source, $layouts);
         $printCodes = $print[1];
         foreach ($layouts[1] as $attributes) {
-            $this->assertSame(1, preg_match('/\bfilterState=\{\s*(\w+)\s*\}/', $attributes, $binding), $screen.': layout harus menerima state pratinjau secara langsung.');
+            if (preg_match('/\bfilterState=\{\s*(\w+)\s*\}/', $attributes, $binding) !== 1) {
+                $this->fail($screen.': layout harus menerima state pratinjau secara langsung.');
+            }
             $this->assertArrayHasKey($binding[1], $states, $screen.': state cetak tidak berasal dari useReportData pada layar ini.');
             $printCodes[] = $states[$binding[1]];
         }
@@ -114,7 +116,9 @@ class ReportScreenCodeTest extends TestCase
     private function assertSharedReportFlow(string $layout, string $hook): void
     {
         $this->assertMatchesRegularExpression('/const\s*\{\s*reportCode\s*,\s*filters\s*\}\s*=\s*filterState\s*;/', $layout);
-        $this->assertSame(1, preg_match('/const handlePrint = \(\) => \{(.*?)\n    \};/s', $layout, $handler));
+        if (preg_match('/const handlePrint = \(\) => \{(.*?)\n    \};/s', $layout, $handler) !== 1) {
+            $this->fail('Layout harus memiliki handler cetak yang dapat diperiksa.');
+        }
         $this->assertMatchesRegularExpression('/requestPrint\(\{\s*report:\s*reportCode\s*,.*?parameters:\s*toParameters\(filters\)/s', $handler[1]);
         $this->assertStringContainsString('onClick={handlePrint}', $layout);
         $this->assertMatchesRegularExpression('/const\s+filterState:\s*ReportFilterState\s*=\s*\{\s*reportCode\s*,/', $hook);
