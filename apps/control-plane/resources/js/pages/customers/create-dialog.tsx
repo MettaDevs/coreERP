@@ -1,3 +1,5 @@
+import { FormErrorHeader } from '@/components/form-error-header';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import { Button } from '@apperp/ui/button';
 import { Checkbox } from '@apperp/ui/checkbox';
 import {
@@ -44,6 +46,9 @@ export default function CreateDialog({
 }: {
     app: { id: string; name: string }[];
 }) {
+    const { wrap: wrapLocalForm0Request, summary: localForm0RequestSummary } =
+        useInertiaFeedback();
+
     const [open, setOpen] = useState(false);
     const { data, setData, post, processing, errors, reset, clearErrors } =
         useForm({
@@ -80,12 +85,15 @@ export default function CreateDialog({
 
     function submit(e: FormEvent) {
         e.preventDefault();
-        post('/tenant', {
-            onSuccess: () => {
-                reset();
-                setOpen(false);
-            },
-        });
+        post(
+            '/tenant',
+            wrapLocalForm0Request({
+                onSuccess: () => {
+                    reset();
+                    setOpen(false);
+                },
+            }),
+        );
     }
 
     return (
@@ -106,7 +114,7 @@ export default function CreateDialog({
                 <Button>Tenant baru</Button>
             </DialogTrigger>
             <DialogContent>
-                <form onSubmit={submit}>
+                <form noValidate onSubmit={submit}>
                     <DialogHeader>
                         <DialogTitle>Tenant baru</DialogTitle>
                         <DialogDescription>
@@ -114,6 +122,10 @@ export default function CreateDialog({
                             lalu menampilkan kata sandi sementaranya satu kali.
                         </DialogDescription>
                     </DialogHeader>
+                    <>
+                        {localForm0RequestSummary}
+                        <FormErrorHeader errors={errors} />
+                    </>
 
                     <div className="space-y-4 py-4">
                         {otherErrors.length > 0 && (

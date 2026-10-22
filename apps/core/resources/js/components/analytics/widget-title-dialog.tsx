@@ -13,9 +13,10 @@ import { Field, FieldError, FieldGroup } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { Textarea } from '@apperp/ui/textarea';
 import { useState } from 'react';
+import { useSaveFeedback } from '@/hooks/use-save-feedback';
 import { updateWidget } from '@/lib/analytics/api';
 import type { DashboardWidget, TextVisual } from '@/lib/analytics/types';
-import { CoreApiError, toastSaveError } from '@/lib/core-api';
+import { CoreApiError } from '@/lib/core-api';
 
 /**
  * Mengganti judul satu widget, dan isi teksnya untuk widget teks. Isi query dan tampilan diubah lewat
@@ -32,6 +33,12 @@ export function WidgetTitleDialog({
     onSaved: (widget: DashboardWidget) => void;
 }) {
     const isText = widget.type === 'text';
+    const {
+        report: saveReport,
+        clear: saveClear,
+        summary: saveSummary,
+        scopeRef: saveScopeRef,
+    } = useSaveFeedback(widget.id);
     const [title, setTitle] = useState(widget.title);
     const [text, setText] = useState(
         isText ? (widget.visual as TextVisual).text : '',
@@ -41,6 +48,7 @@ export function WidgetTitleDialog({
     const [saving, setSaving] = useState(false);
 
     const save = async () => {
+        saveClear();
         setSaving(true);
         setErrors({});
         setFieldError(null);
@@ -61,7 +69,7 @@ export function WidgetTitleDialog({
                 }
             }
 
-            toastSaveError(caught, 'Perubahan belum disimpan.');
+            saveReport(caught, 'Perubahan belum disimpan.');
         } finally {
             setSaving(false);
         }
@@ -95,8 +103,11 @@ export function WidgetTitleDialog({
                         <ActionButton action="cancel" type="button" />
                     </DialogClose>
                 </DialogToolbar>
+                {saveSummary}
                 <DialogBody>
                     <form
+                        noValidate
+                        ref={saveScopeRef}
                         id="widget-title-form"
                         onSubmit={(event) => {
                             event.preventDefault();
@@ -104,7 +115,10 @@ export function WidgetTitleDialog({
                         }}
                     >
                         <FieldGroup>
-                            <Field data-invalid={Boolean(errors.title)}>
+                            <Field
+                                data-error-field="title"
+                                data-invalid={Boolean(errors.title)}
+                            >
                                 <Input
                                     label="Judul"
                                     required

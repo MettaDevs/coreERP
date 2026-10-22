@@ -1,5 +1,5 @@
 import { Printer } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
@@ -9,14 +9,25 @@ import {
 } from '@apperp/ui/collapsible-section';
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
-import { DialogToolbar } from '@apperp/ui/dialog';
+import { DateTimePicker } from '@apperp/ui/date-time-picker';
+import {
+    Dialog,
+    DialogBody,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogToolbar,
+} from '@apperp/ui/dialog';
 import {
     Empty,
     EmptyDescription,
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
-import { Field, FieldDescription, FieldLabel } from '@apperp/ui/field';
+import { FieldLabel } from '@apperp/ui/field';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { usePageDialogRecord } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
@@ -24,14 +35,11 @@ import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
 import EditShield from '../../_shared/EditShield';
-import {
-    api,
-    errorMessage,
-    newIdempotencyKey,
-    toastSaveError,
-} from '../../api';
+import { RecordLookup } from '../../_shared/RecordLookup';
+import { ApiError, api, errorMessage, newIdempotencyKey } from '../../api';
 import { requestPrint } from '../../print';
 import { useRecordOptions } from '../../use-record-list';
+import { useSaveFeedback } from '../../use-save-feedback';
 import { RecordCardHeader } from '../_shared/record-card';
 import type { RecordCardControls } from '../_shared/record-card';
 import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
@@ -53,7 +61,6 @@ import {
     bukaChecklistJob as navigateChecklist,
     emptyJob,
     emptyWorkOrder,
-    idDari,
     izin,
     labelDari,
 } from './workOrder';
@@ -114,8 +121,6 @@ function JobRow({
         jobTypes = jobSource.options,
         variants = variantSource.options,
         trades = tradeSource.options;
-    const pilih = (options: Option[], id: string) =>
-        options.find((option) => option.id === id);
     const teks = (label: string) => ({
         readOnly,
         onFocus: readOnly ? onRequestEdit : undefined,
@@ -134,81 +139,79 @@ function JobRow({
                     />
                 )}
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-                <Field>
+            <FormGrid>
+                <FormControl>
                     <EditShield
                         active={readOnly}
                         label="aset"
                         onActivate={onRequestEdit}
                     >
-                        <Select
+                        <RecordLookup
                             portalContainer={portalContainer}
                             label="Aset"
                             required
-                            {...assetSource.selectProps}
-                            items={asetItems.map(
-                                (aset) => labelDari(aset) ?? '',
-                            )}
-                            value={labelDari(pilih(aset, job.aset_id))}
+                            source={assetSource}
+                            items={asetItems.map((option) => ({
+                                value: option.id,
+                                label: labelDari(option) ?? '',
+                            }))}
+                            value={job.aset_id || null}
                             placeholder="Pilih aset"
                             searchPlaceholder="Cari kode atau nama aset"
                             ariaLabel={`Aset baris ${index + 1}`}
                             onValueChange={(value) =>
                                 onChange({
-                                    aset_id: idDari(aset, value),
+                                    aset_id: value ?? '',
                                     maintenance_job_type_id: '',
                                     variant_id: '',
                                 })
                             }
                         />
                     </EditShield>
-                </Field>
-                <Field>
+                </FormControl>
+                <FormControl>
                     <EditShield
                         active={readOnly}
                         label="jenis pekerjaan"
                         onActivate={onRequestEdit}
                     >
-                        <Select
+                        <RecordLookup
                             portalContainer={portalContainer}
                             label="Jenis pekerjaan"
                             required
-                            {...jobSource.selectProps}
-                            items={jobTypes.map(
-                                (type) => labelDari(type) ?? '',
-                            )}
-                            value={labelDari(
-                                pilih(jobTypes, job.maintenance_job_type_id),
-                            )}
+                            source={jobSource}
+                            items={jobTypes.map((option) => ({
+                                value: option.id,
+                                label: labelDari(option) ?? '',
+                            }))}
+                            value={job.maintenance_job_type_id || null}
                             placeholder="Pilih jenis pekerjaan"
                             searchPlaceholder="Cari jenis pekerjaan"
                             ariaLabel={`Jenis pekerjaan baris ${index + 1}`}
                             onValueChange={(value) =>
                                 onChange({
-                                    maintenance_job_type_id: idDari(
-                                        jobTypes,
-                                        value,
-                                    ),
+                                    maintenance_job_type_id: value ?? '',
                                     variant_id: '',
                                 })
                             }
                         />
                     </EditShield>
-                </Field>
-                <Field>
+                </FormControl>
+                <FormControl>
                     <EditShield
                         active={readOnly}
                         label="varian pekerjaan"
                         onActivate={onRequestEdit}
                     >
-                        <Select
+                        <RecordLookup
                             portalContainer={portalContainer}
                             label="Varian pekerjaan"
-                            {...variantSource.selectProps}
-                            items={variants.map(
-                                (variant) => labelDari(variant) ?? '',
-                            )}
-                            value={labelDari(pilih(variants, job.variant_id))}
+                            source={variantSource}
+                            items={variants.map((option) => ({
+                                value: option.id,
+                                label: labelDari(option) ?? '',
+                            }))}
+                            value={job.variant_id || null}
                             placeholder={
                                 job.maintenance_job_type_id
                                     ? 'Pilih varian bila diperlukan'
@@ -218,36 +221,37 @@ function JobRow({
                             ariaLabel={`Varian pekerjaan baris ${index + 1}`}
                             onValueChange={(value) =>
                                 onChange({
-                                    variant_id: idDari(variants, value),
+                                    variant_id: value ?? '',
                                 })
                             }
                         />
                     </EditShield>
-                </Field>
-                <Field>
+                </FormControl>
+                <FormControl>
                     <EditShield
                         active={readOnly}
                         label="bidang keahlian"
                         onActivate={onRequestEdit}
                     >
-                        <Select
+                        <RecordLookup
                             portalContainer={portalContainer}
                             label="Bidang keahlian"
-                            {...tradeSource.selectProps}
-                            items={trades.map(
-                                (trade) => labelDari(trade) ?? '',
-                            )}
-                            value={labelDari(pilih(trades, job.trade_id))}
+                            source={tradeSource}
+                            items={trades.map((option) => ({
+                                value: option.id,
+                                label: labelDari(option) ?? '',
+                            }))}
+                            value={job.trade_id || null}
                             placeholder="Pilih bidang keahlian"
                             searchPlaceholder="Cari bidang keahlian"
                             ariaLabel={`Bidang keahlian baris ${index + 1}`}
                             onValueChange={(value) =>
-                                onChange({ trade_id: idDari(trades, value) })
+                                onChange({ trade_id: value ?? '' })
                             }
                         />
                     </EditShield>
-                </Field>
-                <Field>
+                </FormControl>
+                <FormControl>
                     <Input
                         label="Estimasi jam"
                         type="number"
@@ -259,41 +263,43 @@ function JobRow({
                         }
                         {...teks(`Estimasi jam baris ${index + 1}`)}
                     />
-                </Field>
-                <Field>
-                    <Input
+                </FormControl>
+                <FormControl>
+                    <DateTimePicker
+                        portalContainer={portalContainer}
                         label="Jadwal mulai"
-                        type="datetime-local"
+
                         value={
                             job.dijadwalkan_mulai
                                 ?.replace(' ', 'T')
                                 .slice(0, 16) ?? ''
                         }
-                        onChange={(event) =>
-                            onChange({ dijadwalkan_mulai: event.target.value })
+                        onValueChange={(value) =>
+                            onChange({ dijadwalkan_mulai: value })
                         }
                         {...teks(`Jadwal mulai baris ${index + 1}`)}
                     />
-                </Field>
-                <Field>
-                    <Input
+                </FormControl>
+                <FormControl>
+                    <DateTimePicker
+                        portalContainer={portalContainer}
                         label="Jadwal selesai"
-                        type="datetime-local"
+
                         value={
                             job.dijadwalkan_selesai
                                 ?.replace(' ', 'T')
                                 .slice(0, 16) ?? ''
                         }
-                        onChange={(event) =>
+                        onValueChange={(value) =>
                             onChange({
-                                dijadwalkan_selesai: event.target.value,
+                                dijadwalkan_selesai: value,
                             })
                         }
                         {...teks(`Jadwal selesai baris ${index + 1}`)}
                     />
-                </Field>
-            </div>
-            <Field>
+                </FormControl>
+            </FormGrid>
+            <FormControl>
                 <FieldLabel htmlFor={`job-catatan-${index}`}>
                     Catatan
                 </FieldLabel>
@@ -307,7 +313,7 @@ function JobRow({
                         onChange({ catatan: event.target.value })
                     }
                 />
-            </Field>
+            </FormControl>
         </div>
     );
 }
@@ -446,52 +452,58 @@ function ChecklistPanel({
                                 </p>
                             ) : row.tipe === 'variable' ? (
                                 editable ? (
-                                    <Select
-                                        portalContainer={portalContainer}
-                                        label="Jawaban"
-                                        items={row.pilihan.map(
-                                            (choice) => choice.value,
-                                        )}
-                                        value={row.nilai}
-                                        placeholder="Pilih jawaban"
-                                        searchPlaceholder="Cari jawaban"
-                                        ariaLabel={`Jawaban ${row.nama}`}
-                                        onValueChange={(value) =>
-                                            onChange(row.id, { nilai: value })
-                                        }
-                                    />
+                                    <FormControl>
+                                        <Select
+                                            portalContainer={portalContainer}
+                                            label="Jawaban"
+                                            items={row.pilihan.map(
+                                                (choice) => choice.value,
+                                            )}
+                                            value={row.nilai}
+                                            placeholder="Pilih jawaban"
+                                            searchPlaceholder="Cari jawaban"
+                                            ariaLabel={`Jawaban ${row.nama}`}
+                                            onValueChange={(value) =>
+                                                onChange(row.id, {
+                                                    nilai: value,
+                                                })
+                                            }
+                                        />
+                                    </FormControl>
                                 ) : (
                                     <p className="text-sm">
                                         Jawaban: {row.nilai ?? 'Belum diisi'}
                                     </p>
                                 )
                             ) : editable ? (
-                                <Input
-                                    label={
-                                        row.tipe === 'measurement'
-                                            ? `Nilai${row.satuan ? ` (${row.satuan})` : ''}`
-                                            : 'Jawaban'
-                                    }
-                                    type={
-                                        row.tipe === 'measurement'
-                                            ? 'number'
-                                            : 'text'
-                                    }
-                                    step="any"
-                                    value={row.nilai ?? ''}
-                                    onChange={(event) =>
-                                        onChange(row.id, {
-                                            nilai: event.target.value,
-                                        })
-                                    }
-                                />
+                                <FormControl>
+                                    <Input
+                                        label={
+                                            row.tipe === 'measurement'
+                                                ? `Nilai${row.satuan ? ` (${row.satuan})` : ''}`
+                                                : 'Jawaban'
+                                        }
+                                        type={
+                                            row.tipe === 'measurement'
+                                                ? 'number'
+                                                : 'text'
+                                        }
+                                        step="any"
+                                        value={row.nilai ?? ''}
+                                        onChange={(event) =>
+                                            onChange(row.id, {
+                                                nilai: event.target.value,
+                                            })
+                                        }
+                                    />
+                                </FormControl>
                             ) : (
                                 <p className="text-sm">
                                     Jawaban: {row.nilai ?? 'Belum diisi'}
                                 </p>
                             )}
                             {editable ? (
-                                <Field>
+                                <FormControl>
                                     <FieldLabel htmlFor={`catatan-${row.id}`}>
                                         Catatan teknisi
                                         {row.pilihan.some(
@@ -513,7 +525,7 @@ function ChecklistPanel({
                                             })
                                         }
                                     />
-                                </Field>
+                                </FormControl>
                             ) : (
                                 row.catatan_teknisi && (
                                     <p className="text-muted-foreground text-sm">
@@ -558,6 +570,20 @@ export default function WorkOrderDetailPage({
     mode: Mode;
     checklistJobId?: string;
 } & RecordCardControls) {
+    const [feedbackSections, setFeedbackSections] = useState<string[]>([
+        'general',
+        'lines',
+    ]);
+
+    const {
+        scopeRef: feedbackScopeRef,
+        feedbackSummary,
+        reportSaveError,
+        clearSaveFeedback,
+    } = useSaveFeedback(undefined, workOrderId, () =>
+        setFeedbackSections(['general', 'lines', 'notes']),
+    );
+
     const embedded = usePageDialogRecord(undefined);
 
     const [localChecklistJobId, setLocalChecklistJobId] = useState<
@@ -625,6 +651,18 @@ export default function WorkOrderDetailPage({
         rows: ChecklistRow[];
     } | null>(null);
     const [saving, setSaving] = useState(false);
+    const [cancellationLabel, setCancellationLabel] = useState<string | null>(
+        null,
+    );
+    const [cancellationReason, setCancellationReason] = useState('');
+    const [cancellationFieldError, setCancellationFieldError] = useState('');
+    const cancellationReasonErrorId = useId();
+    const {
+        scopeRef: cancellationScopeRef,
+        feedbackSummary: cancellationFeedback,
+        reportSaveError: reportCancellationError,
+        clearSaveFeedback: clearCancellationFeedback,
+    } = useSaveFeedback(undefined, workOrderId);
     const [mainDirty, setMainDirty] = useState(false);
     const [auxiliaryDirty, setAuxiliaryDirty] = useState(false);
     useEffect(() => {
@@ -768,20 +806,42 @@ export default function WorkOrderDetailPage({
         return () => onDirtyChange?.(false);
     }, [mainDirty, auxiliaryDirty, onDirtyChange]);
 
-    const pindahStatus = async (ke: string, label: string) => {
-        if (!record?.id || !record.kode) {
+    const pindahStatus = async (
+        ke: string,
+        label: string,
+        providedReason?: string,
+    ) => {
+        if (!record?.id || !record.kode || saving) {
             return;
         }
 
-        const alasan =
-            ke === 'dibatalkan'
-                ? window.prompt(`Alasan membatalkan ${record.kode}?`)
-                : null;
+        if (ke === 'dibatalkan' && providedReason === undefined) {
+            clearCancellationFeedback();
+            setCancellationReason('');
+            setCancellationFieldError('');
+            setCancellationLabel(label);
+
+            return;
+        }
+
+        const alasan = providedReason?.trim() || null;
 
         if (ke === 'dibatalkan' && !alasan?.trim()) {
+            setCancellationFieldError('Isi alasan pembatalan.');
+            reportCancellationError(
+                new ApiError(
+                    'Isi alasan pembatalan.',
+                    { alasan: ['Isi alasan pembatalan.'] },
+                    422,
+                ),
+                'Pembatalan belum dapat diproses.',
+            );
+
             return;
         }
 
+        clearCancellationFeedback();
+        setCancellationFieldError('');
         setSaving(true);
 
         try {
@@ -794,9 +854,20 @@ export default function WorkOrderDetailPage({
                 }),
             });
             muatUlang();
+            clearSaveFeedback();
+            setCancellationLabel(null);
             toast.success(`${record.kode} — ${label.toLowerCase()} berhasil.`);
         } catch (caught) {
-            toastSaveError(
+            const reportFailure =
+                ke === 'dibatalkan' ? reportCancellationError : reportSaveError;
+
+            if (ke === 'dibatalkan' && caught instanceof ApiError) {
+                setCancellationFieldError(
+                    caught.validationErrors.alasan?.[0] ?? '',
+                );
+            }
+
+            reportFailure(
                 caught,
                 `${record.kode} belum dapat dipindahkan statusnya.`,
             );
@@ -828,10 +899,11 @@ export default function WorkOrderDetailPage({
                     }),
                 },
             );
+            clearSaveFeedback();
             toast.success('Hasil pemeriksaan tersimpan.');
             (onSaved ?? bukaWorkOrder)(workOrderId);
         } catch (caught) {
-            toastSaveError(caught, 'Hasil pemeriksaan belum dapat disimpan.');
+            reportSaveError(caught, 'Hasil pemeriksaan belum dapat disimpan.');
         } finally {
             setSaving(false);
         }
@@ -862,10 +934,11 @@ export default function WorkOrderDetailPage({
                     }),
                 },
             );
+            clearSaveFeedback();
             toast.success('Hasil pekerjaan tersimpan.');
             muatUlang();
         } catch (caught) {
-            toastSaveError(caught, 'Hasil pekerjaan belum dapat disimpan.');
+            reportSaveError(caught, 'Hasil pekerjaan belum dapat disimpan.');
         } finally {
             setSaving(false);
         }
@@ -873,7 +946,8 @@ export default function WorkOrderDetailPage({
 
     const save = async () => {
         if (!record || !context.legal_entity_id || !context.org_unit_id) {
-            toast.error(
+            reportSaveError(
+                null,
                 'Pilih perusahaan dan unit kerja aktif sebelum membuat work order.',
             );
 
@@ -881,7 +955,7 @@ export default function WorkOrderDetailPage({
         }
 
         if (!record.tipe_work_order_id) {
-            toast.error('Pilih tipe work order lebih dahulu.');
+            reportSaveError(null, 'Pilih tipe work order lebih dahulu.');
 
             return;
         }
@@ -891,7 +965,10 @@ export default function WorkOrderDetailPage({
                 (job) => job.aset_id && job.maintenance_job_type_id,
             )
         ) {
-            toast.error('Pilih aset dan jenis pekerjaan pada setiap baris.');
+            reportSaveError(
+                null,
+                'Pilih aset dan jenis pekerjaan pada setiap baris.',
+            );
 
             return;
         }
@@ -928,6 +1005,7 @@ export default function WorkOrderDetailPage({
                     method: 'PATCH',
                     body: JSON.stringify({ ...body, version: record.version }),
                 });
+                clearSaveFeedback();
                 toast.success('Work order disimpan.');
                 (onSaved ?? bukaWorkOrder)(record.id);
             } else {
@@ -939,11 +1017,12 @@ export default function WorkOrderDetailPage({
                         body: JSON.stringify(body),
                     },
                 );
+                clearSaveFeedback();
                 toast.success('Work order disimpan.');
                 (onSaved ?? bukaWorkOrder)(dibuat.data.id);
             }
         } catch (caught) {
-            toastSaveError(caught, 'Work order belum dapat disimpan.');
+            reportSaveError(caught, 'Work order belum dapat disimpan.');
         } finally {
             setSaving(false);
         }
@@ -1043,21 +1122,23 @@ export default function WorkOrderDetailPage({
             header: 'Jam aktual',
             cell: (job) =>
                 canEditExecution ? (
-                    <Input
-                        aria-label={`Jam aktual ${job.aset_kode ?? ''}`}
-                        type="number"
-                        min="0"
-                        step="0.25"
-                        value={job.aktual_jam ?? ''}
-                        onChange={(event) =>
-                            updateJob(job.id, {
-                                aktual_jam:
-                                    event.target.value === ''
-                                        ? null
-                                        : Number(event.target.value),
-                            })
-                        }
-                    />
+                    <FormControl>
+                        <Input
+                            aria-label={`Jam aktual ${job.aset_kode ?? ''}`}
+                            type="number"
+                            min="0"
+                            step="0.25"
+                            value={job.aktual_jam ?? ''}
+                            onChange={(event) =>
+                                updateJob(job.id, {
+                                    aktual_jam:
+                                        event.target.value === ''
+                                            ? null
+                                            : Number(event.target.value),
+                                })
+                            }
+                        />
+                    </FormControl>
                 ) : (
                     (job.aktual_jam ?? '—')
                 ),
@@ -1074,41 +1155,46 @@ export default function WorkOrderDetailPage({
 
                 return canEditExecution ? (
                     <div className="flex flex-col gap-2">
-                        <Select
-                            portalContainer={portalContainer}
-                            {...faultSource.selectProps}
-                            items={faultCauses.map(
-                                (option) => labelDari(option) ?? '',
-                            )}
-                            value={labelDari(selected)}
-                            placeholder="Pilih bila ada"
-                            searchPlaceholder="Cari sebab kerusakan"
-                            ariaLabel={`Sebab kerusakan ${job.aset_kode ?? ''}`}
-                            onValueChange={(value) => {
-                                const id = idDari(faultCauses, value) || null;
-                                const mintaKeterangan = faultCauses.find(
-                                    (option) => option.id === id,
-                                )?.minta_keterangan;
-                                updateJob(job.id, {
-                                    sebab_kerusakan_id: id,
-                                    ...(!mintaKeterangan && {
-                                        sebab_kerusakan_keterangan: null,
-                                    }),
-                                });
-                            }}
-                        />
-                        {selected?.minta_keterangan && (
-                            <Input
-                                aria-label={`Keterangan sebab kerusakan ${job.aset_kode ?? ''}`}
-                                placeholder="Tulis sebab kerusakan"
-                                value={job.sebab_kerusakan_keterangan ?? ''}
-                                onChange={(event) =>
+                        <FormControl>
+                            <RecordLookup
+                                portalContainer={portalContainer}
+                                source={faultSource}
+                                items={faultCauses.map((option) => ({
+                                    value: option.id,
+                                    label: labelDari(option) ?? '',
+                                }))}
+                                value={selected?.id ?? null}
+                                placeholder="Pilih bila ada"
+                                searchPlaceholder="Cari sebab kerusakan"
+                                ariaLabel={`Sebab kerusakan ${job.aset_kode ?? ''}`}
+                                onValueChange={(value) => {
+                                    const id = (value ?? '') || null;
+                                    const mintaKeterangan = faultCauses.find(
+                                        (option) => option.id === id,
+                                    )?.minta_keterangan;
                                     updateJob(job.id, {
-                                        sebab_kerusakan_keterangan:
-                                            event.target.value,
-                                    })
-                                }
+                                        sebab_kerusakan_id: id,
+                                        ...(!mintaKeterangan && {
+                                            sebab_kerusakan_keterangan: null,
+                                        }),
+                                    });
+                                }}
                             />
+                        </FormControl>
+                        {selected?.minta_keterangan && (
+                            <FormControl>
+                                <Input
+                                    aria-label={`Keterangan sebab kerusakan ${job.aset_kode ?? ''}`}
+                                    placeholder="Tulis sebab kerusakan"
+                                    value={job.sebab_kerusakan_keterangan ?? ''}
+                                    onChange={(event) =>
+                                        updateJob(job.id, {
+                                            sebab_kerusakan_keterangan:
+                                                event.target.value,
+                                        })
+                                    }
+                                />
+                            </FormControl>
                         )}
                     </div>
                 ) : (
@@ -1134,41 +1220,48 @@ export default function WorkOrderDetailPage({
 
                 return canEditExecution ? (
                     <div className="flex flex-col gap-2">
-                        <Select
-                            portalContainer={portalContainer}
-                            {...repairSource.selectProps}
-                            items={repairActions.map(
-                                (option) => labelDari(option) ?? '',
-                            )}
-                            value={labelDari(selected)}
-                            placeholder="Pilih bila ada"
-                            searchPlaceholder="Cari tindakan perbaikan"
-                            ariaLabel={`Tindakan perbaikan ${job.aset_kode ?? ''}`}
-                            onValueChange={(value) => {
-                                const id = idDari(repairActions, value) || null;
-                                const mintaKeterangan = repairActions.find(
-                                    (option) => option.id === id,
-                                )?.minta_keterangan;
-                                updateJob(job.id, {
-                                    tindakan_perbaikan_id: id,
-                                    ...(!mintaKeterangan && {
-                                        tindakan_perbaikan_keterangan: null,
-                                    }),
-                                });
-                            }}
-                        />
-                        {selected?.minta_keterangan && (
-                            <Input
-                                aria-label={`Keterangan tindakan perbaikan ${job.aset_kode ?? ''}`}
-                                placeholder="Tulis tindakan perbaikan"
-                                value={job.tindakan_perbaikan_keterangan ?? ''}
-                                onChange={(event) =>
+                        <FormControl>
+                            <RecordLookup
+                                portalContainer={portalContainer}
+                                source={repairSource}
+                                items={repairActions.map((option) => ({
+                                    value: option.id,
+                                    label: labelDari(option) ?? '',
+                                }))}
+                                value={selected?.id ?? null}
+                                placeholder="Pilih bila ada"
+                                searchPlaceholder="Cari tindakan perbaikan"
+                                ariaLabel={`Tindakan perbaikan ${job.aset_kode ?? ''}`}
+                                onValueChange={(value) => {
+                                    const id = (value ?? '') || null;
+                                    const mintaKeterangan = repairActions.find(
+                                        (option) => option.id === id,
+                                    )?.minta_keterangan;
                                     updateJob(job.id, {
-                                        tindakan_perbaikan_keterangan:
-                                            event.target.value,
-                                    })
-                                }
+                                        tindakan_perbaikan_id: id,
+                                        ...(!mintaKeterangan && {
+                                            tindakan_perbaikan_keterangan: null,
+                                        }),
+                                    });
+                                }}
                             />
+                        </FormControl>
+                        {selected?.minta_keterangan && (
+                            <FormControl>
+                                <Input
+                                    aria-label={`Keterangan tindakan perbaikan ${job.aset_kode ?? ''}`}
+                                    placeholder="Tulis tindakan perbaikan"
+                                    value={
+                                        job.tindakan_perbaikan_keterangan ?? ''
+                                    }
+                                    onChange={(event) =>
+                                        updateJob(job.id, {
+                                            tindakan_perbaikan_keterangan:
+                                                event.target.value,
+                                        })
+                                    }
+                                />
+                            </FormControl>
                         )}
                     </div>
                 ) : (
@@ -1205,7 +1298,93 @@ export default function WorkOrderDetailPage({
     ];
 
     return (
-        <div className="flex h-full min-h-0 flex-col overflow-hidden">
+        <div
+            ref={feedbackScopeRef}
+            className="flex h-full min-h-0 flex-col overflow-hidden"
+        >
+            <Dialog
+                open={cancellationLabel !== null}
+                onOpenChange={(open) => {
+                    if (!open && !saving) {
+                        setCancellationLabel(null);
+                    }
+                }}
+            >
+                <DialogContent
+                    ref={cancellationScopeRef}
+                    size="compact"
+                    onEscapeKeyDown={(event) => {
+                        if (saving) {
+                            event.preventDefault();
+                        }
+                    }}
+                >
+                    <DialogHeader>
+                        <DialogTitle>
+                            Batalkan work order {record.kode}
+                        </DialogTitle>
+                        <DialogDescription>
+                            Isi alasan pembatalan. Work order baru dibatalkan
+                            setelah kamu memilih Batalkan work order.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {cancellationFeedback}
+                    <DialogBody>
+                        <FormControl
+                            data-error-field="alasan"
+                            error={
+                                cancellationFieldError ? (
+                                    <span id={cancellationReasonErrorId}>
+                                        {cancellationFieldError}
+                                    </span>
+                                ) : undefined
+                            }
+                        >
+                            <Textarea
+                                label="Alasan pembatalan"
+                                required
+                                value={cancellationReason}
+                                readOnly={saving}
+                                aria-invalid={!!cancellationFieldError}
+                                aria-describedby={
+                                    cancellationFieldError
+                                        ? cancellationReasonErrorId
+                                        : undefined
+                                }
+                                onChange={(event) =>
+                                    setCancellationReason(event.target.value)
+                                }
+                            />
+                        </FormControl>
+                    </DialogBody>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            disabled={saving}
+                            onClick={() => setCancellationLabel(null)}
+                        >
+                            Kembali
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            disabled={saving}
+                            onClick={() => {
+                                if (cancellationLabel) {
+                                    void pindahStatus(
+                                        'dibatalkan',
+                                        cancellationLabel,
+                                        cancellationReason,
+                                    );
+                                }
+                            }}
+                        >
+                            {saving ? 'Memproses…' : 'Batalkan work order'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
             <RecordCardHeader
                 recordTitle={record.kode ?? 'Baru'}
                 editing={editing}
@@ -1221,6 +1400,7 @@ export default function WorkOrderDetailPage({
                 }
             />
             <RecordActionBar
+                feedback={feedbackSummary}
                 title={
                     embedded
                         ? undefined
@@ -1321,7 +1501,8 @@ export default function WorkOrderDetailPage({
                         aktif Anda.
                     </p>
                     <CollapsibleSectionGroup
-                        defaultValue={['general', 'lines']}
+                        value={feedbackSections}
+                        onValueChange={setFeedbackSections}
                     >
                         <CollapsibleSection
                             value="general"
@@ -1336,31 +1517,38 @@ export default function WorkOrderDetailPage({
                             }
                         >
                             <div className="space-y-4">
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    <Field>
+                                <FormGrid>
+                                    <FormControl
+                                        data-error-field="tipe_work_order_id"
+                                        hint={
+                                            <>
+                                                Tipe menentukan apa yang wajib
+                                                diisi sebelum pekerjaan boleh
+                                                dinyatakan selesai.
+                                            </>
+                                        }
+                                    >
                                         <EditShield
                                             active={readOnly}
                                             label="tipe work order"
                                             onActivate={mintaSunting}
                                         >
-                                            <Select
+                                            <RecordLookup
                                                 portalContainer={
                                                     portalContainer
                                                 }
                                                 label="Tipe work order"
                                                 required
-                                                {...typeSource.selectProps}
-                                                items={tipe.map(
-                                                    (option) =>
+                                                source={typeSource}
+                                                items={tipe.map((option) => ({
+                                                    value: option.id,
+                                                    label:
                                                         labelDari(option) ?? '',
-                                                )}
-                                                value={labelDari(
-                                                    tipe.find(
-                                                        (option) =>
-                                                            option.id ===
-                                                            record.tipe_work_order_id,
-                                                    ),
-                                                )}
+                                                }))}
+                                                value={
+                                                    record.tipe_work_order_id ||
+                                                    null
+                                                }
                                                 placeholder="Pilih tipe work order"
                                                 searchPlaceholder="Cari tipe work order"
                                                 ariaLabel="Tipe work order"
@@ -1368,40 +1556,36 @@ export default function WorkOrderDetailPage({
                                                     setRecord({
                                                         ...record,
                                                         tipe_work_order_id:
-                                                            idDari(tipe, value),
+                                                            value ?? '',
                                                     })
                                                 }
                                             />
                                         </EditShield>
-                                        <FieldDescription>
-                                            Tipe menentukan apa yang wajib diisi
-                                            sebelum pekerjaan boleh dinyatakan
-                                            selesai.
-                                        </FieldDescription>
-                                    </Field>
-                                    <Field>
+                                    </FormControl>
+                                    <FormControl data-error-field="tingkat_layanan_id">
                                         <EditShield
                                             active={readOnly}
                                             label="tingkat layanan"
                                             onActivate={mintaSunting}
                                         >
-                                            <Select
+                                            <RecordLookup
                                                 portalContainer={
                                                     portalContainer
                                                 }
                                                 label="Tingkat layanan"
-                                                {...serviceSource.selectProps}
+                                                source={serviceSource}
                                                 items={layanan.map(
-                                                    (option) =>
-                                                        labelDari(option) ?? '',
+                                                    (option) => ({
+                                                        value: option.id,
+                                                        label:
+                                                            labelDari(option) ??
+                                                            '',
+                                                    }),
                                                 )}
-                                                value={labelDari(
-                                                    layanan.find(
-                                                        (option) =>
-                                                            option.id ===
-                                                            record.tingkat_layanan_id,
-                                                    ),
-                                                )}
+                                                value={
+                                                    record.tingkat_layanan_id ||
+                                                    null
+                                                }
                                                 placeholder="Pilih tingkat layanan"
                                                 searchPlaceholder="Cari tingkat layanan"
                                                 ariaLabel="Tingkat layanan"
@@ -1409,19 +1593,25 @@ export default function WorkOrderDetailPage({
                                                     setRecord({
                                                         ...record,
                                                         tingkat_layanan_id:
-                                                            idDari(
-                                                                layanan,
-                                                                value,
-                                                            ),
+                                                            value ?? '',
                                                     })
                                                 }
                                             />
                                         </EditShield>
-                                    </Field>
-                                    <Field>
-                                        <Input
+                                    </FormControl>
+                                    <FormControl
+                                        data-error-field="diharapkan_mulai"
+                                        hint={
+                                            <>
+                                                Batas waktu yang diharapkan
+                                                untuk memulai pekerjaan.
+                                            </>
+                                        }
+                                    >
+                                        <DateTimePicker
+                                            portalContainer={portalContainer}
                                             label="Diharapkan mulai"
-                                            type="datetime-local"
+
                                             readOnly={readOnly}
                                             onFocus={
                                                 readOnly
@@ -1433,23 +1623,27 @@ export default function WorkOrderDetailPage({
                                                     ?.replace(' ', 'T')
                                                     .slice(0, 16) ?? ''
                                             }
-                                            onChange={(event) =>
+                                            onValueChange={(value) =>
                                                 setRecord({
                                                     ...record,
-                                                    diharapkan_mulai:
-                                                        event.target.value,
+                                                    diharapkan_mulai: value,
                                                 })
                                             }
                                         />
-                                        <FieldDescription>
-                                            Batas waktu yang diharapkan untuk
-                                            memulai pekerjaan.
-                                        </FieldDescription>
-                                    </Field>
-                                    <Field>
-                                        <Input
+                                    </FormControl>
+                                    <FormControl
+                                        data-error-field="diharapkan_selesai"
+                                        hint={
+                                            <>
+                                                Batas waktu yang diharapkan
+                                                untuk menyelesaikan pekerjaan.
+                                            </>
+                                        }
+                                    >
+                                        <DateTimePicker
+                                            portalContainer={portalContainer}
                                             label="Diharapkan selesai"
-                                            type="datetime-local"
+
                                             readOnly={readOnly}
                                             onFocus={
                                                 readOnly
@@ -1461,23 +1655,27 @@ export default function WorkOrderDetailPage({
                                                     ?.replace(' ', 'T')
                                                     .slice(0, 16) ?? ''
                                             }
-                                            onChange={(event) =>
+                                            onValueChange={(value) =>
                                                 setRecord({
                                                     ...record,
-                                                    diharapkan_selesai:
-                                                        event.target.value,
+                                                    diharapkan_selesai: value,
                                                 })
                                             }
                                         />
-                                        <FieldDescription>
-                                            Batas waktu yang diharapkan untuk
-                                            menyelesaikan pekerjaan.
-                                        </FieldDescription>
-                                    </Field>
-                                    <Field>
-                                        <Input
+                                    </FormControl>
+                                    <FormControl
+                                        data-error-field="dijadwalkan_mulai"
+                                        hint={
+                                            <>
+                                                Harus diisi sebelum work order
+                                                dapat dijadwalkan.
+                                            </>
+                                        }
+                                    >
+                                        <DateTimePicker
+                                            portalContainer={portalContainer}
                                             label="Dijadwalkan mulai"
-                                            type="datetime-local"
+
                                             readOnly={readOnly}
                                             onFocus={
                                                 readOnly
@@ -1489,23 +1687,19 @@ export default function WorkOrderDetailPage({
                                                     ?.replace(' ', 'T')
                                                     .slice(0, 16) ?? ''
                                             }
-                                            onChange={(event) =>
+                                            onValueChange={(value) =>
                                                 setRecord({
                                                     ...record,
-                                                    dijadwalkan_mulai:
-                                                        event.target.value,
+                                                    dijadwalkan_mulai: value,
                                                 })
                                             }
                                         />
-                                        <FieldDescription>
-                                            Harus diisi sebelum work order dapat
-                                            dijadwalkan.
-                                        </FieldDescription>
-                                    </Field>
-                                    <Field>
-                                        <Input
+                                    </FormControl>
+                                    <FormControl data-error-field="dijadwalkan_selesai">
+                                        <DateTimePicker
+                                            portalContainer={portalContainer}
                                             label="Dijadwalkan selesai"
-                                            type="datetime-local"
+
                                             readOnly={readOnly}
                                             onFocus={
                                                 readOnly
@@ -1517,16 +1711,15 @@ export default function WorkOrderDetailPage({
                                                     ?.replace(' ', 'T')
                                                     .slice(0, 16) ?? ''
                                             }
-                                            onChange={(event) =>
+                                            onValueChange={(value) =>
                                                 setRecord({
                                                     ...record,
-                                                    dijadwalkan_selesai:
-                                                        event.target.value,
+                                                    dijadwalkan_selesai: value,
                                                 })
                                             }
                                         />
-                                    </Field>
-                                </div>
+                                    </FormControl>
+                                </FormGrid>
                             </div>
                         </CollapsibleSection>
                         <CollapsibleSection
@@ -1655,7 +1848,7 @@ export default function WorkOrderDetailPage({
                             }
                         >
                             <div className="space-y-4">
-                                <Field>
+                                <FormControl data-error-field="keterangan">
                                     <FieldLabel htmlFor="work-order-keterangan">
                                         Keterangan
                                     </FieldLabel>
@@ -1674,7 +1867,7 @@ export default function WorkOrderDetailPage({
                                             })
                                         }
                                     />
-                                </Field>
+                                </FormControl>
                             </div>
                         </CollapsibleSection>
                     </CollapsibleSectionGroup>

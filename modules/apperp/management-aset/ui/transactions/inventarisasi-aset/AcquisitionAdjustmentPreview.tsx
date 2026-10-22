@@ -6,7 +6,8 @@ import type {
     PostingCheckProblem,
 } from '@/components/finance/posting-check';
 import { useToday } from '@/hooks/use-work-date';
-import { Field, FieldDescription } from '@apperp/ui/field';
+
+import { FormControl } from '@apperp/ui/form-control';
 import { Textarea } from '@apperp/ui/textarea';
 import { api, errorMessage } from '../../api';
 import { money } from './aset';
@@ -151,7 +152,14 @@ export function AcquisitionAdjustmentPreview({
                     {money(String(Math.abs(selisih)), currencyCode)}.
                 </p>
             )}
-            <Field>
+            <FormControl
+                hint={
+                    <>
+                        Ikut ke keterangan jurnal koreksi di aplikasi finance,
+                        misalnya &quot;Faktur ternyata 510.000&quot;.
+                    </>
+                }
+            >
                 <Textarea
                     label="Alasan koreksi"
                     required
@@ -160,11 +168,7 @@ export function AcquisitionAdjustmentPreview({
                     value={reason}
                     onChange={(event) => onReasonChange(event.target.value)}
                 />
-                <FieldDescription>
-                    Ikut ke keterangan jurnal koreksi di aplikasi finance,
-                    misalnya &quot;Faktur ternyata 510.000&quot;.
-                </FieldDescription>
-            </Field>
+            </FormControl>
             {galat && <p className="text-destructive text-sm">{galat}</p>}
             {memuat && !pratinjau && (
                 <p className="text-muted-foreground text-sm">

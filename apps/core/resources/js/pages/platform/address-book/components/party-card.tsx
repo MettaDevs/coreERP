@@ -26,6 +26,7 @@ import { usePageDialogRecord } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
+import { FormErrorHeader } from '@/components/form-error-header';
 import { apiJson, apiRequest, errorText } from '@/lib/core-api';
 import {
     OrganizationAddressesSection,
@@ -118,7 +119,6 @@ export function PartyCard({
             setError(errorText(caught, 'Pihak belum dapat diarsipkan.'));
         } finally {
             setBusy(false);
-            setConfirmArchive(false);
         }
     }
 
@@ -224,7 +224,14 @@ export function PartyCard({
     return (
         <div className="flex h-full min-h-0 flex-col">
             {!embedded && (
-                <RecordActionBar>
+                <RecordActionBar
+                    feedback={
+                        <FormErrorHeader
+                            message={error}
+                            operation="Pihak belum dapat diarsipkan"
+                        />
+                    }
+                >
                     <Button variant="outline" onClick={onBack}>
                         Kembali ke daftar
                     </Button>

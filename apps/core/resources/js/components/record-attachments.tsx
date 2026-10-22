@@ -34,6 +34,7 @@ import { Trash2 } from 'lucide-react';
 import { Download, FileText, Paperclip, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { FormErrorHeader } from '@/components/form-error-header';
 import { RecordUploadDialog } from '@/components/record-upload-dialog';
 import { useDateTimeFormat } from '@/hooks/use-date-time';
 import { apiJson, apiRequest } from '@/lib/core-api';
@@ -158,6 +159,7 @@ export function RecordAttachments({
     const [busy, setBusy] = useState(false);
     const [selected, setSelected] = useState<Attachment | null>(null);
     const [archiving, setArchiving] = useState<Attachment | null>(null);
+    const [archiveError, setArchiveError] = useState<string | null>(null);
     const [uploadOpen, setUploadOpen] = useState(false);
     const formatDateTime = useDateTimeFormat();
     const path = `/api/v1/records/${encodeURIComponent(recordType)}/${encodeURIComponent(recordId)}/attachments`;
@@ -214,7 +216,7 @@ export function RecordAttachments({
 
     async function archive(attachment: Attachment) {
         setBusy(true);
-        setError(null);
+        setArchiveError(null);
 
         try {
             await apiRequest(
@@ -237,10 +239,9 @@ export function RecordAttachments({
             setArchiving(null);
             toast.success('Lampiran sudah diarsipkan.');
         } catch (caught) {
-            setError(
+            setArchiveError(
                 attachmentError(caught, 'Lampiran belum dapat diarsipkan.'),
             );
-            setArchiving(null);
         } finally {
             setBusy(false);
         }
@@ -319,9 +320,12 @@ export function RecordAttachments({
                     )}
                 </div>
                 <div className="space-y-4">
+                    <FormErrorHeader
+                        message={error}
+                        operation="Lampiran belum dapat dibuka"
+                    />
                     {error && (
-                        <Alert variant="destructive">
-                            <AlertDescription>{error}</AlertDescription>
+                        <div>
                             <Button
                                 type="button"
                                 variant="outline"
@@ -335,7 +339,7 @@ export function RecordAttachments({
                             >
                                 Muat ulang
                             </Button>
-                        </Alert>
+                        </div>
                     )}
                     {loading ? (
                         <div
@@ -387,6 +391,7 @@ export function RecordAttachments({
                                     }
 
                                     if (action === 'archive') {
+                                        setArchiveError(null);
                                         setArchiving(item);
                                     }
                                 }}
@@ -479,6 +484,10 @@ export function RecordAttachments({
                             daftar lampiran ini. Berkasnya tetap tersimpan.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
+                    <FormErrorHeader
+                        message={archiveError}
+                        operation="Lampiran belum dapat diarsipkan"
+                    />
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={busy}>
                             Batal

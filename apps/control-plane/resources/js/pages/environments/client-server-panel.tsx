@@ -1,3 +1,5 @@
+import { FormErrorHeader } from '@/components/form-error-header';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import { Button } from '@apperp/ui/button';
 import {
     CollapsibleSection,
@@ -131,6 +133,9 @@ function InstallCommandCard({ issued }: { issued: InstallCommand }) {
 }
 
 function Prepare({ environmentId }: { environmentId: string }) {
+    const { wrap: wrapLocalForm0Request, summary: localForm0RequestSummary } =
+        useInertiaFeedback();
+
     const { data, setData, post, processing, errors } = useForm({
         server_address: '',
         update_window_start: '',
@@ -139,13 +144,21 @@ function Prepare({ environmentId }: { environmentId: string }) {
 
     function submit(e: FormEvent) {
         e.preventDefault();
-        post(`/lingkungan/${environmentId}/server-klien`, {
-            preserveScroll: true,
-        });
+        post(
+            `/lingkungan/${environmentId}/server-klien`,
+            wrapLocalForm0Request({
+                preserveScroll: true,
+            }),
+        );
     }
 
     return (
-        <form className="space-y-4" onSubmit={submit}>
+        <form noValidate className="space-y-4" onSubmit={submit}>
+            <>
+                {localForm0RequestSummary}
+                <FormErrorHeader errors={errors} />
+            </>
+
             <p className="text-sm text-muted-foreground">
                 Produksi tenant ini berjalan di server milik klien, bukan di
                 server kita. Menyiapkannya mencatat server itu — namanya, app
@@ -185,6 +198,9 @@ function EditSettings({
     environmentId: string;
     site: NonNullable<ServerClient['site']>;
 }) {
+    const { wrap: wrapLocalForm1Request, summary: localForm1RequestSummary } =
+        useInertiaFeedback();
+
     const { data, setData, patch, processing, errors } = useForm({
         server_address: site.serverAddress ?? '',
         update_window_start: site.updateWindow?.start ?? '',
@@ -206,14 +222,23 @@ function EditSettings({
                 summary={summary}
             >
                 <form
+                    noValidate
                     className="space-y-4"
                     onSubmit={(e: FormEvent) => {
                         e.preventDefault();
-                        patch(`/lingkungan/${environmentId}/server-klien`, {
-                            preserveScroll: true,
-                        });
+                        patch(
+                            `/lingkungan/${environmentId}/server-klien`,
+                            wrapLocalForm1Request({
+                                preserveScroll: true,
+                            }),
+                        );
                     }}
                 >
+                    <>
+                        {localForm1RequestSummary}
+                        <FormErrorHeader errors={errors} />
+                    </>
+
                     <ServerAddressField
                         value={data.server_address}
                         onChange={(value) => setData('server_address', value)}
@@ -301,6 +326,9 @@ export default function ClientServerPanel({
     serverClient: ServerClient;
     installCommand: InstallCommand | null;
 }) {
+    const { wrapRouter: wrapRouterRequest, summary: routerRequestSummary } =
+        useInertiaFeedback();
+
     const { progress, site } = serverClient;
     const [issuing, setIssuing] = useState(false);
     const [options, setOptions] = useState<InstallOptionValues>({
@@ -351,11 +379,11 @@ export default function ClientServerPanel({
         router.post(
             `/lingkungan/${environmentId}/perintah-pasang`,
             { ...options },
-            {
+            wrapRouterRequest({
                 preserveScroll: true,
                 onStart: () => setIssuing(true),
                 onFinish: () => setIssuing(false),
-            },
+            }),
         );
     }
 
@@ -378,6 +406,7 @@ export default function ClientServerPanel({
             className="space-y-4 rounded-lg border bg-background p-5"
             data-test="server-client-panel"
         >
+            {routerRequestSummary}
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h2 className="text-sm font-semibold">Server klien</h2>

@@ -8,11 +8,12 @@ import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
 import { PageDialog, PageDialogContent } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
 import type { InfiniteScrollRef } from '@inertiajs/core';
 import { Head, router } from '@inertiajs/react';
 import { useRef, useState } from 'react';
+import { FormErrorHeader } from '@/components/form-error-header';
 import { RecordListScroll } from '@/components/record-list-scroll';
-import { useRecordTransition } from '@/hooks/use-record-transition';
 import { apiJson, errorText } from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
 import { AddressBookHint } from './components/address-book-hint';
@@ -183,7 +184,14 @@ export default function GlobalAddressBook(props: Props) {
             <Head title="Buku alamat global" />
             <ListPageLayout
                 header={
-                    <RecordActionBar>
+                    <RecordActionBar
+                        feedback={
+                            <FormErrorHeader
+                                message={error}
+                                operation="Tindakan pada pihak belum berhasil"
+                            />
+                        }
+                    >
                         <div className="flex items-center gap-2">
                             <h1 className="text-sm font-semibold">
                                 Buku alamat global
@@ -226,6 +234,7 @@ export default function GlobalAddressBook(props: Props) {
                 filters={
                     <div className="space-y-2 px-4 pb-4">
                         <form
+                            noValidate
                             onSubmit={(event) => {
                                 event.preventDefault();
                                 applyFilter('q', query);

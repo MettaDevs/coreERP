@@ -20,26 +20,24 @@ import {
 } from '@apperp/ui/collapsible-section';
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
-import { Field, FieldDescription } from '@apperp/ui/field';
+import { DatePicker } from '@apperp/ui/date-picker';
+import { FieldError } from '@apperp/ui/field';
+
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { usePageDialogRecord } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
-import { Select } from '@apperp/ui/select';
 
 import { Textarea } from '@apperp/ui/textarea';
 import EditShield from '../../_shared/EditShield';
-import {
-    ApiError,
-    api,
-    errorMessage,
-    newIdempotencyKey,
-    toastSaveError,
-} from '../../api';
+import { RecordLookup } from '../../_shared/RecordLookup';
+import { ApiError, api, errorMessage, newIdempotencyKey } from '../../api';
 import AssetConditionSelect from '../../master/AssetConditionSelect';
 import { defaultDepartmentOf } from '../../master/locationDefaults';
-import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
+import { useMasterOptions } from '../../master/useMasterOptions';
 import { requestPrint } from '../../print';
 import { useRecordOptions } from '../../use-record-list';
+import { useSaveFeedback } from '../../use-save-feedback';
 import { RecordCardHeader } from '../_shared/record-card';
 import type { RecordCardControls } from '../_shared/record-card';
 import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
@@ -92,6 +90,20 @@ export default function MutasiDetailPage({
     mutasiId?: string;
     mode: Mode;
 }) {
+    const [feedbackSections, setFeedbackSections] = useState<string[]>([
+        'general',
+        'lines',
+    ]);
+
+    const {
+        scopeRef: feedbackScopeRef,
+        feedbackSummary,
+        reportSaveError,
+        clearSaveFeedback,
+    } = useSaveFeedback(undefined, mutasiId, () =>
+        setFeedbackSections(['general', 'lines', 'notes']),
+    );
+
     const embedded = usePageDialogRecord(undefined);
 
     const can = izin(permissions);
@@ -238,7 +250,8 @@ export default function MutasiDetailPage({
 
     async function simpan() {
         if (!context.legal_entity_id) {
-            toast.error(
+            reportSaveError(
+                null,
                 'Pilih perusahaan aktif terlebih dahulu pada header CoreERP.',
             );
 
@@ -273,6 +286,7 @@ export default function MutasiDetailPage({
                     headers: { 'Idempotency-Key': newIdempotencyKey() },
                     body: JSON.stringify(payload),
                 });
+                clearSaveFeedback();
                 toast.success(
                     `Mutasi ${hasil.data.kode} disimpan sebagai draf.`,
                 );
@@ -292,6 +306,7 @@ export default function MutasiDetailPage({
                 },
             );
             setTersimpan(hasil.data);
+            clearSaveFeedback();
             toast.success('Perubahan mutasi disimpan.');
             saveCompleted(String(mutasiId));
         } catch (caught) {
@@ -299,7 +314,7 @@ export default function MutasiDetailPage({
                 setGalat(caught.validationErrors);
             }
 
-            toastSaveError(caught, 'Mutasi belum dapat disimpan.');
+            reportSaveError(caught, 'Mutasi belum dapat disimpan.');
         } finally {
             setMenyimpan(false);
         }
@@ -318,6 +333,7 @@ export default function MutasiDetailPage({
                 },
             );
             setTersimpan(hasil.data);
+            clearSaveFeedback();
             toast.success(
                 'Serah terima diselesaikan. Penempatan aset sudah berpindah.',
             );
@@ -327,7 +343,7 @@ export default function MutasiDetailPage({
                 setGalat(caught.validationErrors);
             }
 
-            toastSaveError(caught, 'Mutasi belum dapat diselesaikan.');
+            reportSaveError(caught, 'Mutasi belum dapat diselesaikan.');
         } finally {
             setMenyimpan(false);
         }
@@ -343,10 +359,11 @@ export default function MutasiDetailPage({
                 method: 'DELETE',
                 body: JSON.stringify({ version: tersimpan?.version }),
             });
+            clearSaveFeedback();
             toast.success('Draf mutasi diarsipkan.');
             deleteCompleted();
         } catch (caught) {
-            toastSaveError(caught, 'Mutasi belum dapat diarsipkan.');
+            reportSaveError(caught, 'Mutasi belum dapat diarsipkan.');
         } finally {
             setMenyimpan(false);
         }
@@ -373,7 +390,10 @@ export default function MutasiDetailPage({
             : (tersimpan?.kode ?? 'Mutasi aset');
 
     return (
-        <div className="flex h-full min-h-0 flex-col overflow-hidden">
+        <div
+            ref={feedbackScopeRef}
+            className="flex h-full min-h-0 flex-col overflow-hidden"
+        >
             <RecordCardHeader
                 recordTitle={tersimpan?.kode ?? 'Baru'}
                 editing={!readOnly}
@@ -394,6 +414,7 @@ export default function MutasiDetailPage({
                 }
             />
             <RecordActionBar
+                feedback={feedbackSummary}
                 title={embedded ? undefined : judul}
                 trailing={
                     tersimpan ? (
@@ -472,7 +493,8 @@ export default function MutasiDetailPage({
                         keadaan aset itu sekarang, jadi tidak perlu diisi.
                     </p>
                     <CollapsibleSectionGroup
-                        defaultValue={['general', 'lines']}
+                        value={feedbackSections}
+                        onValueChange={setFeedbackSections}
                     >
                         <CollapsibleSection
                             value="general"
@@ -480,29 +502,35 @@ export default function MutasiDetailPage({
                             summary={tanggalTampil(record.tanggal)}
                         >
                             <div className="space-y-4">
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    <Field>
-                                        <Input
+                                <FormGrid>
+                                    <FormControl data-error-field="tanggal">
+                                        <DatePicker
                                             label="Tanggal serah terima"
-                                            type="date"
+
                                             required
                                             readOnly={readOnly}
                                             value={record.tanggal ?? ''}
-                                            onChange={(event) =>
+                                            onValueChange={(value) =>
                                                 setRecord({
                                                     ...record,
-                                                    tanggal: event.target.value,
+                                                    tanggal: value,
                                                 })
                                             }
                                         />
                                         {pesan('tanggal') && (
-                                            <FieldDescription>
+                                            <FieldError>
                                                 {pesan('tanggal')}
-                                            </FieldDescription>
+                                            </FieldError>
                                         )}
-                                    </Field>
+                                    </FormControl>
 
-                                    <Field>
+                                    <FormControl
+                                        data-error-field="tujuan_lokasi_id"
+                                        error={lokasi.error}
+                                        hint={
+                                            'Seluruh aset pada berita acara ini pindah ke lokasi yang sama.'
+                                        }
+                                    >
                                         <EditShield
                                             active={readOnly}
                                             label="lokasi tujuan"
@@ -510,20 +538,19 @@ export default function MutasiDetailPage({
                                                 mutasiId && editRecord(mutasiId)
                                             }
                                         >
-                                            <Select
-                                                {...lokasi.selectProps}
+                                            <RecordLookup
+                                                source={lokasi}
                                                 label="Lokasi tujuan"
                                                 items={lokasi.options.map(
-                                                    optionLabel,
+                                                    (record) => ({
+                                                        value: record.id,
+                                                        label: lokasi.getLabel(
+                                                            record,
+                                                        ),
+                                                    }),
                                                 )}
                                                 value={
-                                                    lokasi.options
-                                                        .filter(
-                                                            (option) =>
-                                                                option.id ===
-                                                                record.tujuan_lokasi_id,
-                                                        )
-                                                        .map(optionLabel)[0] ??
+                                                    record.tujuan_lokasi_id ||
                                                     null
                                                 }
                                                 placeholder="Tanpa lokasi"
@@ -535,14 +562,13 @@ export default function MutasiDetailPage({
                                                     const dipilih =
                                                         lokasi.options.find(
                                                             (option) =>
-                                                                optionLabel(
-                                                                    option,
-                                                                ) === item,
+                                                                option.id ===
+                                                                item,
                                                         );
                                                     setRecord({
                                                         ...record,
                                                         tujuan_lokasi_id:
-                                                            dipilih?.id ?? '',
+                                                            item ?? '',
                                                         tujuan_org_unit_id:
                                                             defaultDepartmentOf(
                                                                 dipilih,
@@ -552,13 +578,16 @@ export default function MutasiDetailPage({
                                                 }}
                                             />
                                         </EditShield>
-                                        <FieldDescription>
-                                            {lokasi.error ||
-                                                'Seluruh aset pada berita acara ini pindah ke lokasi yang sama.'}
-                                        </FieldDescription>
-                                    </Field>
+                                    </FormControl>
 
-                                    <Field>
+                                    <FormControl
+                                        error={unitKerja.error}
+                                        hint={
+                                            unitDariLokasi
+                                                ? 'Terisi sendiri dari unit kerja bawaan lokasi tujuan; masih dapat diganti.'
+                                                : 'Unit kerja yang menanggung aset setelah serah terima.'
+                                        }
+                                    >
                                         <EditShield
                                             active={readOnly}
                                             label="unit kerja tujuan"
@@ -566,23 +595,19 @@ export default function MutasiDetailPage({
                                                 mutasiId && editRecord(mutasiId)
                                             }
                                         >
-                                            <Select
-                                                {...unitKerja.selectProps}
+                                            <RecordLookup
+                                                source={unitKerja}
                                                 label="Unit kerja tujuan"
                                                 required
                                                 items={unitKerja.options.map(
-                                                    optionLabel,
+                                                    (record) => ({
+                                                        value: record.id,
+                                                        label: unitKerja.getLabel(
+                                                            record,
+                                                        ),
+                                                    }),
                                                 )}
-                                                value={
-                                                    unitKerja.options
-                                                        .filter(
-                                                            (option) =>
-                                                                option.id ===
-                                                                unitTujuan,
-                                                        )
-                                                        .map(optionLabel)[0] ??
-                                                    null
-                                                }
+                                                value={unitTujuan || null}
                                                 placeholder="Pilih unit kerja"
                                                 searchPlaceholder="Cari unit kerja"
                                                 emptyMessage="Unit kerja tidak ditemukan."
@@ -592,25 +617,14 @@ export default function MutasiDetailPage({
                                                     setRecord({
                                                         ...record,
                                                         tujuan_org_unit_id:
-                                                            unitKerja.options.find(
-                                                                (option) =>
-                                                                    optionLabel(
-                                                                        option,
-                                                                    ) === item,
-                                                            )?.id ?? '',
+                                                            item ?? '',
                                                     })
                                                 }
                                             />
                                         </EditShield>
-                                        <FieldDescription>
-                                            {unitKerja.error ||
-                                                (unitDariLokasi
-                                                    ? 'Terisi sendiri dari unit kerja bawaan lokasi tujuan; masih dapat diganti.'
-                                                    : 'Unit kerja yang menanggung aset setelah serah terima.')}
-                                        </FieldDescription>
-                                    </Field>
+                                    </FormControl>
 
-                                    <Field>
+                                    <FormControl data-error-field="alasan">
                                         <Input
                                             label="Alasan mutasi"
                                             required
@@ -625,13 +639,19 @@ export default function MutasiDetailPage({
                                             }
                                         />
                                         {pesan('alasan') && (
-                                            <FieldDescription>
+                                            <FieldError>
                                                 {pesan('alasan')}
-                                            </FieldDescription>
+                                            </FieldError>
                                         )}
-                                    </Field>
+                                    </FormControl>
 
-                                    <Field>
+                                    <FormControl
+                                        data-error-field="diserahkan_oleh_user_id"
+                                        error={anggota.error}
+                                        hint={
+                                            'Muncul pada blok tanda tangan kiri berita acara.'
+                                        }
+                                    >
                                         <EditShield
                                             active={readOnly}
                                             label="yang menyerahkan"
@@ -639,20 +659,19 @@ export default function MutasiDetailPage({
                                                 mutasiId && editRecord(mutasiId)
                                             }
                                         >
-                                            <Select
-                                                {...anggota.selectProps}
+                                            <RecordLookup
+                                                source={anggota}
                                                 label="Diserahkan oleh"
                                                 items={anggota.options.map(
-                                                    optionLabel,
+                                                    (record) => ({
+                                                        value: record.id,
+                                                        label: anggota.getLabel(
+                                                            record,
+                                                        ),
+                                                    }),
                                                 )}
                                                 value={
-                                                    anggota.options
-                                                        .filter(
-                                                            (option) =>
-                                                                option.id ===
-                                                                record.diserahkan_oleh_user_id,
-                                                        )
-                                                        .map(optionLabel)[0] ??
+                                                    record.diserahkan_oleh_user_id ||
                                                     null
                                                 }
                                                 placeholder="Pilih orang"
@@ -664,23 +683,20 @@ export default function MutasiDetailPage({
                                                     setRecord({
                                                         ...record,
                                                         diserahkan_oleh_user_id:
-                                                            anggota.options.find(
-                                                                (option) =>
-                                                                    optionLabel(
-                                                                        option,
-                                                                    ) === item,
-                                                            )?.id ?? '',
+                                                            item ?? '',
                                                     })
                                                 }
                                             />
                                         </EditShield>
-                                        <FieldDescription>
-                                            {anggota.error ||
-                                                'Muncul pada blok tanda tangan kiri berita acara.'}
-                                        </FieldDescription>
-                                    </Field>
+                                    </FormControl>
 
-                                    <Field>
+                                    <FormControl
+                                        data-error-field="diterima_oleh_user_id"
+                                        error={anggota.error}
+                                        hint={
+                                            'Menjadi penanggung jawab aset setelah serah terima diselesaikan.'
+                                        }
+                                    >
                                         <EditShield
                                             active={readOnly}
                                             label="yang menerima"
@@ -688,20 +704,19 @@ export default function MutasiDetailPage({
                                                 mutasiId && editRecord(mutasiId)
                                             }
                                         >
-                                            <Select
-                                                {...anggota.selectProps}
+                                            <RecordLookup
+                                                source={anggota}
                                                 label="Diterima oleh"
                                                 items={anggota.options.map(
-                                                    optionLabel,
+                                                    (record) => ({
+                                                        value: record.id,
+                                                        label: anggota.getLabel(
+                                                            record,
+                                                        ),
+                                                    }),
                                                 )}
                                                 value={
-                                                    anggota.options
-                                                        .filter(
-                                                            (option) =>
-                                                                option.id ===
-                                                                record.diterima_oleh_user_id,
-                                                        )
-                                                        .map(optionLabel)[0] ??
+                                                    record.diterima_oleh_user_id ||
                                                     null
                                                 }
                                                 placeholder="Pilih orang"
@@ -713,22 +728,13 @@ export default function MutasiDetailPage({
                                                     setRecord({
                                                         ...record,
                                                         diterima_oleh_user_id:
-                                                            anggota.options.find(
-                                                                (option) =>
-                                                                    optionLabel(
-                                                                        option,
-                                                                    ) === item,
-                                                            )?.id ?? '',
+                                                            item ?? '',
                                                     })
                                                 }
                                             />
                                         </EditShield>
-                                        <FieldDescription>
-                                            {anggota.error ||
-                                                'Menjadi penanggung jawab aset setelah serah terima diselesaikan.'}
-                                        </FieldDescription>
-                                    </Field>
-                                </div>
+                                    </FormControl>
+                                </FormGrid>
                             </div>
                         </CollapsibleSection>
                         <CollapsibleSection
@@ -793,6 +799,7 @@ export default function MutasiDetailPage({
                                             {
                                                 id: 'column-1',
                                                 header: 'Aset',
+                                                content: 'control',
                                                 cell: ({
                                                     baris,
                                                     index,
@@ -810,64 +817,71 @@ export default function MutasiDetailPage({
                                                                 </span>
                                                             </span>
                                                         ) : (
-                                                            <Select
-                                                                {...assetSource.selectProps}
-                                                                items={aset.map(
-                                                                    (item) => ({
-                                                                        value: item.id,
-                                                                        label: item.nama
-                                                                            ? `${item.nama} — ${item.kode}`
-                                                                            : item.kode,
-                                                                    }),
-                                                                )}
-                                                                value={
-                                                                    dipilih?.id ??
-                                                                    null
-                                                                }
-                                                                placeholder="Pilih aset"
-                                                                searchPlaceholder="Cari nama atau kode aset"
-                                                                emptyMessage="Aset tidak ditemukan."
-                                                                ariaLabel={`Aset baris ${index + 1}`}
-                                                                portalContainer={
-                                                                    lookupPortal
-                                                                }
-                                                                onValueChange={(
-                                                                    item,
-                                                                ) => {
-                                                                    const dipilih =
-                                                                        aset.find(
-                                                                            (
-                                                                                calon,
-                                                                            ) =>
-                                                                                calon.id ===
-                                                                                item,
-                                                                        );
+                                                            <FormControl>
+                                                                <RecordLookup
+                                                                    label="Pilih aset"
+                                                                    source={
+                                                                        assetSource
+                                                                    }
+                                                                    items={aset.map(
+                                                                        (
+                                                                            record,
+                                                                        ) => ({
+                                                                            value: record.id,
+                                                                            label: assetSource.getLabel(
+                                                                                record,
+                                                                            ),
+                                                                        }),
+                                                                    )}
+                                                                    value={
+                                                                        dipilih?.id ??
+                                                                        null
+                                                                    }
+                                                                    placeholder="Pilih aset"
+                                                                    searchPlaceholder="Cari nama atau kode aset"
+                                                                    emptyMessage="Aset tidak ditemukan."
+                                                                    ariaLabel={`Aset baris ${index + 1}`}
+                                                                    portalContainer={
+                                                                        lookupPortal
+                                                                    }
+                                                                    onValueChange={(
+                                                                        item,
+                                                                    ) => {
+                                                                        const dipilih =
+                                                                            aset.find(
+                                                                                (
+                                                                                    calon,
+                                                                                ) =>
+                                                                                    calon.id ===
+                                                                                    item,
+                                                                            );
 
-                                                                    // Kondisi ikut terisi dari
-                                                                    // kondisi aset yang tercatat
-                                                                    // sekarang, dan tetap boleh
-                                                                    // diubah: serah terima justru
-                                                                    // momen barangnya diperiksa
-                                                                    // ulang. Membiarkannya kosong
-                                                                    // memaksa orang mengetik ulang
-                                                                    // fakta yang sudah dimiliki
-                                                                    // sistem, dan yang diketik
-                                                                    // ulang bisa berbeda tanpa ada
-                                                                    // yang benar-benar melihat
-                                                                    // barangnya.
-                                                                    ubahBaris(
-                                                                        index,
-                                                                        {
-                                                                            aset_id:
-                                                                                dipilih?.id ??
-                                                                                '',
-                                                                            kondisi_aset_id:
-                                                                                dipilih?.kondisi_aset_id ??
-                                                                                '',
-                                                                        },
-                                                                    );
-                                                                }}
-                                                            />
+                                                                        // Kondisi ikut terisi dari
+                                                                        // kondisi aset yang tercatat
+                                                                        // sekarang, dan tetap boleh
+                                                                        // diubah: serah terima justru
+                                                                        // momen barangnya diperiksa
+                                                                        // ulang. Membiarkannya kosong
+                                                                        // memaksa orang mengetik ulang
+                                                                        // fakta yang sudah dimiliki
+                                                                        // sistem, dan yang diketik
+                                                                        // ulang bisa berbeda tanpa ada
+                                                                        // yang benar-benar melihat
+                                                                        // barangnya.
+                                                                        ubahBaris(
+                                                                            index,
+                                                                            {
+                                                                                aset_id:
+                                                                                    item ??
+                                                                                    '',
+                                                                                kondisi_aset_id:
+                                                                                    dipilih?.kondisi_aset_id ??
+                                                                                    '',
+                                                                            },
+                                                                        );
+                                                                    }}
+                                                                />
+                                                            </FormControl>
                                                         )}
                                                     </>
                                                 ),
@@ -900,6 +914,7 @@ export default function MutasiDetailPage({
                                             {
                                                 id: 'column-3',
                                                 header: 'Kondisi',
+                                                content: 'control',
                                                 cell: ({ baris, index }) => (
                                                     <>
                                                         {readOnly ? (
@@ -938,31 +953,34 @@ export default function MutasiDetailPage({
                                             {
                                                 id: 'column-4',
                                                 header: 'Catatan',
+                                                content: 'control',
                                                 cell: ({ baris, index }) => (
                                                     <>
                                                         {readOnly ? (
                                                             baris.catatan || '—'
                                                         ) : (
-                                                            <Input
-                                                                aria-label={`Catatan baris ${index + 1}`}
-                                                                value={
-                                                                    baris.catatan ??
-                                                                    ''
-                                                                }
-                                                                onChange={(
-                                                                    event,
-                                                                ) =>
-                                                                    ubahBaris(
-                                                                        index,
-                                                                        {
-                                                                            catatan:
-                                                                                event
-                                                                                    .target
-                                                                                    .value,
-                                                                        },
-                                                                    )
-                                                                }
-                                                            />
+                                                            <FormControl>
+                                                                <Input
+                                                                    aria-label={`Catatan baris ${index + 1}`}
+                                                                    value={
+                                                                        baris.catatan ??
+                                                                        ''
+                                                                    }
+                                                                    onChange={(
+                                                                        event,
+                                                                    ) =>
+                                                                        ubahBaris(
+                                                                            index,
+                                                                            {
+                                                                                catatan:
+                                                                                    event
+                                                                                        .target
+                                                                                        .value,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </FormControl>
                                                         )}
                                                     </>
                                                 ),
@@ -1040,7 +1058,7 @@ export default function MutasiDetailPage({
                             }
                         >
                             <div className="space-y-4">
-                                <Field>
+                                <FormControl data-error-field="keterangan">
                                     <Textarea
                                         label="Keterangan"
                                         rows={3}
@@ -1053,7 +1071,7 @@ export default function MutasiDetailPage({
                                             })
                                         }
                                     />
-                                </Field>
+                                </FormControl>
                             </div>
                         </CollapsibleSection>
                     </CollapsibleSectionGroup>

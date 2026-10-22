@@ -16,10 +16,15 @@ import { Form } from '@inertiajs/react';
 import { AlertTriangle } from 'lucide-react';
 import { useRef } from 'react';
 import ProfileController from '@/actions/App/Platform/Identity/Http/Controllers/ProfileController';
+import { FormErrorHeader } from '@/components/form-error-header';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 
 export default function DeleteUser() {
+    const { wrap: wrapFormResponse1, summary: formResponse1Summary } =
+        useInertiaFeedback();
+
     const passwordInput = useRef<HTMLInputElement>(null);
 
     return (
@@ -57,6 +62,7 @@ export default function DeleteUser() {
                         </DialogHeader>
 
                         <Form
+                            noValidate
                             {...ProfileController.destroy.form()}
                             options={{
                                 preserveScroll: true,
@@ -66,9 +72,15 @@ export default function DeleteUser() {
                             /* `contents` membuat body dan footer tetap menjadi
                                anak langsung flex milik DialogContent. */
                             className="contents"
+                            {...wrapFormResponse1({})}
                         >
                             {({ resetAndClearErrors, processing, errors }) => (
                                 <>
+                                    <>
+                                        {formResponse1Summary}
+                                        <FormErrorHeader errors={errors} />
+                                    </>
+
                                     <DialogBody className="grid gap-2">
                                         <PasswordInput
                                             id="password"

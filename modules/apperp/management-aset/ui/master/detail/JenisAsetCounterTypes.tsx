@@ -3,9 +3,11 @@ import { ActionButton } from '@apperp/ui/action-button';
 
 import { DialogToolbar } from '@apperp/ui/dialog';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
+import { FormControl } from '@apperp/ui/form-control';
 import { TransferList } from '@apperp/ui/transfer-list';
 import type { TransferListItem } from '@apperp/ui/transfer-list';
 import { api, errorMessage } from '../../api';
+import { useSaveFeedback } from '../../use-save-feedback';
 
 type Choice = { id: string; kode: string; nama: string; satuan: string | null };
 
@@ -37,6 +39,13 @@ export default function JenisAsetCounterTypes({
     const [selected, setSelected] = useState<TransferListItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const {
+        scopeRef: feedbackScopeRef,
+        feedbackSummary,
+        reportSaveError,
+        clearSaveFeedback,
+        fieldError,
+    } = useSaveFeedback(undefined, jenisAsetId);
     const [error, setError] = useState('');
     const [saved, setSaved] = useState(false);
 
@@ -76,6 +85,7 @@ export default function JenisAsetCounterTypes({
     }, [jenisAsetId]);
 
     async function save() {
+        clearSaveFeedback();
         setSaving(true);
         setError('');
 
@@ -93,7 +103,7 @@ export default function JenisAsetCounterTypes({
             onVersionChange(result.version);
             setSaved(true);
         } catch (caught) {
-            setError(errorMessage(caught, 'Counter belum dapat disimpan.'));
+            reportSaveError(caught, 'Counter belum dapat disimpan.');
         } finally {
             setSaving(false);
         }
@@ -120,7 +130,8 @@ export default function JenisAsetCounterTypes({
     }
 
     return (
-        <div className="space-y-4">
+        <div ref={feedbackScopeRef} className="space-y-4">
+            {feedbackSummary}
             {canEdit && (
                 <DialogToolbar className="px-0">
                     <ActionButton
@@ -137,20 +148,25 @@ export default function JenisAsetCounterTypes({
                 tidak dikaitkan ke jenis aset mana pun berlaku untuk semua jenis
                 aset.
             </p>
-            <TransferList
-                remaining={remaining}
-                selected={selected}
-                onChange={(next) => {
-                    setRemaining(next.remaining);
-                    setSelected(next.selected);
-                    setSaved(false);
-                }}
-                remainingTitle="Counter tersisa"
-                selectedTitle="Counter terpilih"
-                disabled={!canEdit || saving}
-                remainingEmptyLabel="Semua counter sudah terpilih."
-                selectedEmptyLabel="Belum ada counter yang dipilih."
-            />
+            <FormControl
+                data-error-field="jenis_counter_ids"
+                error={fieldError('jenis_counter_ids')}
+            >
+                <TransferList
+                    remaining={remaining}
+                    selected={selected}
+                    onChange={(next) => {
+                        setRemaining(next.remaining);
+                        setSelected(next.selected);
+                        setSaved(false);
+                    }}
+                    remainingTitle="Counter tersisa"
+                    selectedTitle="Counter terpilih"
+                    disabled={!canEdit || saving}
+                    remainingEmptyLabel="Semua counter sudah terpilih."
+                    selectedEmptyLabel="Belum ada counter yang dipilih."
+                />
+            </FormControl>
 
             {saved && (
                 <p className="text-muted-foreground text-sm">

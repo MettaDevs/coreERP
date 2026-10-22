@@ -11,6 +11,7 @@ import {
 } from '@apperp/ui/alert-dialog';
 
 import { DataTable, DataTableText } from '@apperp/ui/data-table';
+import { FieldError } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import {
     PageDialog as Dialog,
@@ -19,7 +20,8 @@ import {
 import { router } from '@inertiajs/react';
 import { Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { apiJson, apiRequest, errorText } from '@/lib/core-api';
+import { FormErrorHeader } from '@/components/form-error-header';
+import { apiJson, apiRequest, CoreApiError, errorText } from '@/lib/core-api';
 import type { AddressBook, DirectoryMetadata } from '../types';
 import { AddressBookHint } from './address-book-hint';
 
@@ -36,7 +38,11 @@ export function AddressBookManager({
     const [name, setName] = useState('');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>(
+        {},
+    );
     async function save(event: React.FormEvent) {
+        setFieldErrors({});
         event.preventDefault();
         setBusy(true);
         setError('');
@@ -63,6 +69,10 @@ export function AddressBookManager({
             setName('');
             router.reload({ only: ['addressBooks'] });
         } catch (caught) {
+            if (caught instanceof CoreApiError) {
+                setFieldErrors(caught.errors);
+            }
+
             setError(errorText(caught, 'Buku alamat belum dapat disimpan.'));
         } finally {
             setBusy(false);
@@ -126,22 +136,31 @@ export function AddressBookManager({
                     'Kelompok pihak untuk memudahkan pencarian. Mengarsipkan\n                        kelompok tidak mengarsipkan pihak di dalamnya.'
                 }
             >
+                <FormErrorHeader
+                    message={archiving ? null : error}
+                    errors={archiving ? undefined : fieldErrors}
+                />
+
                 {error && (
                     <p role="alert" className="text-sm text-destructive">
                         {error}
                     </p>
                 )}
                 <form
+                    noValidate
                     onSubmit={(event) => void save(event)}
                     className="flex flex-wrap items-end gap-3"
                 >
                     <Input
+                        data-error-field="name"
+                        aria-invalid={!!fieldErrors.name}
                         label="Nama buku alamat"
                         required
                         value={name}
                         disabled={busy}
                         onChange={(event) => setName(event.target.value)}
                     />
+                    <FieldError>{fieldErrors.name?.join(' ')}</FieldError>
                     <ActionButton action="save" type="submit" disabled={busy} />
                     {editing && (
                         <ActionButton
@@ -210,6 +229,8 @@ export function AddressBookManager({
                                 ini akan dilepas dari pihak.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
+                        <FormErrorHeader message={error} />
+
                         {error && (
                             <p
                                 role="alert"

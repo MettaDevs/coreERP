@@ -1,8 +1,10 @@
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
-import { Field } from '@apperp/ui/field';
+import { Field, FieldError } from '@apperp/ui/field';
 import { Textarea } from '@apperp/ui/textarea';
 import { Link, useForm } from '@inertiajs/react';
+import { FormErrorHeader } from '@/components/form-error-header';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 
 export type ApprovalRequest = {
     id: string;
@@ -16,12 +18,18 @@ export type ApprovalRequest = {
 };
 
 export function ApprovalRequestCard({ item }: { item: ApprovalRequest }) {
+    const { wrap: wrapFormRequest, summary: formRequestSummary } =
+        useInertiaFeedback();
+
     const form = useForm({ decision: '', comment: '' });
     const decide = (decision: 'approve' | 'reject') => {
         form.transform((data) => ({ ...data, decision }));
-        form.post(`/workflow-inbox/${item.id}/decision`, {
-            preserveScroll: true,
-        });
+        form.post(
+            `/workflow-inbox/${item.id}/decision`,
+            wrapFormRequest({
+                preserveScroll: true,
+            }),
+        );
     };
 
     return (
@@ -38,6 +46,13 @@ export function ApprovalRequestCard({ item }: { item: ApprovalRequest }) {
                 </div>
                 <Badge variant="secondary">Menunggu keputusan</Badge>
             </div>
+            <>
+                {formRequestSummary}
+                <FormErrorHeader
+                    errors={form.errors}
+                    operation="Keputusan belum disimpan"
+                />
+            </>
             {item.reason && (
                 <p className="text-sm whitespace-pre-wrap">{item.reason}</p>
             )}
@@ -52,14 +67,17 @@ export function ApprovalRequestCard({ item }: { item: ApprovalRequest }) {
                     dari aplikasi.
                 </p>
             )}
-            <Field>
+            <Field data-error-field={'comment'}>
                 <Textarea
                     label="Catatan keputusan"
+                    data-error-field="comment"
+                    aria-invalid={!!form.errors.comment}
                     value={form.data.comment}
                     onChange={(event) =>
                         form.setData('comment', event.target.value)
                     }
                 />
+                <FieldError>{form.errors.comment}</FieldError>
             </Field>
             {(form.errors.decision || form.errors.comment) && (
                 <p role="alert" className="text-sm text-destructive">

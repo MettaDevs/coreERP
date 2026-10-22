@@ -424,6 +424,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('integration-clients/{integrationClient}/test-push', [IntegrationClientController::class, 'testPush'])->middleware('throttle:10,1')->name('integration-clients.test-push');
         Route::get('vendors/party-options', [VendorController::class, 'partyOptions'])->name('vendors.party-options');
         Route::get('vendors/company-options', [VendorController::class, 'companyOptions'])->name('vendors.company-options');
+        Route::get('vendors/create-context', [VendorController::class, 'createContext'])->name('vendors.create-context');
         Route::get('vendors/lookup', [VendorController::class, 'lookup'])->name('vendors.lookup');
         Route::get('vendors/{vendor}/activity', [VendorController::class, 'activity'])->middleware('throttle:60,1')->name('vendors.activity');
         Route::post('vendors', [VendorController::class, 'store'])->middleware('throttle:60,1')->name('vendors.store');

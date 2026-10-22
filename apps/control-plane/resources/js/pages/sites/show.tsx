@@ -1,3 +1,5 @@
+import { FormErrorHeader } from '@/components/form-error-header';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import { Input } from '@apperp/ui/input';
@@ -233,6 +235,9 @@ function ServerSettingsSection({
     site: Site;
     revoked: boolean;
 }) {
+    const { wrap: wrapLocalForm0Request, summary: localForm0RequestSummary } =
+        useInertiaFeedback();
+
     const { data, setData, patch, processing, errors } = useForm({
         server_address: site.serverAddress ?? '',
         update_window_start: site.updateWindow?.start ?? '',
@@ -280,14 +285,23 @@ function ServerSettingsSection({
                 )}
             </div>
             <form
+                noValidate
                 className="space-y-4"
                 onSubmit={(e: FormEvent) => {
                     e.preventDefault();
-                    patch(`/situs/${site.id}/setelan`, {
-                        preserveScroll: true,
-                    });
+                    patch(
+                        `/situs/${site.id}/setelan`,
+                        wrapLocalForm0Request({
+                            preserveScroll: true,
+                        }),
+                    );
                 }}
             >
+                <>
+                    {localForm0RequestSummary}
+                    <FormErrorHeader errors={errors} />
+                </>
+
                 {refusal && (
                     <p role="alert" className="text-sm text-destructive">
                         {refusal}
@@ -353,6 +367,9 @@ function Installation({ site }: { site: Site }) {
 
 /** Pendaftaran tangan untuk situs lama tanpa lingkungan — satu-satunya yang masih memakainya. */
 function Enrollment({ site }: { site: Site }) {
+    const { wrap: wrapFormRequest, summary: formRequestSummary } =
+        useInertiaFeedback();
+
     const { enrollment } = usePage<{
         enrollment: { command: string; expiresAt: string } | null;
     }>().props;
@@ -385,15 +402,24 @@ function Enrollment({ site }: { site: Site }) {
                 </div>
             )}
             <form
+                noValidate
                 className="space-y-3"
                 onSubmit={(e: FormEvent) => {
                     e.preventDefault();
-                    form.post(`/situs/${site.id}/pendaftaran`, {
-                        preserveScroll: true,
-                        onSuccess: () => form.reset(),
-                    });
+                    form.post(
+                        `/situs/${site.id}/pendaftaran`,
+                        wrapFormRequest({
+                            preserveScroll: true,
+                            onSuccess: () => form.reset(),
+                        }),
+                    );
                 }}
             >
+                <>
+                    {formRequestSummary}
+                    <FormErrorHeader errors={form.errors} />
+                </>
+
                 <InstallOptionsFields
                     value={form.data}
                     onChange={(value) => form.setData(value)}
@@ -421,6 +447,9 @@ function RequestOperation({
     licenseKeyConfigured: boolean;
     licenseValidDays: number;
 }) {
+    const { wrap: wrapLocalForm2Request, summary: localForm2RequestSummary } =
+        useInertiaFeedback();
+
     const { data, setData, post, processing, errors } = useForm({
         operation: 'backup',
         release: releases[0] ?? '',
@@ -433,14 +462,23 @@ function RequestOperation({
             description="Agen mengambilnya pada kunjungan berikutnya. Pembaruan hanya diambil di dalam jendela pembaruan; operasi lain kapan saja."
         >
             <form
+                noValidate
                 className="space-y-3"
                 onSubmit={(e: FormEvent) => {
                     e.preventDefault();
-                    post(`/situs/${site.id}/operasi`, {
-                        preserveScroll: true,
-                    });
+                    post(
+                        `/situs/${site.id}/operasi`,
+                        wrapLocalForm2Request({
+                            preserveScroll: true,
+                        }),
+                    );
                 }}
             >
+                <>
+                    {localForm2RequestSummary}
+                    <FormErrorHeader errors={errors} />
+                </>
+
                 <NativeSelect
                     label="Operasi"
                     value={data.operation}
@@ -518,7 +556,10 @@ function RequestOperation({
 }
 
 function Revoke({ site }: { site: Site }) {
-    const { post, processing } = useForm({});
+    const { wrap: wrapLocalForm3Request, summary: localForm3RequestSummary } =
+        useInertiaFeedback();
+
+    const { post, processing, errors } = useForm({});
 
     return (
         <section className="space-y-4 rounded-lg border border-red-200 bg-background p-5 dark:border-red-900/60">
@@ -534,12 +575,21 @@ function Revoke({ site }: { site: Site }) {
                 </p>
             </div>
             <form
+                noValidate
                 className="space-y-3"
                 onSubmit={(e: FormEvent) => {
                     e.preventDefault();
-                    post(`/situs/${site.id}/cabut`, { preserveScroll: true });
+                    post(
+                        `/situs/${site.id}/cabut`,
+                        wrapLocalForm3Request({ preserveScroll: true }),
+                    );
                 }}
             >
+                <>
+                    {localForm3RequestSummary}
+                    <FormErrorHeader errors={errors} />
+                </>
+
                 <Button
                     type="submit"
                     variant="destructive"
@@ -585,6 +635,9 @@ function termsSentence(license: License): string {
  * datang dari app yang dibeli tenant, jadi kalimat di layar tidak boleh menjanjikan yang sebaliknya.
  */
 function LicenseTermsForm({ site }: { site: Site }) {
+    const { wrap: wrapLocalForm4Request, summary: localForm4RequestSummary } =
+        useInertiaFeedback();
+
     const { terms, defaultTerms } = site.license;
     const { data, setData, post, processing, errors } = useForm({
         mode: terms.perpetual
@@ -598,14 +651,23 @@ function LicenseTermsForm({ site }: { site: Site }) {
 
     return (
         <form
+            noValidate
             className="space-y-3 border-t pt-4"
             onSubmit={(e: FormEvent) => {
                 e.preventDefault();
-                post(`/situs/${site.id}/lisensi/masa`, {
-                    preserveScroll: true,
-                });
+                post(
+                    `/situs/${site.id}/lisensi/masa`,
+                    wrapLocalForm4Request({
+                        preserveScroll: true,
+                    }),
+                );
             }}
         >
+            <>
+                {localForm4RequestSummary}
+                <FormErrorHeader errors={errors} />
+            </>
+
             <NativeSelect
                 label="Masa lisensi"
                 value={data.mode}
@@ -623,7 +685,7 @@ function LicenseTermsForm({ site }: { site: Site }) {
 
             {data.mode === 'custom' && (
                 <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-2">
+                    <div className="space-y-2" data-error-field={'valid_days'}>
                         <Input
                             label="Masa berlaku (hari)"
                             type="number"
@@ -637,7 +699,10 @@ function LicenseTermsForm({ site }: { site: Site }) {
                         />
                         <FieldError message={errors.valid_days} />
                     </div>
-                    <div className="space-y-2">
+                    <div
+                        className="space-y-2"
+                        data-error-field={'renew_before_days'}
+                    >
                         <Input
                             label="Diperpanjang berapa hari sebelum habis"
                             type="number"
@@ -671,9 +736,12 @@ function LicenseTermsForm({ site }: { site: Site }) {
 }
 
 function LicenseRenewal({ site, revoked }: { site: Site; revoked: boolean }) {
+    const { wrap: wrapLocalForm5Request, summary: localForm5RequestSummary } =
+        useInertiaFeedback();
+
     const { license } = site;
     const suspended = license.suspendedAt !== null;
-    const { post, processing } = useForm({});
+    const { post, processing, errors } = useForm({});
 
     return (
         <Section
@@ -703,17 +771,23 @@ function LicenseRenewal({ site, revoked }: { site: Site; revoked: boolean }) {
 
             {!revoked && (
                 <form
+                    noValidate
                     className="space-y-3"
                     onSubmit={(e: FormEvent) => {
                         e.preventDefault();
                         post(
                             `/situs/${site.id}/lisensi/${suspended ? 'lanjutkan' : 'hentikan'}`,
-                            {
+                            wrapLocalForm5Request({
                                 preserveScroll: true,
-                            },
+                            }),
                         );
                     }}
                 >
+                    <>
+                        {localForm5RequestSummary}
+                        <FormErrorHeader errors={errors} />
+                    </>
+
                     <Button
                         type="submit"
                         variant={suspended ? 'default' : 'destructive'}
@@ -941,6 +1015,9 @@ export default function Show({
     licenseKeyConfigured: boolean;
     licenseValidDays: number;
 }) {
+    const { wrapRouter: wrapRouterRequest, summary: routerRequestSummary } =
+        useInertiaFeedback();
+
     const report = site.lastReport;
     const revoked = site.state === 'revoked';
     const operationError = usePage().props.errors.operation;
@@ -962,6 +1039,7 @@ export default function Show({
                 )
             }
         >
+            {routerRequestSummary}
             <Head title={site.name} />
 
             {operationError && (
@@ -1242,9 +1320,9 @@ export default function Show({
                                                     router.post(
                                                         `/situs/${site.id}/operasi/${op.id}/batal`,
                                                         {},
-                                                        {
+                                                        wrapRouterRequest({
                                                             preserveScroll: true,
-                                                        },
+                                                        }),
                                                     )
                                                 }
                                             >

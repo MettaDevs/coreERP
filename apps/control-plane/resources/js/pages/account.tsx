@@ -1,3 +1,5 @@
+import { FormErrorHeader } from '@/components/form-error-header';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import { Button } from '@apperp/ui/button';
 import { Input } from '@apperp/ui/input';
 import { Head, useForm } from '@inertiajs/react';
@@ -23,6 +25,9 @@ type Props = {
  * bahwa tindakan inilah yang meminta kata sandi.
  */
 export default function Account({ sso, ssoError }: Props) {
+    const { wrap: wrapLocalForm0Request, summary: localForm0RequestSummary } =
+        useInertiaFeedback();
+
     const {
         data,
         setData,
@@ -37,9 +42,15 @@ export default function Account({ sso, ssoError }: Props) {
         e.preventDefault();
 
         if (sso?.linked) {
-            destroy('/akun/sso', { onFinish: () => reset('password') });
+            destroy(
+                '/akun/sso',
+                wrapLocalForm0Request({ onFinish: () => reset('password') }),
+            );
         } else {
-            post('/akun/sso', { onError: () => reset('password') });
+            post(
+                '/akun/sso',
+                wrapLocalForm0Request({ onError: () => reset('password') }),
+            );
         }
     }
 
@@ -72,7 +83,12 @@ export default function Account({ sso, ssoError }: Props) {
                         SSO belum disetel di konsol ini.
                     </p>
                 ) : (
-                    <form onSubmit={submit} className="space-y-4">
+                    <form noValidate onSubmit={submit} className="space-y-4">
+                        <>
+                            {localForm0RequestSummary}
+                            <FormErrorHeader errors={errors} />
+                        </>
+
                         <p className="text-sm" data-test="sso-status">
                             {sso.linked
                                 ? `Terhubung${sso.emailAtLink ? ` sebagai ${sso.emailAtLink}` : ''}${sso.linkedAt ? `, ${sso.linkedAt}` : ''}.`

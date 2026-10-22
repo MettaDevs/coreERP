@@ -5,10 +5,12 @@ import { DataTable } from '@apperp/ui/data-table';
 
 import { DialogToolbar } from '@apperp/ui/dialog';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
+import { FormControl } from '@apperp/ui/form-control';
 
 import { TransferList } from '@apperp/ui/transfer-list';
 import type { TransferListItem } from '@apperp/ui/transfer-list';
 import { api, errorMessage } from '../../api';
+import { useSaveFeedback } from '../../use-save-feedback';
 import type { JenisAsetDetail, JenisAsetModelSummary } from './jenisAsetDetail';
 
 type Asal = { remaining: TransferListItem[]; selected: TransferListItem[] };
@@ -44,6 +46,13 @@ export default function JenisAsetModels({
     onVersionChange: (version: number) => void;
 }) {
     const [saving, setSaving] = useState(false);
+    const {
+        scopeRef: feedbackScopeRef,
+        feedbackSummary,
+        reportSaveError,
+        clearSaveFeedback,
+        fieldError,
+    } = useSaveFeedback(undefined, jenisAsetId);
 
     /**
      * Isi transfer list adalah salinan kerja: mula-mula persis seperti yang datang dari
@@ -75,6 +84,7 @@ export default function JenisAsetModels({
     const { remaining, selected, saved, saveError } = aktif;
 
     async function save() {
+        clearSaveFeedback();
         setSaving(true);
         setKerja({ ...aktif, saved: false, saveError: '' });
 
@@ -92,6 +102,7 @@ export default function JenisAsetModels({
             onVersionChange(result.data.version);
             setKerja((current) => current && { ...current, saved: true });
         } catch (caught) {
+            reportSaveError(caught, 'Pabrikan dan model belum dapat disimpan.');
             setKerja(
                 (current) =>
                     current && {
@@ -131,7 +142,8 @@ export default function JenisAsetModels({
 
     if (canEdit) {
         return (
-            <div className="space-y-4">
+            <div ref={feedbackScopeRef} className="space-y-4">
+                {feedbackSummary}
                 <DialogToolbar className="px-0">
                     <ActionButton
                         action="save"
@@ -145,23 +157,28 @@ export default function JenisAsetModels({
                     Pilih model yang boleh dipakai untuk jenis aset ini. Model
                     dan pabrikan tetap dikelola di master masing-masing.
                 </p>
-                <TransferList
-                    remaining={remaining}
-                    selected={selected}
-                    onChange={(next) =>
-                        setKerja({
-                            ...aktif,
-                            remaining: next.remaining,
-                            selected: next.selected,
-                            saved: false,
-                        })
-                    }
-                    remainingTitle="Model tersedia"
-                    selectedTitle="Model terpasang"
-                    disabled={saving}
-                    remainingEmptyLabel="Semua model aktif sudah terpasang."
-                    selectedEmptyLabel="Belum ada model yang dipasang."
-                />
+                <FormControl
+                    data-error-field="model_ids"
+                    error={fieldError('model_ids')}
+                >
+                    <TransferList
+                        remaining={remaining}
+                        selected={selected}
+                        onChange={(next) =>
+                            setKerja({
+                                ...aktif,
+                                remaining: next.remaining,
+                                selected: next.selected,
+                                saved: false,
+                            })
+                        }
+                        remainingTitle="Model tersedia"
+                        selectedTitle="Model terpasang"
+                        disabled={saving}
+                        remainingEmptyLabel="Semua model aktif sudah terpasang."
+                        selectedEmptyLabel="Belum ada model yang dipasang."
+                    />
+                </FormControl>
                 {saveError && (
                     <p className="text-destructive text-sm">{saveError}</p>
                 )}

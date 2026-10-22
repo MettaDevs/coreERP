@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { ActionButton } from '@apperp/ui/action-button';
 
 import { Field, FieldLabel } from '@apperp/ui/field';
+import { FormControl } from '@apperp/ui/form-control';
 import { Switch } from '@apperp/ui/switch';
 import { TransferList } from '@apperp/ui/transfer-list';
 import type { TransferListItem } from '@apperp/ui/transfer-list';
 import { api, errorMessage } from '../api';
+import { useSaveFeedback } from '../use-save-feedback';
 import { useMasterOptions } from './useMasterOptions';
 import type { MasterOption } from './useMasterOptions';
 
@@ -44,6 +46,13 @@ export default function JenisAsetAtribut({
     const types = source.options;
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
+    const {
+        scopeRef: feedbackScopeRef,
+        feedbackSummary,
+        reportSaveError,
+        clearSaveFeedback,
+        fieldError,
+    } = useSaveFeedback(undefined, jenisAsetId);
     const [saved, setSaved] = useState(false);
 
     useEffect(() => {
@@ -145,6 +154,7 @@ export default function JenisAsetAtribut({
     }
 
     async function save() {
+        clearSaveFeedback();
         setSaving(true);
         setError('');
         setSaved(false);
@@ -166,32 +176,35 @@ export default function JenisAsetAtribut({
             onVersionChange(result.version);
             setSaved(true);
         } catch (caught) {
-            setError(errorMessage(caught, 'Atribut belum dapat disimpan.'));
+            reportSaveError(caught, 'Atribut belum dapat disimpan.');
         } finally {
             setSaving(false);
         }
     }
 
     return (
-        <div className="space-y-4">
+        <div ref={feedbackScopeRef} className="space-y-4">
+            {feedbackSummary}
             <p className="text-muted-foreground text-sm">
                 Aset yang memakai jenis ini akan diminta mengisi atribut yang
                 terpasang di sebelah kanan saat diterima.
             </p>
 
-            <TransferList
-                incremental={source.selectProps.incremental}
-                searchValue={source.selectProps.searchValue}
-                onSearchChange={source.selectProps.onSearchChange}
-                remaining={remaining}
-                selected={selected}
-                onChange={applyTransfer}
-                remainingTitle="Komponen Atribut Aset tersedia"
-                selectedTitle="Komponen Atribut Aset terpasang"
-                disabled={!canEdit}
-                remainingEmptyLabel="Semua komponen atribut aset sudah terpasang."
-                selectedEmptyLabel="Belum ada komponen atribut aset yang dipasang."
-            />
+            <FormControl data-error-field="rows" error={fieldError('rows')}>
+                <TransferList
+                    incremental={source.selectProps.incremental}
+                    searchValue={source.selectProps.searchValue}
+                    onSearchChange={source.selectProps.onSearchChange}
+                    remaining={remaining}
+                    selected={selected}
+                    onChange={applyTransfer}
+                    remainingTitle="Komponen Atribut Aset tersedia"
+                    selectedTitle="Komponen Atribut Aset terpasang"
+                    disabled={!canEdit}
+                    remainingEmptyLabel="Semua komponen atribut aset sudah terpasang."
+                    selectedEmptyLabel="Belum ada komponen atribut aset yang dipasang."
+                />
+            </FormControl>
 
             {rows.length > 0 && (
                 <div className="space-y-2">

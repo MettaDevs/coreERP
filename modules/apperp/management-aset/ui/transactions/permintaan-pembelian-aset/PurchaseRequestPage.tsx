@@ -9,6 +9,9 @@ import type {
     DataTableRowAction,
 } from '@apperp/ui/data-table';
 
+import { DatePicker } from '@apperp/ui/date-picker';
+import { FormControl } from '@apperp/ui/form-control';
+import { InlineLookup } from '@apperp/ui/inline-lookup';
 import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import {
@@ -18,10 +21,10 @@ import {
     PageDialogBody,
 } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
-import { Select } from '@apperp/ui/select';
 
 import { Textarea } from '@apperp/ui/textarea';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
 import {
     api,
     errorMessage,
@@ -33,6 +36,7 @@ import { useRecordList, useRecordOptions } from '../../use-record-list';
 import { RecordCardHeader, recordQueryUrl } from '../_shared/record-card';
 import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
 import { useRecordQueryTarget } from '../_shared/use-record-query-target';
+import PlanningPage from '../perencanaan-aset/PlanningPage';
 
 type Context = { legal_entity_id: string | null; org_unit_id: string | null };
 type PlanLine = {
@@ -80,9 +84,14 @@ export type PurchaseRequest = {
 export default function PurchaseRequestPage({
     context,
     permissions,
+    createCard,
 }: {
     context: Context;
     permissions: string[];
+    createCard?: {
+        onCreated: (request: PurchaseRequest) => void;
+        onClose: () => void;
+    };
 }) {
     const can = (action: string) =>
         permissions.includes(
@@ -92,10 +101,11 @@ export default function PurchaseRequestPage({
     const [record, setRecord] = useState<PurchaseRequest | null>(null);
     const [lines, setLines] = useState<RequestLine[]>([]);
     const [planId, setPlanId] = useState<string | null>(null);
+    const [creatingPlan, setCreatingPlan] = useState(false);
     const [date, setDate] = useState(workDate);
     const [description, setDescription] = useState('');
-    const [open, setOpen] = useState(false);
-    const [editing, setEditing] = useState(false);
+    const [open, setOpen] = useState(Boolean(createCard));
+    const [editing, setEditing] = useState(Boolean(createCard));
     const [busy, setBusy] = useState(false);
     const [requestDirty, setRequestDirty] = useState(false);
     const [error, setError] = useState('');
@@ -107,6 +117,7 @@ export default function PurchaseRequestPage({
         '/permintaan-pembelian-aset',
         '',
         { refresh: String(reload) },
+        !createCard,
     );
     const records = list.items;
     const loading = list.loading;
@@ -170,7 +181,7 @@ export default function PurchaseRequestPage({
 
     const { url } = usePage();
     const sourceQuery = new URL(url, 'http://localhost').searchParams;
-    const sourceId = sourceQuery.get('planning');
+    const sourceId = createCard ? null : sourceQuery.get('planning');
     const sourceLines = sourceQuery.get('lines');
     const openSourceForm = useEffectEvent((source: Plan) => {
         if (!can('create')) {
@@ -265,6 +276,7 @@ export default function PurchaseRequestPage({
 
     const clearRecordTarget = useRecordQueryTarget({
         scopeKey: 'permintaan-pembelian-aset',
+        enabled: !createCard,
         onOpen: (id, signal) => show(id, false, signal),
     });
     async function save() {
@@ -284,7 +296,7 @@ export default function PurchaseRequestPage({
         setError('');
 
         try {
-            await api(
+            const result = await api<{ data: PurchaseRequest }>(
                 `/permintaan-pembelian-aset${record ? `/${record.id}` : ''}`,
                 {
                     method: record ? 'PATCH' : 'POST',
@@ -304,6 +316,13 @@ export default function PurchaseRequestPage({
                     }),
                 },
             );
+
+            if (createCard) {
+                createCard.onCreated(result.data);
+
+                return;
+            }
+
             clearRecordTarget();
             setOpen(false);
             setReload((value) => value + 1);
@@ -379,18 +398,21 @@ export default function PurchaseRequestPage({
         actions.push({ id: 'edit', label: 'Ubah' });
     }
 
-    const discardRequest = () =>
-        !requestDirty || window.confirm('Buang perubahan yang belum disimpan?');
+    const {
+        request: requestRequestTransition,
+        confirmation: requestTransitionConfirmation,
+    } = useRecordTransition(requestDirty, busy);
     const newRequest = () => {
-        if (!busy && discardRequest()) {
+        requestRequestTransition(() => {
             clearRecordTarget();
             create();
-        }
+        });
     };
     const closeRequest = () => {
-        if (!busy && discardRequest()) {
+        requestRequestTransition(() => {
             setOpen(false);
-        }
+            createCard?.onClose();
+        });
     };
     useRecordCardDirty({
         value: { lines, planId, date, description },
@@ -412,55 +434,63 @@ export default function PurchaseRequestPage({
 
     return (
         <>
-            <ListPageLayout
-                header={
-                    <RecordActionBar title="Permintaan pembelian aset">
-                        {can('create') && (
-                            <ActionButton
-                                action="create"
-                                disabled={busy}
-                                onClick={() => void create()}
-                            />
-                        )}
-                    </RecordActionBar>
-                }
-            >
-                {!open && error && (
-                    <p role="alert" className="text-destructive p-4 text-sm">
-                        {error}
-                    </p>
-                )}
-                {loading && <p className="p-4 text-sm">Memuat permintaan…</p>}
-                <DataTable
-                    columns={columns}
-                    incremental={list}
-                    sort={list.sort}
-                    onSortChange={list.onSortChange}
-                    data={records}
-                    getRowKey={(row) => row.id}
-                    actions={actions}
-                    actionsPlacement="inline"
-                    rowActivation="double-click"
-                    onRowClick={(row) =>
-                        void show(
-                            row.id,
-                            can('update') && row.status === 'draft',
-                        )
+            {requestTransitionConfirmation}
+            {!createCard && (
+                <ListPageLayout
+                    header={
+                        <RecordActionBar title="Permintaan pembelian aset">
+                            {can('create') && (
+                                <ActionButton
+                                    action="create"
+                                    disabled={busy}
+                                    onClick={() => void create()}
+                                />
+                            )}
+                        </RecordActionBar>
                     }
-                    onRowAction={(action, row) => {
-                        if (action === 'print') {
-                            requestPrint({
-                                report: 'purchase-request',
-                                title: `Cetak ${row.kode}`,
-                                parameters: { id: row.id },
-                            });
-                        } else {
-                            void show(row.id, action === 'edit');
+                >
+                    {!open && error && (
+                        <p
+                            role="alert"
+                            className="text-destructive p-4 text-sm"
+                        >
+                            {error}
+                        </p>
+                    )}
+                    {loading && (
+                        <p className="p-4 text-sm">Memuat permintaan…</p>
+                    )}
+                    <DataTable
+                        columns={columns}
+                        incremental={list}
+                        sort={list.sort}
+                        onSortChange={list.onSortChange}
+                        data={records}
+                        getRowKey={(row) => row.id}
+                        actions={actions}
+                        actionsPlacement="inline"
+                        rowActivation="double-click"
+                        onRowClick={(row) =>
+                            void show(
+                                row.id,
+                                can('update') && row.status === 'draft',
+                            )
                         }
-                    }}
-                    emptyMessage="Belum ada permintaan pembelian aset."
-                />
-            </ListPageLayout>
+                        onRowAction={(action, row) => {
+                            if (action === 'print') {
+                                requestPrint({
+                                    report: 'purchase-request',
+                                    title: `Cetak ${row.kode}`,
+                                    parameters: { id: row.id },
+                                });
+                            } else {
+                                void show(row.id, action === 'edit');
+                            }
+                        }}
+                        emptyMessage="Belum ada permintaan pembelian aset."
+                    />
+                </ListPageLayout>
+            )}
             <PageDialog
                 open={open}
                 onOpenChange={(value) => {
@@ -477,6 +507,7 @@ export default function PurchaseRequestPage({
                     navigation={record ? requestNavigation : undefined}
                 >
                     <form
+                        noValidate
                         className="flex min-h-0 flex-1 flex-col"
                         onSubmit={(event) => {
                             event.preventDefault();
@@ -562,42 +593,98 @@ export default function PurchaseRequestPage({
                             )}
                             {!record && (
                                 <fieldset className="min-w-0" disabled={busy}>
-                                    <Select
-                                        {...planSource.selectProps}
+                                    <InlineLookup<Plan>
                                         label="Perencanaan"
                                         required
-                                        items={plans.map((plan) => ({
-                                            value: plan.id,
-                                            label: `${plan.kode} · ${plan.description || 'Tanpa tujuan'} · ${plan.planned_on.slice(0, 10)}`,
-                                        }))}
-                                        value={planId}
+                                        value={
+                                            plans.find(
+                                                (plan) => plan.id === planId,
+                                            ) ?? null
+                                        }
+                                        loadItems={planSource.loadItems}
+                                        columns={[
+                                            {
+                                                id: 'code',
+                                                header: 'Kode',
+                                                width: 112,
+                                                cell: (plan) => plan.kode,
+                                            },
+                                            {
+                                                id: 'description',
+                                                header: 'Tujuan',
+                                                width: 280,
+                                                cell: (plan) =>
+                                                    plan.description ||
+                                                    'Tanpa tujuan',
+                                            },
+                                            {
+                                                id: 'date',
+                                                header: 'Tanggal',
+                                                width: 112,
+                                                cell: (plan) =>
+                                                    plan.planned_on.slice(
+                                                        0,
+                                                        10,
+                                                    ),
+                                            },
+                                        ]}
+                                        getItemValue={(plan) => plan.id}
+                                        getItemLabel={(plan) =>
+                                            `${plan.kode} · ${plan.description || 'Tanpa tujuan'}`
+                                        }
+                                        getSearchText={(plan) =>
+                                            `${plan.kode} ${plan.description ?? ''}`
+                                        }
                                         portalContainer={portalContainer}
-                                        onValueChange={(value) =>
-                                            void selectPlan(value)
+                                        onValueChange={(plan) => {
+                                            planSource.acceptItems([plan]);
+                                            void selectPlan(plan.id);
+                                        }}
+                                        onCreate={
+                                            permissions.includes(
+                                                'management-aset.perencanaan-aset.create',
+                                            ) &&
+                                            permissions.includes(
+                                                'management-aset.perencanaan-aset.read',
+                                            ) &&
+                                            context.legal_entity_id &&
+                                            context.org_unit_id
+                                                ? () => setCreatingPlan(true)
+                                                : undefined
                                         }
                                         placeholder="Pilih perencanaan"
-                                        searchPlaceholder="Cari kode atau tujuan perencanaan"
+                                        showDetails={false}
                                     />
+                                    {planSource.error && (
+                                        <p
+                                            role="alert"
+                                            className="text-destructive text-sm"
+                                        >
+                                            {planSource.error}
+                                        </p>
+                                    )}
                                 </fieldset>
                             )}
-                            <Input
-                                label="Tanggal permintaan"
-                                type="date"
-                                required
-                                value={date}
-                                readOnly={!editing}
-                                onChange={(event) =>
-                                    setDate(event.target.value)
-                                }
-                            />
-                            <Textarea
-                                label="Keterangan"
-                                value={description}
-                                readOnly={!editing}
-                                onChange={(event) =>
-                                    setDescription(event.target.value)
-                                }
-                            />
+                            <FormControl>
+                                <DatePicker
+                                    label="Tanggal permintaan"
+                                    required
+                                    value={date}
+                                    readOnly={!editing}
+                                    onValueChange={setDate}
+                                    portalContainer={portalContainer}
+                                />
+                            </FormControl>
+                            <FormControl>
+                                <Textarea
+                                    label="Keterangan"
+                                    value={description}
+                                    readOnly={!editing}
+                                    onChange={(event) =>
+                                        setDescription(event.target.value)
+                                    }
+                                />
+                            </FormControl>
                             {lines.map((line, index) => (
                                 <div
                                     key={line.planning_detail_id || index}
@@ -611,49 +698,57 @@ export default function PurchaseRequestPage({
                                             'Belum terhubung ke perencanaan'}{' '}
                                         · {line.unit}
                                     </p>
-                                    <Input
-                                        label="Jumlah diminta"
-                                        type="number"
-                                        required
-                                        min="0.0001"
-                                        step="0.0001"
-                                        value={line.quantity}
-                                        readOnly={!editing}
-                                        onChange={(event) =>
-                                            setLines(
-                                                lines.map((item, position) =>
-                                                    position === index
-                                                        ? {
-                                                              ...item,
-                                                              quantity:
-                                                                  event.target
-                                                                      .value,
-                                                          }
-                                                        : item,
-                                                ),
-                                            )
-                                        }
-                                    />
-                                    <Textarea
-                                        label="Spesifikasi"
-                                        required
-                                        value={line.specification}
-                                        readOnly={!editing}
-                                        onChange={(event) =>
-                                            setLines(
-                                                lines.map((item, position) =>
-                                                    position === index
-                                                        ? {
-                                                              ...item,
-                                                              specification:
-                                                                  event.target
-                                                                      .value,
-                                                          }
-                                                        : item,
-                                                ),
-                                            )
-                                        }
-                                    />
+                                    <FormControl>
+                                        <Input
+                                            label="Jumlah diminta"
+                                            type="number"
+                                            required
+                                            min="0.0001"
+                                            step="0.0001"
+                                            value={line.quantity}
+                                            readOnly={!editing}
+                                            onChange={(event) =>
+                                                setLines(
+                                                    lines.map(
+                                                        (item, position) =>
+                                                            position === index
+                                                                ? {
+                                                                      ...item,
+                                                                      quantity:
+                                                                          event
+                                                                              .target
+                                                                              .value,
+                                                                  }
+                                                                : item,
+                                                    ),
+                                                )
+                                            }
+                                        />
+                                    </FormControl>
+                                    <FormControl>
+                                        <Textarea
+                                            label="Spesifikasi"
+                                            required
+                                            value={line.specification}
+                                            readOnly={!editing}
+                                            onChange={(event) =>
+                                                setLines(
+                                                    lines.map(
+                                                        (item, position) =>
+                                                            position === index
+                                                                ? {
+                                                                      ...item,
+                                                                      specification:
+                                                                          event
+                                                                              .target
+                                                                              .value,
+                                                                  }
+                                                                : item,
+                                                    ),
+                                                )
+                                            }
+                                        />
+                                    </FormControl>
                                     {!editing && (
                                         <p className="text-sm">
                                             Diterima:{' '}
@@ -689,6 +784,28 @@ export default function PurchaseRequestPage({
                     </form>
                 </PageDialogContent>
             </PageDialog>
+            {creatingPlan && (
+                <PlanningPage
+                    context={context}
+                    permissions={permissions}
+                    createCard={{
+                        onClose: () => setCreatingPlan(false),
+                        onCreated: (plan) => {
+                            planSource.acceptItems([
+                                {
+                                    id: plan.id,
+                                    kode: plan.kode,
+                                    description: plan.description,
+                                    planned_on: plan.planned_on,
+                                },
+                            ]);
+                            planSource.reload();
+                            setCreatingPlan(false);
+                            void selectPlan(plan.id);
+                        },
+                    }}
+                />
+            )}
         </>
     );
 }

@@ -31,9 +31,11 @@ export function useMasterOptions(
     query = '',
     selectedId: string | string[] = '',
 ) {
-    return useRecordOptions<MasterOption>(
+    const source = useRecordOptions<MasterOption>(
         resource ? `/${resource}?aktif=true&${query}` : null,
         optionLabel,
         selectedId,
     );
+
+    return { ...source, resource };
 }

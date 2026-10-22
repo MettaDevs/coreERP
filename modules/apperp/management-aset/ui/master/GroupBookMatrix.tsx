@@ -10,10 +10,13 @@ import {
     FieldError,
     FieldLabel,
 } from '@apperp/ui/field';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
-import { api, errorMessage } from '../api';
+import RecordLookup from '../_shared/RecordLookup';
+import { api, ApiError, errorMessage } from '../api';
+import { useSaveFeedback } from '../use-save-feedback';
 import {
     monthsPerPeriod,
     serviceLifeMonths,
@@ -110,6 +113,13 @@ export default function GroupBookMatrix({
     };
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
+    const {
+        scopeRef: feedbackScopeRef,
+        feedbackSummary,
+        reportSaveError,
+        clearSaveFeedback,
+        fieldError,
+    } = useSaveFeedback(undefined, groupId);
     const [saved, setSaved] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const profiles = useMasterOptions(
@@ -209,6 +219,8 @@ export default function GroupBookMatrix({
         );
 
     async function save() {
+        clearSaveFeedback();
+
         if (draft) {
             return;
         }
@@ -222,8 +234,30 @@ export default function GroupBookMatrix({
                         !profileFor(row)),
             )
         ) {
-            setError(
-                'Masa manfaat harus sesuai frekuensi metode yang dipakai. Periksa tahun dan bulan pada baris buku.',
+            const errors = Object.fromEntries(
+                rows.flatMap((row, index) =>
+                    row.useful_life_periods !== '' &&
+                    (!Number.isInteger(Number(row.useful_life_periods)) ||
+                        Number(row.useful_life_periods) < 1 ||
+                        !profileFor(row))
+                        ? [
+                              [
+                                  `rows.${index}.useful_life_periods`,
+                                  [
+                                      'Masa manfaat harus sesuai frekuensi metode. Periksa tahun dan bulan pada baris buku ini.',
+                                  ],
+                              ],
+                          ]
+                        : [],
+                ),
+            );
+            reportSaveError(
+                new ApiError(
+                    'Periksa masa manfaat pada baris buku.',
+                    errors,
+                    422,
+                ),
+                'Matriks belum dapat disimpan.',
             );
 
             return;
@@ -264,7 +298,7 @@ export default function GroupBookMatrix({
             onVersionChange(result.version);
             setSaved(true);
         } catch (caught) {
-            setError(errorMessage(caught, 'Matriks belum dapat disimpan.'));
+            reportSaveError(caught, 'Matriks belum dapat disimpan.');
         } finally {
             setSaving(false);
         }
@@ -295,6 +329,7 @@ export default function GroupBookMatrix({
     return (
         <div
             ref={(node) => {
+                feedbackScopeRef.current = node;
                 containerRef.current =
                     node?.closest<HTMLDivElement>(
                         '[data-slot="page-dialog-contents"]',
@@ -302,6 +337,7 @@ export default function GroupBookMatrix({
             }}
             className={staging ? 'space-y-4' : 'space-y-4 border-t px-5 py-4'}
         >
+            {feedbackSummary}
             {canEdit && !staging && (
                 <DialogToolbar className="px-0">
                     <ActionButton
@@ -362,33 +398,34 @@ export default function GroupBookMatrix({
                         <FieldError>
                             {draft?.errors?.[index]?.join(' ')}
                         </FieldError>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                            <Field>
-                                <Select
-                                    {...profiles.selectProps}
+                        <FormGrid>
+                            <FormControl
+                                hint={
+                                    <>
+                                        {profiles.error ||
+                                            'Kosong berarti memakai metode utama pada Buku penyusutan. Server akan memeriksa masa manfaat, metode, frekuensi, dan tanggal berlakunya sebelum aset ditempatkan.'}
+                                    </>
+                                }
+                                data-error-field={`rows.${index}.depreciation_profile_id`}
+                                error={fieldError(
+                                    `rows.${index}.depreciation_profile_id`,
+                                )}
+                            >
+                                <RecordLookup
+                                    source={profiles}
                                     label="Metode utama untuk group ini"
-                                    items={profiles.options.map(optionLabel)}
-                                    value={
-                                        profiles.options
-                                            .filter(
-                                                (item) =>
-                                                    item.id ===
-                                                    row.depreciation_profile_id,
-                                            )
-                                            .map(optionLabel)[0]
-                                    }
+                                    items={profiles.options.map((item) => ({
+                                        value: item.id,
+                                        label: optionLabel(item),
+                                    }))}
+                                    value={row.depreciation_profile_id || ''}
                                     placeholder="Ikuti metode utama buku"
                                     searchPlaceholder="Cari metode penyusutan"
-                                    emptyMessage="Metode Penyusutan tidak ditemukan."
+
                                     ariaLabel="Pilih metode utama untuk group ini"
                                     portalContainer={containerRef}
                                     onValueChange={(item) => {
-                                        const id =
-                                            profiles.options.find(
-                                                (option) =>
-                                                    optionLabel(option) ===
-                                                    item,
-                                            )?.id ?? '';
+                                        const id = item ?? '';
                                         const nextProfile = profileFor({
                                             ...row,
                                             depreciation_profile_id: id,
@@ -411,49 +448,47 @@ export default function GroupBookMatrix({
                                         });
                                     }}
                                 />
-                                <FieldDescription>
-                                    {profiles.error ||
-                                        'Kosong berarti memakai metode utama pada Buku penyusutan. Server akan memeriksa masa manfaat, metode, frekuensi, dan tanggal berlakunya sebelum aset ditempatkan.'}
-                                </FieldDescription>
-                            </Field>
-                            <Field>
-                                <Select
-                                    {...profiles.selectProps}
+                            </FormControl>
+                            <FormControl
+                                hint={
+                                    <>
+                                        Dipakai begitu saldo menurun
+                                        menghasilkan angka lebih kecil daripada
+                                        garis lurus sisa umur, agar aset tetap
+                                        habis di akhir masa manfaat.
+                                    </>
+                                }
+                                data-error-field={`rows.${index}.alternative_profile_id`}
+                                error={fieldError(
+                                    `rows.${index}.alternative_profile_id`,
+                                )}
+                            >
+                                <RecordLookup
+                                    source={profiles}
                                     label="Metode pengganti (opsional)"
-                                    items={profiles.options.map(optionLabel)}
-                                    value={
-                                        profiles.options
-                                            .filter(
-                                                (item) =>
-                                                    item.id ===
-                                                    row.alternative_profile_id,
-                                            )
-                                            .map(optionLabel)[0]
-                                    }
+                                    items={profiles.options.map((item) => ({
+                                        value: item.id,
+                                        label: optionLabel(item),
+                                    }))}
+                                    value={row.alternative_profile_id || ''}
                                     placeholder="Tanpa pengganti"
                                     searchPlaceholder="Cari metode pengganti"
-                                    emptyMessage="Metode Penyusutan tidak ditemukan."
+
                                     ariaLabel="Pilih metode pengganti"
                                     portalContainer={containerRef}
                                     onValueChange={(item) =>
                                         patch(index, {
-                                            alternative_profile_id:
-                                                profiles.options.find(
-                                                    (option) =>
-                                                        optionLabel(option) ===
-                                                        item,
-                                                )?.id ?? '',
+                                            alternative_profile_id: item ?? '',
                                         })
                                     }
                                 />
-                                <FieldDescription>
-                                    Dipakai begitu saldo menurun menghasilkan
-                                    angka lebih kecil daripada garis lurus sisa
-                                    umur, agar aset tetap habis di akhir masa
-                                    manfaat.
-                                </FieldDescription>
-                            </Field>
-                            <div className="space-y-3">
+                            </FormControl>
+                            <FormControl
+                                data-error-field={`rows.${index}.useful_life_periods`}
+                                error={fieldError(
+                                    `rows.${index}.useful_life_periods`,
+                                )}
+                            >
                                 <Field orientation="horizontal">
                                     <Switch
                                         id={`custom-life-${row.buku_id}`}
@@ -496,8 +531,17 @@ export default function GroupBookMatrix({
                                         }
                                     />
                                 )}
-                            </div>
-                            <Field>
+                            </FormControl>
+                            <FormControl
+                                hint={
+                                    <>
+                                        Dihitung dari tanggal aset mulai
+                                        digunakan.
+                                    </>
+                                }
+                                data-error-field={`rows.${index}.value`}
+                                error={fieldError(`rows.${index}.value`)}
+                            >
                                 <Select
                                     label="Perlakuan periode pertama"
                                     items={CONVENTIONS.map(
@@ -523,11 +567,19 @@ export default function GroupBookMatrix({
                                         })
                                     }
                                 />
-                                <FieldDescription>
-                                    Dihitung dari tanggal aset mulai digunakan.
-                                </FieldDescription>
-                            </Field>
-                            <Field>
+                            </FormControl>
+                            <FormControl
+                                hint={
+                                    <>
+                                        Kosong mengikuti Book. Periode terakhir
+                                        tidak dibulatkan.
+                                    </>
+                                }
+                                data-error-field={`rows.${index}.round_off_depreciation`}
+                                error={fieldError(
+                                    `rows.${index}.round_off_depreciation`,
+                                )}
+                            >
                                 <Input
                                     id={`round-off-${row.buku_id}`}
                                     label="Kelipatan pembulatan penyusutan"
@@ -542,12 +594,13 @@ export default function GroupBookMatrix({
                                                 event.target.value,
                                         })
                                     }
+                                    aria-invalid={
+                                        !!fieldError(
+                                            `rows.${index}.round_off_depreciation`,
+                                        )
+                                    }
                                 />
-                                <FieldDescription>
-                                    Kosong mengikuti Book. Periode terakhir
-                                    tidak dibulatkan.
-                                </FieldDescription>
-                            </Field>
+                            </FormControl>
                             <Field orientation="horizontal">
                                 <Switch
                                     id={`depreciate-${row.buku_id}`}
@@ -563,31 +616,33 @@ export default function GroupBookMatrix({
                                     Hitung penyusutan
                                 </FieldLabel>
                             </Field>
-                        </div>
+                        </FormGrid>
                     </div>
                 );
             })}
 
-            {canEdit && unused.length > 0 && (
+            {canEdit && (
                 <div className="sm:w-72">
-                    <Select
-                        items={unused.map(
-                            (book) => `${book.kode} — ${book.nama}`,
+                    <RecordLookup
+                        source={bookSource}
+                        filterKey={JSON.stringify(
+                            rows.map((row) => row.buku_id).sort(),
                         )}
+                        filterRecord={(book) =>
+                            !rows.some((row) => row.buku_id === book.id)
+                        }
+                        items={unused.map((book) => ({
+                            value: book.id,
+                            label: `${book.kode} — ${book.nama}`,
+                        }))}
                         placeholder="Pilih buku penyusutan"
                         searchPlaceholder="Cari buku"
                         emptyMessage="Buku tidak ditemukan."
                         ariaLabel="Pilih buku penyusutan"
                         portalContainer={containerRef}
-                        onValueChange={(item) => {
-                            const book = unused.find(
-                                (candidate) =>
-                                    `${candidate.kode} — ${candidate.nama}` ===
-                                    item,
-                            );
-
-                            if (book) {
-                                setRows([...rows, emptyRow(book.id)]);
+                        onValueChange={(id) => {
+                            if (id && !rows.some((row) => row.buku_id === id)) {
+                                setRows([...rows, emptyRow(id)]);
                             }
                         }}
                     />

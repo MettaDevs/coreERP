@@ -1,3 +1,5 @@
+import { FormErrorHeader } from '@/components/form-error-header';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import { Button } from '@apperp/ui/button';
 import { Spinner } from '@apperp/ui/spinner';
 import {
@@ -86,6 +88,9 @@ export default function Show({
     installCommand: InstallCommand | null;
     installedRelease: { version: string | null; error: string | null };
 }) {
+    const { wrapRouter: wrapRouterRequest, summary: routerRequestSummary } =
+        useInertiaFeedback();
+
     const last = history[0];
     const [running, setRunning] = useState(false);
     const retry = environment.status === 'degraded';
@@ -110,11 +115,11 @@ export default function Show({
         router.post(
             `/lingkungan/${environment.id}/siapkan`,
             {},
-            {
+            wrapRouterRequest({
                 preserveScroll: true,
                 onStart: () => setRunning(true),
                 onFinish: () => setRunning(false),
-            },
+            }),
         );
     }
 
@@ -123,7 +128,12 @@ export default function Show({
             title={environment.name}
             description={`Milik ${environment.tenant}`}
         >
+            {routerRequestSummary}
             <Head title={environment.name} />
+            <FormErrorHeader
+                message={provisionError}
+                operation="Lingkungan belum dapat disiapkan"
+            />
 
             {/*
                 Kalimatnya panjang — ia menyebut alamat dan sebab — jadi kotaknya dibiarkan tumbuh

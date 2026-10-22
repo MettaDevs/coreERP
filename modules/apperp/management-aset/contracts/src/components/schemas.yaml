@@ -3444,6 +3444,21 @@ MasterDraftChildRows:
                     keterangan: { type: [string, 'null'], maxLength: 2000 }
                     aktif: { type: boolean, default: true }
                     jenis_aset_id: { type: [string, 'null'], format: ulid }
+AssetReceiptMultipartInput:
+    type: object
+    required: [payload]
+    properties:
+        payload:
+            type: string
+            description: JSON kepala dan rincian penerimaan, termasuk version untuk pembaruan.
+        attachments:
+            type: array
+            description: Berkas baru; ukuran, jumlah, dan jenis mengikuti attachment-limits.
+            items: { type: string, format: binary }
+        _method:
+            type: string
+            enum: [PATCH]
+            description: Untuk pembaruan multipart, kirim POST dengan override PATCH.
 MasterDraftAssetTypeIds:
     type: object
     required: [jenis_aset_ids]

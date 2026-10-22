@@ -99,8 +99,9 @@ Aturan module-nya sendiri adalah desain kanonik di
 
 ## UI runtime verification
 
-- Setelah mengubah UI, `npm run build` saja tidak cukup: rebuild dan recreate container runtime melalui `D:\Kerja\erp-dev\start.ps1 -Build`, lalu buka layar yang diubah pada `http://localhost:8000` untuk memastikan artifact baru benar-benar tampil.
-- Jangan melaporkan perubahan UI selesai hanya karena type-check atau build lokal lulus. Pastikan container yang aktif dibuat ulang setelah perubahan dan health check stack selesai.
+- Jika runtime lokal memakai HotReload aktif, perubahan source UI diterapkan otomatis oleh Vite. Jangan rebuild/recreate container atau reload halaman setelah setiap perubahan; jalankan pemeriksaan source yang relevan.
+- Gunakan `D:\Kerja\erp-dev\start.ps1 -Build` bila HotReload tidak aktif atau perubahan memang memerlukan image baru, misalnya Dockerfile atau dependency container berubah. Jika HotReload aktif tetapi user/developer melaporkan layar masih menampilkan source lama, periksa watcher dan mount source dulu; baru restart, rebuild, atau reload seperlunya.
+- Jangan membuka atau menguji UI bila user meminta memeriksanya sendiri. Pemeriksaan health stack dilakukan setelah runtime benar-benar direstart atau ada perubahan runtime yang memerlukannya.
 
 ## Runtime database verification
 

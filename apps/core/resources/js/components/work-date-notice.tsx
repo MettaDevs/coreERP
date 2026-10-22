@@ -3,6 +3,7 @@ import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import { Link, router } from '@inertiajs/react';
 import { CalendarClock, X } from 'lucide-react';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import { formatWorkDate, useWorkDate } from '@/hooks/use-work-date';
 
 const PROFILE = '/settings/profile';
@@ -16,6 +17,9 @@ const PROFILE = '/settings/profile';
  * lewat {@see WorkDateBadge}.
  */
 export default function WorkDateNotice() {
+    const { wrapRouter: wrapRouterRequest, summary: routerRequestSummary } =
+        useInertiaFeedback();
+
     const { date, isToday, noticeDismissed } = useWorkDate();
 
     if (isToday || noticeDismissed || date === '') {
@@ -24,6 +28,7 @@ export default function WorkDateNotice() {
 
     return (
         <div className="px-4 pt-3">
+            {routerRequestSummary}
             <Alert role="status">
                 <CalendarClock />
                 <AlertTitle>
@@ -44,7 +49,7 @@ export default function WorkDateNotice() {
                                 router.patch(
                                     '/settings/date-time',
                                     { work_date: null },
-                                    { preserveScroll: true },
+                                    wrapRouterRequest({ preserveScroll: true }),
                                 )
                             }
                         >
@@ -57,7 +62,7 @@ export default function WorkDateNotice() {
                                 router.post(
                                     '/settings/date-time/dismiss-work-date-notice',
                                     {},
-                                    { preserveScroll: true },
+                                    wrapRouterRequest({ preserveScroll: true }),
                                 )
                             }
                         >

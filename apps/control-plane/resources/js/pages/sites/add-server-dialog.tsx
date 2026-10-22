@@ -1,3 +1,5 @@
+import { FormErrorHeader } from '@/components/form-error-header';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import { Button } from '@apperp/ui/button';
 import {
     CollapsibleSection,
@@ -38,6 +40,9 @@ export default function AddServerDialog({
 }: {
     candidates: Candidate[];
 }) {
+    const { wrap: wrapLocalForm0Request, summary: localForm0RequestSummary } =
+        useInertiaFeedback();
+
     const [open, setOpen] = useState(false);
     const { data, setData, post, processing, errors, transform, clearErrors } =
         useForm({
@@ -60,9 +65,12 @@ export default function AddServerDialog({
             update_window_start: values.update_window_start,
             update_window_end: values.update_window_end,
         }));
-        post(`/lingkungan/${data.environment_id}/server-klien`, {
-            onSuccess: () => setOpen(false),
-        });
+        post(
+            `/lingkungan/${data.environment_id}/server-klien`,
+            wrapLocalForm0Request({
+                onSuccess: () => setOpen(false),
+            }),
+        );
     }
 
     return (
@@ -125,7 +133,7 @@ export default function AddServerDialog({
                         </DialogFooter>
                     </>
                 ) : (
-                    <form onSubmit={submit}>
+                    <form noValidate onSubmit={submit}>
                         <DialogHeader>
                             <DialogTitle>Tambah server klien</DialogTitle>
                             <DialogDescription>
@@ -134,6 +142,10 @@ export default function AddServerDialog({
                                 perintah pasangnya dijalankan di sana.
                             </DialogDescription>
                         </DialogHeader>
+                        <>
+                            {localForm0RequestSummary}
+                            <FormErrorHeader errors={errors} />
+                        </>
 
                         <div className="space-y-4 py-4">
                             {refusal && (

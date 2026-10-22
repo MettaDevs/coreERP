@@ -18,7 +18,8 @@ import {
     CollapsibleSection,
     CollapsibleSectionGroup,
 } from '@apperp/ui/collapsible-section';
-import { Field, FieldError, FieldLabel } from '@apperp/ui/field';
+import { FieldError, FieldLabel } from '@apperp/ui/field';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { IncrementalListStatus } from '@apperp/ui/incremental-list-status';
 import { Input } from '@apperp/ui/input';
 import { MasterDetailLayout } from '@apperp/ui/master-detail-layout';
@@ -26,8 +27,9 @@ import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { RecordEditBoundary } from '@apperp/ui/record-edit-boundary';
 import { Switch } from '@apperp/ui/switch';
 import EditShield from '../../_shared/EditShield';
-import { api, ApiError, errorMessage, newIdempotencyKey } from '../../api';
+import { api, ApiError, newIdempotencyKey } from '../../api';
 import { useRecordList } from '../../use-record-list';
+import { useSaveFeedback } from '../../use-save-feedback';
 
 type Classification = {
     id: string;
@@ -52,6 +54,12 @@ export default function AssetClassificationPage({
     permissions: string[];
 }) {
     const [selectedId, setSelectedId] = useState<string | null>(null);
+    const {
+        scopeRef: actionScopeRef,
+        feedbackSummary: actionFeedback,
+        reportSaveError: reportActionError,
+        clearSaveFeedback: clearActionFeedback,
+    } = useSaveFeedback(undefined, selectedId);
     const [search, setSearch] = useState('');
     const [showDetail, setShowDetail] = useState(false);
     const list = useRecordList<Classification>('/kelompok-harta', search);
@@ -122,6 +130,8 @@ export default function AssetClassificationPage({
     }
 
     async function archive() {
+        clearActionFeedback();
+
         if (!selected || saving) {
             return;
         }
@@ -141,9 +151,7 @@ export default function AssetClassificationPage({
             list.reload();
             toast.success('Kelompok Aset diarsipkan.');
         } catch (caught) {
-            setActionError(
-                errorMessage(caught, 'Kelompok Aset belum dapat diarsipkan.'),
-            );
+            reportActionError(caught, 'Kelompok Aset belum dapat diarsipkan.');
         } finally {
             setSaving(false);
             setArchiving(false);
@@ -151,7 +159,8 @@ export default function AssetClassificationPage({
     }
 
     return (
-        <div className="flex h-full min-h-0 flex-col">
+        <div ref={actionScopeRef} className="flex h-full min-h-0 flex-col">
+            {actionFeedback}
             <RecordActionBar title="Kelompok Aset">
                 {editing ? (
                     <>
@@ -227,17 +236,19 @@ export default function AssetClassificationPage({
                             <p className="text-sm font-semibold">
                                 Daftar kelompok aset
                             </p>
-                            <Input
-                                type="search"
-                                label="Cari nama"
-                                value={search}
-                                readOnly={saving}
-                                onChange={(event) => {
-                                    requestChange({
-                                        search: event.target.value,
-                                    });
-                                }}
-                            />
+                            <FormControl>
+                                <Input
+                                    type="search"
+                                    label="Cari nama"
+                                    value={search}
+                                    readOnly={saving}
+                                    onChange={(event) => {
+                                        requestChange({
+                                            search: event.target.value,
+                                        });
+                                    }}
+                                />
+                            </FormControl>
                         </div>
                         <div className="min-h-0 overflow-y-auto">
                             {loadError && (
@@ -415,6 +426,8 @@ function ClassificationForm({
     const [error, setError] = useState('');
     const [errors, setErrors] = useState<Record<string, string[]>>({});
     const formRef = useRef<HTMLFormElement>(null);
+    const { feedbackSummary, reportSaveError, clearSaveFeedback } =
+        useSaveFeedback(formRef, record?.id);
     const pendingFocusRef = useRef<string | null>(null);
 
     function enterEdit(name: string) {
@@ -477,6 +490,7 @@ function ClassificationForm({
             return;
         }
 
+        clearSaveFeedback();
         const values = new FormData(event.currentTarget);
         onSaving(true);
         setError('');
@@ -509,9 +523,7 @@ function ClassificationForm({
             onSaved(result.data);
             toast.success('Kelompok Aset disimpan.');
         } catch (caught) {
-            setError(
-                errorMessage(caught, 'Kelompok Aset belum dapat disimpan.'),
-            );
+            reportSaveError(caught, 'Kelompok Aset belum dapat disimpan.');
 
             if (caught instanceof ApiError) {
                 setErrors(caught.validationErrors);
@@ -530,13 +542,15 @@ function ClassificationForm({
             className="flex min-h-0 min-w-0 flex-col"
         >
             <form
+                noValidate
                 ref={formRef}
                 id="asset-classification-form"
                 onSubmit={(event) => void save(event)}
                 className="space-y-4"
                 onChange={() => editing && onDirtyChange(true)}
             >
-                <Field data-field-name="kode">
+                {feedbackSummary}
+                <FormControl data-field-name="kode">
                     <Input
                         name="kode"
                         label="Kode kelompok aset"
@@ -547,9 +561,9 @@ function ClassificationForm({
                         aria-invalid={!!errors.kode}
                     />
                     <FieldError>{errors.kode?.join(' ')}</FieldError>
-                </Field>
+                </FormControl>
                 <div className="flex items-center gap-3">
-                    <Field className="flex-1" data-field-name="label">
+                    <FormControl className="flex-1" data-field-name="label">
                         <Input
                             name="label"
                             label="Nama kelompok aset"
@@ -560,7 +574,7 @@ function ClassificationForm({
                             aria-invalid={!!errors.label}
                         />
                         <FieldError>{errors.label?.join(' ')}</FieldError>
-                    </Field>
+                    </FormControl>
                     <Badge variant={active ? 'default' : 'secondary'}>
                         {active ? 'Aktif' : 'Tidak aktif'}
                     </Badge>
@@ -577,8 +591,8 @@ function ClassificationForm({
                         summary={`${depreciable ? 'Disusutkan' : 'Tidak disusutkan'} · ${active ? 'Aktif' : 'Tidak aktif'}`}
                     >
                         <div className="space-y-4">
-                            <div className="grid gap-4 sm:grid-cols-3">
-                                <Field data-field-name="depreciable">
+                            <FormGrid className="sm:grid-cols-3">
+                                <FormControl data-field-name="depreciable">
                                     <FieldLabel htmlFor="classification-depreciable">
                                         Disusutkan
                                     </FieldLabel>
@@ -600,8 +614,8 @@ function ClassificationForm({
                                             }}
                                         />
                                     </EditShield>
-                                </Field>
-                                <Field data-field-name="allow_reducing_balance">
+                                </FormControl>
+                                <FormControl data-field-name="allow_reducing_balance">
                                     <FieldLabel htmlFor="classification-reducing">
                                         Boleh memakai saldo menurun
                                     </FieldLabel>
@@ -623,8 +637,8 @@ function ClassificationForm({
                                             }}
                                         />
                                     </EditShield>
-                                </Field>
-                                <Field data-field-name="allow_straight_line">
+                                </FormControl>
+                                <FormControl data-field-name="allow_straight_line">
                                     <FieldLabel htmlFor="classification-straight-line">
                                         Boleh memakai garis lurus
                                     </FieldLabel>
@@ -646,13 +660,14 @@ function ClassificationForm({
                                             }}
                                         />
                                     </EditShield>
-                                </Field>
-                            </div>
-                            <div className="grid gap-4 sm:grid-cols-2">
+                                </FormControl>
+                            </FormGrid>
+                            <FormGrid>
                                 {fields.map((field) => (
-                                    <Field
+                                    <FormControl
                                         key={field.name}
                                         data-field-name={field.name}
+                                        data-error-field={field.name}
                                     >
                                         <Input
                                             name={field.name}
@@ -675,9 +690,9 @@ function ClassificationForm({
                                         <FieldError>
                                             {errors[field.name]?.join(' ')}
                                         </FieldError>
-                                    </Field>
+                                    </FormControl>
                                 ))}
-                                <Field data-field-name="aktif">
+                                <FormControl data-field-name="aktif">
                                     <FieldLabel htmlFor="classification-active">
                                         Aktif
                                     </FieldLabel>
@@ -697,8 +712,8 @@ function ClassificationForm({
                                             }}
                                         />
                                     </EditShield>
-                                </Field>
-                            </div>
+                                </FormControl>
+                            </FormGrid>
                             <p className="text-muted-foreground text-sm">
                                 Perubahan di sini tidak otomatis mengubah metode
                                 penyusutan yang sudah dibuat. Periksa metode

@@ -1,5 +1,5 @@
 import { router } from '@inertiajs/react';
-import { useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { toast } from 'sonner';
 import { useWorkDate } from '@/hooks/use-work-date';
@@ -14,6 +14,7 @@ import {
     CardTitle,
 } from '@apperp/ui/card';
 import { Checkbox } from '@apperp/ui/checkbox';
+import { DatePicker } from '@apperp/ui/date-picker';
 
 import {
     Empty,
@@ -21,7 +22,8 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
-import { Field, FieldLabel } from '@apperp/ui/field';
+import { FieldLabel } from '@apperp/ui/field';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { IncrementalListStatus } from '@apperp/ui/incremental-list-status';
 import { Input } from '@apperp/ui/input';
 import {
@@ -33,16 +35,15 @@ import {
 import { Select } from '@apperp/ui/select';
 
 import { Textarea } from '@apperp/ui/textarea';
+import { useConfirmation } from '@apperp/ui/use-confirmation';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
-import {
-    api,
-    errorMessage,
-    newIdempotencyKey,
-    toastSaveError,
-} from '../../api';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
+import { RecordLookup } from '../../_shared/RecordLookup';
+import { api, errorMessage, newIdempotencyKey } from '../../api';
 import { useMasterOptions } from '../../master/useMasterOptions';
 import { useRecordList } from '../../use-record-list';
 import { useRecordOptions } from '../../use-record-list';
+import { useSaveFeedback } from '../../use-save-feedback';
 import { RecordCardHeader, recordQueryUrl } from '../_shared/record-card';
 import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
 import { useRecordQueryTarget } from '../_shared/use-record-query-target';
@@ -131,15 +132,15 @@ function AsetDetailRow({
                     />
                 )}
             </div>
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_10rem_8rem]">
-                <Field>
-                    <Select
+            <FormGrid className="sm:grid-cols-[minmax(0,1fr)_10rem_8rem]">
+                <FormControl data-error-field="jenis_aset_id">
+                    <RecordLookup
                         label="Jenis aset"
                         required
-                        {...typeSource.selectProps}
-                        items={typeSource.options.map((type) => ({
-                            value: type.id,
-                            label: type.nama,
+                        source={typeSource}
+                        items={typeSource.options.map((record) => ({
+                            value: record.id,
+                            label: typeSource.getLabel(record),
                         }))}
                         value={detail.jenis_aset_id || null}
                         placeholder="Pilih jenis aset"
@@ -152,15 +153,15 @@ function AsetDetailRow({
                             })
                         }
                     />
-                </Field>
-                <Field>
-                    <Select
+                </FormControl>
+                <FormControl data-error-field="satuan_id">
+                    <RecordLookup
                         label="Satuan"
                         required
-                        {...unitSource.selectProps}
-                        items={unitSource.options.map((unit) => ({
-                            value: unit.id,
-                            label: unit.nama,
+                        source={unitSource}
+                        items={unitSource.options.map((record) => ({
+                            value: record.id,
+                            label: unitSource.getLabel(record),
                         }))}
                         value={detail.satuan_id || null}
                         placeholder="Pilih satuan"
@@ -173,8 +174,8 @@ function AsetDetailRow({
                             })
                         }
                     />
-                </Field>
-                <Field>
+                </FormControl>
+                <FormControl data-error-field="quantity">
                     <Input
                         label="Jumlah"
                         type="number"
@@ -185,9 +186,9 @@ function AsetDetailRow({
                             onChange({ quantity: event.target.value })
                         }
                     />
-                </Field>
-            </div>
-            <Field>
+                </FormControl>
+            </FormGrid>
+            <FormControl data-error-field="requested_specification">
                 <Input
                     label="Spesifikasi yang diminta"
                     value={detail.requested_specification}
@@ -198,8 +199,8 @@ function AsetDetailRow({
                     }
                     required
                 />
-            </Field>
-            <Field>
+            </FormControl>
+            <FormControl data-error-field="estimated_unit_price">
                 <Input
                     label="Perkiraan harga satuan"
                     type="number"
@@ -210,7 +211,7 @@ function AsetDetailRow({
                         onChange({ estimated_unit_price: event.target.value })
                     }
                 />
-            </Field>
+            </FormControl>
         </div>
     );
 }
@@ -218,16 +219,36 @@ function AsetDetailRow({
 export default function PlanningPage({
     context,
     permissions,
+    createCard,
 }: {
     context: Context;
     permissions: Permission[];
+    createCard?: {
+        onCreated: (plan: Plan) => void;
+        onClose: () => void;
+    };
 }) {
+    const { confirm: confirmAction, confirmation: actionConfirmation } =
+        useConfirmation();
+
+    const {
+        feedbackSummary: pageFeedbackSummary,
+        reportSaveError: pageFeedbackReportSaveError,
+        clearSaveFeedback: pageFeedbackClearSaveFeedback,
+    } = useSaveFeedback();
+    const pageFeedback = {
+        reportSaveError: pageFeedbackReportSaveError,
+        clearSaveFeedback: pageFeedbackClearSaveFeedback,
+    };
+
     const can = (action: string) =>
         permissions.includes(`management-aset.perencanaan-aset.${action}`);
     const { date: workDate } = useWorkDate();
     const [editing, setEditing] = useState<
-        (Plan & { details: Detail[] }) | null | undefined
-    >();
+        | (Plan & { details: Detail[] })
+        | ReturnType<typeof emptyPlan>
+        | undefined
+    >(() => (createCard ? emptyPlan(workDate) : undefined));
     const [viewing, setViewing] = useState<Plan | null>(null);
     const [selectedLines, setSelectedLines] = useState<string[]>([]);
     const [manualCode, setManualCode] = useState('');
@@ -236,20 +257,39 @@ export default function PlanningPage({
         allow_automatic: boolean;
     } | null>(null);
     const [saving, setSaving] = useState(false);
-    const [cardLoading, setCardLoading] = useState(false);
+    const [cardLoading, setCardLoading] = useState(Boolean(createCard));
     const [planDirty, setPlanDirty] = useState(false);
     const sheetContentRef = useRef<HTMLDivElement>(null);
+    const {
+        feedbackSummary: editFeedbackSummary,
+        reportSaveError: editFeedbackReportSaveError,
+        clearSaveFeedback: editFeedbackClearSaveFeedback,
+    } = useSaveFeedback(
+        sheetContentRef,
+        editing !== undefined ? 'editing' : 'closed',
+    );
+    const editFeedback = {
+        reportSaveError: editFeedbackReportSaveError,
+        clearSaveFeedback: editFeedbackClearSaveFeedback,
+    };
 
     // Effect adalah satu-satunya pemilik pengambilan daftar rencana. Pemuatan ulang
     // setelah simpan atau arsip dinyatakan dengan menaikkan penanda ini.
     const [versiMuat, setVersiMuat] = useState(0);
     const muatUlang = () => setVersiMuat((versi) => versi + 1);
 
-    const list = useRecordList<Plan>('/perencanaan-aset', '', {
-        refresh: String(versiMuat),
-    });
+    const list = useRecordList<Plan>(
+        '/perencanaan-aset',
+        '',
+        {
+            refresh: String(versiMuat),
+        },
+        !createCard,
+    );
     const plans = list.items;
     const openCreate = async () => {
+        editFeedback.clearSaveFeedback();
+
         setCardLoading(true);
         setNumberPolicy(null);
         setManualCode('');
@@ -259,15 +299,56 @@ export default function PlanningPage({
                 data: { allow_manual: boolean; allow_automatic: boolean };
             }>('/perencanaan-aset/number-policy');
             setNumberPolicy(result.data);
-            setEditing(emptyPlan(workDate) as never);
+            setEditing(emptyPlan(workDate));
         } catch (caught) {
             toast.error(
                 errorMessage(caught, 'Pengaturan kode belum dapat dimuat.'),
             );
+            createCard?.onClose();
         } finally {
             setCardLoading(false);
         }
     };
+
+    const closeCreateCard = useEffectEvent(() => createCard?.onClose());
+    const isCreateCard = Boolean(createCard);
+    useEffect(() => {
+        if (!isCreateCard) {
+            return;
+        }
+
+        const request = new AbortController();
+        const loadPolicy = async () => {
+            try {
+                const result = await api<{
+                    data: { allow_manual: boolean; allow_automatic: boolean };
+                }>('/perencanaan-aset/number-policy', {
+                    signal: request.signal,
+                });
+
+                if (!request.signal.aborted) {
+                    setNumberPolicy(result.data);
+                }
+            } catch (caught) {
+                if (!request.signal.aborted) {
+                    toast.error(
+                        errorMessage(
+                            caught,
+                            'Pengaturan kode belum dapat dimuat.',
+                        ),
+                    );
+                    closeCreateCard();
+                }
+            } finally {
+                if (!request.signal.aborted) {
+                    setCardLoading(false);
+                }
+            }
+        };
+        void loadPolicy();
+
+        return () => request.abort();
+    }, [isCreateCard]);
 
     const openDetails = async (id: string, signal?: AbortSignal) => {
         setCardLoading(true);
@@ -303,9 +384,12 @@ export default function PlanningPage({
 
     const clearRecordTarget = useRecordQueryTarget({
         scopeKey: 'perencanaan-aset',
+        enabled: !createCard,
         onOpen: (id, signal) => openDetails(id, signal),
     });
     const openEdit = async (id: string) => {
+        editFeedback.clearSaveFeedback();
+
         setCardLoading(true);
 
         try {
@@ -330,7 +414,15 @@ export default function PlanningPage({
     };
 
     const archive = async (plan: Pick<Plan, 'id' | 'kode' | 'version'>) => {
-        if (!window.confirm(`Delete rencana ${plan.kode}?`)) {
+        if (
+            !(await confirmAction({
+                title: `Delete rencana ${plan.kode}?`,
+                description:
+                    'Data yang dihapus tidak lagi tampil pada daftar pilihan.',
+                confirmLabel: 'Delete',
+                destructive: true,
+            }))
+        ) {
             return;
         }
 
@@ -349,7 +441,10 @@ export default function PlanningPage({
             );
             muatUlang();
         } catch (caught) {
-            toastSaveError(caught, 'Rencana aset belum dapat diarsipkan.');
+            pageFeedback.reportSaveError(
+                caught,
+                'Rencana aset belum dapat diarsipkan.',
+            );
         } finally {
             setSaving(false);
         }
@@ -369,7 +464,8 @@ export default function PlanningPage({
 
     const save = async () => {
         if (!editing || !context.legal_entity_id || !context.org_unit_id) {
-            toast.error(
+            editFeedback.reportSaveError(
+                null,
                 'Pilih perusahaan dan unit kerja aktif sebelum membuat rencana.',
             );
 
@@ -384,7 +480,8 @@ export default function PlanningPage({
                     detail.requested_specification.trim(),
             )
         ) {
-            toast.error(
+            editFeedback.reportSaveError(
+                null,
                 'Pilih jenis aset, satuan, dan isi spesifikasi pada setiap rincian.',
             );
 
@@ -396,7 +493,10 @@ export default function PlanningPage({
             !numberPolicy?.allow_automatic &&
             !manualCode.trim()
         ) {
-            toast.error('Isi kode perencanaan terlebih dahulu.');
+            editFeedback.reportSaveError(
+                null,
+                'Isi kode perencanaan terlebih dahulu.',
+            );
 
             return;
         }
@@ -425,36 +525,51 @@ export default function PlanningPage({
                     body: JSON.stringify({ ...body, version: editing.version }),
                 });
             } else {
-                await api('/perencanaan-aset', {
+                const result = await api<{ data: Plan }>('/perencanaan-aset', {
                     method: 'POST',
                     headers: { 'Idempotency-Key': newIdempotencyKey() },
                     body: JSON.stringify(body),
                 });
+
+                if (createCard) {
+                    editFeedback.clearSaveFeedback();
+                    toast.success('Rencana aset disimpan.');
+                    createCard.onCreated(result.data);
+
+                    return;
+                }
             }
 
             clearRecordTarget();
             setEditing(undefined);
             muatUlang();
+            editFeedback.clearSaveFeedback();
             toast.success('Rencana aset disimpan.');
         } catch (caught) {
-            toastSaveError(caught, 'Rencana aset belum dapat disimpan.');
+            editFeedback.reportSaveError(
+                caught,
+                'Rencana aset belum dapat disimpan.',
+            );
         } finally {
             setSaving(false);
         }
     };
 
-    const discardPlan = () =>
-        !planDirty || window.confirm('Buang perubahan yang belum disimpan?');
+    const {
+        request: requestPlanTransition,
+        confirmation: planTransitionConfirmation,
+    } = useRecordTransition(planDirty, saving || cardLoading);
     const newPlan = () => {
-        if (!saving && !cardLoading && discardPlan()) {
+        requestPlanTransition(() => {
             clearRecordTarget();
             void openCreate();
-        }
+        });
     };
     const closePlan = () => {
-        if (!saving && !cardLoading && discardPlan()) {
+        requestPlanTransition(() => {
             setEditing(undefined);
-        }
+            createCard?.onClose();
+        });
     };
     useRecordCardDirty({
         value: { editing, manualCode },
@@ -486,91 +601,106 @@ export default function PlanningPage({
     });
 
     return (
-        <Card className="min-h-full rounded-none border-0 shadow-none">
-            <CardHeader className="border-b">
-                <CardTitle>Perencanaan aset</CardTitle>
-                {can('create') && (
-                    <CardAction>
-                        <ActionButton
-                            action="create"
-                            onClick={() => void openCreate()}
-                        />
-                    </CardAction>
-                )}
-            </CardHeader>
-            <CardContent className="px-0">
-                {!plans.length && !list.loading && !list.error ? (
-                    <Empty>
-                        <EmptyHeader>
-                            <EmptyTitle>Belum ada rencana aset</EmptyTitle>
-                            <EmptyDescription>
-                                Rencana dibuat dari jenis aset. Spesifikasi
-                                dicatat pada rincian rencana, bukan pada master.
-                            </EmptyDescription>
-                        </EmptyHeader>
-                    </Empty>
-                ) : (
-                    <div className="divide-y">
-                        {plans.map((plan) => (
-                            <div
-                                key={plan.id}
-                                className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"
-                            >
-                                <div className="min-w-0 flex-1">
-                                    <p
-                                        className="truncate font-medium"
-                                        title={`${plan.kode} - ${plan.description || 'Tanpa tujuan'}`}
+        <>
+            {actionConfirmation}
+
+            {planTransitionConfirmation}
+            {!createCard && (
+                <Card className="min-h-full rounded-none border-0 shadow-none">
+                    <CardHeader className="border-b">
+                        <CardTitle>Perencanaan aset</CardTitle>
+                        {can('create') && (
+                            <CardAction>
+                                <ActionButton
+                                    action="create"
+                                    onClick={() => void openCreate()}
+                                />
+                            </CardAction>
+                        )}
+                    </CardHeader>
+                    <CardContent className="px-0">
+                        {!viewing && pageFeedbackSummary}
+                        {!plans.length && !list.loading && !list.error ? (
+                            <Empty>
+                                <EmptyHeader>
+                                    <EmptyTitle>
+                                        Belum ada rencana aset
+                                    </EmptyTitle>
+                                    <EmptyDescription>
+                                        Rencana dibuat dari jenis aset.
+                                        Spesifikasi dicatat pada rincian
+                                        rencana, bukan pada master.
+                                    </EmptyDescription>
+                                </EmptyHeader>
+                            </Empty>
+                        ) : (
+                            <div className="divide-y">
+                                {plans.map((plan) => (
+                                    <div
+                                        key={plan.id}
+                                        className="flex flex-wrap items-center justify-between gap-3 px-5 py-4"
                                     >
-                                        {plan.kode} ·{' '}
-                                        {plan.description || 'Tanpa tujuan'}
-                                    </p>
-                                    <p className="text-muted-foreground text-sm">
-                                        {plan.planned_on} ·{' '}
-                                        {plan.planning_type === 'regular'
-                                            ? 'Reguler'
-                                            : 'Tambahan'}{' '}
-                                        · Rp{' '}
-                                        {Number(
-                                            plan.total_estimated_value,
-                                        ).toLocaleString('id-ID')}
-                                    </p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <Badge variant="secondary">
-                                        {plan.status === 'draft'
-                                            ? 'Draf'
-                                            : plan.status}
-                                    </Badge>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() =>
-                                            void openDetails(plan.id)
-                                        }
-                                    >
-                                        Buka rincian
-                                    </Button>
-                                    {can('update') && (
-                                        <ActionButton
-                                            action="edit"
-                                            onClick={() =>
-                                                void openEdit(plan.id)
-                                            }
-                                        />
-                                    )}
-                                    {can('archive') && (
-                                        <ActionButton
-                                            action="archive"
-                                            onClick={() => void archive(plan)}
-                                        />
-                                    )}
-                                </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p
+                                                className="truncate font-medium"
+                                                title={`${plan.kode} - ${plan.description || 'Tanpa tujuan'}`}
+                                            >
+                                                {plan.kode} ·{' '}
+                                                {plan.description ||
+                                                    'Tanpa tujuan'}
+                                            </p>
+                                            <p className="text-muted-foreground text-sm">
+                                                {plan.planned_on} ·{' '}
+                                                {plan.planning_type ===
+                                                'regular'
+                                                    ? 'Reguler'
+                                                    : 'Tambahan'}{' '}
+                                                · Rp{' '}
+                                                {Number(
+                                                    plan.total_estimated_value,
+                                                ).toLocaleString('id-ID')}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="secondary">
+                                                {plan.status === 'draft'
+                                                    ? 'Draf'
+                                                    : plan.status}
+                                            </Badge>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() =>
+                                                    void openDetails(plan.id)
+                                                }
+                                            >
+                                                Buka rincian
+                                            </Button>
+                                            {can('update') && (
+                                                <ActionButton
+                                                    action="edit"
+                                                    onClick={() =>
+                                                        void openEdit(plan.id)
+                                                    }
+                                                />
+                                            )}
+                                            {can('archive') && (
+                                                <ActionButton
+                                                    action="archive"
+                                                    onClick={() =>
+                                                        void archive(plan)
+                                                    }
+                                                />
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                        ))}
-                    </div>
-                )}
-                <IncrementalListStatus state={list} />
-            </CardContent>
+                        )}
+                        <IncrementalListStatus state={list} />
+                    </CardContent>
+                </Card>
+            )}
 
             <PageDialog
                 open={viewing !== null}
@@ -609,6 +739,7 @@ export default function PlanningPage({
                                     : undefined
                             }
                         />
+                        {pageFeedbackSummary}
                         {permissions.includes(
                             'management-aset.permintaan-pembelian-aset.create',
                         ) && (
@@ -733,7 +864,7 @@ export default function PlanningPage({
                                 <ActionButton
                                     action="save"
                                     type="button"
-                                    disabled={saving}
+                                    disabled={saving || cardLoading}
                                     onClick={() => void save()}
                                     pending={saving}
                                 />
@@ -743,6 +874,7 @@ export default function PlanningPage({
                                     onClick={closePlan}
                                 />
                             </PageDialogToolbar>
+                            {editFeedbackSummary}
                             <PageDialogBody
                                 className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4"
                                 inert={cardLoading || saving}
@@ -751,55 +883,53 @@ export default function PlanningPage({
                                     Unit perencanaan dan penanggung jawab
                                     mengikuti konteks aktif Anda.
                                 </p>
-                                <Input
-                                    label="Kode perencanaan"
-                                    value={
-                                        'id' in editing
-                                            ? editing.kode
-                                            : numberPolicy?.allow_manual
-                                              ? manualCode
-                                              : 'Dibuat otomatis saat disimpan'
-                                    }
-                                    disabled={
-                                        'id' in editing ||
-                                        !numberPolicy?.allow_manual
-                                    }
-                                    required={
-                                        !('id' in editing) &&
-                                        !numberPolicy?.allow_automatic
-                                    }
-                                    placeholder={
-                                        numberPolicy?.allow_automatic
-                                            ? 'Kosongkan untuk membuat kode otomatis'
-                                            : 'Masukkan kode'
-                                    }
-                                    onChange={(event) =>
-                                        setManualCode(event.target.value)
-                                    }
-                                />
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    <Field>
-                                        <Input
+                                <FormControl data-error-field="kode">
+                                    <Input
+                                        label="Kode perencanaan"
+                                        value={
+                                            'id' in editing
+                                                ? editing.kode
+                                                : numberPolicy?.allow_manual
+                                                  ? manualCode
+                                                  : 'Dibuat otomatis saat disimpan'
+                                        }
+                                        disabled={
+                                            'id' in editing ||
+                                            !numberPolicy?.allow_manual
+                                        }
+                                        required={
+                                            !('id' in editing) &&
+                                            !numberPolicy?.allow_automatic
+                                        }
+                                        placeholder={
+                                            numberPolicy?.allow_automatic
+                                                ? 'Kosongkan untuk membuat kode otomatis'
+                                                : 'Masukkan kode'
+                                        }
+                                        onChange={(event) =>
+                                            setManualCode(event.target.value)
+                                        }
+                                    />
+                                </FormControl>
+                                <FormGrid>
+                                    <FormControl data-error-field="planned_on">
+                                        <DatePicker
                                             label="Tanggal perencanaan"
-                                            type="date"
+
                                             value={editing.planned_on}
-                                            onChange={(event) =>
+                                            onValueChange={(value) =>
                                                 setEditing({
                                                     ...editing,
-                                                    planned_on:
-                                                        event.target.value,
+                                                    planned_on: value,
                                                     planning_year: Number(
-                                                        event.target.value.slice(
-                                                            0,
-                                                            4,
-                                                        ),
+                                                        value.slice(0, 4),
                                                     ),
                                                 })
                                             }
                                             required
                                         />
-                                    </Field>
-                                    <Field>
+                                    </FormControl>
+                                    <FormControl data-error-field="planning_year">
                                         <Input
                                             label="Tahun perencanaan"
                                             type="number"
@@ -814,8 +944,8 @@ export default function PlanningPage({
                                             }
                                             required
                                         />
-                                    </Field>
-                                    <Field>
+                                    </FormControl>
+                                    <FormControl data-error-field="planning_type">
                                         <Select
                                             label="Jenis perencanaan"
                                             required
@@ -839,8 +969,8 @@ export default function PlanningPage({
                                                 })
                                             }
                                         />
-                                    </Field>
-                                    <Field>
+                                    </FormControl>
+                                    <FormControl data-error-field="funding_source">
                                         <Input
                                             label="Sumber dana"
                                             value={editing.funding_source ?? ''}
@@ -852,9 +982,9 @@ export default function PlanningPage({
                                                 })
                                             }
                                         />
-                                    </Field>
-                                </div>
-                                <Field>
+                                    </FormControl>
+                                </FormGrid>
+                                <FormControl data-error-field="description">
                                     <FieldLabel htmlFor="planning-description">
                                         Tujuan perencanaan
                                     </FieldLabel>
@@ -870,7 +1000,7 @@ export default function PlanningPage({
                                             })
                                         }
                                     />
-                                </Field>
+                                </FormControl>
                                 <div className="space-y-3">
                                     <div className="flex items-center justify-between">
                                         <h3 className="font-medium">
@@ -921,6 +1051,6 @@ export default function PlanningPage({
                     )}
                 </PageDialogContent>
             </PageDialog>
-        </Card>
+        </>
     );
 }

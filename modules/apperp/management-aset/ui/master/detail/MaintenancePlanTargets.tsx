@@ -1,17 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import { Checkbox } from '@apperp/ui/checkbox';
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
+import { DatePicker } from '@apperp/ui/date-picker';
 import { DialogToolbar } from '@apperp/ui/dialog';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
-import { Input } from '@apperp/ui/input';
+import { FormControl } from '@apperp/ui/form-control';
+
 import { Select } from '@apperp/ui/select';
+import RecordLookup from '../../_shared/RecordLookup';
 
 import { api, errorMessage } from '../../api';
 import { useRecordOptions } from '../../use-record-list';
+import { useSaveFeedback } from '../../use-save-feedback';
 import type { MasterOption } from '../useMasterOptions';
 import { optionLabel, useMasterOptions } from '../useMasterOptions';
 
@@ -79,9 +83,17 @@ export default function MaintenancePlanTargets({
     version: number;
     onVersionChange: (version: number) => void;
 }) {
+    const portal = useRef<HTMLDivElement | null>(null);
     const [targets, setTargets] = useState<Target[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const {
+        scopeRef: feedbackScopeRef,
+        feedbackSummary,
+        reportSaveError,
+        clearSaveFeedback,
+        fieldError,
+    } = useSaveFeedback(undefined, planId);
     const [error, setError] = useState('');
     const [saved, setSaved] = useState(false);
     const assetSource = useRecordOptions<MasterOption>(
@@ -137,6 +149,7 @@ export default function MaintenancePlanTargets({
     }
 
     async function save() {
+        clearSaveFeedback();
         setSaving(true);
         setError('');
 
@@ -167,9 +180,7 @@ export default function MaintenancePlanTargets({
             onVersionChange(result.version);
             setSaved(true);
         } catch (caught) {
-            setError(
-                errorMessage(caught, 'Objek rencana belum dapat disimpan.'),
-            );
+            reportSaveError(caught, 'Objek rencana belum dapat disimpan.');
         } finally {
             setSaving(false);
         }
@@ -217,7 +228,16 @@ export default function MaintenancePlanTargets({
     }
 
     return (
-        <div className="space-y-3">
+        <div
+            ref={(node) => {
+                feedbackScopeRef.current = node;
+                portal.current = node?.closest<HTMLElement>(
+                    '[data-slot="page-dialog-contents"]',
+                ) as HTMLDivElement | null;
+            }}
+            className="space-y-3"
+        >
+            {feedbackSummary}
             <DialogToolbar className="px-0">
                 <ActionButton
                     action="save"
@@ -262,81 +282,118 @@ export default function MaintenancePlanTargets({
                     >[] = [
                         {
                             id: 'column-0',
+                            content: 'control',
                             header: 'Berlaku untuk',
                             cell: ({ target, index }) => (
                                 <div className="min-w-48">
-                                    <Select
-                                        items={KINDS}
-                                        value={target.kind}
-                                        ariaLabel={`Jenis objek baris ${index + 1}`}
-                                        onValueChange={(value) =>
-                                            value &&
-                                            update(index, {
-                                                kind: value as Kind,
-                                                aset_id: '',
-                                                jenis_aset_id: '',
-                                            })
-                                        }
-                                    />
+                                    <FormControl
+                                        data-error-field={`targets.${index}.kind`}
+                                        error={fieldError(
+                                            `targets.${index}.kind`,
+                                        )}
+                                    >
+                                        <Select
+                                            portalContainer={portal}
+                                            items={KINDS}
+                                            value={target.kind}
+                                            ariaLabel={`Jenis objek baris ${index + 1}`}
+                                            onValueChange={(value) =>
+                                                value &&
+                                                update(index, {
+                                                    kind: value as Kind,
+                                                    aset_id: '',
+                                                    jenis_aset_id: '',
+                                                })
+                                            }
+                                        />
+                                    </FormControl>
                                 </div>
                             ),
                         } satisfies DataTableColumn<(typeof sdkRows)[number]>,
                         {
                             id: 'column-1',
+                            content: 'control',
                             header: 'Aset atau jenis aset',
                             cell: ({ target, index }) => (
                                 <div className="min-w-64">
                                     {target.kind === 'aset' ? (
-                                        <Select
-                                            {...assetSource.selectProps}
-                                            items={items(assets)}
-                                            value={target.aset_id || null}
-                                            placeholder="Pilih aset"
-                                            ariaLabel={`Aset baris ${index + 1}`}
-                                            onValueChange={(value) =>
-                                                update(index, {
-                                                    aset_id: value ?? '',
-                                                })
-                                            }
-                                        />
+                                        <FormControl
+                                            data-error-field={`targets.${index}.aset_id`}
+                                            error={fieldError(
+                                                `targets.${index}.aset_id`,
+                                            )}
+                                        >
+                                            <RecordLookup
+                                                source={assetSource}
+                                                portalContainer={portal}
+                                                items={items(assets)}
+                                                value={target.aset_id || null}
+                                                placeholder="Pilih aset"
+                                                ariaLabel={`Aset baris ${index + 1}`}
+                                                onValueChange={(value) =>
+                                                    update(index, {
+                                                        aset_id: value ?? '',
+                                                    })
+                                                }
+                                            />
+                                        </FormControl>
                                     ) : (
-                                        <Select
-                                            {...jenis.selectProps}
-                                            items={items(jenis.options)}
-                                            value={target.jenis_aset_id || null}
-                                            placeholder="Pilih jenis aset"
-                                            ariaLabel={`Jenis aset baris ${index + 1}`}
-                                            onValueChange={(value) =>
-                                                update(index, {
-                                                    jenis_aset_id: value ?? '',
-                                                })
-                                            }
-                                        />
+                                        <FormControl
+                                            data-error-field={`targets.${index}.jenis_aset_id`}
+                                            error={fieldError(
+                                                `targets.${index}.jenis_aset_id`,
+                                            )}
+                                        >
+                                            <RecordLookup
+                                                source={jenis}
+                                                portalContainer={portal}
+                                                items={items(jenis.options)}
+                                                value={
+                                                    target.jenis_aset_id || null
+                                                }
+                                                placeholder="Pilih jenis aset"
+                                                ariaLabel={`Jenis aset baris ${index + 1}`}
+                                                onValueChange={(value) =>
+                                                    update(index, {
+                                                        jenis_aset_id:
+                                                            value ?? '',
+                                                    })
+                                                }
+                                            />
+                                        </FormControl>
                                     )}
                                 </div>
                             ),
                         } satisfies DataTableColumn<(typeof sdkRows)[number]>,
                         {
                             id: 'column-2',
+                            content: 'control',
                             header: 'Tanggal mulai',
                             cell: ({ target, index }) => (
                                 <>
-                                    <Input
-                                        type="date"
-                                        aria-label={`Tanggal mulai baris ${index + 1}`}
-                                        value={target.tanggal_mulai}
-                                        onChange={(event) =>
-                                            update(index, {
-                                                tanggal_mulai:
-                                                    event.target.value,
-                                            })
-                                        }
-                                    />
+                                    <FormControl
+                                        data-error-field={`targets.${index}.tanggal_mulai`}
+                                        error={fieldError(
+                                            `targets.${index}.tanggal_mulai`,
+                                        )}
+                                    >
+                                        <DatePicker
+                                            portalContainer={portal}
+                                            aria-label={`Tanggal mulai baris ${index + 1}`}
+                                            value={target.tanggal_mulai}
+                                            onValueChange={(value) =>
+                                                update(index, {
+                                                    tanggal_mulai: value,
+                                                })
+                                            }
+                                        />
+                                    </FormControl>
                                 </>
                             ),
                         } satisfies DataTableColumn<(typeof sdkRows)[number]>,
                         {
                             id: 'column-3',
+                            content: 'control',
                             header: 'Aktif',
                             cell: ({ target, index }) => (
                                 <>

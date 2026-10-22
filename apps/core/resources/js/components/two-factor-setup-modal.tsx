@@ -14,9 +14,11 @@ import { REGEXP_ONLY_DIGITS } from 'input-otp';
 import { Check, Copy, ScanLine } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AlertError from '@/components/alert-error';
+import { FormErrorHeader } from '@/components/form-error-header';
 import InputError from '@/components/input-error';
 import { useAppearance } from '@/hooks/use-appearance';
 import { useClipboard } from '@/hooks/use-clipboard';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import { OTP_MAX_LENGTH } from '@/hooks/use-two-factor-auth';
 import { confirm } from '@/routes/two-factor';
 
@@ -143,6 +145,9 @@ function TwoFactorVerificationStep({
     onClose: () => void;
     onBack: () => void;
 }) {
+    const { wrap: wrapFormResponse1, summary: formResponse1Summary } =
+        useInertiaFeedback();
+
     const [code, setCode] = useState<string>('');
     const pinInputContainerRef = useRef<HTMLDivElement>(null);
 
@@ -154,10 +159,12 @@ function TwoFactorVerificationStep({
 
     return (
         <Form
+            noValidate
             {...confirm.form()}
             onSuccess={() => onClose()}
             resetOnError
             resetOnSuccess
+            {...wrapFormResponse1({})}
         >
             {({
                 processing,
@@ -167,6 +174,15 @@ function TwoFactorVerificationStep({
                 errors?: { confirmTwoFactorAuthentication?: { code?: string } };
             }) => (
                 <>
+                    <>
+                        {formResponse1Summary}
+                        <FormErrorHeader
+                            message={
+                                errors?.confirmTwoFactorAuthentication?.code
+                            }
+                        />
+                    </>
+
                     <div
                         ref={pinInputContainerRef}
                         className="relative w-full space-y-3"
