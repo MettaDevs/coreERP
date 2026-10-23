@@ -28,7 +28,6 @@ import { ApiError, api, errorMessage } from '../api';
 import { useRecordQueryTarget } from '../transactions/_shared/use-record-query-target';
 import { useRecordList } from '../use-record-list';
 import { useSaveFeedback } from '../use-save-feedback';
-import GroupBookMatrix from './GroupBookMatrix';
 import MasterForm from './MasterForm';
 import type {
     MasterAction,
@@ -39,51 +38,10 @@ import type {
 } from './masters';
 import { parentSummaryOf, permission } from './masters';
 import MasterSelect from './MasterSelect';
-import TipeAtributNilai from './TipeAtributNilai';
 
 const optionLabel = (option: ParentSummary) =>
     `${option.kode} — ${option.nama}`;
 const allLabel = (label: string) => `Semua ${label.toLowerCase()}`;
-
-/**
- * Bagian yang disunting di dalam form pemiliknya, bukan sebagai menu tersendiri.
- *
- * Seluruhnya butuh id pemilik, jadi baru muncul setelah record tersimpan. Pilihan nilai
- * hanya relevan untuk atribut teks; ada atau tidaknya Values menentukan apakah form
- * aset memakai dropdown atau teks bebas.
- */
-function extraSectionFor(
-    resource: string,
-    record: MasterRecord,
-    canEdit: boolean,
-    onVersionChange: (version: number) => void,
-) {
-    // Rincian disimpan dengan mengklaim versi record pemiliknya, jadi versi itu satu dan
-    // dipegang bersama form: simpan rincian lalu simpan form tidak saling menolak.
-    if (resource === 'group-aset') {
-        return (
-            <GroupBookMatrix
-                groupId={record.id}
-                canEdit={canEdit}
-                version={record.version}
-                onVersionChange={onVersionChange}
-            />
-        );
-    }
-
-    if (resource === 'tipe-atribut' && record.data_type === 'string') {
-        return (
-            <TipeAtributNilai
-                tipeAtributId={record.id}
-                canEdit={canEdit}
-                version={record.version}
-                onVersionChange={onVersionChange}
-            />
-        );
-    }
-
-    return undefined;
-}
 
 export default function MasterPage({
     config,
@@ -139,7 +97,7 @@ export default function MasterPage({
         `/${config.resource}?${query}`,
         search,
     );
-    const { items, setItems, loading } = list;
+    const { items, loading } = list;
     const load = () => {
         setError('');
         list.reload();
@@ -186,23 +144,6 @@ export default function MasterPage({
         [picked, items],
     );
 
-    async function toggle(item: MasterRecord) {
-        clearMutationFeedback();
-
-        try {
-            await api(`/${config.resource}/${item.id}`, {
-                method: 'PATCH',
-                body: JSON.stringify({
-                    aktif: !item.aktif,
-                    version: item.version,
-                }),
-            });
-            load();
-        } catch (caught) {
-            reportMutationError(caught, 'Status belum dapat diubah.');
-        }
-    }
-
     async function archive(item: MasterRecord) {
         clearMutationFeedback();
 
@@ -230,57 +171,6 @@ export default function MasterPage({
         } catch (caught) {
             reportMutationError(caught, 'Data belum dapat diarsipkan.');
         }
-    }
-
-    async function changeSelected(aktif: boolean) {
-        clearMutationFeedback();
-        const selected = items.filter(
-            (item) => selectedIds.includes(item.id) && item.aktif !== aktif,
-        );
-
-        if (!selected.length) {
-            return;
-        }
-
-        const action = aktif ? 'Aktifkan' : 'Nonaktifkan';
-
-        if (
-            !(await confirmAction({
-                title: `${action} ${selected.length} data terpilih?`,
-                description:
-                    'Status data terpilih akan diubah sesuai pilihanmu.',
-                confirmLabel: action,
-                destructive: false,
-            }))
-        ) {
-            return;
-        }
-
-        const results = await Promise.allSettled(
-            selected.map((item) =>
-                api(`/${config.resource}/${item.id}`, {
-                    method: 'PATCH',
-                    body: JSON.stringify({ aktif, version: item.version }),
-                }),
-            ),
-        );
-        const failed = results.filter(
-            (result) => result.status === 'rejected',
-        ).length;
-        setPicked([]);
-
-        if (failed) {
-            reportMutationError(
-                new ApiError(
-                    `${selected.length - failed} data berhasil diubah. ${failed} data belum dapat diubah. Periksa status data sebelum mengulang.`,
-                    {},
-                    422,
-                ),
-                'Sebagian data belum dapat diubah.',
-            );
-        }
-
-        load();
     }
 
     async function archiveSelected() {
@@ -325,18 +215,6 @@ export default function MasterPage({
         }
 
         load();
-    }
-
-    /** Versi baru sesudah rincian disimpan, untuk form yang terbuka dan baris daftarnya. */
-    function changeVersion(id: string, version: number) {
-        setEditing((current) =>
-            current?.id === id ? { ...current, version } : current,
-        );
-        setItems((current) =>
-            current.map((item) =>
-                item.id === id ? { ...item, version } : item,
-            ),
-        );
     }
 
     const typeLabel: Record<string, string> = {
@@ -433,10 +311,7 @@ export default function MasterPage({
     const rowActions: DataTableRowAction[] = [];
 
     if (can('update')) {
-        rowActions.push(
-            { id: 'edit', label: 'Ubah' },
-            { id: 'toggle', label: 'Ubah status' },
-        );
+        rowActions.push({ id: 'edit', label: 'Ubah' });
     }
 
     if (can('archive')) {
@@ -551,15 +426,6 @@ export default function MasterPage({
                         <div className="bg-muted/40 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b px-5 py-2 text-sm">
                             <span>{selectedIds.length} data dipilih</span>
                             <div className="flex gap-2">
-                                {can('update') && (
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => changeSelected(false)}
-                                    >
-                                        Nonaktifkan
-                                    </Button>
-                                )}
                                 {can('archive') && (
                                     <ActionButton
                                         action="archive"
@@ -618,10 +484,6 @@ export default function MasterPage({
                                     setEditing(item);
                                 }
 
-                                if (action === 'toggle') {
-                                    toggle(item);
-                                }
-
                                 if (action === 'archive') {
                                     archive(item);
                                 }
@@ -658,39 +520,11 @@ export default function MasterPage({
                         setEditing(undefined);
                     }}
                     key={editing?.id ?? 'baru'}
-                    onSaved={(savedRecord, created) => {
-                        // Form hanya tetap terbuka bila ada rincian lanjutan yang
-                        // baru dapat diisi setelah record pemiliknya tersimpan.
-                        const keepOpen =
-                            created &&
-                            Boolean(
-                                extraSectionFor(
-                                    config.resource,
-                                    savedRecord,
-                                    can('update'),
-                                    (version) =>
-                                        changeVersion(savedRecord.id, version),
-                                ),
-                            );
-
-                        if (!keepOpen) {
-                            clearRecordTarget();
-                        }
-
-                        setEditing(keepOpen ? savedRecord : undefined);
+                    onSaved={() => {
+                        clearRecordTarget();
+                        setEditing(undefined);
                         void load();
                     }}
-                    extraSection={
-                        editing
-                            ? extraSectionFor(
-                                  config.resource,
-                                  editing,
-                                  can('update'),
-                                  (version) =>
-                                      changeVersion(editing.id, version),
-                              )
-                            : undefined
-                    }
                 />
             )}
         </div>

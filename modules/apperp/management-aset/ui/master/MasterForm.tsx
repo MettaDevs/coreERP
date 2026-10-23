@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { FormEvent, ReactNode } from 'react';
+import type { FormEvent } from 'react';
 import { ActionButton } from '@apperp/ui/action-button';
 
 import { Field, FieldLabel, FieldTitle } from '@apperp/ui/field';
@@ -23,11 +23,15 @@ import {
     RecordCardHeader,
     recordQueryUrl,
 } from '../transactions/_shared/record-card';
-import type { DraftMasterDetailsValue } from './DraftMasterDetails';
+import type {
+    DraftMasterDetailsValue,
+    MasterDetailsPayload,
+} from './DraftMasterDetails';
 import DraftMasterDetails, { draftMasterPayload } from './DraftMasterDetails';
 import DynamicField from './DynamicField';
 import type { FieldValue } from './fields';
 import { isVisible, payloadValue, valueFrom } from './fields';
+import GroupBookMatrix, { groupBookRowsPayload } from './GroupBookMatrix';
 import LokasiAsetFields from './LokasiAsetFields';
 import type {
     MasterConfig,
@@ -39,6 +43,7 @@ import { parentIdOf, parentSummaryOf } from './masters';
 import MasterSelect from './MasterSelect';
 import { changeProfileField } from './serviceLife';
 import ServiceLifeFields from './ServiceLifeFields';
+import TipeAtributNilai from './TipeAtributNilai';
 import { useNumberPolicy } from './useNumberPolicy';
 
 type FormValue = { nama: string; keterangan: string; aktif: boolean };
@@ -48,7 +53,6 @@ export default function MasterForm({
     value,
     onClose,
     onSaved,
-    extraSection,
     onNew,
     onDelete,
     navigation,
@@ -65,8 +69,6 @@ export default function MasterForm({
     value: MasterRecord | null;
     onClose: () => void;
     onSaved: (record: MasterRecord, created: boolean) => void | Promise<void>;
-    /** Bagian tambahan di bawah field, misalnya matriks yang disunting di dalam form ini. */
-    extraSection?: ReactNode;
     onNew?: () => void;
     onDelete?: () => void;
     navigation?: PageDialogNavigation;
@@ -109,14 +111,21 @@ export default function MasterForm({
     const [draftDetails, setDraftDetails] = useState<DraftMasterDetailsValue>(
         {},
     );
+    const [stagedDetails, setStagedDetails] = useState<MasterDetailsPayload>(
+        {},
+    );
     const [detailErrors, setDetailErrors] = useState<ApiValidationErrors>({});
     const [initialSnapshot] = useState(() =>
         JSON.stringify({ form, parentIds, extra, manualCode }),
     );
     const dirty =
+        Object.keys(stagedDetails).length > 0 ||
         JSON.stringify({ form, parentIds, extra, manualCode }) !==
             initialSnapshot ||
         Object.values(draftDetails).some((rows) => rows && rows.length > 0);
+    function stageDetails(next: MasterDetailsPayload) {
+        setStagedDetails((current) => ({ ...current, ...next }));
+    }
     const [feedback, setFeedback] = useState<FormFeedback | null>(null);
     const [saving, setSaving] = useState(false);
     const creationKey = useRef(newIdempotencyKey());
@@ -168,6 +177,15 @@ export default function MasterForm({
         setDetailErrors({});
 
         try {
+            const applicableDetails = { ...stagedDetails };
+
+            if (
+                config.resource === 'tipe-atribut' &&
+                extra.data_type !== 'string'
+            ) {
+                delete applicableDetails.values;
+            }
+
             const saved = await api<{ data: MasterRecord }>(
                 `/${config.resource}${value ? `/${value.id}` : ''}`,
                 {
@@ -190,6 +208,9 @@ export default function MasterForm({
                                       extra,
                                   ),
                               }
+                            : {}),
+                        ...(value && Object.keys(applicableDetails).length > 0
+                            ? { details: applicableDetails }
                             : {}),
                         nama: form.nama,
                         keterangan: form.keterangan,
@@ -309,6 +330,8 @@ export default function MasterForm({
                             scopeRef={contentRef}
                         />
                         <PageDialogBody
+                            inert={saving || undefined}
+                            aria-busy={saving}
                             className="space-y-4"
                             scroll-region="true"
                         >
@@ -533,7 +556,32 @@ export default function MasterForm({
                                     portalContainer={contentRef}
                                 />
                             )}
-                            {extraSection}
+                            {value && config.resource === 'group-aset' && (
+                                <GroupBookMatrix
+                                    groupId={value.id}
+                                    canEdit={canStageDetails}
+                                    onChange={(rows) =>
+                                        stageDetails({
+                                            books: {
+                                                rows: groupBookRowsPayload(
+                                                    rows,
+                                                ),
+                                            },
+                                        })
+                                    }
+                                    validationErrors={detailErrors}
+                                />
+                            )}
+                            {value && config.resource === 'tipe-atribut' && (
+                                <div hidden={extra.data_type !== 'string'}>
+                                    <TipeAtributNilai
+                                        tipeAtributId={value.id}
+                                        canEdit={canStageDetails}
+                                        onChange={stageDetails}
+                                        validationErrors={detailErrors}
+                                    />
+                                </div>
+                            )}
                         </PageDialogBody>
                     </form>
                 </PageDialogContent>

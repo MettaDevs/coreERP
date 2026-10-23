@@ -169,6 +169,7 @@ export default function PenerimaanDetailPage({
     const [tersimpan, setTersimpan] = useState<Penerimaan | null>(null);
     const [ringkasan, setRingkasan] = useState<Ringkasan | null>(null);
     const [terbit, setTerbit] = useState<AsetTerbit[]>([]);
+    const savedIssuedAssets = useRef<AsetTerbit[]>([]);
     const [issuedLoaded, setIssuedLoaded] = useState(false);
     const [memuat, setMemuat] = useState(mode !== 'create');
     const [menyimpan, setMenyimpan] = useState(false);
@@ -286,7 +287,7 @@ export default function PenerimaanDetailPage({
         saldoAwal,
     );
 
-    const readOnly = mode === 'view';
+    const readOnly = mode === 'view' || menyimpan;
     const selesai = tersimpan !== null && tersimpan.status !== 'draft';
 
     useEffect(() => {
@@ -417,7 +418,12 @@ export default function PenerimaanDetailPage({
 
         let dibatalkan = false;
         api<{ data: AsetTerbit[] }>(`/penerimaan-aset/${penerimaanId}/aset`)
-            .then((result) => !dibatalkan && setTerbit(result.data))
+            .then((result) => {
+                if (!dibatalkan) {
+                    savedIssuedAssets.current = result.data;
+                    setTerbit(result.data);
+                }
+            })
             .catch(() => undefined)
             .finally(() => {
                 if (!dibatalkan) {
@@ -695,6 +701,7 @@ export default function PenerimaanDetailPage({
                 },
             );
             setTerbit(hasil.data);
+            savedIssuedAssets.current = hasil.data;
             setTersimpan((sebelumnya) =>
                 sebelumnya
                     ? { ...sebelumnya, version: hasil.version }
@@ -742,6 +749,13 @@ export default function PenerimaanDetailPage({
         scopeKey: JSON.stringify([penerimaanId, mode, tersimpan?.version]),
         onDirtyChange: onDirtyChange,
     });
+
+    const editingSerial =
+        selesai &&
+        mode === 'view' &&
+        canCorrect &&
+        issuedLoaded &&
+        terbit.length > 0;
 
     if (memuat) {
         return (
@@ -864,12 +878,16 @@ export default function PenerimaanDetailPage({
                         onClick={() => setKonfirmasiArsip(true)}
                     />
                 )}
-                {mode !== 'view' && (
+                {(mode !== 'view' || editingSerial) && (
                     <>
                         <ActionButton
                             action="save"
                             type="button"
-                            onClick={() => void simpan()}
+                            onClick={() =>
+                                void (editingSerial
+                                    ? simpanNomorSeri()
+                                    : simpan())
+                            }
                             disabled={menyimpan}
                             pending={menyimpan}
                         />
@@ -877,11 +895,16 @@ export default function PenerimaanDetailPage({
                             action="cancel"
                             disabled={menyimpan}
                             type="button"
-                            onClick={() =>
-                                penerimaanId
-                                    ? bukaPenerimaan(penerimaanId)
-                                    : bukaPenerimaanDaftar()
-                            }
+                            onClick={() => {
+                                if (editingSerial) {
+                                    setTerbit(savedIssuedAssets.current);
+                                    clearSaveFeedback();
+                                } else if (penerimaanId) {
+                                    bukaPenerimaan(penerimaanId);
+                                } else {
+                                    bukaPenerimaanDaftar();
+                                }
+                            }}
                         />
                     </>
                 )}
@@ -925,6 +948,7 @@ export default function PenerimaanDetailPage({
 
             <div
                 data-page-dialog-body
+                inert={menyimpan || undefined}
                 ref={panelRef}
                 className="min-h-0 flex-1 overflow-y-auto"
             >
@@ -2333,7 +2357,8 @@ export default function PenerimaanDetailPage({
                                                                 maxLength={150}
                                                                 placeholder="Belum bernomor seri"
                                                                 readOnly={
-                                                                    !canCorrect
+                                                                    !canCorrect ||
+                                                                    menyimpan
                                                                 }
                                                                 value={
                                                                     aset.serial_number ??
@@ -2386,40 +2411,6 @@ export default function PenerimaanDetailPage({
                                             />
                                         );
                                     })()}
-                                    <div className="flex items-center gap-1">
-                                        {canCorrect && (
-                                            <ActionButton
-                                                action="save"
-                                                type="button"
-                                                onClick={() =>
-                                                    void simpanNomorSeri()
-                                                }
-                                                disabled={menyimpan}
-                                                pending={menyimpan}
-                                            />
-                                        )}
-                                        <FieldHint
-                                            hint={
-                                                <>
-                                                    Satu simpan untuk seluruh
-                                                    dokumen, bukan satu per
-                                                    aset: yang mengetiknya
-                                                    sedang memegang setumpuk
-                                                    stiker dan membacanya
-                                                    berurutan.
-                                                </>
-                                            }
-                                        >
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon-sm"
-                                                aria-label="Bantuan field"
-                                            >
-                                                <Info aria-hidden="true" />
-                                            </Button>
-                                        </FieldHint>
-                                    </div>
                                 </div>
                             </CollapsibleSection>
                         )}

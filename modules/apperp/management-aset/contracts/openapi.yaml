@@ -6859,6 +6859,95 @@ paths:
           description: Hanya work order draf atau yang sudah dibatalkan yang dapat diarsipkan
         '428':
           $ref: '#/components/responses/VersionRequired'
+  /api/v1/pemeliharaan-aset/{id}/execution:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    put:
+      tags:
+      - Pemeliharaan aset
+      operationId: saveWorkOrderExecutionBatch
+      summary: Menyimpan seluruh hasil pekerjaan dan checklist sekaligus secara atomik. Checklist hanya boleh diubah saat
+        dikerjakan; hasil pekerjaan juga boleh diubah saat selesai.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - jobs
+              properties:
+                version:
+                  $ref: '#/components/schemas/VersionField'
+                jobs:
+                  type: array
+                  minItems: 1
+                  maxItems: 200
+                  items:
+                    type: object
+                    properties:
+                      aktual_jam:
+                        type: number
+                        minimum: 0
+                        maximum: 999999.99
+                        nullable: true
+                      sebab_kerusakan_id:
+                        allOf:
+                        - $ref: '#/components/schemas/Ulid'
+                        nullable: true
+                      tindakan_perbaikan_id:
+                        allOf:
+                        - $ref: '#/components/schemas/Ulid'
+                        nullable: true
+                      sebab_kerusakan_keterangan:
+                        type: string
+                        maxLength: 1000
+                        nullable: true
+                        description: Wajib bila sebab kerusakan yang dipilih meminta keterangan.
+                      tindakan_perbaikan_keterangan:
+                        type: string
+                        maxLength: 1000
+                        nullable: true
+                        description: Wajib bila tindakan perbaikan yang dipilih meminta keterangan.
+                      id:
+                        $ref: '#/components/schemas/Ulid'
+                      checklist:
+                        type: array
+                        maxItems: 200
+                        items:
+                          type: object
+                          required:
+                          - id
+                          properties:
+                            id:
+                              $ref: '#/components/schemas/Ulid'
+                            nilai:
+                              type: string
+                              maxLength: 255
+                              nullable: true
+                            tidak_berlaku:
+                              type: boolean
+                            catatan_teknisi:
+                              type: string
+                              maxLength: 2000
+                              nullable: true
+                    required:
+                    - id
+      responses:
+        '200':
+          description: Seluruh perubahan tersimpan; data memuat work order dengan version terbaru.
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          description: Status, baris pekerjaan, atau checklist tidak sah; seluruh perubahan dibatalkan.
+        '428':
+          $ref: '#/components/responses/VersionRequired'
   /api/v1/jenis-counter:
     get:
       tags:
@@ -10794,6 +10883,8 @@ components:
     MasterPatch:
       type: object
       properties:
+        details:
+          $ref: '#/components/schemas/MasterDraftDetails'
         version:
           $ref: '#/components/schemas/VersionField'
         nama:
@@ -10978,6 +11069,16 @@ components:
       allOf:
       - $ref: '#/components/schemas/MasterPatch'
       - $ref: '#/components/schemas/GroupAsetFields'
+      - type: object
+        properties:
+          details:
+            description: Matriks buku yang diganti bersama data grup dalam satu transaksi. Versi memakai version pada kiriman
+              induk.
+            type: object
+            additionalProperties: false
+            properties:
+              books:
+                $ref: '#/components/schemas/GroupBukuPenyusutanReplace'
     GroupAsetResponse:
       type: object
       required:
@@ -13631,7 +13732,59 @@ components:
       - nama
       - nomor_polis
       - berlaku_mulai
+      description: POST dan PATCH menyimpan kartu polis serta coverage_operations dalam satu transaksi. Operasi diterapkan
+        berurutan, memakai versi polis dan mempertahankan riwayat pertanggungan. Satu operasi gagal membatalkan seluruh penyimpanan.
+        Replay POST membandingkan kepala dan seluruh operasi; perubahan isi pada Idempotency-Key yang sama ditolak 409 idempotency_conflict.
       properties:
+        coverage_operations:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            required:
+            - kind
+            properties:
+              kind:
+                type: string
+                enum:
+                - add
+                - end
+                - replace
+                - archive
+              coverage_id:
+                type: string
+                format: ulid
+                description: Wajib untuk end
+                replace: null
+                archive; harus milik polis dan aset dalam jangkauan pengguna.: null
+              creation_key:
+                type: string
+                maxLength: 140
+                pattern: ^[A-Za-z0-9._:-]+$
+                description: Wajib untuk add; tetap sama saat mencoba ulang.
+              aset_id:
+                type: string
+                format: ulid
+                description: Wajib untuk add.
+              nilai_pertanggungan:
+                type: number
+                exclusiveMinimum: 0
+                description: Wajib untuk add dan replace.
+              berlaku_mulai:
+                type: string
+                format: date
+                description: Wajib untuk add dan replace.
+              berlaku_sampai:
+                type:
+                - string
+                - 'null'
+                format: date
+                description: Wajib untuk end.
+              keterangan:
+                type:
+                - string
+                - 'null'
+                maxLength: 2000
         legal_entity_id:
           $ref: '#/components/schemas/Ulid'
         nama:
@@ -14539,16 +14692,20 @@ components:
       type: object
       additionalProperties: false
       description: |
-        Rincian master baru dikirim bersama POST pemiliknya. Nomor, pemilik, dan seluruh
+        Rincian master dikirim bersama POST atau PATCH pemiliknya. Nomor, pemilik, dan seluruh
         rincian disimpan dalam satu transaksi; satu rincian tidak sah membatalkan semuanya.
-        Kiriman ulang dengan Idempotency-Key yang sama tidak menambahkan baris lagi.
+        Kiriman ulang dengan Idempotency-Key dan isi kepala/rincian yang sama tidak menambahkan baris lagi.
+        Isi berbeda pada kunci yang sama ditolak 409 idempotency_conflict.
         Tiap seksi tetap memerlukan izin yang sama dengan endpoint rincian tersendiri.
         Seksi yang diterima bergantung resource: pabrikan-aset models; jenis-aset attributes,
         models, conditions, counters, job_types; group-aset books; tipe-atribut values;
         maintenance-job-types variants dan asset_types; maintenance-checklist-variables values;
         maintenance-checklist-templates lines; rencana-pemeliharaan lines dan targets.
         Baris baru tidak memakai id sementara sebagai id database. Versi rincian berasal dari
-        pemilik yang baru dibuat. Rincian ini tidak diterapkan lagi pada replay yang sukses.
+        pemilik yang disimpan dan diperbarui untuk setiap seksi. Rincian ini tidak diterapkan lagi pada replay POST yang sukses.
+        Pada PATCH, seksi yang tidak dikirim tidak diubah; array kosong menghapus semua
+        rincian dalam seksi penggantian. Models pabrikan dan variants memakai operasi
+        per baris; rincian yang tidak dikirim tetap ada (daftar dapat dipaginasi).
       properties:
         attributes:
           $ref: '#/components/schemas/JenisAsetAtributReplace'
@@ -14623,6 +14780,10 @@ components:
                 $ref: '#/components/schemas/MaintenancePlanTargetWrite'
     MasterDraftChildRows:
       type: object
+      description: |
+        PATCH memakai id dan version untuk baris yang diubah, creation_key stabil untuk
+        baris baru, serta deleted untuk arsip. Semua baris wajib milik pemilik aktif.
+        creation_key wajib pada baris baru saat PATCH; POST awal boleh mengabaikannya.
       required:
       - rows
       properties:
@@ -14634,6 +14795,14 @@ components:
             required:
             - nama
             properties:
+              id:
+                $ref: '#/components/schemas/Ulid'
+              version:
+                $ref: '#/components/schemas/VersionField'
+              creation_key:
+                type: string
+                maxLength: 133
+                pattern: ^[A-Za-z0-9._:-]+$
               kode:
                 type:
                 - string
@@ -14656,6 +14825,19 @@ components:
                 - string
                 - 'null'
                 format: ulid
+        deleted:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            required:
+            - id
+            - version
+            properties:
+              id:
+                $ref: '#/components/schemas/Ulid'
+              version:
+                $ref: '#/components/schemas/VersionField'
     AssetReceiptMultipartInput:
       type: object
       required:

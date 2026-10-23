@@ -14,8 +14,9 @@ import { Select } from '@apperp/ui/select';
 import RecordLookup from '../../_shared/RecordLookup';
 
 import { api, errorMessage } from '../../api';
+import type { ApiValidationErrors } from '../../api';
 import { useRecordOptions } from '../../use-record-list';
-import { useSaveFeedback } from '../../use-save-feedback';
+import type { MasterDetailsPayload } from '../DraftMasterDetails';
 import type { MasterOption } from '../useMasterOptions';
 import { optionLabel, useMasterOptions } from '../useMasterOptions';
 
@@ -74,28 +75,27 @@ const items = (options: MasterOption[]) =>
 export default function MaintenancePlanTargets({
     planId,
     canEdit,
-    version,
-    onVersionChange,
+    onChange,
+    validationErrors,
 }: {
     planId: string;
     canEdit: boolean;
-    /** Versi record pemilik; penyimpanan rincian ini mengklaimnya. */
-    version: number;
-    onVersionChange: (version: number) => void;
+    onChange: (details: MasterDetailsPayload) => void;
+    validationErrors?: ApiValidationErrors;
 }) {
     const portal = useRef<HTMLDivElement | null>(null);
     const [targets, setTargets] = useState<Target[]>([]);
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const {
-        scopeRef: feedbackScopeRef,
-        feedbackSummary,
-        reportSaveError,
-        clearSaveFeedback,
-        fieldError,
-    } = useSaveFeedback(undefined, planId);
+    const fieldError = (field: string) =>
+        Object.entries(validationErrors ?? {})
+            .filter(
+                ([name]) =>
+                    name === `details.targets.${field}` ||
+                    name.startsWith(`details.targets.${field}.`),
+            )
+            .flatMap(([, messages]) => messages)
+            .join(' ') || undefined;
     const [error, setError] = useState('');
-    const [saved, setSaved] = useState(false);
     const assetSource = useRecordOptions<MasterOption>(
         canEdit ? '/aset' : null,
         optionLabel,
@@ -139,51 +139,34 @@ export default function MaintenancePlanTargets({
         };
     }, [planId]);
 
+    function changeTargets(
+        change: Target[] | ((current: Target[]) => Target[]),
+    ) {
+        const next = typeof change === 'function' ? change(targets) : change;
+        setTargets(next);
+        onChange({
+            targets: {
+                targets: next.map((target) => ({
+                    id: target.id,
+                    aset_id:
+                        target.kind === 'aset' ? target.aset_id || null : null,
+                    jenis_aset_id:
+                        target.kind === 'jenis'
+                            ? target.jenis_aset_id || null
+                            : null,
+                    tanggal_mulai: target.tanggal_mulai || null,
+                    aktif: target.aktif,
+                })),
+            },
+        });
+    }
+
     function update(index: number, changes: Partial<Target>) {
-        setSaved(false);
-        setTargets((current) =>
+        changeTargets((current) =>
             current.map((target, position) =>
                 position === index ? { ...target, ...changes } : target,
             ),
         );
-    }
-
-    async function save() {
-        clearSaveFeedback();
-        setSaving(true);
-        setError('');
-
-        try {
-            const result = await api<{ data: ServerTarget[]; version: number }>(
-                `/rencana-pemeliharaan/${planId}/objek`,
-                {
-                    method: 'PUT',
-                    body: JSON.stringify({
-                        version,
-                        targets: targets.map((target) => ({
-                            id: target.id,
-                            aset_id:
-                                target.kind === 'aset'
-                                    ? target.aset_id || null
-                                    : null,
-                            jenis_aset_id:
-                                target.kind === 'jenis'
-                                    ? target.jenis_aset_id || null
-                                    : null,
-                            tanggal_mulai: target.tanggal_mulai || null,
-                            aktif: target.aktif,
-                        })),
-                    }),
-                },
-            );
-            setTargets(result.data.map(fromServer));
-            onVersionChange(result.version);
-            setSaved(true);
-        } catch (caught) {
-            reportSaveError(caught, 'Objek rencana belum dapat disimpan.');
-        } finally {
-            setSaving(false);
-        }
     }
 
     if (loading) {
@@ -230,28 +213,18 @@ export default function MaintenancePlanTargets({
     return (
         <div
             ref={(node) => {
-                feedbackScopeRef.current = node;
                 portal.current = node?.closest<HTMLElement>(
                     '[data-slot="page-dialog-contents"]',
                 ) as HTMLDivElement | null;
             }}
             className="space-y-3"
         >
-            {feedbackSummary}
             <DialogToolbar className="px-0">
-                <ActionButton
-                    action="save"
-                    type="button"
-                    disabled={saving}
-                    onClick={() => void save()}
-                    pending={saving}
-                />
                 <ActionButton
                     action="add"
                     type="button"
                     onClick={() => {
-                        setSaved(false);
-                        setTargets((current) => [
+                        changeTargets((current) => [
                             ...current,
                             {
                                 id: null,
@@ -287,7 +260,7 @@ export default function MaintenancePlanTargets({
                             cell: ({ target, index }) => (
                                 <div className="min-w-48">
                                     <FormControl
-                                        data-error-field={`targets.${index}.kind`}
+                                        data-error-field={`details.targets.targets.${index}.kind`}
                                         error={fieldError(
                                             `targets.${index}.kind`,
                                         )}
@@ -318,7 +291,7 @@ export default function MaintenancePlanTargets({
                                 <div className="min-w-64">
                                     {target.kind === 'aset' ? (
                                         <FormControl
-                                            data-error-field={`targets.${index}.aset_id`}
+                                            data-error-field={`details.targets.targets.${index}.aset_id`}
                                             error={fieldError(
                                                 `targets.${index}.aset_id`,
                                             )}
@@ -339,7 +312,7 @@ export default function MaintenancePlanTargets({
                                         </FormControl>
                                     ) : (
                                         <FormControl
-                                            data-error-field={`targets.${index}.jenis_aset_id`}
+                                            data-error-field={`details.targets.targets.${index}.jenis_aset_id`}
                                             error={fieldError(
                                                 `targets.${index}.jenis_aset_id`,
                                             )}
@@ -372,7 +345,7 @@ export default function MaintenancePlanTargets({
                             cell: ({ target, index }) => (
                                 <>
                                     <FormControl
-                                        data-error-field={`targets.${index}.tanggal_mulai`}
+                                        data-error-field={`details.targets.targets.${index}.tanggal_mulai`}
                                         error={fieldError(
                                             `targets.${index}.tanggal_mulai`,
                                         )}
@@ -419,8 +392,7 @@ export default function MaintenancePlanTargets({
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => {
-                                            setSaved(false);
-                                            setTargets((current) =>
+                                            changeTargets((current) =>
                                                 current.filter(
                                                     (_, position) =>
                                                         position !== index,
@@ -455,11 +427,6 @@ export default function MaintenancePlanTargets({
 
             {assetError && (
                 <p className="text-muted-foreground text-sm">{assetError}</p>
-            )}
-            {saved && (
-                <p className="text-muted-foreground text-sm">
-                    Objek rencana tersimpan.
-                </p>
             )}
             {error && <p className="text-destructive text-sm">{error}</p>}
         </div>

@@ -11,7 +11,8 @@ import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
 import RecordLookup from '../../_shared/RecordLookup';
 import { api, errorMessage } from '../../api';
-import { useSaveFeedback } from '../../use-save-feedback';
+import type { ApiValidationErrors } from '../../api';
+import type { MasterDetailsPayload } from '../DraftMasterDetails';
 import type { MasterOption } from '../useMasterOptions';
 import { optionLabel, useMasterOptions } from '../useMasterOptions';
 
@@ -186,28 +187,27 @@ const optional = (options: MasterOption[], none: string) => [
 export default function MaintenancePlanLines({
     planId,
     canEdit,
-    version,
-    onVersionChange,
+    onChange,
+    validationErrors,
 }: {
     planId: string;
     canEdit: boolean;
-    /** Versi record pemilik; penyimpanan rincian ini mengklaimnya. */
-    version: number;
-    onVersionChange: (version: number) => void;
+    onChange: (details: MasterDetailsPayload) => void;
+    validationErrors?: ApiValidationErrors;
 }) {
     const portal = useRef<HTMLDivElement | null>(null);
     const [lines, setLines] = useState<Line[]>([]);
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const {
-        scopeRef: feedbackScopeRef,
-        feedbackSummary,
-        reportSaveError,
-        clearSaveFeedback,
-        fieldError,
-    } = useSaveFeedback(undefined, planId);
+    const fieldError = (field: string) =>
+        Object.entries(validationErrors ?? {})
+            .filter(
+                ([name]) =>
+                    name === `details.lines.${field}` ||
+                    name.startsWith(`details.lines.${field}.`),
+            )
+            .flatMap(([, messages]) => messages)
+            .join(' ') || undefined;
     const [error, setError] = useState('');
-    const [saved, setSaved] = useState(false);
     const jobTypes = useMasterOptions(
         canEdit ? 'maintenance-job-types' : null,
         '',
@@ -264,39 +264,18 @@ export default function MaintenancePlanLines({
         };
     }, [planId]);
 
+    function changeLines(change: Line[] | ((current: Line[]) => Line[])) {
+        const next = typeof change === 'function' ? change(lines) : change;
+        setLines(next);
+        onChange({ lines: { lines: next.map(toPayload) } });
+    }
+
     function update(index: number, changes: Partial<Line>) {
-        setSaved(false);
-        setLines((current) =>
+        changeLines((current) =>
             current.map((line, position) =>
                 position === index ? { ...line, ...changes } : line,
             ),
         );
-    }
-
-    async function save() {
-        clearSaveFeedback();
-        setSaving(true);
-        setError('');
-
-        try {
-            const result = await api<{ data: ServerLine[]; version: number }>(
-                `/rencana-pemeliharaan/${planId}/baris`,
-                {
-                    method: 'PUT',
-                    body: JSON.stringify({
-                        version,
-                        lines: lines.map(toPayload),
-                    }),
-                },
-            );
-            setLines(result.data.map(fromServer));
-            onVersionChange(result.version);
-            setSaved(true);
-        } catch (caught) {
-            reportSaveError(caught, 'Baris rencana belum dapat disimpan.');
-        } finally {
-            setSaving(false);
-        }
     }
 
     if (loading) {
@@ -343,7 +322,6 @@ export default function MaintenancePlanLines({
     return (
         <div
             ref={(node) => {
-                feedbackScopeRef.current = node;
                 portal.current =
                     node?.closest<HTMLDivElement>(
                         '[data-slot="page-dialog-contents"]',
@@ -351,21 +329,12 @@ export default function MaintenancePlanLines({
             }}
             className="space-y-4"
         >
-            {feedbackSummary}
             <DialogToolbar className="px-0">
-                <ActionButton
-                    action="save"
-                    type="button"
-                    disabled={saving}
-                    onClick={() => void save()}
-                    pending={saving}
-                />
                 <ActionButton
                     action="add"
                     type="button"
                     onClick={() => {
-                        setSaved(false);
-                        setLines((current) => [...current, emptyLine()]);
+                        changeLines((current) => [...current, emptyLine()]);
                     }}
                 />
             </DialogToolbar>
@@ -391,8 +360,7 @@ export default function MaintenancePlanLines({
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                                setSaved(false);
-                                setLines((current) =>
+                                changeLines((current) =>
                                     current.filter(
                                         (_, position) => position !== index,
                                     ),
@@ -411,7 +379,7 @@ export default function MaintenancePlanLines({
                                       ? 'Interval dihitung dari tanggal selesai work order terakhir untuk aset dan pekerjaan yang sama. Cocok untuk kalibrasi.'
                                       : 'Jatuh tempo setiap kelipatan interval dari total counter aset.'
                             }
-                            data-error-field={`lines.${index}.dasar`}
+                            data-error-field={`details.lines.lines.${index}.dasar`}
                             error={fieldError(`lines.${index}.dasar`)}
                         >
                             <Select
@@ -428,7 +396,7 @@ export default function MaintenancePlanLines({
                         </FormControl>
                         {line.dasar === 'nilai_counter' ? (
                             <FormControl
-                                data-error-field={`lines.${index}.jenis_counter_id`}
+                                data-error-field={`details.lines.lines.${index}.jenis_counter_id`}
                                 error={fieldError(
                                     `lines.${index}.jenis_counter_id`,
                                 )}
@@ -450,7 +418,7 @@ export default function MaintenancePlanLines({
                         ) : (
                             <>
                                 <FormControl
-                                    data-error-field={`lines.${index}.interval`}
+                                    data-error-field={`details.lines.lines.${index}.interval`}
                                     error={fieldError(
                                         `lines.${index}.interval`,
                                     )}
@@ -474,7 +442,7 @@ export default function MaintenancePlanLines({
                                     />
                                 </FormControl>
                                 <FormControl
-                                    data-error-field={`lines.${index}.satuan_interval`}
+                                    data-error-field={`details.lines.lines.${index}.satuan_interval`}
                                     error={fieldError(
                                         `lines.${index}.satuan_interval`,
                                     )}
@@ -498,7 +466,7 @@ export default function MaintenancePlanLines({
                         {line.dasar === 'nilai_counter' && (
                             <>
                                 <FormControl
-                                    data-error-field={`lines.${index}.interval_counter`}
+                                    data-error-field={`details.lines.lines.${index}.interval_counter`}
                                     error={fieldError(
                                         `lines.${index}.interval_counter`,
                                     )}
@@ -526,7 +494,7 @@ export default function MaintenancePlanLines({
                                     hint={
                                         'Usulan muncul lebih awal, saat total counter kurang sebanyak ini dari batasnya.'
                                     }
-                                    data-error-field={`lines.${index}.toleransi_counter`}
+                                    data-error-field={`details.lines.lines.${index}.toleransi_counter`}
                                     error={fieldError(
                                         `lines.${index}.toleransi_counter`,
                                     )}
@@ -553,7 +521,7 @@ export default function MaintenancePlanLines({
                             </>
                         )}
                         <FormControl
-                            data-error-field={`lines.${index}.maintenance_job_type_id`}
+                            data-error-field={`details.lines.lines.${index}.maintenance_job_type_id`}
                             error={fieldError(
                                 `lines.${index}.maintenance_job_type_id`,
                             )}
@@ -573,7 +541,7 @@ export default function MaintenancePlanLines({
                             />
                         </FormControl>
                         <FormControl
-                            data-error-field={`lines.${index}.tipe_work_order_id`}
+                            data-error-field={`details.lines.lines.${index}.tipe_work_order_id`}
                             error={fieldError(
                                 `lines.${index}.tipe_work_order_id`,
                             )}
@@ -593,7 +561,7 @@ export default function MaintenancePlanLines({
                             />
                         </FormControl>
                         <FormControl
-                            data-error-field={`lines.${index}.trade_id`}
+                            data-error-field={`details.lines.lines.${index}.trade_id`}
                             error={fieldError(`lines.${index}.trade_id`)}
                         >
                             <RecordLookup
@@ -612,7 +580,7 @@ export default function MaintenancePlanLines({
                             />
                         </FormControl>
                         <FormControl
-                            data-error-field={`lines.${index}.tingkat_layanan_id`}
+                            data-error-field={`details.lines.lines.${index}.tingkat_layanan_id`}
                             error={fieldError(
                                 `lines.${index}.tingkat_layanan_id`,
                             )}
@@ -638,7 +606,7 @@ export default function MaintenancePlanLines({
                             hint={
                                 'Target selesai work order dihitung dari tanggal jatuh tempo ditambah angka ini.'
                             }
-                            data-error-field={`lines.${index}.selesai_dalam_hari`}
+                            data-error-field={`details.lines.lines.${index}.selesai_dalam_hari`}
                             error={fieldError(
                                 `lines.${index}.selesai_dalam_hari`,
                             )}
@@ -661,7 +629,7 @@ export default function MaintenancePlanLines({
                             />
                         </FormControl>
                         <FormControl
-                            data-error-field={`lines.${index}.deskripsi`}
+                            data-error-field={`details.lines.lines.${index}.deskripsi`}
                             error={fieldError(`lines.${index}.deskripsi`)}
                         >
                             <Input
@@ -701,12 +669,6 @@ export default function MaintenancePlanLines({
                             {source.error}
                         </p>
                     ),
-            )}
-            {saved && (
-                <p className="text-muted-foreground text-sm">
-                    Baris rencana tersimpan. Hitung ulang jadwal untuk melihat
-                    akibatnya.
-                </p>
             )}
             {error && <p className="text-destructive text-sm">{error}</p>}
         </div>

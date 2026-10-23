@@ -17,13 +17,14 @@ import { recordQueryUrl } from '../../transactions/_shared/record-card';
 import { useSaveFeedback } from '../../use-save-feedback';
 import type {
     DraftMasterDetailsValue,
+    MasterDetailsPayload,
     DraftSectionKey,
 } from '../DraftMasterDetails';
 import DraftMasterDetails, { draftMasterPayload } from '../DraftMasterDetails';
 import DynamicField from '../DynamicField';
 import type { FieldValue } from '../fields';
 import { isVisible, payloadValue, valueFrom } from '../fields';
-import GroupBookMatrix from '../GroupBookMatrix';
+import GroupBookMatrix, { groupBookRowsPayload } from '../GroupBookMatrix';
 import JenisAsetAtribut from '../JenisAsetAtribut';
 import type { MasterConfig, MasterRecord, Permission } from '../masters';
 import { permission } from '../masters';
@@ -65,10 +66,10 @@ export default function RecordDetailPane({
     mode,
     permissions,
     canEdit,
+    saving,
     onRequestEdit,
     onDirtyChange,
     onSavingChange,
-    onVersionChange,
     onSaved,
 }: {
     formId: string;
@@ -77,11 +78,10 @@ export default function RecordDetailPane({
     mode: DetailMode;
     permissions: Permission[];
     canEdit: boolean;
+    saving: boolean;
     onRequestEdit: () => void;
     onDirtyChange: (dirty: boolean) => void;
     onSavingChange: (saving: boolean) => void;
-    /** Rincian yang disimpan menaikkan versi record ini; induk mencatat versi barunya. */
-    onVersionChange: (version: number) => void;
     onSaved: (record: MasterRecord, created: boolean) => void;
 }) {
     const readOnly = mode === 'view';
@@ -100,6 +100,9 @@ export default function RecordDetailPane({
         ),
     );
     const [draftDetails, setDraftDetails] = useState<DraftMasterDetailsValue>(
+        {},
+    );
+    const [stagedDetails, setStagedDetails] = useState<MasterDetailsPayload>(
         {},
     );
     const [detailErrors, setDetailErrors] = useState<ApiValidationErrors>({});
@@ -121,8 +124,6 @@ export default function RecordDetailPane({
      * effect di bawah begitu `readOnly` berubah, lalu dikosongkan lagi.
      */
     const pendingFocusRef = useRef<string | null>(null);
-    const [pabrikanAsetDetailVersion, setPabrikanAsetDetailVersion] =
-        useState(0);
 
     /**
      * Detail tambahan disimpan berpasangan dengan kunci yang menghasilkannya, lalu
@@ -147,12 +148,8 @@ export default function RecordDetailPane({
     const jenisAsetDetailLoading =
         jenisAsetKunci !== null && jenisAsetTermuat === null;
 
-    // Nomor versi ikut masuk kunci: memintanya naik berarti detail pabrikan dianggap
-    // belum termuat lagi, persis seperti saat record-nya baru dibuka.
     const pabrikanAsetKunci =
-        config.resource === 'pabrikan-aset' && record?.id
-            ? `${record.id}|${pabrikanAsetDetailVersion}`
-            : null;
+        config.resource === 'pabrikan-aset' && record?.id ? record.id : null;
     const [pabrikanAsetMuatan, setPabrikanAsetMuatan] = useState<{
         kunci: string;
         detail: PabrikanAsetDetail | null;
@@ -314,6 +311,10 @@ export default function RecordDetailPane({
                 payload.kode = manualCode.trim() || null;
             }
 
+            if (record && Object.keys(stagedDetails).length > 0) {
+                payload.details = stagedDetails;
+            }
+
             if (record) {
                 // Dari `record` saat menyimpan: rincian di panel ini dapat menaikkannya lebih dahulu.
                 payload.version = record.version;
@@ -376,6 +377,11 @@ export default function RecordDetailPane({
                 </Empty>
             </div>
         );
+    }
+
+    function stageDetails(next: MasterDetailsPayload) {
+        markDirty();
+        setStagedDetails((current) => ({ ...current, ...next }));
     }
 
     function sectionBody(section: DetailSection) {
@@ -469,21 +475,28 @@ export default function RecordDetailPane({
                     canReadJenis={permissions.includes(
                         permission('jenis-aset', 'read'),
                     )}
-                    canCreate={permissions.includes(
-                        permission('model-aset', 'create'),
-                    )}
-                    canUpdate={permissions.includes(
-                        permission('model-aset', 'update'),
-                    )}
-                    canArchive={permissions.includes(
-                        permission('model-aset', 'archive'),
-                    )}
+                    canCreate={
+                        !readOnly &&
+                        canEdit &&
+                        permissions.includes(permission('model-aset', 'create'))
+                    }
+                    canUpdate={
+                        !readOnly &&
+                        canEdit &&
+                        permissions.includes(permission('model-aset', 'update'))
+                    }
+                    canArchive={
+                        !readOnly &&
+                        canEdit &&
+                        permissions.includes(
+                            permission('model-aset', 'archive'),
+                        )
+                    }
                     canReadAset={permissions.includes(
                         'management-aset.aset.read',
                     )}
-                    onChanged={() =>
-                        setPabrikanAsetDetailVersion((current) => current + 1)
-                    }
+                    onChange={stageDetails}
+                    validationErrors={detailErrors}
                 />
             ) : null;
         }
@@ -493,8 +506,12 @@ export default function RecordDetailPane({
                 <GroupBookMatrix
                     groupId={record.id}
                     canEdit={!readOnly && canEdit}
-                    version={record.version}
-                    onVersionChange={onVersionChange}
+                    onChange={(rows) => {
+                        stageDetails({
+                            books: { rows: groupBookRowsPayload(rows) },
+                        });
+                    }}
+                    validationErrors={detailErrors}
                 />
             ) : null;
         }
@@ -504,8 +521,8 @@ export default function RecordDetailPane({
                 <JenisAsetAtribut
                     jenisAsetId={record.id}
                     canEdit={!readOnly && canEdit}
-                    version={record.version}
-                    onVersionChange={onVersionChange}
+                    onChange={stageDetails}
+                    validationErrors={detailErrors}
                 />
             ) : null;
         }
@@ -513,13 +530,12 @@ export default function RecordDetailPane({
         if (section.models) {
             return record ? (
                 <JenisAsetModels
-                    jenisAsetId={record.id}
                     detail={jenisAsetDetail}
                     loading={jenisAsetDetailLoading}
                     error={jenisAsetDetailError}
                     canEdit={!readOnly && canEdit}
-                    version={record.version}
-                    onVersionChange={onVersionChange}
+                    onChange={stageDetails}
+                    validationErrors={detailErrors}
                 />
             ) : null;
         }
@@ -532,8 +548,8 @@ export default function RecordDetailPane({
                     key={record.id}
                     jobTypeId={record.id}
                     canEdit={!readOnly && canEdit}
-                    version={record.version}
-                    onVersionChange={onVersionChange}
+                    onChange={stageDetails}
+                    validationErrors={detailErrors}
                 />
             ) : null;
         }
@@ -543,8 +559,8 @@ export default function RecordDetailPane({
                 <MaintenanceChecklistVariableValues
                     variableId={record.id}
                     canEdit={!readOnly && canEdit}
-                    version={record.version}
-                    onVersionChange={onVersionChange}
+                    onChange={stageDetails}
+                    validationErrors={detailErrors}
                 />
             ) : null;
         }
@@ -554,8 +570,8 @@ export default function RecordDetailPane({
                 <MaintenanceChecklistTemplateLines
                     templateId={record.id}
                     canEdit={!readOnly && canEdit}
-                    version={record.version}
-                    onVersionChange={onVersionChange}
+                    onChange={stageDetails}
+                    validationErrors={detailErrors}
                 />
             ) : null;
         }
@@ -568,8 +584,8 @@ export default function RecordDetailPane({
                     key={record.id}
                     jenisAsetId={record.id}
                     canEdit={!readOnly && canEdit}
-                    version={record.version}
-                    onVersionChange={onVersionChange}
+                    onChange={stageDetails}
+                    validationErrors={detailErrors}
                 />
             ) : null;
         }
@@ -580,8 +596,8 @@ export default function RecordDetailPane({
                     key={record.id}
                     assetTypeId={record.id}
                     canEdit={!readOnly && canEdit}
-                    version={record.version}
-                    onVersionChange={onVersionChange}
+                    onChange={stageDetails}
+                    validationErrors={detailErrors}
                 />
             ) : null;
         }
@@ -592,8 +608,8 @@ export default function RecordDetailPane({
                     key={record.id}
                     jenisAsetId={record.id}
                     canEdit={!readOnly && canEdit}
-                    version={record.version}
-                    onVersionChange={onVersionChange}
+                    onChange={stageDetails}
+                    validationErrors={detailErrors}
                 />
             ) : null;
         }
@@ -604,8 +620,8 @@ export default function RecordDetailPane({
                     key={record.id}
                     planId={record.id}
                     canEdit={!readOnly && canEdit}
-                    version={record.version}
-                    onVersionChange={onVersionChange}
+                    onChange={stageDetails}
+                    validationErrors={detailErrors}
                 />
             ) : null;
         }
@@ -616,8 +632,8 @@ export default function RecordDetailPane({
                     key={record.id}
                     planId={record.id}
                     canEdit={!readOnly && canEdit}
-                    version={record.version}
-                    onVersionChange={onVersionChange}
+                    onChange={stageDetails}
+                    validationErrors={detailErrors}
                 />
             ) : null;
         }
@@ -697,6 +713,8 @@ export default function RecordDetailPane({
         >
             <form
                 noValidate
+                inert={saving || undefined}
+                aria-busy={saving}
                 id={formId}
                 ref={formRef}
                 onSubmit={submit}
@@ -794,6 +812,7 @@ export default function RecordDetailPane({
                             <CollapsibleSection
                                 key={section.id}
                                 value={section.id}
+                                keepMounted
                                 title={section.title}
                                 summary={summaryFor(section, values)}
                             >

@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ActionButton } from '@apperp/ui/action-button';
 
+import { Button } from '@apperp/ui/button';
 import {
     Field,
     FieldDescription,
@@ -21,13 +22,12 @@ import {
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
 import RecordLookup from '../../_shared/RecordLookup';
-import { api, newIdempotencyKey } from '../../api';
+import { newIdempotencyKey } from '../../api';
 import {
     RecordCardHeader,
     recordQueryUrl,
 } from '../../transactions/_shared/record-card';
 import { useRecordCardDirty } from '../../transactions/_shared/use-record-card-dirty';
-import { useSaveFeedback } from '../../use-save-feedback';
 import type { MasterRecord, ParentSummary } from '../masters';
 import { useMasterOptions } from '../useMasterOptions';
 import type { PabrikanModelRecord } from './pabrikanAsetDetail';
@@ -46,18 +46,16 @@ export default function ModelAsetFormSheet({
     onDelete,
     navigation,
     onDirtyChange,
-    onBusyChange,
 }: {
     manufacturer: MasterRecord;
     value: PabrikanModelRecord | null;
     canReadJenis: boolean;
     onClose: () => void;
-    onSaved: () => void | Promise<void>;
+    onSaved: (record: PabrikanModelRecord) => void;
     onNew?: () => void;
     onDelete?: () => void;
     navigation?: PageDialogNavigation;
     onDirtyChange?: (dirty: boolean) => void;
-    onBusyChange?: (busy: boolean) => void;
 }) {
     const [nama, setNama] = useState(value?.nama ?? '');
     const [keterangan, setKeterangan] = useState(value?.keterangan ?? '');
@@ -71,44 +69,37 @@ export default function ModelAsetFormSheet({
     const jenisOptions = jenisSource.options;
     const jenisError = jenisSource.error;
     const [error, setError] = useState('');
-    const [saving, setSaving] = useState(false);
-    useEffect(() => {
-        onBusyChange?.(saving);
-
-        return () => onBusyChange?.(false);
-    }, [saving, onBusyChange]);
     const sheetContentRef = useRef<HTMLDivElement>(null);
-    const { feedbackSummary, reportSaveError, clearSaveFeedback, fieldError } =
-        useSaveFeedback(sheetContentRef, value?.id);
+    const fieldError = (field: string) =>
+        field === 'nama' ? error : undefined;
     const creationKey = useRef(newIdempotencyKey());
 
-    async function submit(event: FormEvent) {
+    function submit(event: FormEvent) {
         event.preventDefault();
-        clearSaveFeedback();
-        setSaving(true);
-        setError('');
 
-        try {
-            await api(`/${'model-aset'}${value ? `/${value.id}` : ''}`, {
-                method: value ? 'PATCH' : 'POST',
-                headers: value
-                    ? undefined
-                    : { 'Idempotency-Key': creationKey.current },
-                body: JSON.stringify({
-                    ...(value ? { version: value.version } : {}),
-                    nama,
-                    keterangan,
-                    aktif,
-                    pabrikan_aset_id: manufacturer.id,
-                    jenis_aset_id: jenisAsetId || null,
-                }),
-            });
-            await onSaved();
-        } catch (caught) {
-            reportSaveError(caught, 'Model belum dapat disimpan.');
-        } finally {
-            setSaving(false);
+        if (!nama.trim()) {
+            setError('Isi nama model.');
+
+            return;
         }
+
+        const stableCreationKey = value?.creation_key ?? creationKey.current;
+        onSaved({
+            id: value?.id ?? `draft:${stableCreationKey}`,
+            ...(value?.id && !value.creation_key
+                ? {}
+                : { creation_key: stableCreationKey }),
+            kode: value?.kode ?? '',
+            version: value?.version ?? 0,
+            nama,
+            keterangan,
+            aktif,
+            pabrikan_aset_id: manufacturer.id,
+            jenis_aset_id: jenisAsetId || null,
+            jenis_aset:
+                jenisOptions.find((item) => item.id === jenisAsetId) ?? null,
+            aset_count: value?.aset_count ?? 0,
+        });
     }
 
     useRecordCardDirty({
@@ -123,13 +114,12 @@ export default function ModelAsetFormSheet({
             <PageDialogContent
                 ref={sheetContentRef}
                 title={'Model aset'}
-                busy={saving}
                 onNew={value ? onNew : undefined}
                 navigation={value ? navigation : undefined}
             >
                 <RecordCardHeader
                     recordUrl={
-                        value
+                        value && !value.creation_key
                             ? recordQueryUrl('model-aset', value.id)
                             : undefined
                     }
@@ -145,20 +135,19 @@ export default function ModelAsetFormSheet({
                     onSubmit={submit}
                 >
                     <PageDialogToolbar>
-                        <ActionButton
-                            action="save"
-                            type="submit"
-                            disabled={saving}
-                            pending={saving}
-                        />
+                        {value ? (
+                            <Button type="submit" variant="ghost">
+                                Selesai
+                            </Button>
+                        ) : (
+                            <ActionButton action="add" type="submit" />
+                        )}
                         <ActionButton
                             action="cancel"
-                            disabled={saving}
                             type="button"
                             onClick={onClose}
                         />
                     </PageDialogToolbar>
-                    {feedbackSummary}
                     <PageDialogBody className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
                         <FormGrid columns={1}>
                             <FormControl>

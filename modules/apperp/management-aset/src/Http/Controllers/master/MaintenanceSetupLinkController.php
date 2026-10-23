@@ -69,6 +69,15 @@ final class MaintenanceSetupLinkController extends Controller
         return response()->json($this->asetTypeTransfer($jobTypeId, 'job_type_id', MaintenanceJobType::class));
     }
 
+    /** @param array<string, mixed> $payload */
+    public function lockJenisAsetJobTypes(Request $request, string $jenisAsetId, array $payload): void
+    {
+        $this->permission($request, 'jenis-aset', 'update');
+        $data = validator($payload, $this->jobTypeIdsRules($this->tenant($request)))->validate();
+        $current = MaintenanceJobTypeJenisAset::query()->where('jenis_aset_id', $jenisAsetId)->pluck('job_type_id')->all();
+        $this->lockJobTypes([...$current, ...$data['jenis_aset_ids']]);
+    }
+
     public function jenisAsetAsetTypes(Request $request, string $jenisAsetId): JsonResponse
     {
         $this->jenisAset($jenisAsetId);
