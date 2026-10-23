@@ -11,17 +11,21 @@ import {
     SidebarMenuItem,
 } from '@apperp/ui/sidebar';
 import { Link, usePage } from '@inertiajs/react';
+import { Building2, Layers, RefreshCw, Server, Settings } from 'lucide-react';
 import OperatorMenu from '@/components/operator-menu';
 import { activeItem, navigation } from '@/lib/navigation';
 
-/**
- * Sepadan dengan `app-sidebar.tsx` milik Core, tetapi satu kolom dan tanpa ikon.
- *
- * Core memakai rel ikon di kiri karena navigasinya bertingkat: belasan bagian, masing-masing
- * dengan anak-anaknya sendiri, dan module yang menyumbang lagi. Konsol ini punya dua butir yang
- * keduanya muat sebagai satu kata. Rel ikon untuk dua kata hanya menambah satu lapis yang harus
- * ditebak artinya, dan ikonnya pun harus datang dari dependensi yang belum diminta konsol ini.
- */
+const navigationIcons = {
+    '/tenant': Building2,
+    '/lingkungan': Layers,
+    '/pembaruan': RefreshCw,
+    '/situs': Server,
+    '/pengaturan': Settings,
+};
+function navigationIcon(href: string) {
+    return Object.entries(navigationIcons).find(([path]) => path === href)?.[1];
+}
+
 export default function AppSidebar() {
     const { url, props } = usePage();
     const active = activeItem(url);
@@ -45,18 +49,37 @@ export default function AppSidebar() {
                     <SidebarGroupLabel>Menu</SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu>
-                            {navigation.map((item) => (
-                                <SidebarMenuItem key={item.href}>
-                                    <SidebarMenuButton
-                                        asChild
-                                        isActive={active?.href === item.href}
-                                    >
-                                        <Link href={item.href}>
-                                            {item.title}
-                                        </Link>
-                                    </SidebarMenuButton>
-                                </SidebarMenuItem>
-                            ))}
+                            {navigation.map((item) => {
+                                const Icon = navigationIcon(item.href);
+
+                                return (
+                                    <SidebarMenuItem key={item.href}>
+                                        <SidebarMenuButton
+                                            asChild
+                                            isActive={
+                                                active?.href === item.href
+                                            }
+                                            className="h-auto min-h-9 py-2 font-normal whitespace-normal data-[active=true]:font-normal"
+                                        >
+                                            <Link
+                                                href={item.href}
+                                                aria-current={
+                                                    active?.href === item.href
+                                                        ? 'page'
+                                                        : undefined
+                                                }
+                                            >
+                                                {Icon && (
+                                                    <Icon aria-hidden="true" />
+                                                )}
+                                                <span className="break-words whitespace-normal">
+                                                    {item.title}
+                                                </span>
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                );
+                            })}
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>

@@ -1,20 +1,21 @@
 import { FormErrorHeader } from '@/components/form-error-header';
 import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
-import { Button } from '@apperp/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@apperp/ui/dialog';
+import { ActionButton } from '@apperp/ui/action-button';
+import { DatePicker } from '@apperp/ui/date-picker';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { NativeSelect } from '@apperp/ui/native-select';
+import {
+    PageDialog as Dialog,
+    PageDialogContent as DialogContent,
+    PageDialogTrigger as DialogTrigger,
+    PageDialogBody,
+    PageDialogToolbar,
+} from '@apperp/ui/page-dialog';
+import { useConfirmation } from '@apperp/ui/use-confirmation';
 import { useForm } from '@inertiajs/react';
 import { Cloud, Server } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { kindLabels, labelFor } from '@/lib/display';
 
@@ -45,19 +46,18 @@ function HostingOption({
     return (
         <button
             type="button"
-            role="radio"
-            aria-checked={chosen}
+            aria-pressed={chosen}
             onClick={() => onChoose(value)}
             className={`flex w-full items-start gap-3 rounded-lg border p-3 text-start transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
                 chosen
-                    ? 'border-sky-600 bg-sky-50 ring-1 ring-sky-600 dark:bg-sky-950/40'
+                    ? 'border-primary/30 bg-primary/10 ring-1 ring-ring'
                     : 'bg-background hover:bg-muted/60'
             }`}
         >
             <span
                 className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md ${
                     chosen
-                        ? 'bg-sky-600 text-white'
+                        ? 'bg-primary text-primary-foreground'
                         : 'bg-muted text-muted-foreground'
                 }`}
             >
@@ -99,18 +99,51 @@ export default function CreateDialog({
         useInertiaFeedback();
 
     const [open, setOpen] = useState(false);
-    const { data, setData, post, processing, errors, reset, transform } =
-        useForm({
-            kind: 'demo',
-            tenant_id: tenant[0]?.id ?? '',
-            name: '',
-            expires_at: '',
-            hosting: 'provider' as Hosting,
-        });
+    const contentRef = useRef<HTMLDivElement>(null);
+    const { confirm, confirmation } = useConfirmation();
+    const {
+        data,
+        setData,
+        post,
+        processing,
+        errors,
+        reset,
+        transform,
+        clearErrors,
+        isDirty,
+    } = useForm({
+        kind: 'demo',
+        tenant_id: tenant[0]?.id ?? '',
+        name: '',
+        expires_at: '',
+        hosting: 'provider' as Hosting,
+    });
 
     const production = data.kind === 'production';
     const demo = data.kind === 'demo';
     const clientServer = production && data.hosting === 'client_server';
+
+    async function closeDraft() {
+        if (processing) {
+            return;
+        }
+
+        if (
+            isDirty &&
+            !(await confirm({
+                title: 'Buang perubahan?',
+                description: 'Isian yang belum disimpan akan dibuang.',
+                confirmLabel: 'Buang perubahan',
+                destructive: true,
+            }))
+        ) {
+            return;
+        }
+
+        reset();
+        clearErrors();
+        setOpen(false);
+    }
 
     function submit(e: FormEvent) {
         e.preventDefault();
@@ -130,217 +163,204 @@ export default function CreateDialog({
     }
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+            open={open}
+            onOpenChange={(next) => {
+                if (next) {
+                    setOpen(true);
+                } else {
+                    void closeDraft();
+                }
+            }}
+        >
+            {confirmation}
             <DialogTrigger asChild>
-                <Button disabled={tenant.length === 0}>Buat lingkungan</Button>
+                <ActionButton action="create" disabled={tenant.length === 0} />
             </DialogTrigger>
-            <DialogContent>
-                <form noValidate onSubmit={submit}>
-                    <DialogHeader>
-                        <DialogTitle>Buat lingkungan</DialogTitle>
-                        <DialogDescription>
-                            Jenis menentukan sisanya, jadi ia dipilih lebih
-                            dulu.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <>
-                        {localForm0RequestSummary}
-                        <FormErrorHeader errors={errors} />
-                    </>
+            <DialogContent
+                ref={contentRef}
+                title="Lingkungan"
+                recordTitle="Baru"
+                busy={processing}
+            >
+                <form
+                    noValidate
+                    onSubmit={submit}
+                    className="flex min-h-0 flex-1 flex-col"
+                >
+                    <PageDialogToolbar>
+                        <ActionButton
+                            action="save"
+                            type="submit"
+                            pending={processing}
+                        />
+                        <ActionButton
+                            action="cancel"
+                            disabled={processing}
+                            onClick={() => void closeDraft()}
+                        />
+                    </PageDialogToolbar>
+                    <PageDialogBody>
+                        <>
+                            {localForm0RequestSummary}
+                            <FormErrorHeader errors={errors} />
+                        </>
 
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <NativeSelect
-                                id="kind"
-                                label="Jenis"
-                                value={data.kind}
-                                onChange={(e) =>
-                                    setData('kind', e.target.value)
-                                }
-                            >
-                                {kinds.map((k) => (
-                                    <option key={k} value={k}>
-                                        {labelFor(kindLabels, k)}
-                                    </option>
-                                ))}
-                            </NativeSelect>
-                            {errors.kind && (
-                                <p className="text-sm text-destructive">
-                                    {errors.kind}
-                                </p>
-                            )}
-                        </div>
-
-                        {production && (
-                            <fieldset className="space-y-2">
-                                <legend className="mb-2 text-sm font-medium">
-                                    Berjalan di
-                                </legend>
-                                <div
-                                    role="radiogroup"
-                                    aria-label="Berjalan di"
-                                    className="grid gap-2 sm:grid-cols-2"
-                                >
-                                    <HostingOption
-                                        value="provider"
-                                        chosen={data.hosting === 'provider'}
-                                        onChoose={(value) =>
-                                            setData('hosting', value)
-                                        }
-                                        icon={<Cloud className="size-4" />}
-                                        title="Server kita (SaaS)"
-                                    >
-                                        Database disiapkan di sini, alamatnya di
-                                        domain kita.
-                                    </HostingOption>
-                                    <HostingOption
-                                        value="client_server"
-                                        chosen={
-                                            data.hosting === 'client_server'
-                                        }
-                                        onChoose={(value) =>
-                                            setData('hosting', value)
-                                        }
-                                        icon={<Server className="size-4" />}
-                                        title="Server klien"
-                                    >
-                                        Dipasang di VPS milik klien dengan satu
-                                        perintah, dikelola dari sini.
-                                    </HostingOption>
-                                </div>
-                                {errors.hosting && (
-                                    <p className="text-sm text-destructive">
-                                        {errors.hosting}
+                        <div className="space-y-8 py-4">
+                            <section className="space-y-4">
+                                <h2 className="text-lg font-semibold">
+                                    Identitas lingkungan
+                                </h2>
+                                <FormGrid>
+                                    <FormControl error={errors.name}>
+                                        <Input
+                                            id="name"
+                                            label="Nama lingkungan"
+                                            required
+                                            value={data.name}
+                                            onChange={(e) =>
+                                                setData('name', e.target.value)
+                                            }
+                                        />
+                                    </FormControl>
+                                    <FormControl error={errors.tenant_id}>
+                                        <NativeSelect
+                                            id="tenant"
+                                            label="Tenant"
+                                            required
+                                            value={data.tenant_id}
+                                            onChange={(e) =>
+                                                setData(
+                                                    'tenant_id',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        >
+                                            {tenant.map((t) => (
+                                                <option key={t.id} value={t.id}>
+                                                    {t.name}
+                                                </option>
+                                            ))}
+                                        </NativeSelect>
+                                    </FormControl>
+                                    <FormControl error={errors.kind}>
+                                        <NativeSelect
+                                            id="kind"
+                                            label="Jenis"
+                                            required
+                                            value={data.kind}
+                                            onChange={(e) =>
+                                                setData('kind', e.target.value)
+                                            }
+                                        >
+                                            {kinds.map((k) => (
+                                                <option key={k} value={k}>
+                                                    {labelFor(kindLabels, k)}
+                                                </option>
+                                            ))}
+                                        </NativeSelect>
+                                    </FormControl>
+                                    {demo && (
+                                        <FormControl error={errors.expires_at}>
+                                            <DatePicker
+                                                id="expires_at"
+                                                label="Berakhir pada"
+                                                required
+                                                portalContainer={contentRef}
+                                                value={data.expires_at}
+                                                onValueChange={(value) =>
+                                                    setData('expires_at', value)
+                                                }
+                                            />
+                                        </FormControl>
+                                    )}
+                                </FormGrid>
+                                {demo && (
+                                    <p className="text-sm text-muted-foreground">
+                                        Demo hanya berlaku sampai tanggal yang
+                                        dipilih.
                                     </p>
                                 )}
-                            </fieldset>
-                        )}
-
-                        <div className="space-y-2">
-                            <NativeSelect
-                                id="tenant"
-                                label="Tenant"
-                                value={data.tenant_id}
-                                onChange={(e) =>
-                                    setData('tenant_id', e.target.value)
-                                }
-                            >
-                                {tenant.map((t) => (
-                                    <option key={t.id} value={t.id}>
-                                        {t.name}
-                                    </option>
-                                ))}
-                            </NativeSelect>
-                            {errors.tenant_id && (
-                                <p className="text-sm text-destructive">
-                                    {errors.tenant_id}
-                                </p>
+                            </section>
+                            {production && (
+                                <section className="space-y-4 border-t pt-6">
+                                    <h2 className="text-lg font-semibold">
+                                        Lokasi server
+                                    </h2>
+                                    <div
+                                        role="group"
+                                        aria-label="Lokasi server"
+                                        className="grid gap-3 sm:grid-cols-2"
+                                    >
+                                        <HostingOption
+                                            value="provider"
+                                            chosen={data.hosting === 'provider'}
+                                            onChoose={(value) =>
+                                                setData('hosting', value)
+                                            }
+                                            icon={<Cloud className="size-4" />}
+                                            title="Server kita"
+                                        >
+                                            Aplikasi dan database dikelola di
+                                            server kita.
+                                        </HostingOption>
+                                        <HostingOption
+                                            value="client_server"
+                                            chosen={
+                                                data.hosting === 'client_server'
+                                            }
+                                            onChoose={(value) =>
+                                                setData('hosting', value)
+                                            }
+                                            icon={<Server className="size-4" />}
+                                            title="Server klien"
+                                        >
+                                            Aplikasi dipasang di server klien
+                                            dan dipantau dari konsol ini.
+                                        </HostingOption>
+                                    </div>
+                                    {errors.hosting && (
+                                        <p className="text-sm text-destructive">
+                                            {errors.hosting}
+                                        </p>
+                                    )}
+                                </section>
                             )}
-                        </div>
-
-                        <div className="space-y-2">
-                            <Input
-                                id="name"
-                                label="Nama"
-                                required
-                                value={data.name}
-                                onChange={(e) =>
-                                    setData('name', e.target.value)
-                                }
-                            />
-                            {errors.name && (
-                                <p className="text-sm text-destructive">
-                                    {errors.name}
-                                </p>
-                            )}
-                        </div>
-
-                        {demo && (
-                            <div className="space-y-2">
-                                <Input
-                                    id="expires_at"
-                                    label="Berakhir pada"
-                                    required
-                                    type="date"
-                                    value={data.expires_at}
-                                    onChange={(e) =>
-                                        setData('expires_at', e.target.value)
-                                    }
-                                />
-                                <p className="text-xs text-muted-foreground">
-                                    Demo wajib punya tanggal berakhir. Tanpa itu
-                                    ia tinggal selamanya, dan tidak ada yang
-                                    menyadarinya sampai disknya penuh.
-                                </p>
-                                {errors.expires_at && (
-                                    <p className="text-sm text-destructive">
-                                        {errors.expires_at}
-                                    </p>
-                                )}
-                            </div>
-                        )}
-
-                        <dl className="space-y-1.5 rounded-md border bg-muted/40 p-4 text-sm">
-                            <div className="flex justify-between gap-4">
-                                <dt className="text-muted-foreground">
-                                    Kirim keluar
-                                </dt>
-                                <dd
-                                    className={
-                                        production
-                                            ? 'font-medium'
-                                            : 'font-medium text-amber-700'
-                                    }
-                                >
-                                    {production ? 'Ya' : 'Tidak'}
-                                </dd>
-                            </div>
-                            {/*
-                                Dua baris ini sempat berbunyi "Database sendiri: Belum" dan "Dapat
-                                dimasuki: Belum", dan itu menyesatkan: keduanya berdiri sejajar
-                                dengan "Kirim keluar", yang memang sebuah pilihan. "Belum" karena
-                                itu terbaca seperti kotak yang lupa dicentang, padahal ia langkah
-                                berikutnya yang pasti terjadi. Yang dibetulkan bukan datanya
-                                melainkan kata kerjanya — ini rencana, bukan setelan.
-                            */}
-                            <div className="flex justify-between gap-4">
-                                <dt className="text-muted-foreground">
-                                    Database
-                                </dt>
-                                <dd className="text-end font-medium">
+                            <section className="space-y-3 rounded-md border bg-muted/30 p-4">
+                                <h2 className="text-sm font-semibold">
+                                    Setelah disimpan
+                                </h2>
+                                <p className="text-sm">
                                     {clientServer
-                                        ? 'Di server klien, dibuat saat pemasangan'
-                                        : 'Dibuatkan sendiri, di langkah berikutnya'}
-                                </dd>
-                            </div>
-                            <div className="flex justify-between gap-4">
-                                <dt className="text-muted-foreground">
-                                    Setelah dibuat
-                                </dt>
-                                <dd className="text-end font-medium">
-                                    {clientServer
-                                        ? 'Siapkan server klien, lalu buat perintah pasang'
-                                        : 'Belum dapat dimasuki'}
-                                </dd>
-                            </div>
-                            <p className="pt-2 text-xs text-muted-foreground">
-                                {production
-                                    ? 'Produksi boleh menghubungi dunia luar: email, webhook, dan pengiriman otomatis berjalan seperti biasa.'
-                                    : 'Di luar produksi, webhook dan pengiriman otomatis dimatikan. Itu satu-satunya alasan lingkungan terpisah ada — supaya salinan tidak menghubungi orang sungguhan.'}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                                {clientServer
-                                    ? 'Yang tercatat di sini baru registry-nya. Aplikasi dan datanya tidak pernah ada di server kita: agen memasangnya di VPS klien setelah perintah pasang dijalankan di sana, dan alamatnya milik server itu.'
-                                    : 'Yang tercatat di sini baru registry-nya. Databasenya disiapkan satu langkah sesudahnya, lewat tombol di halaman rincian — sampai itu selesai, lingkungannya tidak dapat dibuka siapa pun.'}
-                            </p>
-                        </dl>
-                    </div>
-
-                    <DialogFooter>
-                        <Button type="submit" disabled={processing}>
-                            Buat
-                        </Button>
-                    </DialogFooter>
+                                        ? 'Buka rincian lingkungan, siapkan server klien, lalu jalankan perintah pemasangannya di sana.'
+                                        : 'Buka rincian lingkungan dan pilih Siapkan. Lingkungan dapat digunakan setelah penyiapan selesai.'}
+                                </p>
+                                <dl className="grid gap-3 border-t pt-3 text-sm sm:grid-cols-2">
+                                    <div>
+                                        <dt className="text-muted-foreground">
+                                            Database
+                                        </dt>
+                                        <dd className="mt-1">
+                                            {clientServer
+                                                ? 'Dibuat saat pemasangan di server klien'
+                                                : 'Disiapkan sendiri untuk lingkungan ini'}
+                                        </dd>
+                                    </div>
+                                    <div>
+                                        <dt className="text-muted-foreground">
+                                            Email, webhook, dan pengiriman
+                                            otomatis
+                                        </dt>
+                                        <dd className="mt-1">
+                                            {production
+                                                ? 'Diizinkan'
+                                                : 'Dinonaktifkan agar data percobaan tidak terkirim keluar'}
+                                        </dd>
+                                    </div>
+                                </dl>
+                            </section>
+                        </div>
+                    </PageDialogBody>
                 </form>
             </DialogContent>
         </Dialog>

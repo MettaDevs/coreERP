@@ -23,13 +23,8 @@ use Throwable;
  * operator sesudah penyiapan berjalan — dan perbedaan itu menghilang kalau kita membaca daftar yang
  * sama dua kali.
  *
- * ## Kenapa kegagalan membacanya bukan galat
- *
- * Lingkungan bisa saja belum punya database, databasenya sedang tidak dapat dihubungi, atau
- * migrationnya belum pernah berjalan sehingga tabelnya belum ada. Ketiganya keadaan yang sah, dan
- * ketiganya artinya sama bagi layar ini: belum ada yang bisa ditampilkan. Menjatuhkan seluruh
- * halaman rincian karena satu daftar tambahan berarti operator kehilangan justru riwayat operasi
- * yang menjelaskan kenapa daftarnya kosong.
+ * Kegagalan membaca database dilaporkan terpisah dari daftar kosong. Controller tetap
+ * menampilkan rincian lingkungan dan riwayatnya, dengan pesan bahwa daftar belum tersedia.
  */
 final class InstalledModules
 {
@@ -72,8 +67,10 @@ final class InstalledModules
                 ->where('tenant_id', $environment->tenant_id)
                 ->orderBy('module_id')
                 ->get(['module_id', 'version', 'status', 'seeded_at']);
-        } catch (Throwable) {
-            return [];
+        } catch (Throwable $failure) {
+            report($failure);
+
+            throw new EnvironmentRejected('Daftar aplikasi terpasang belum dapat dibaca. Periksa koneksi database lingkungan lalu muat ulang halaman.', previous: $failure);
         }
 
         if ($rows->isEmpty()) {

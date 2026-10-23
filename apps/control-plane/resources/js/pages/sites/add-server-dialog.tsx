@@ -1,5 +1,6 @@
 import { FormErrorHeader } from '@/components/form-error-header';
 import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
+import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
 import {
     CollapsibleSection,
@@ -13,11 +14,11 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
+    DialogToolbar,
 } from '@apperp/ui/dialog';
 import { NativeSelect } from '@apperp/ui/native-select';
-import { Spinner } from '@apperp/ui/spinner';
+import { useConfirmation } from '@apperp/ui/use-confirmation';
 import { Link, useForm } from '@inertiajs/react';
-import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import {
@@ -28,7 +29,7 @@ import {
 export type Candidate = { id: string; name: string; tenant: string };
 
 /**
- * "Tambah server klien" dari daftar server klien.
+ * "Server klien baru" dari daftar server klien.
  *
  * Bukan formulir situs yang berdiri sendiri. Server klien selalu milik satu lingkungan produksi yang
  * berjalan di server klien, jadi yang dipilih di sini lingkungannya — daftarnya dari server, hanya yang
@@ -44,18 +45,49 @@ export default function AddServerDialog({
         useInertiaFeedback();
 
     const [open, setOpen] = useState(false);
-    const { data, setData, post, processing, errors, transform, clearErrors } =
-        useForm({
-            environment_id: candidates[0]?.id ?? '',
-            server_address: '',
-            update_window_start: '',
-            update_window_end: '',
-        });
+    const { confirm, confirmation } = useConfirmation();
+    const {
+        data,
+        setData,
+        post,
+        processing,
+        errors,
+        transform,
+        clearErrors,
+        reset,
+        isDirty,
+    } = useForm({
+        environment_id: candidates[0]?.id ?? '',
+        server_address: '',
+        update_window_start: '',
+        update_window_end: '',
+    });
 
     // Penolakan `ClientServerSetup` datang dengan nama `server_client`, bukan nama satu isian.
     const refusal = (errors as Record<string, string | undefined>)
         .server_client;
 
+    async function closeDraft() {
+        if (processing) {
+            return;
+        }
+
+        if (
+            isDirty &&
+            !(await confirm({
+                title: 'Buang perubahan?',
+                description: 'Isian yang belum disimpan akan dibuang.',
+                confirmLabel: 'Buang perubahan',
+                destructive: true,
+            }))
+        ) {
+            return;
+        }
+
+        reset();
+        clearErrors();
+        setOpen(false);
+    }
     function submit(e: FormEvent) {
         e.preventDefault();
 
@@ -77,24 +109,22 @@ export default function AddServerDialog({
         <Dialog
             open={open}
             onOpenChange={(opened) => {
-                setOpen(opened);
-
-                if (!opened) {
-                    clearErrors();
+                if (opened) {
+                    setOpen(true);
+                } else {
+                    void closeDraft();
                 }
             }}
         >
+            {confirmation}
             <DialogTrigger asChild>
-                <Button>
-                    <Plus />
-                    Tambah server klien
-                </Button>
+                <ActionButton action="create" />
             </DialogTrigger>
             <DialogContent>
                 {candidates.length === 0 ? (
                     <>
                         <DialogHeader>
-                            <DialogTitle>Tambah server klien</DialogTitle>
+                            <DialogTitle>Server klien baru</DialogTitle>
                             <DialogDescription>
                                 Setiap server klien menjalankan satu lingkungan
                                 produksi.
@@ -102,9 +132,9 @@ export default function AddServerDialog({
                         </DialogHeader>
                         <div className="space-y-3 py-4 text-sm">
                             <p>
-                                Belum ada lingkungan produksi di server klien
-                                yang belum punya server. Buat dulu lingkungan
-                                produksinya:
+                                Belum ada lingkungan produksi yang dapat
+                                dipilih. Siapkan lingkungan di server klien
+                                terlebih dahulu:
                             </p>
                             <ol className="list-decimal space-y-1 ps-5 text-muted-foreground">
                                 <li>
@@ -135,13 +165,26 @@ export default function AddServerDialog({
                 ) : (
                     <form noValidate onSubmit={submit}>
                         <DialogHeader>
-                            <DialogTitle>Tambah server klien</DialogTitle>
+                            <DialogTitle>Server klien baru</DialogTitle>
                             <DialogDescription>
-                                Catat VPS milik klien untuk satu lingkungan
-                                produksi. Belum ada yang dipasang sampai
-                                perintah pasangnya dijalankan di sana.
+                                Pilih lingkungan dan catat alamat server.
+                                Setelah disimpan, lanjutkan dengan menjalankan
+                                perintah pemasangan di server klien.
                             </DialogDescription>
                         </DialogHeader>
+                        <DialogToolbar>
+                            <ActionButton
+                                action="save"
+                                type="submit"
+                                pending={processing}
+                                disabled={data.environment_id === ''}
+                            />
+                            <ActionButton
+                                action="cancel"
+                                disabled={processing}
+                                onClick={() => void closeDraft()}
+                            />
+                        </DialogToolbar>
                         <>
                             {localForm0RequestSummary}
                             <FormErrorHeader errors={errors} />
@@ -151,7 +194,7 @@ export default function AddServerDialog({
                             {refusal && (
                                 <div
                                     role="alert"
-                                    className="rounded-md border border-destructive/40 bg-red-50 px-4 py-3 text-sm text-destructive dark:bg-red-950/40 dark:text-red-200"
+                                    className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
                                 >
                                     {refusal}
                                 </div>
@@ -208,18 +251,6 @@ export default function AddServerDialog({
                                 </CollapsibleSection>
                             </CollapsibleSectionGroup>
                         </div>
-
-                        <DialogFooter>
-                            <Button
-                                type="submit"
-                                disabled={
-                                    processing || data.environment_id === ''
-                                }
-                            >
-                                {processing && <Spinner />}
-                                Simpan dan lanjut ke perintah pasang
-                            </Button>
-                        </DialogFooter>
                     </form>
                 )}
             </DialogContent>

@@ -43,6 +43,18 @@ supaya ia tidak menuntut tabel. Alasannya ditulis di `apps/control-plane/bootstr
 
 Layarnya Inertia + React di `resources/js/pages/`.
 
+Bingkai konsol memakai bar perintah SDK yang tetap terlihat saat isi halaman digulir.
+Form tenant dan lingkungan memakai `PageDialog`; daftar induk tetap terpasang, Simpan/Batal
+berada sebelum isi form, dan penutupan draft yang berubah meminta konfirmasi. Selama request
+berjalan, kartu tidak dapat ditutup. Batal membuang draft; kegagalan simpan mempertahankan isian.
+Warna status memakai token semantik SDK agar mengikuti tema terang dan gelap, dengan label
+teks yang tetap menjelaskan statusnya. Endpoint dan pemeriksaan operator tetap milik backend.
+Isi halaman memisahkan tindakan operasional, keadaan terkini, dan rincian teknis. Form tenant dan
+lingkungan memakai kelompok identitas, pilihan lingkungan, dan aplikasi. Tanggal kalender memakai
+DatePicker SDK dengan portal pada kartu. Detail server mendahulukan tindakan dan laporan kesehatan;
+identitas teknis serta aktivitas operator tersedia melalui bagian yang dapat dibuka. Pengaturan
+menampilkan kesiapan koneksi sebelum rincian kunci, registry, dan DNS.
+
 Rincian lingkungan menampilkan **Versi terpasang**. Untuk lingkungan di server kita, nomornya
 dibaca dari `platform_release` pada `GET /api/internal/v1/fleet`: Core mengambilnya dari
 `SENTRY_RELEASE` yang dikirim pemasang SaaS untuk rilis yang sedang dijalankan. Semua lingkungan
@@ -51,6 +63,32 @@ Untuk server klien, sumbernya `sites.reported_release` dari laporan agen terakhi
 terbaru di katalog atau rilis yang baru diantrekan. Versi kosong tampil "Belum diketahui";
 kegagalan menghubungi Core ditampilkan tanpa menutup rincian lingkungan. Lingkungan aktif yang
 memakai database bersama tidak dianggap belum siap hanya karena tidak punya database sendiri.
+
+## Keputusan dan kegagalan pada batas aplikasi
+
+Pencatatan lingkungan berjalan melalui `POST /api/internal/v1/environments` di Core. Core menyimpan
+lingkungan, operasi awal, dan audit operator dalam transaksi yang sama. Konsol memeriksa status
+`201`, kecocokan tenant, lalu membaca record hasilnya. Konsol tidak lagi memiliki salinan penulis
+registry lingkungan.
+
+Adapter fleet dan penyiapan menerima `200`; adapter antrean menerima `202`. Bentuk wajib respons
+diperiksa sebelum dipakai. Jawaban HTML, kosong, atau tidak lengkap bukan keberhasilan. Pada perintah
+yang hasilnya belum pasti, operator diminta memeriksa keadaan sebelum mengirim ulang.
+`modules_error` membedakan kegagalan membaca pemasangan dari daftar yang benar-benar kosong.
+
+Pembaruan memiliki satu reservasi `UniqueLock` Laravel per lingkungan, termasuk selama menunggu
+worker. Fleet membawa `queued`, sehingga layar tetap memantau sebelum operasi mulai berjalan.
+Reservasi dilepas bila pengiriman ke antrean gagal atau worker selesai.
+
+Penerbit lisensi membaca ulang dan mengunci Site setelah permintaan entitlement selesai. Pencabutan,
+penghentian perpanjangan, dan kebijakan lisensi terbaru diperiksa sebelum lisensi ditandatangani.
+Penerbit kredensial registry juga memeriksa ulang Site setelah Harbor menjawab; robot yang tidak lagi
+boleh diberikan dibersihkan melalui jalur kompensasi.
+
+Pencabutan boleh dipanggil ulang untuk menyelesaikan penghapusan DNS dan kredensial registry. Audit
+pencabutan tidak digandakan. Metadata DNS dan auditnya disimpan dalam satu transaksi lokal, sedangkan
+panggilan Cloudflare tetap berada di luar transaksi tersebut. Nomor rilis baru wajib tiga bagian
+angka tanpa leading zero agar rilis yang diterima konsol juga diterima agen.
 
 ## Batas data: apa milik sisi pusat
 

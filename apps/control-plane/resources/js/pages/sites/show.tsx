@@ -2,6 +2,12 @@ import { FormErrorHeader } from '@/components/form-error-header';
 import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
+import { Card, CardHeader, CardTitle, CardContent } from '@apperp/ui/card';
+import {
+    CollapsibleSection,
+    CollapsibleSectionGroup,
+} from '@apperp/ui/collapsible-section';
+import { DatePicker } from '@apperp/ui/date-picker';
 import { Input } from '@apperp/ui/input';
 import { NativeSelect } from '@apperp/ui/native-select';
 import {
@@ -107,6 +113,7 @@ type Site = {
     serverAddress: string | null;
     appUrl: string | null;
     appUrlAutomatic: boolean;
+    cleanupPending: boolean;
     dns: DnsInfo;
     lastSeenIp: string | null;
     reportedRelease: string | null;
@@ -141,9 +148,9 @@ const SINGLE_IMAGE_EDITION = 'coreerp';
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
     return (
-        <div className="flex flex-wrap justify-between gap-4 border-b py-2.5 last:border-b-0">
+        <div className="grid grid-cols-1 gap-1 border-b py-2.5 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] sm:gap-4">
             <dt className="text-sm text-muted-foreground">{label}</dt>
-            <dd className="text-end text-sm font-medium break-all">
+            <dd className="text-sm font-medium break-words sm:text-end">
                 {children}
             </dd>
         </div>
@@ -162,20 +169,19 @@ function Section({
     children: ReactNode;
 }) {
     return (
-        <section
-            id={id}
-            className="scroll-mt-24 space-y-4 rounded-lg border bg-background p-5"
-        >
-            <div>
-                <h2 className="text-sm font-semibold">{title}</h2>
+        <Card id={id} className="min-w-0 scroll-mt-24">
+            <CardHeader>
+                <CardTitle>{title}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
                 {description && (
-                    <p className="mt-1 text-sm text-muted-foreground">
+                    <p className="text-sm text-muted-foreground">
                         {description}
                     </p>
                 )}
-            </div>
-            {children}
-        </section>
+                {children}
+            </CardContent>
+        </Card>
     );
 }
 
@@ -458,7 +464,7 @@ function RequestOperation({
 
     return (
         <Section
-            title="Minta operasi"
+            title="Jalankan tindakan"
             description="Agen mengambilnya pada kunjungan berikutnya. Pembaruan hanya diambil di dalam jendela pembaruan; operasi lain kapan saja."
         >
             <form
@@ -518,12 +524,12 @@ function RequestOperation({
                 {data.operation === 'install_license' && (
                     <>
                         <div className="space-y-1">
-                            <Input
+                            <DatePicker
                                 label="Lisensi berlaku sampai"
-                                type="date"
+
                                 value={data.valid_until}
-                                onChange={(e) =>
-                                    setData('valid_until', e.target.value)
+                                onValueChange={(value) =>
+                                    setData('valid_until', value)
                                 }
                             />
                             <p className="text-xs text-muted-foreground">
@@ -556,22 +562,32 @@ function RequestOperation({
 }
 
 function Revoke({ site }: { site: Site }) {
+    const cleanup = site.state === 'revoked';
     const { wrap: wrapLocalForm3Request, summary: localForm3RequestSummary } =
         useInertiaFeedback();
 
     const { post, processing, errors } = useForm({});
 
     return (
-        <section className="space-y-4 rounded-lg border border-red-200 bg-background p-5 dark:border-red-900/60">
+        <section className="space-y-4 rounded-lg border border-destructive/30 bg-background p-5">
             <div>
-                <h2 className="text-sm font-semibold text-red-700 dark:text-red-300">
-                    Cabut server klien
+                <h2 className="text-sm font-semibold text-destructive">
+                    {cleanup
+                        ? 'Selesaikan pembersihan akses'
+                        : 'Cabut server klien'}
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                    Tanda tangan agen server ini berhenti diterima dan
-                    permintaan yang menunggu dibatalkan. Aplikasinya di server
-                    klien tetap berjalan — yang berhenti pengelolaannya, bukan
-                    pelayanan pasien. Tidak dapat dibatalkan dari layar ini.
+                    {cleanup ? (
+                        'Server sudah dicabut. Coba ulang penghapusan DNS dan akses registry yang belum selesai.'
+                    ) : (
+                        <>
+                            Tanda tangan agen server ini berhenti diterima dan
+                            permintaan yang menunggu dibatalkan. Aplikasinya di
+                            server klien tetap berjalan — yang berhenti
+                            pengelolaannya, bukan pelayanan pasien. Tidak dapat
+                            dibatalkan dari layar ini.
+                        </>
+                    )}
                 </p>
             </div>
             <form
@@ -595,7 +611,9 @@ function Revoke({ site }: { site: Site }) {
                     variant="destructive"
                     disabled={processing}
                 >
-                    Cabut server klien
+                    {cleanup
+                        ? 'Coba bersihkan akses lagi'
+                        : 'Cabut server klien'}
                 </Button>
             </form>
         </section>
@@ -812,8 +830,8 @@ function ContainerBadge({
         container.state === 'running' &&
         (!container.health || container.health === 'healthy');
     const classes = good
-        ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200'
-        : 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200';
+        ? 'border-success/30 bg-success/10 text-success   '
+        : 'border-destructive/30 bg-destructive/10 text-destructive   ';
 
     return (
         <Badge variant="outline" className={`font-mono ${classes}`}>
@@ -889,7 +907,7 @@ function FinanceFeedSection({
     return (
         <Section
             id="feed-finance"
-            title="Feed posting finance"
+            title="Pengiriman jurnal ke finance"
             description="Ringkasan dari Core di server ini, dibawa laporan agen: jumlah dan waktu saja, tanpa isi jurnal. Rincian dan tindak lanjutnya di Posting finance › Pantau posting pada aplikasi server ini."
         >
             <div className="flex flex-wrap items-center gap-2">
@@ -902,7 +920,7 @@ function FinanceFeedSection({
             </div>
 
             {feed.alerts.length > 0 && (
-                <ul className="list-disc space-y-1 ps-5 text-sm text-red-700 dark:text-red-300">
+                <ul className="list-disc space-y-1 ps-5 text-sm text-destructive">
                     {feed.alerts.map((alert) => (
                         <li key={alert}>{feedAlertText(alert, feed)}</li>
                     ))}
@@ -923,7 +941,7 @@ function FinanceFeedSection({
                                     key={status}
                                     className={
                                         problem
-                                            ? 'rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900/60 dark:bg-red-950/40'
+                                            ? 'rounded-lg border border-destructive/30 bg-destructive/10 p-3'
                                             : 'rounded-lg border p-3'
                                     }
                                 >
@@ -934,7 +952,7 @@ function FinanceFeedSection({
                                         )}
                                     </p>
                                     <p
-                                        className={`mt-1 text-lg font-semibold tabular-nums ${problem ? 'text-red-700 dark:text-red-200' : ''}`}
+                                        className={`mt-1 text-lg font-semibold tabular-nums ${problem ? 'text-destructive' : ''}`}
                                     >
                                         {COUNT.format(count)}
                                     </p>
@@ -948,7 +966,7 @@ function FinanceFeedSection({
                                 <span
                                     className={
                                         pendingOld
-                                            ? 'text-red-700 dark:text-red-300'
+                                            ? 'text-destructive'
                                             : undefined
                                     }
                                 >
@@ -977,7 +995,7 @@ function FinanceFeedSection({
                                 <span
                                     className={
                                         (feed.failedPushes ?? 0) > 0
-                                            ? 'text-red-700 dark:text-red-300'
+                                            ? 'text-destructive'
                                             : undefined
                                     }
                                 >
@@ -1045,7 +1063,7 @@ export default function Show({
             {operationError && (
                 <div
                     role="alert"
-                    className="rounded-md border border-destructive/40 bg-red-50 px-4 py-3 text-sm text-destructive dark:bg-red-950/40 dark:text-red-200"
+                    className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
                 >
                     {operationError}
                 </div>
@@ -1054,7 +1072,7 @@ export default function Show({
             {site.license.notRequiredOnServer && (
                 <div
                     role="alert"
-                    className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+                    className="rounded-md border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning"
                 >
                     Server ini tidak mewajibkan lisensi — periksa berkas .env di
                     server klien.
@@ -1064,10 +1082,10 @@ export default function Show({
             {site.financeFeed.state === 'attention' && (
                 <div
                     role="alert"
-                    className="rounded-md border border-destructive/40 bg-red-50 px-4 py-3 text-sm text-destructive dark:bg-red-950/40 dark:text-red-200"
+                    className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
                 >
-                    Feed posting finance di server ini perlu perhatian: ada
-                    jurnal yang belum dibukukan aplikasi finance klinik.{' '}
+                    Ada jurnal yang belum dibukukan oleh aplikasi finance.
+                    Periksa pengirimannya sebelum melanjutkan.{' '}
                     <a
                         href="#feed-finance"
                         className="font-medium underline underline-offset-4"
@@ -1076,6 +1094,49 @@ export default function Show({
                     </a>
                 </div>
             )}
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Ringkasan server</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-wrap items-start gap-4">
+                    <div className="min-w-0 flex-1 space-y-1">
+                        <p className="text-sm font-medium">
+                            {revoked
+                                ? 'Akses server sudah dicabut'
+                                : site.state === 'not_enrolled'
+                                  ? 'Selesaikan pemasangan agar server mulai melapor'
+                                  : site.state === 'stale'
+                                    ? 'Server belum mengirim laporan terbaru'
+                                    : 'Server terhubung ke konsol'}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                            {revoked
+                                ? 'Server ini tidak dapat menerima tindakan baru dari konsol.'
+                                : site.state === 'not_enrolled'
+                                  ? 'Buka bagian Pemasangan di bawah untuk melanjutkan penyiapan.'
+                                  : site.state === 'stale'
+                                    ? 'Periksa koneksi dan agen di server. Laporan terakhir tetap tersedia di bawah.'
+                                    : 'Pantau cadangan, ruang penyimpanan, dan hasil tindakan dari halaman ini.'}
+                        </p>
+                    </div>
+                    {site.appUrl && (
+                        <Button asChild variant="outline">
+                            <a
+                                href={site.appUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                            >
+                                Buka aplikasi{' '}
+                                <ExternalLink className="size-4" />
+                            </a>
+                        </Button>
+                    )}
+                    <Button asChild variant="ghost">
+                        <Link href="/situs">Daftar server</Link>
+                    </Button>
+                </CardContent>
+            </Card>
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <Summary
@@ -1110,7 +1171,7 @@ export default function Show({
                     ) : (
                         <a
                             href="#setelan"
-                            className="font-normal text-amber-700 hover:underline dark:text-amber-300"
+                            className="font-normal text-warning hover:underline"
                         >
                             Belum dicatat
                         </a>
@@ -1120,7 +1181,7 @@ export default function Show({
                     label="Rilis terpasang"
                     hint={
                         newer ? (
-                            <span className="flex items-center gap-1 text-amber-700 dark:text-amber-300">
+                            <span className="flex items-center gap-1 text-warning">
                                 <ArrowUpCircle className="size-3.5" />
                                 {newer} tersedia
                             </span>
@@ -1151,12 +1212,29 @@ export default function Show({
                 </Summary>
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-2">
-                <ServerSettingsSection site={site} revoked={revoked} />
+            <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                <div className="min-w-0 space-y-4">
+                    {!revoked &&
+                        site.state === 'not_enrolled' &&
+                        (site.environment ? (
+                            <Installation site={site} />
+                        ) : (
+                            <Enrollment site={site} />
+                        ))}
+                    {!revoked && site.state !== 'not_enrolled' && (
+                        <RequestOperation
+                            site={site}
+                            operations={operations}
+                            releases={releases}
+                            licenseKeyConfigured={licenseKeyConfigured}
+                            licenseValidDays={licenseValidDays}
+                        />
+                    )}
+                </div>
 
                 <Section
                     title="Laporan terakhir"
-                    description="Hanya isi yang boleh keluar dari server klien: keadaan container, sisa disk, cadangan, dan masa berlaku."
+                    description="Kondisi server berdasarkan laporan agen terakhir. Saat server tidak melapor, kondisi di sini mungkin sudah berubah."
                 >
                     {report ? (
                         <dl>
@@ -1192,22 +1270,6 @@ export default function Show({
                             <Row label="Sertifikat berakhir">
                                 {report.certificate_expires_at ?? '—'}
                             </Row>
-                            <Row label="Versi agen">
-                                {report.agent_version ?? '—'}
-                            </Row>
-                            <Row label="Terdaftar">
-                                {site.enrolledAt ?? '—'}
-                            </Row>
-                            {site.edition !== SINGLE_IMAGE_EDITION && (
-                                <Row label="Edisi">{site.edition}</Row>
-                            )}
-                            {site.reportedDigest && (
-                                <Row label="Digest">
-                                    <span className="font-mono text-xs font-normal">
-                                        {site.reportedDigest}
-                                    </span>
-                                </Row>
-                            )}
                         </dl>
                     ) : (
                         <p className="text-sm text-muted-foreground">
@@ -1215,16 +1277,33 @@ export default function Show({
                             datang sekitar satu menit setelah agennya terpasang.
                         </p>
                     )}
-                    {site.appUrl && (
-                        <a
-                            href={site.appUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-sm underline underline-offset-4"
-                        >
-                            Buka aplikasi
-                            <ExternalLink className="size-3.5" />
-                        </a>
+                    {report && (
+                        <CollapsibleSectionGroup>
+                            <CollapsibleSection
+                                value="technical"
+                                title="Rincian teknis"
+                                summary={`Agen ${report.agent_version ?? 'belum diketahui'} ... identitas rilis dan pendaftaran`}
+                            >
+                                <dl>
+                                    <Row label="Versi agen">
+                                        {report.agent_version ?? '—'}
+                                    </Row>
+                                    <Row label="Terdaftar">
+                                        {site.enrolledAt ?? '—'}
+                                    </Row>
+                                    {site.edition !== SINGLE_IMAGE_EDITION && (
+                                        <Row label="Edisi">{site.edition}</Row>
+                                    )}
+                                    {site.reportedDigest && (
+                                        <Row label="Digest">
+                                            <span className="font-mono text-xs font-normal">
+                                                {site.reportedDigest}
+                                            </span>
+                                        </Row>
+                                    )}
+                                </dl>
+                            </CollapsibleSection>
+                        </CollapsibleSectionGroup>
                     )}
                 </Section>
             </div>
@@ -1233,24 +1312,8 @@ export default function Show({
                 feed={site.financeFeed}
                 reported={report !== null}
             />
-
-            <div className="grid gap-6 lg:grid-cols-2">
-                {!revoked &&
-                    site.state === 'not_enrolled' &&
-                    (site.environment ? (
-                        <Installation site={site} />
-                    ) : (
-                        <Enrollment site={site} />
-                    ))}
-                {!revoked && site.state !== 'not_enrolled' && (
-                    <RequestOperation
-                        site={site}
-                        operations={operations}
-                        releases={releases}
-                        licenseKeyConfigured={licenseKeyConfigured}
-                        licenseValidDays={licenseValidDays}
-                    />
-                )}
+            <div className="grid items-start gap-4 xl:grid-cols-2">
+                <ServerSettingsSection site={site} revoked={revoked} />
                 <LicenseRenewal site={site} revoked={revoked} />
             </div>
 
@@ -1337,45 +1400,48 @@ export default function Show({
                 </div>
             </Section>
 
-            <Section
-                title="Jejak audit"
-                description="Tindakan operator dan sistem terhadap server ini. Jejaknya hanya dapat ditambah; database menolak perubahan dan penghapusan."
-            >
-                {audit.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                        Belum ada tindakan tercatat.
-                    </p>
-                ) : (
-                    <ul className="divide-y text-sm">
-                        {audit.map((event) => (
-                            <li
-                                key={event.id}
-                                className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2"
-                            >
-                                <span>
-                                    <span className="font-medium">
-                                        {labelFor(
-                                            siteAuditLabels,
-                                            event.action,
-                                        )}
+            <CollapsibleSectionGroup className="rounded-md border bg-card">
+                <CollapsibleSection
+                    value="audit"
+                    title="Aktivitas operator"
+                    summary={`${audit.length} tindakan terakhir ... siapa yang mengubah server dan kapan`}
+                >
+                    {audit.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                            Belum ada tindakan tercatat.
+                        </p>
+                    ) : (
+                        <ul className="divide-y text-sm">
+                            {audit.map((event) => (
+                                <li
+                                    key={event.id}
+                                    className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2"
+                                >
+                                    <span>
+                                        <span className="font-medium">
+                                            {labelFor(
+                                                siteAuditLabels,
+                                                event.action,
+                                            )}
+                                        </span>
+                                        <span className="ms-2 text-muted-foreground">
+                                            oleh {event.by}
+                                        </span>
                                     </span>
-                                    <span className="ms-2 text-muted-foreground">
-                                        oleh {event.by}
+                                    <span className="flex items-baseline gap-3 text-xs text-muted-foreground">
+                                        <span className="font-mono">
+                                            {event.action}
+                                        </span>
+                                        <span>{event.at}</span>
                                     </span>
-                                </span>
-                                <span className="flex items-baseline gap-3 text-xs text-muted-foreground">
-                                    <span className="font-mono">
-                                        {event.action}
-                                    </span>
-                                    <span>{event.at}</span>
-                                </span>
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </Section>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </CollapsibleSection>
+            </CollapsibleSectionGroup>
 
-            {!revoked && <Revoke site={site} />}
+            {(!revoked || site.cleanupPending) && <Revoke site={site} />}
         </Shell>
     );
 }

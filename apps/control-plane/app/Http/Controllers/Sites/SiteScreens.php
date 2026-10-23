@@ -133,6 +133,7 @@ final class SiteScreens extends Controller
                 // keadaan pemasangan yang sama dan menaut ke panelnya, bukan formulir pendaftaran lama.
                 'progress' => InstallProgress::forSite($row),
                 'enrolledAt' => $row->enrolled_at?->toDateTimeString(),
+                'cleanupPending' => $row->revoked() && ($row->dns_record_id !== null || SiteOperation::query()->where('site_id', $row->id)->whereNotNull('registry_robot_id')->exists()),
                 'reportedDigest' => $row->reported_digest,
                 'lastReport' => $row->last_report,
                 'license' => [
