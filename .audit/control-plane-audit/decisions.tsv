@@ -9,3 +9,4 @@ ts	phase	decision	why	evidence	result
 2026-10-23T08:46:57.1833093+00:00	mfa-review	menggunakan provider Fortify dan menolak OTP yang sudah dipakai	menyamakan kebijakan MFA dengan login Core	OperatorSecondFactorTest; core-targeted.log	VERIFIED
 2026-10-23T08:46:57.1833093+00:00	verification	menutup pemeriksaan jalur konsol dengan batas eksplisit	full console dan scoped Core lulus; PHPOffice masih terbuka	report.md	VERIFIED scoped; dependencies partially open
 2026-10-23T08:47:41.8268755+00:00	cleanup	menghentikan server HTTP audit dan menghapus container PostgreSQL tmpfs khusus audit	mengakhiri resource sementara tanpa menyentuh runtime UI	report.md	complete
+2026-10-23T09:09:42.3080864+00:00	ci-fix	memperbarui Wayfinder 0.1.20 ke 0.1.23	Laravel baru menambahkan HTTP QUERY yang belum dikenali generator lama	CI quality Check Frontend Types; wayfinder generate	regenerate runtime types; no generated source committed
