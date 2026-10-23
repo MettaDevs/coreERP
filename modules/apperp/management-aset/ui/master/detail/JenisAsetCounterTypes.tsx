@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
-import { ActionButton } from '@apperp/ui/action-button';
 
-import { DialogToolbar } from '@apperp/ui/dialog';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
 import { FormControl } from '@apperp/ui/form-control';
 import { TransferList } from '@apperp/ui/transfer-list';
 import type { TransferListItem } from '@apperp/ui/transfer-list';
 import { api, errorMessage } from '../../api';
-import { useSaveFeedback } from '../../use-save-feedback';
+import type { ApiValidationErrors } from '../../api';
+import type { MasterDetailsPayload } from '../DraftMasterDetails';
 
 type Choice = { id: string; kode: string; nama: string; satuan: string | null };
 
@@ -26,28 +25,27 @@ const itemOf = (item: Choice): TransferListItem => ({
 export default function JenisAsetCounterTypes({
     jenisAsetId,
     canEdit,
-    version,
-    onVersionChange,
+    onChange,
+    validationErrors,
 }: {
     jenisAsetId: string;
     canEdit: boolean;
-    /** Versi record pemilik; penyimpanan rincian ini mengklaimnya. */
-    version: number;
-    onVersionChange: (version: number) => void;
+    onChange: (details: MasterDetailsPayload) => void;
+    validationErrors?: ApiValidationErrors;
 }) {
     const [remaining, setRemaining] = useState<TransferListItem[]>([]);
     const [selected, setSelected] = useState<TransferListItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const {
-        scopeRef: feedbackScopeRef,
-        feedbackSummary,
-        reportSaveError,
-        clearSaveFeedback,
-        fieldError,
-    } = useSaveFeedback(undefined, jenisAsetId);
+    const fieldError = (field: string) =>
+        Object.entries(validationErrors ?? {})
+            .filter(
+                ([name]) =>
+                    name === `details.counters.${field}` ||
+                    name.startsWith(`details.counters.${field}.`),
+            )
+            .flatMap(([, messages]) => messages)
+            .join(' ') || undefined;
     const [error, setError] = useState('');
-    const [saved, setSaved] = useState(false);
 
     useEffect(() => {
         let dilepas = false;
@@ -84,31 +82,6 @@ export default function JenisAsetCounterTypes({
         };
     }, [jenisAsetId]);
 
-    async function save() {
-        clearSaveFeedback();
-        setSaving(true);
-        setError('');
-
-        try {
-            const result = await api<{ version: number }>(
-                `/jenis-aset/${jenisAsetId}/counter`,
-                {
-                    method: 'PUT',
-                    body: JSON.stringify({
-                        version,
-                        jenis_counter_ids: selected.map((item) => item.id),
-                    }),
-                },
-            );
-            onVersionChange(result.version);
-            setSaved(true);
-        } catch (caught) {
-            reportSaveError(caught, 'Counter belum dapat disimpan.');
-        } finally {
-            setSaving(false);
-        }
-    }
-
     if (loading) {
         return <p className="text-muted-foreground text-sm">Memuat counter…</p>;
     }
@@ -130,26 +103,14 @@ export default function JenisAsetCounterTypes({
     }
 
     return (
-        <div ref={feedbackScopeRef} className="space-y-4">
-            {feedbackSummary}
-            {canEdit && (
-                <DialogToolbar className="px-0">
-                    <ActionButton
-                        action="save"
-                        type="button"
-                        disabled={saving}
-                        onClick={() => void save()}
-                        pending={saving}
-                    />
-                </DialogToolbar>
-            )}
+        <div className="space-y-4">
             <p className="text-muted-foreground text-sm">
                 Pilih counter yang dibaca pada aset jenis ini. Counter yang
                 tidak dikaitkan ke jenis aset mana pun berlaku untuk semua jenis
                 aset.
             </p>
             <FormControl
-                data-error-field="jenis_counter_ids"
+                data-error-field="details.counters.jenis_counter_ids"
                 error={fieldError('jenis_counter_ids')}
             >
                 <TransferList
@@ -158,21 +119,21 @@ export default function JenisAsetCounterTypes({
                     onChange={(next) => {
                         setRemaining(next.remaining);
                         setSelected(next.selected);
-                        setSaved(false);
+                        onChange({
+                            counters: {
+                                jenis_counter_ids: next.selected.map(
+                                    (item) => item.id,
+                                ),
+                            },
+                        });
                     }}
                     remainingTitle="Counter tersisa"
                     selectedTitle="Counter terpilih"
-                    disabled={!canEdit || saving}
+                    disabled={!canEdit}
                     remainingEmptyLabel="Semua counter sudah terpilih."
                     selectedEmptyLabel="Belum ada counter yang dipilih."
                 />
             </FormControl>
-
-            {saved && (
-                <p className="text-muted-foreground text-sm">
-                    Counter jenis aset tersimpan.
-                </p>
-            )}
             {error && <p className="text-destructive text-sm">{error}</p>}
         </div>
     );

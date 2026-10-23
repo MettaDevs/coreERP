@@ -61,6 +61,63 @@ class WorkOrderExecutionTest extends TestCase
         return $this->tersemai ??= $this->seedMasters();
     }
 
+    public function test_execution_batch_saves_execution_and_checklist_with_one_version(): void
+    {
+        $workOrder = $this->siapDikerjakan();
+        $jobId = $this->jobId($workOrder['id']);
+        $row = DB::table('aset_tr_pemeliharaan_aset_checklist')->where(['pemeliharaan_aset_detail_id' => $jobId, 'tipe' => 'measurement'])->first();
+        $version = $this->versi($workOrder['id']);
+        $this->headers(self::SEMUA, 'montir-1')->putJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$workOrder['id'].'/execution', [
+            'version' => $version,
+            'jobs' => [['id' => $jobId, 'aktual_jam' => 4, 'checklist' => [['id' => $row->id, 'nilai' => '32']]]],
+        ])->assertOk()->assertJsonPath('data.version', $version + 1);
+        $this->assertDatabaseHas('aset_tr_pemeliharaan_aset_details', ['id' => $jobId, 'aktual_jam' => 4]);
+        $this->assertDatabaseHas('aset_tr_pemeliharaan_aset_checklist', ['id' => $row->id, 'nilai' => '32']);
+    }
+
+    public function test_execution_batch_rolls_back_when_a_later_job_is_from_another_document(): void
+    {
+        $workOrder = $this->siapDikerjakan();
+        $other = $this->siapDikerjakan();
+        $jobId = $this->jobId($workOrder['id']);
+        $version = $this->versi($workOrder['id']);
+        $this->headers(self::SEMUA, 'montir-1')->putJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$workOrder['id'].'/execution', [
+            'version' => $version,
+            'jobs' => [['id' => $jobId, 'aktual_jam' => 4], ['id' => $this->jobId($other['id']), 'aktual_jam' => 9]],
+        ])->assertNotFound();
+        $this->assertDatabaseHas('aset_tr_pemeliharaan_aset_details', ['id' => $jobId, 'aktual_jam' => null]);
+        $this->assertSame($version, $this->versi($workOrder['id']));
+    }
+
+    public function test_execution_batch_rolls_back_execution_when_checklist_is_invalid(): void
+    {
+        $workOrder = $this->siapDikerjakan();
+        $jobId = $this->jobId($workOrder['id']);
+        $version = $this->versi($workOrder['id']);
+        $this->headers(self::SEMUA, 'montir-1')->putJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$workOrder['id'].'/execution', [
+            'version' => $version,
+            'jobs' => [['id' => $jobId, 'aktual_jam' => 4, 'checklist' => [['id' => (string) Str::ulid(), 'nilai' => '32']]]],
+        ])->assertUnprocessable();
+        $this->assertDatabaseHas('aset_tr_pemeliharaan_aset_details', ['id' => $jobId, 'aktual_jam' => null]);
+        $this->assertSame($version, $this->versi($workOrder['id']));
+    }
+
+    public function test_execution_batch_preserves_permission_status_and_version_gates(): void
+    {
+        $workOrder = $this->siapDikerjakan();
+        $jobId = $this->jobId($workOrder['id']);
+        $url = '/api/modules/management-aset/v1/pemeliharaan-aset/'.$workOrder['id'].'/execution';
+        $payload = ['version' => $this->versi($workOrder['id']), 'jobs' => [['id' => $jobId, 'aktual_jam' => 4]]];
+        $this->headers(['management-aset.pemeliharaan-aset.read'])->putJson($url, $payload)->assertForbidden();
+        $this->headers(self::SEMUA)->putJson($url, ['jobs' => $payload['jobs']])->assertStatus(428);
+        $this->headers(self::SEMUA)->putJson($url, $payload)->assertOk();
+        $this->headers(self::SEMUA)->putJson($url, $payload)->assertConflict();
+        $draft = $this->buatWorkOrder();
+        $this->headers(self::SEMUA)->putJson('/api/modules/management-aset/v1/pemeliharaan-aset/'.$draft['id'].'/execution', [
+            'version' => $this->versi($draft['id']), 'jobs' => [['id' => $this->jobId($draft['id']), 'aktual_jam' => 4]],
+        ])->assertUnprocessable();
+    }
+
     public function test_menolak_penjadwalan_tanpa_tanggal_mulai_dan_menerimanya_setelah_diisi(): void
     {
         $workOrder = $this->buatWorkOrder(['dijadwalkan_mulai' => null]);

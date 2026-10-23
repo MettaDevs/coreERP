@@ -13,9 +13,10 @@ import { Switch } from '@apperp/ui/switch';
 import { TableCell, TableRow } from '@apperp/ui/table';
 import { Textarea } from '@apperp/ui/textarea';
 import RecordLookup from '../../_shared/RecordLookup';
-import { ApiError, api, errorMessage } from '../../api';
+import { api, errorMessage } from '../../api';
+import type { ApiValidationErrors } from '../../api';
 import { useRecordOptions } from '../../use-record-list';
-import { useSaveFeedback } from '../../use-save-feedback';
+import type { MasterDetailsPayload } from '../DraftMasterDetails';
 
 type Line = {
     id?: string;
@@ -65,24 +66,18 @@ const newLine = (line_number: number): Line => ({
 });
 type LineErrors = Record<number, Record<string, string>>;
 
-function lineErrorsFrom(caught: unknown): LineErrors {
-    if (!(caught instanceof ApiError)) {
-        return {};
-    }
-
-    return Object.entries(caught.validationErrors).reduce<LineErrors>(
+function lineErrorsFrom(errors: ApiValidationErrors | undefined): LineErrors {
+    return Object.entries(errors ?? {}).reduce<LineErrors>(
         (result, [key, messages]) => {
-            const match = /^lines\.(\d+)\.([^.]+)$/.exec(key);
+            const match = /^details\.lines\.lines\.(\d+)\.([^.]+)$/.exec(key);
 
-            if (!match) {
-                return result;
+            if (match) {
+                const index = Number(match[1]);
+                result[index] = {
+                    ...result[index],
+                    [match[2]]: messages[0] ?? 'Periksa nilai ini.',
+                };
             }
-
-            const index = Number(match[1]);
-            result[index] = {
-                ...result[index],
-                [match[2]]: messages[0] ?? 'Periksa nilai ini.',
-            };
 
             return result;
         },
@@ -90,65 +85,35 @@ function lineErrorsFrom(caught: unknown): LineErrors {
     );
 }
 
-function validationSummary(caught: unknown): string {
-    if (!(caught instanceof ApiError)) {
-        return '';
-    }
-
-    const first = Object.entries(caught.validationErrors)[0];
-
-    if (!first) {
-        return '';
-    }
-
-    const match = /^lines\.(\d+)\.([^.]+)$/.exec(first[0]);
-    const fieldLabels: Record<string, string> = {
-        nama: 'Nama',
-        line_number: 'Nomor baris',
-        type: 'Jenis',
-        variable_id: 'Variabel checklist',
-        nested_template_id: 'Template checklist',
-    };
-
-    if (!match) {
-        return first[1][0] ?? '';
-    }
-
-    return `Baris ${Number(match[1]) + 1}, ${fieldLabels[match[2]] ?? match[2]}: ${first[1][0] ?? 'Periksa nilai ini.'}`;
-}
-
 export default function MaintenanceChecklistTemplateLines({
     templateId,
     canEdit,
-    version,
-    onVersionChange,
+    onChange,
+    validationErrors,
 }: {
     templateId: string;
     canEdit: boolean;
-    /** Versi record pemilik; penyimpanan rincian ini mengklaimnya. */
-    version: number;
-    onVersionChange: (version: number) => void;
+    onChange: (details: MasterDetailsPayload) => void;
+    validationErrors?: ApiValidationErrors;
 }) {
     const portal = useRef<HTMLDivElement | null>(null);
     const [lines, setLines] = useState<Line[]>([]);
-    const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+    const [requestedIndex, setSelectedIndex] = useState<number | null>(null);
     const [checkedIndexes, setCheckedIndexes] = useState<number[]>([]);
-    const [saving, setSaving] = useState(false);
-    const {
-        scopeRef: feedbackScopeRef,
-        feedbackSummary,
-        reportSaveError,
-        clearSaveFeedback,
-    } = useSaveFeedback(undefined, templateId, (field) => {
-        const match = /^lines\.(\d+)\./.exec(field);
-
-        if (match) {
-            setSelectedIndex(Number(match[1]));
-        }
-    });
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [saved, setSaved] = useState(false);
-    const [lineErrors, setLineErrors] = useState<LineErrors>({});
+    const lineErrors = lineErrorsFrom(validationErrors);
+    const selectedIndex =
+        requestedIndex ??
+        Object.keys(lineErrors)
+            .map(Number)
+            .sort((a, b) => a - b)[0] ??
+        null;
+    function changeLines(change: Line[] | ((current: Line[]) => Line[])) {
+        const next = typeof change === 'function' ? change(lines) : change;
+        setLines(next);
+        onChange({ lines: { lines: next } });
+    }
     const variableSource = useRecordOptions<Option>(
         '/maintenance-checklist-variables?aktif=true',
         label,
@@ -190,34 +155,18 @@ export default function MaintenanceChecklistTemplateLines({
                               'Baris checklist belum dapat dimuat.',
                           ),
                 ),
-            );
+            )
+            .finally(() => {
+                if (!request.signal.aborted) {
+                    setLoading(false);
+                }
+            });
 
         return () => request.abort();
     }, [templateId]);
 
     const update = (index: number, changes: Partial<Line>) => {
-        setSaved(false);
-        setError('');
-        setLineErrors((current) => {
-            const row = current[index];
-
-            if (!row) {
-                return current;
-            }
-
-            const remaining = { ...row };
-            Object.keys(changes).forEach((field) => delete remaining[field]);
-            const next = { ...current };
-
-            if (Object.keys(remaining).length === 0) {
-                delete next[index];
-            } else {
-                next[index] = remaining;
-            }
-
-            return next;
-        });
-        setLines((current) =>
+        changeLines((current) =>
             current.map((item, currentIndex) =>
                 currentIndex === index ? { ...item, ...changes } : item,
             ),
@@ -254,46 +203,6 @@ export default function MaintenanceChecklistTemplateLines({
               : line.type === 'measurement'
                 ? (line.unit ?? '—')
                 : '—';
-    async function save() {
-        clearSaveFeedback();
-        setSaving(true);
-        setError('');
-        setLineErrors({});
-
-        try {
-            const result = await api<{ data: Line[]; version: number }>(
-                `/maintenance-checklist-templates/${templateId}/lines`,
-                { method: 'PUT', body: JSON.stringify({ version, lines }) },
-            );
-            onVersionChange(result.version);
-            setLines(result.data);
-            setSaved(true);
-        } catch (caught) {
-            reportSaveError(caught, 'Baris checklist belum dapat disimpan.');
-            const nextErrors = lineErrorsFrom(caught);
-            setLineErrors(nextErrors);
-            const firstErrorIndex = Object.keys(nextErrors)
-                .map(Number)
-                .sort((a, b) => a - b)[0];
-
-            if (firstErrorIndex !== undefined) {
-                setCheckedIndexes([firstErrorIndex]);
-                setSelectedIndex(firstErrorIndex);
-            }
-
-            setError(
-                validationSummary(caught) ||
-                    (firstErrorIndex !== undefined
-                        ? 'Periksa kolom yang ditandai merah.'
-                        : errorMessage(
-                              caught,
-                              'Baris checklist belum dapat disimpan.',
-                          )),
-            );
-        } finally {
-            setSaving(false);
-        }
-    }
     function check(index: number, checked: boolean) {
         setCheckedIndexes((current) => {
             const next = checked
@@ -320,7 +229,11 @@ export default function MaintenanceChecklistTemplateLines({
         setSelectedIndex(index);
     }
 
-    if (error && lines.length === 0) {
+    if (loading) {
+        return <p className="text-muted-foreground text-sm">Memuat rincian�</p>;
+    }
+
+    if (error) {
         return <p className="text-destructive text-sm">{error}</p>;
     }
 
@@ -331,7 +244,6 @@ export default function MaintenanceChecklistTemplateLines({
     return (
         <div
             ref={(node) => {
-                feedbackScopeRef.current = node;
                 portal.current =
                     node?.closest<HTMLDivElement>(
                         '[data-slot="page-dialog-contents"]',
@@ -339,7 +251,6 @@ export default function MaintenanceChecklistTemplateLines({
             }}
             className="space-y-3"
         >
-            {feedbackSummary}
             <div className="flex items-center justify-between">
                 <h3 className="font-semibold">Baris checklist maintenance</h3>
                 {canEdit && (
@@ -348,7 +259,7 @@ export default function MaintenanceChecklistTemplateLines({
                             action="add"
                             type="button"
                             onClick={() => {
-                                setLines((current) => [
+                                changeLines((current) => [
                                     ...current,
                                     newLine(current.length + 1),
                                 ]);
@@ -360,7 +271,7 @@ export default function MaintenanceChecklistTemplateLines({
                             type="button"
                             disabled={checkedIndexes.length === 0}
                             onClick={() => {
-                                setLines((current) =>
+                                changeLines((current) =>
                                     current.filter(
                                         (_, index) =>
                                             !checkedIndexes.includes(index),
@@ -369,13 +280,6 @@ export default function MaintenanceChecklistTemplateLines({
                                 setCheckedIndexes([]);
                                 setSelectedIndex(null);
                             }}
-                        />
-                        <ActionButton
-                            action="save"
-                            type="button"
-                            disabled={saving}
-                            onClick={() => void save()}
-                            pending={saving}
                         />
                     </div>
                 )}
@@ -576,7 +480,7 @@ export default function MaintenanceChecklistTemplateLines({
                                                             value={typeLabel(
                                                                 item.type,
                                                             )}
-                                                            data-error-field={`lines.${index}.type`}
+                                                            data-error-field={`details.lines.lines.${index}.type`}
                                                             ariaLabel={`Jenis baris ${index + 1}`}
                                                             onValueChange={(
                                                                 value,
@@ -665,7 +569,7 @@ export default function MaintenanceChecklistTemplateLines({
             {selected && selectedIndex !== null && (
                 <LineDetails
                     line={selected}
-                    fieldPrefix={`lines.${selectedIndex}`}
+                    fieldPrefix={`details.lines.lines.${selectedIndex}`}
                     errors={lineErrors[selectedIndex] ?? {}}
                     canEdit={canEdit}
                     variableSource={variableSource}
@@ -674,11 +578,6 @@ export default function MaintenanceChecklistTemplateLines({
                     templateId={templateId}
                     onChange={(changes) => update(selectedIndex, changes)}
                 />
-            )}
-            {saved && (
-                <p className="text-muted-foreground text-sm">
-                    Baris checklist tersimpan.
-                </p>
             )}
             {error && <p className="text-destructive text-sm">{error}</p>}
         </div>

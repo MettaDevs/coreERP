@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { ActionButton } from '@apperp/ui/action-button';
 
 import { Field, FieldLabel } from '@apperp/ui/field';
 import { FormControl } from '@apperp/ui/form-control';
@@ -7,7 +6,8 @@ import { Switch } from '@apperp/ui/switch';
 import { TransferList } from '@apperp/ui/transfer-list';
 import type { TransferListItem } from '@apperp/ui/transfer-list';
 import { api, errorMessage } from '../api';
-import { useSaveFeedback } from '../use-save-feedback';
+import type { ApiValidationErrors } from '../api';
+import type { MasterDetailsPayload } from './DraftMasterDetails';
 import { useMasterOptions } from './useMasterOptions';
 import type { MasterOption } from './useMasterOptions';
 
@@ -28,14 +28,13 @@ type Row = { tipe_atribut_id: string; wajib: boolean };
 export default function JenisAsetAtribut({
     jenisAsetId,
     canEdit,
-    version,
-    onVersionChange,
+    onChange,
+    validationErrors,
 }: {
     jenisAsetId: string;
     canEdit: boolean;
-    /** Versi record pemilik; penyimpanan rincian ini mengklaimnya. */
-    version: number;
-    onVersionChange: (version: number) => void;
+    onChange: (details: MasterDetailsPayload) => void;
+    validationErrors?: ApiValidationErrors;
 }) {
     const [rows, setRows] = useState<Row[]>([]);
     const source = useMasterOptions(
@@ -44,16 +43,17 @@ export default function JenisAsetAtribut({
         rows.map((row) => row.tipe_atribut_id),
     );
     const types = source.options;
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [saving, setSaving] = useState(false);
-    const {
-        scopeRef: feedbackScopeRef,
-        feedbackSummary,
-        reportSaveError,
-        clearSaveFeedback,
-        fieldError,
-    } = useSaveFeedback(undefined, jenisAsetId);
-    const [saved, setSaved] = useState(false);
+    const fieldError = (field: string) =>
+        Object.entries(validationErrors ?? {})
+            .filter(
+                ([name]) =>
+                    name === `details.attributes.${field}` ||
+                    name.startsWith(`details.attributes.${field}.`),
+            )
+            .flatMap(([, messages]) => messages)
+            .join(' ') || undefined;
 
     useEffect(() => {
         let cancelled = false;
@@ -80,6 +80,11 @@ export default function JenisAsetAtribut({
                             'Atribut jenis aset belum dapat dimuat.',
                         ),
                     );
+                }
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setLoading(false);
                 }
             });
 
@@ -139,10 +144,20 @@ export default function JenisAsetAtribut({
         itemById(row.tipe_atribut_id),
     );
 
+    function changeRows(change: Row[] | ((current: Row[]) => Row[])) {
+        const next = typeof change === 'function' ? change(rows) : change;
+        setRows(next);
+        onChange({
+            attributes: {
+                rows: next.map((row, index) => ({ ...row, urutan: index })),
+            },
+        });
+    }
+
     function applyTransfer(next: { selected: TransferListItem[] }) {
         // Baris yang sudah ada mempertahankan `wajib`-nya; baris baru dari sisi kanan
         // mulai sebagai opsional, sama seperti default sebelumnya.
-        setRows(
+        changeRows(
             next.selected.map(
                 (item) =>
                     rows.find((row) => row.tipe_atribut_id === item.id) ?? {
@@ -153,44 +168,25 @@ export default function JenisAsetAtribut({
         );
     }
 
-    async function save() {
-        clearSaveFeedback();
-        setSaving(true);
-        setError('');
-        setSaved(false);
+    if (loading) {
+        return <p className="text-muted-foreground text-sm">Memuat rincian�</p>;
+    }
 
-        try {
-            const result = await api<{ version: number }>(
-                `/jenis-aset/${jenisAsetId}/atribut`,
-                {
-                    method: 'PUT',
-                    body: JSON.stringify({
-                        version,
-                        rows: rows.map((row, index) => ({
-                            ...row,
-                            urutan: index,
-                        })),
-                    }),
-                },
-            );
-            onVersionChange(result.version);
-            setSaved(true);
-        } catch (caught) {
-            reportSaveError(caught, 'Atribut belum dapat disimpan.');
-        } finally {
-            setSaving(false);
-        }
+    if (error) {
+        return <p className="text-destructive text-sm">{error}</p>;
     }
 
     return (
-        <div ref={feedbackScopeRef} className="space-y-4">
-            {feedbackSummary}
+        <div className="space-y-4">
             <p className="text-muted-foreground text-sm">
                 Aset yang memakai jenis ini akan diminta mengisi atribut yang
                 terpasang di sebelah kanan saat diterima.
             </p>
 
-            <FormControl data-error-field="rows" error={fieldError('rows')}>
+            <FormControl
+                data-error-field="details.attributes.rows"
+                error={fieldError('rows')}
+            >
                 <TransferList
                     incremental={source.selectProps.incremental}
                     searchValue={source.selectProps.searchValue}
@@ -219,7 +215,7 @@ export default function JenisAsetAtribut({
                                 disabled={!canEdit}
                                 checked={row.wajib}
                                 onCheckedChange={(checked) =>
-                                    setRows((current) =>
+                                    changeRows((current) =>
                                         current.map((item, i) =>
                                             i === index
                                                 ? { ...item, wajib: checked }
@@ -239,21 +235,6 @@ export default function JenisAsetAtribut({
             )}
 
             {error && <p className="text-destructive text-sm">{error}</p>}
-            {saved && (
-                <p className="text-muted-foreground text-sm">
-                    Atribut tersimpan.
-                </p>
-            )}
-
-            {canEdit && (
-                <ActionButton
-                    action="save"
-                    type="button"
-                    disabled={saving}
-                    onClick={() => void save()}
-                    pending={saving}
-                />
-            )}
         </div>
     );
 }

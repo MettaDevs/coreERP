@@ -295,6 +295,28 @@ class DepreciationBookTest extends TestCase
         $this->assertDatabaseHas('aset_tr_buku_aset', ['aset_id' => $asset, 'useful_life_periods' => 4]);
     }
 
+    public function test_global_save_updates_group_and_books_atomically(): void
+    {
+        $group = $this->master('group-aset', ['nama' => 'Original group']);
+        $profile = $this->profil('Monthly profile', 'straight_line', 60);
+        $book = $this->master('buku-penyusutan', ['nama' => 'Group book', 'depreciation_profile_id' => $profile]);
+        $url = '/api/modules/management-aset/v1/group-aset/'.$group;
+        $version = DB::table('aset_m_group_aset')->where('id', $group)->value('version');
+        $user = $this->sebagaiPengguna($this->tenantId, $this->permissionsFor('group-aset'));
+        $saved = $user->patchJson($url, ['version' => $version, 'nama' => 'Updated group', 'details' => ['books' => ['rows' => [['buku_id' => $book]]]]])
+            ->assertOk()->assertJsonPath('data.nama', 'Updated group')->json('data');
+        $this->assertDatabaseHas('aset_m_group_buku_penyusutan', ['group_aset_id' => $group, 'buku_id' => $book, 'deleted_at' => null]);
+
+        $user->patchJson($url, ['version' => $version, 'nama' => 'Stale group', 'details' => ['books' => ['rows' => []]]])->assertConflict();
+        $user->patchJson($url, ['version' => $saved['version'], 'nama' => 'Invalid group', 'details' => ['books' => ['rows' => [['buku_id' => (string) Str::ulid()]]]]])
+            ->assertUnprocessable()->assertJsonValidationErrors('details.books.rows.0.buku_id');
+        $this->assertDatabaseHas('aset_m_group_aset', ['id' => $group, 'nama' => 'Updated group', 'version' => $saved['version']]);
+        $this->assertDatabaseHas('aset_m_group_buku_penyusutan', ['group_aset_id' => $group, 'buku_id' => $book, 'deleted_at' => null]);
+
+        $user->patchJson($url, ['version' => $saved['version'], 'details' => ['books' => ['rows' => []]]])->assertOk();
+        $this->assertDatabaseMissing('aset_m_group_buku_penyusutan', ['group_aset_id' => $group, 'buku_id' => $book, 'deleted_at' => null]);
+    }
+
     /** @param array<string, mixed> $payload */
     private function master(string $resource, array $payload, ?string $tenantId = null): string
     {

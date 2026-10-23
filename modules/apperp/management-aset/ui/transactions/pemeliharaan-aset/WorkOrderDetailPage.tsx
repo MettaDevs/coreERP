@@ -58,7 +58,6 @@ import {
     bukaDaftar as navigateClose,
     bukaWorkOrder as navigateView,
     bukaWorkOrderUbah as navigateEdit,
-    bukaChecklistJob as navigateChecklist,
     emptyJob,
     emptyWorkOrder,
     izin,
@@ -327,17 +326,13 @@ function JobRow({
 function ChecklistPanel({
     rows,
     editable,
-    saving,
     onClose,
-    onSave,
     portalContainer,
     onChange,
 }: {
     rows: ChecklistRow[];
     editable: boolean;
-    saving: boolean;
     onClose: () => void;
-    onSave: () => void;
     portalContainer?: RecordCardControls['portalContainer'];
     onChange: (id: string, change: Partial<ChecklistRow>) => void;
 }) {
@@ -355,15 +350,6 @@ function ChecklistPanel({
                 </div>
             </div>
             <DialogToolbar className="px-0">
-                {editable && rows.length > 0 && (
-                    <ActionButton
-                        action="save"
-                        type="button"
-                        disabled={saving}
-                        onClick={onSave}
-                        pending={saving}
-                    />
-                )}
                 <Button type="button" variant="outline" onClick={onClose}>
                     Tutup checklist
                 </Button>
@@ -587,15 +573,14 @@ export default function WorkOrderDetailPage({
     const embedded = usePageDialogRecord(undefined);
 
     const [localChecklistJobId, setLocalChecklistJobId] = useState<
-        string | null
-    >(null);
-    const checklistJobId = localChecklistJobId ?? routedChecklistJobId;
-    const bukaChecklistJob = (id: string, jobId: string) => {
-        if (onRequestView) {
-            setLocalChecklistJobId(jobId);
-        } else {
-            navigateChecklist(id, jobId);
-        }
+        string | null | undefined
+    >(undefined);
+    const checklistJobId =
+        localChecklistJobId === undefined
+            ? routedChecklistJobId
+            : localChecklistJobId;
+    const bukaChecklistJob = (_id: string, jobId: string) => {
+        setLocalChecklistJobId(jobId);
     };
     const bukaWorkOrder = (id: string) => {
         setLocalChecklistJobId(null);
@@ -664,7 +649,10 @@ export default function WorkOrderDetailPage({
         clearSaveFeedback: clearCancellationFeedback,
     } = useSaveFeedback(undefined, workOrderId);
     const [mainDirty, setMainDirty] = useState(false);
-    const [auxiliaryDirty, setAuxiliaryDirty] = useState(false);
+    const [checklistDrafts, setChecklistDrafts] = useState<
+        Record<string, ChecklistRow[]>
+    >({});
+    const auxiliaryDirty = Object.keys(checklistDrafts).length > 0;
     useEffect(() => {
         onBusyChange?.(saving);
 
@@ -724,6 +712,7 @@ export default function WorkOrderDetailPage({
                     return;
                 }
 
+                setChecklistDrafts({});
                 setRecord({
                     ...result.data,
                     tingkat_layanan_id: result.data.tingkat_layanan_id ?? '',
@@ -749,8 +738,6 @@ export default function WorkOrderDetailPage({
         };
     }, [mode, versiMuat, workOrderId]);
 
-    // Checklist yang terbuka ikut alamat: menutupnya berarti kembali ke alamat rincian,
-    // sehingga tombol kembali peramban tidak membuka ulang checklist yang sudah ditutup.
     useEffect(() => {
         if (!workOrderId || !checklistJobId) {
             return;
@@ -777,11 +764,11 @@ export default function WorkOrderDetailPage({
         return () => {
             dibatalkan = true;
         };
-    }, [workOrderId, checklistJobId]);
+    }, [workOrderId, checklistJobId, versiMuat]);
 
     const checklist =
         checklistJobId && checklistMuatan?.jobId === checklistJobId
-            ? checklistMuatan.rows
+            ? (checklistDrafts[checklistJobId] ?? checklistMuatan.rows)
             : undefined;
 
     useRecordCardDirty({
@@ -789,16 +776,6 @@ export default function WorkOrderDetailPage({
         ready: Boolean(record),
         scopeKey: JSON.stringify([workOrderId, mode, record?.version]),
         onDirtyChange: setMainDirty,
-    });
-    useRecordCardDirty({
-        value: checklist,
-        ready: checklist !== undefined,
-        scopeKey: JSON.stringify([
-            workOrderId,
-            checklistJobId,
-            record?.version,
-        ]),
-        onDirtyChange: setAuxiliaryDirty,
     });
     useEffect(() => {
         onDirtyChange?.(mainDirty || auxiliaryDirty);
@@ -876,53 +853,20 @@ export default function WorkOrderDetailPage({
         }
     };
 
-    const simpanChecklist = async () => {
-        if (!checklist || !workOrderId || !checklistJobId || !record) {
+    const saveExecution = async () => {
+        if (!record?.id) {
             return;
         }
 
         setSaving(true);
 
         try {
-            await api(
-                `/pemeliharaan-aset/${workOrderId}/jobs/${checklistJobId}/checklist`,
-                {
-                    method: 'PUT',
-                    body: JSON.stringify({
-                        version: record.version,
-                        baris: checklist.map((row) => ({
-                            id: row.id,
-                            nilai: row.nilai,
-                            tidak_berlaku: row.tidak_berlaku,
-                            catatan_teknisi: row.catatan_teknisi,
-                        })),
-                    }),
-                },
-            );
-            clearSaveFeedback();
-            toast.success('Hasil pemeriksaan tersimpan.');
-            (onSaved ?? bukaWorkOrder)(workOrderId);
-        } catch (caught) {
-            reportSaveError(caught, 'Hasil pemeriksaan belum dapat disimpan.');
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const simpanPelaksanaan = async (job: JobLine) => {
-        if (!record?.id || !job.id) {
-            return;
-        }
-
-        setSaving(true);
-
-        try {
-            await api(
-                `/pemeliharaan-aset/${record.id}/jobs/${job.id}/execution`,
-                {
-                    method: 'PATCH',
-                    body: JSON.stringify({
-                        version: record.version,
+            await api(`/pemeliharaan-aset/${record.id}/execution`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    version: record.version,
+                    jobs: record.details.map((job) => ({
+                        id: job.id,
                         aktual_jam: job.aktual_jam ?? null,
                         sebab_kerusakan_id: job.sebab_kerusakan_id || null,
                         tindakan_perbaikan_id:
@@ -931,12 +875,27 @@ export default function WorkOrderDetailPage({
                             job.sebab_kerusakan_keterangan || null,
                         tindakan_perbaikan_keterangan:
                             job.tindakan_perbaikan_keterangan || null,
-                    }),
-                },
-            );
+                        ...(job.id && checklistDrafts[job.id]
+                            ? {
+                                  checklist: checklistDrafts[job.id].map(
+                                      (row) => ({
+                                          id: row.id,
+                                          nilai: row.nilai,
+                                          tidak_berlaku: row.tidak_berlaku,
+                                          catatan_teknisi: row.catatan_teknisi,
+                                      }),
+                                  ),
+                              }
+                            : {}),
+                    })),
+                }),
+            });
             clearSaveFeedback();
-            toast.success('Hasil pekerjaan tersimpan.');
+            setChecklistDrafts({});
+            setChecklistMuatan(null);
+            setLocalChecklistJobId(null);
             muatUlang();
+            toast.success('Hasil pekerjaan disimpan.');
         } catch (caught) {
             reportSaveError(caught, 'Hasil pekerjaan belum dapat disimpan.');
         } finally {
@@ -1047,7 +1006,7 @@ export default function WorkOrderDetailPage({
     // memang tidak boleh disunting, halaman tetap terbuka dalam mode baca dan tombol
     // Simpan tidak pernah muncul untuk permintaan yang pasti ditolak server.
     const editing = mode !== 'view' && dapatDisunting;
-    const readOnly = !editing;
+    const readOnly = !editing || saving;
     const canEditExecution =
         can('execute') && (status === 'dikerjakan' || status === 'selesai');
     const mintaSunting = () => {
@@ -1058,7 +1017,11 @@ export default function WorkOrderDetailPage({
         bukaWorkOrderUbah(record.id);
     };
 
-    const updateJob = (jobId: string | undefined, change: Partial<JobLine>) =>
+    const updateJob = (jobId: string | undefined, change: Partial<JobLine>) => {
+        if (saving) {
+            return;
+        }
+
         setRecord(
             (current) =>
                 current && {
@@ -1068,6 +1031,7 @@ export default function WorkOrderDetailPage({
                     ),
                 },
         );
+    };
 
     const jobColumns: DataTableColumn<JobLine>[] = [
         {
@@ -1124,6 +1088,7 @@ export default function WorkOrderDetailPage({
                 canEditExecution ? (
                     <FormControl>
                         <Input
+                            disabled={saving}
                             aria-label={`Jam aktual ${job.aset_kode ?? ''}`}
                             type="number"
                             min="0"
@@ -1157,6 +1122,7 @@ export default function WorkOrderDetailPage({
                     <div className="flex flex-col gap-2">
                         <FormControl>
                             <RecordLookup
+                                disabled={saving}
                                 portalContainer={portalContainer}
                                 source={faultSource}
                                 items={faultCauses.map((option) => ({
@@ -1184,6 +1150,7 @@ export default function WorkOrderDetailPage({
                         {selected?.minta_keterangan && (
                             <FormControl>
                                 <Input
+                                    disabled={saving}
                                     aria-label={`Keterangan sebab kerusakan ${job.aset_kode ?? ''}`}
                                     placeholder="Tulis sebab kerusakan"
                                     value={job.sebab_kerusakan_keterangan ?? ''}
@@ -1222,6 +1189,7 @@ export default function WorkOrderDetailPage({
                     <div className="flex flex-col gap-2">
                         <FormControl>
                             <RecordLookup
+                                disabled={saving}
                                 portalContainer={portalContainer}
                                 source={repairSource}
                                 items={repairActions.map((option) => ({
@@ -1249,6 +1217,7 @@ export default function WorkOrderDetailPage({
                         {selected?.minta_keterangan && (
                             <FormControl>
                                 <Input
+                                    disabled={saving}
                                     aria-label={`Keterangan tindakan perbaikan ${job.aset_kode ?? ''}`}
                                     placeholder="Tulis tindakan perbaikan"
                                     value={
@@ -1283,14 +1252,6 @@ export default function WorkOrderDetailPage({
             cell: (job) => (
                 <div className="flex items-center gap-2">
                     <span>{job.hasil ?? 'Belum dihitung'}</span>
-                    {canEditExecution && (
-                        <ActionButton
-                            action="save"
-                            type="button"
-                            disabled={saving}
-                            onClick={() => void simpanPelaksanaan(job)}
-                        />
-                    )}
                 </div>
             ),
             width: 190,
@@ -1410,27 +1371,40 @@ export default function WorkOrderDetailPage({
                 }
                 trailing={status ? <StatusBadge status={status} /> : undefined}
             >
-                {editing ? (
+                {(editing || canEditExecution) && (
                     <>
                         <ActionButton
                             action="save"
                             type="button"
                             disabled={saving}
-                            onClick={() => void save()}
+                            onClick={() =>
+                                void (canEditExecution
+                                    ? saveExecution()
+                                    : save())
+                            }
                             pending={saving}
                         />
                         <ActionButton
                             action="cancel"
                             disabled={saving}
                             type="button"
-                            onClick={() =>
-                                record.id
-                                    ? bukaWorkOrder(record.id)
-                                    : bukaDaftar()
-                            }
+                            onClick={() => {
+                                if (canEditExecution) {
+                                    setChecklistDrafts({});
+                                    setChecklistMuatan(null);
+                                    setLocalChecklistJobId(null);
+                                    clearSaveFeedback();
+                                    muatUlang();
+                                } else if (record.id) {
+                                    bukaWorkOrder(record.id);
+                                } else {
+                                    bukaDaftar();
+                                }
+                            }}
                         />
                     </>
-                ) : (
+                )}
+                {!editing && (
                     <>
                         {dapatDisunting && record.id && !embedded && (
                             <ActionButton
@@ -1451,6 +1425,11 @@ export default function WorkOrderDetailPage({
                                             transisi.ke === 'dibatalkan'
                                                 ? 'destructive'
                                                 : 'default'
+                                        }
+                                        disabled={
+                                            saving ||
+                                            mainDirty ||
+                                            auxiliaryDirty
                                         }
                                         onClick={() =>
                                             void pindahStatus(
@@ -1493,6 +1472,7 @@ export default function WorkOrderDetailPage({
 
             <div
                 data-page-dialog-body
+                inert={saving || undefined}
                 className="min-h-0 flex-1 overflow-y-auto"
             >
                 <div className="space-y-4 p-5">
@@ -1877,27 +1857,24 @@ export default function WorkOrderDetailPage({
                     <ChecklistPanel
                         portalContainer={portalContainer}
                         rows={checklist}
-                        editable={status === 'dikerjakan'}
-                        saving={saving}
-                        onClose={() => {
-                            if (workOrderId) {
-                                bukaWorkOrder(workOrderId);
-                            }
-                        }}
-                        onSave={() => void simpanChecklist()}
-                        onChange={(id, change) =>
-                            setChecklistMuatan(
-                                (current) =>
-                                    current && {
-                                        ...current,
-                                        rows: current.rows.map((row) =>
-                                            row.id === id
-                                                ? { ...row, ...change }
-                                                : row,
-                                        ),
-                                    },
-                            )
+                        editable={
+                            can('execute') && status === 'dikerjakan' && !saving
                         }
+                        onClose={() => setLocalChecklistJobId(null)}
+                        onChange={(id, change) => {
+                            if (saving || !checklistJobId) {
+                                return;
+                            }
+
+                            setChecklistDrafts((current) => ({
+                                ...current,
+                                [checklistJobId]: (
+                                    current[checklistJobId] ?? checklist
+                                ).map((row) =>
+                                    row.id === id ? { ...row, ...change } : row,
+                                ),
+                            }));
+                        }}
                     />
                 )}
             </div>

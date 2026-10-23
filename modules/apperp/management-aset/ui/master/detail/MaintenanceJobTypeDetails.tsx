@@ -3,17 +3,18 @@ import { ActionButton } from '@apperp/ui/action-button';
 import type { DataTableColumn } from '@apperp/ui/data-table';
 import { DataTable } from '@apperp/ui/data-table';
 
-import { DialogToolbar } from '@apperp/ui/dialog';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
 
 import { TransferList } from '@apperp/ui/transfer-list';
 import type { TransferListItem } from '@apperp/ui/transfer-list';
 import { useConfirmation } from '@apperp/ui/use-confirmation';
-import { ApiError, api, errorMessage, newIdempotencyKey } from '../../api';
-import { useSaveFeedback } from '../../use-save-feedback';
+import { api, errorMessage, newIdempotencyKey } from '../../api';
+import type { ApiValidationErrors } from '../../api';
+import type { MasterDetailsPayload } from '../DraftMasterDetails';
 
 type Variant = {
+    creation_key?: string;
     id: string;
     kode: string;
     nama: string;
@@ -30,14 +31,13 @@ function choiceItem(item: Choice): TransferListItem {
 export default function MaintenanceJobTypeDetails({
     jobTypeId,
     canEdit,
-    version,
-    onVersionChange,
+    onChange,
+    validationErrors,
 }: {
     jobTypeId: string;
     canEdit: boolean;
-    /** Versi job type; daftar jenis aset di bawah disimpan dengan mengklaimnya. */
-    version: number;
-    onVersionChange: (version: number) => void;
+    onChange: (details: MasterDetailsPayload) => void;
+    validationErrors?: ApiValidationErrors;
 }) {
     const { confirm: confirmAction, confirmation: actionConfirmation } =
         useConfirmation();
@@ -46,18 +46,34 @@ export default function MaintenanceJobTypeDetails({
     const [remaining, setRemaining] = useState<TransferListItem[]>([]);
     const [selected, setSelected] = useState<TransferListItem[]>([]);
     const [variantName, setVariantName] = useState('');
-    const [busy, setBusy] = useState(false);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const { scopeRef, feedbackSummary, reportSaveError, clearSaveFeedback } =
-        useSaveFeedback(undefined, jobTypeId);
     const [variantError, setVariantError] = useState('');
     const variantErrorId = useId();
-    const [saved, setSaved] = useState(false);
-
-    // Effect adalah satu-satunya pemilik pengambilan data; menambah atau mengarsipkan
-    // varian menyatakan pemuatan ulang dengan menaikkan penanda ini.
-    const [versiMuat, setVersiMuat] = useState(0);
-    const muatUlang = () => setVersiMuat((versi) => versi + 1);
+    const [changedVariants, setChangedVariants] = useState<Variant[]>([]);
+    const [deletedVariants, setDeletedVariants] = useState<
+        { id: string; version: number }[]
+    >([]);
+    function publishVariants(
+        changes: Variant[],
+        deleted: { id: string; version: number }[],
+    ) {
+        setChangedVariants(changes);
+        setDeletedVariants(deleted);
+        onChange({
+            variants: {
+                rows: changes.map((row) => ({
+                    ...(row.creation_key
+                        ? { creation_key: row.creation_key }
+                        : { id: row.id, version: row.version }),
+                    nama: row.nama,
+                    keterangan: row.keterangan,
+                    aktif: row.aktif,
+                })),
+                deleted,
+            },
+        });
+    }
 
     useEffect(() => {
         let dilepas = false;
@@ -95,6 +111,10 @@ export default function MaintenanceJobTypeDetails({
                         'Rincian maintenance belum dapat dimuat.',
                     ),
                 );
+            } finally {
+                if (!dilepas) {
+                    setLoading(false);
+                }
             }
         };
 
@@ -103,58 +123,32 @@ export default function MaintenanceJobTypeDetails({
         return () => {
             dilepas = true;
         };
-    }, [jobTypeId, versiMuat]);
+    }, [jobTypeId]);
 
-    async function addVariant() {
-        clearSaveFeedback();
-        setVariantError('');
-
+    function addVariant() {
         if (!variantName.trim()) {
             setVariantError('Isi nama varian.');
-            reportSaveError(
-                new ApiError(
-                    'Isi nama varian.',
-                    { nama: ['Isi nama varian.'] },
-                    422,
-                ),
-                'Varian belum dapat ditambahkan.',
-            );
 
             return;
         }
 
-        setBusy(true);
-        setError('');
-
-        try {
-            await api('/maintenance-job-type-variants', {
-                method: 'POST',
-                headers: { 'Idempotency-Key': newIdempotencyKey() },
-                body: JSON.stringify({
-                    maintenance_job_type_id: jobTypeId,
-                    nama: variantName.trim(),
-                }),
-            });
-            setVariantName('');
-            muatUlang();
-        } catch (caught) {
-            if (caught instanceof ApiError) {
-                setVariantError(caught.validationErrors.nama?.[0] ?? '');
-            }
-
-            reportSaveError(caught, 'Varian belum dapat ditambahkan.');
-        } finally {
-            setBusy(false);
-        }
+        setVariantError('');
+        const creationKey = newIdempotencyKey();
+        const row: Variant = {
+            id: `draft:${creationKey}`,
+            creation_key: creationKey,
+            kode: '',
+            nama: variantName.trim(),
+            keterangan: null,
+            aktif: true,
+            version: 0,
+        };
+        setVariants([...variants, row]);
+        publishVariants([...changedVariants, row], deletedVariants);
+        setVariantName('');
     }
 
     async function removeVariant(variant: Variant) {
-        if (busy) {
-            return;
-        }
-
-        clearSaveFeedback();
-
         if (
             !(await confirmAction({
                 title: 'Delete varian ini?',
@@ -167,44 +161,20 @@ export default function MaintenanceJobTypeDetails({
             return;
         }
 
-        setBusy(true);
-
-        try {
-            await api(`/maintenance-job-type-variants/${variant.id}`, {
-                method: 'DELETE',
-                body: JSON.stringify({ version: variant.version }),
-            });
-            muatUlang();
-        } catch (caught) {
-            reportSaveError(caught, 'Varian belum dapat diarsipkan.');
-        } finally {
-            setBusy(false);
-        }
+        setVariants(variants.filter((row) => row.id !== variant.id));
+        publishVariants(
+            changedVariants.filter((row) => row.id !== variant.id),
+            variant.creation_key
+                ? deletedVariants
+                : [
+                      ...deletedVariants,
+                      { id: variant.id, version: variant.version },
+                  ],
+        );
     }
 
-    async function saveAsetTypes() {
-        clearSaveFeedback();
-        setBusy(true);
-        setError('');
-
-        try {
-            const result = await api<{ version: number }>(
-                `/maintenance-job-types/${jobTypeId}/jenis-aset`,
-                {
-                    method: 'PUT',
-                    body: JSON.stringify({
-                        version,
-                        jenis_aset_ids: selected.map((item) => item.id),
-                    }),
-                },
-            );
-            onVersionChange(result.version);
-            setSaved(true);
-        } catch (caught) {
-            reportSaveError(caught, 'Relasi jenis aset belum dapat disimpan.');
-        } finally {
-            setBusy(false);
-        }
+    if (loading) {
+        return <p className="text-muted-foreground text-sm">Memuat rincian�</p>;
     }
 
     if (
@@ -217,9 +187,19 @@ export default function MaintenanceJobTypeDetails({
     }
 
     return (
-        <div ref={scopeRef} className="space-y-7">
+        <div className="space-y-7">
             {actionConfirmation}
-            {feedbackSummary}
+            {Object.entries(validationErrors ?? {})
+                .filter(
+                    ([field]) =>
+                        field.startsWith('details.variants.') ||
+                        field.startsWith('details.asset_types.'),
+                )
+                .map(([field, messages]) => (
+                    <p key={field} className="text-destructive text-sm">
+                        {messages[0]}
+                    </p>
+                ))}
 
             <section className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -257,7 +237,6 @@ export default function MaintenanceJobTypeDetails({
                             <ActionButton
                                 action="add"
                                 type="button"
-                                disabled={busy}
                                 onClick={() => void addVariant()}
                             />
                         </div>
@@ -333,17 +312,6 @@ export default function MaintenanceJobTypeDetails({
             </section>
 
             <section className="space-y-3">
-                {canEdit && (
-                    <DialogToolbar className="px-0">
-                        <ActionButton
-                            action="save"
-                            type="button"
-                            disabled={busy}
-                            onClick={() => void saveAsetTypes()}
-                            pending={busy}
-                        />
-                    </DialogToolbar>
-                )}
                 <h3 className="font-semibold">
                     Jenis aset yang menggunakan pekerjaan ini
                 </h3>
@@ -357,20 +325,21 @@ export default function MaintenanceJobTypeDetails({
                     onChange={(next) => {
                         setRemaining(next.remaining);
                         setSelected(next.selected);
-                        setSaved(false);
+                        onChange({
+                            asset_types: {
+                                jenis_aset_ids: next.selected.map(
+                                    (item) => item.id,
+                                ),
+                            },
+                        });
                     }}
                     remainingTitle="Jenis aset tersedia"
                     selectedTitle="Jenis aset terpilih"
-                    disabled={!canEdit || busy}
+                    disabled={!canEdit}
                     remainingEmptyLabel="Semua jenis aset sudah terpilih."
                     selectedEmptyLabel="Belum ada jenis aset yang dipilih."
                 />
             </section>
-            {saved && (
-                <p className="text-muted-foreground text-sm">
-                    Perubahan maintenance tersimpan.
-                </p>
-            )}
             {error && <p className="text-destructive text-sm">{error}</p>}
         </div>
     );

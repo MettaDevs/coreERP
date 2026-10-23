@@ -4,7 +4,8 @@ import { ActionButton } from '@apperp/ui/action-button';
 import { FormControl } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { api, errorMessage } from '../api';
-import { useSaveFeedback } from '../use-save-feedback';
+import type { ApiValidationErrors } from '../api';
+import type { MasterDetailsPayload } from './DraftMasterDetails';
 
 type Row = { nilai: string };
 
@@ -15,26 +16,26 @@ type Row = { nilai: string };
 export default function TipeAtributNilai({
     tipeAtributId,
     canEdit,
-    version,
-    onVersionChange,
+    onChange,
+    validationErrors,
 }: {
     tipeAtributId: string;
     canEdit: boolean;
-    /** Versi record pemilik; penyimpanan rincian ini mengklaimnya. */
-    version: number;
-    onVersionChange: (version: number) => void;
+    onChange: (details: MasterDetailsPayload) => void;
+    validationErrors?: ApiValidationErrors;
 }) {
     const [rows, setRows] = useState<Row[]>([]);
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [saving, setSaving] = useState(false);
-    const {
-        scopeRef: feedbackScopeRef,
-        feedbackSummary,
-        reportSaveError,
-        clearSaveFeedback,
-        fieldError,
-    } = useSaveFeedback(undefined, tipeAtributId);
-    const [saved, setSaved] = useState(false);
+    const fieldError = (field: string) =>
+        Object.entries(validationErrors ?? {})
+            .filter(
+                ([name]) =>
+                    name === `details.values.${field}` ||
+                    name.startsWith(`details.values.${field}.`),
+            )
+            .flatMap(([, messages]) => messages)
+            .join(' ') || undefined;
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -60,6 +61,11 @@ export default function TipeAtributNilai({
                         ),
                     );
                 }
+            })
+            .finally(() => {
+                if (!cancelled) {
+                    setLoading(false);
+                }
             });
 
         return () => {
@@ -72,48 +78,36 @@ export default function TipeAtributNilai({
             ? `rows.${rows.slice(0, index).filter((item) => item.nilai.trim()).length}.nilai`
             : `empty-values.${index}`;
 
-    async function save() {
-        clearSaveFeedback();
-        setSaving(true);
-        setError('');
-        setSaved(false);
+    function changeRows(change: Row[] | ((current: Row[]) => Row[])) {
+        const next = typeof change === 'function' ? change(rows) : change;
+        setRows(next);
+        onChange({
+            values: {
+                rows: next
+                    .filter((row) => row.nilai.trim() !== '')
+                    .map((row, index) => ({
+                        nilai: row.nilai.trim(),
+                        urutan: index,
+                    })),
+            },
+        });
+    }
 
-        try {
-            // Urutan layar menjadi urutan tampil; kirimannya daftar penuh, jadi baris yang
-            // dihapus dari layar ikut diarsipkan server.
-            const result = await api<{ version: number }>(
-                `/tipe-atribut/${tipeAtributId}/nilai`,
-                {
-                    method: 'PUT',
-                    body: JSON.stringify({
-                        version,
-                        rows: rows
-                            .filter((row) => row.nilai.trim() !== '')
-                            .map((row, index) => ({
-                                nilai: row.nilai.trim(),
-                                urutan: index,
-                            })),
-                    }),
-                },
-            );
-            onVersionChange(result.version);
-            setSaved(true);
-        } catch (caught) {
-            reportSaveError(caught, 'Pilihan nilai belum dapat disimpan.');
-        } finally {
-            setSaving(false);
-        }
+    if (loading) {
+        return <p className="text-muted-foreground text-sm">Memuat rincian�</p>;
+    }
+
+    if (error) {
+        return <p className="text-destructive text-sm">{error}</p>;
     }
 
     return (
         <div
             ref={(node) => {
                 containerRef.current = node;
-                feedbackScopeRef.current = node;
             }}
             className="space-y-3 border-t px-5 py-4"
         >
-            {feedbackSummary}
             <div>
                 <p className="font-semibold">Pilihan nilai</p>
                 <p className="text-muted-foreground text-sm">
@@ -132,7 +126,7 @@ export default function TipeAtributNilai({
                 <div key={index} className="flex items-end gap-2">
                     <FormControl
                         className="flex-1"
-                        data-error-field={valueField(index)}
+                        data-error-field={`details.values.${valueField(index)}`}
                         error={fieldError(valueField(index))}
                     >
                         <Input
@@ -142,7 +136,7 @@ export default function TipeAtributNilai({
                             disabled={!canEdit}
                             value={row.nilai}
                             onChange={(event) =>
-                                setRows((current) =>
+                                changeRows((current) =>
                                     current.map((item, i) =>
                                         i === index
                                             ? { nilai: event.target.value }
@@ -158,7 +152,7 @@ export default function TipeAtributNilai({
                             action="delete"
                             type="button"
                             onClick={() =>
-                                setRows(rows.filter((_, i) => i !== index))
+                                changeRows(rows.filter((_, i) => i !== index))
                             }
                         />
                     )}
@@ -166,25 +160,13 @@ export default function TipeAtributNilai({
             ))}
 
             {error && <p className="text-destructive text-sm">{error}</p>}
-            {saved && (
-                <p className="text-muted-foreground text-sm">
-                    Pilihan nilai tersimpan.
-                </p>
-            )}
 
             {canEdit && (
                 <div className="flex gap-2">
                     <ActionButton
                         action="add"
                         type="button"
-                        onClick={() => setRows([...rows, { nilai: '' }])}
-                    />
-                    <ActionButton
-                        action="save"
-                        type="button"
-                        disabled={saving}
-                        onClick={() => void save()}
-                        pending={saving}
+                        onClick={() => changeRows([...rows, { nilai: '' }])}
                     />
                 </div>
             )}
