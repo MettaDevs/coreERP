@@ -233,6 +233,7 @@ final class MasterDraftDetailsTest extends TestCase
         $this->createMaster('pabrikan-aset', $input, 'hashed-master')->assertConflict()->assertJsonPath('error.code', 'idempotency_conflict');
     }
 
+    /** @return list<array{string, string, string, string, string}> */
     private function childResources(): array
     {
         return [
@@ -241,6 +242,11 @@ final class MasterDraftDetailsTest extends TestCase
         ];
     }
 
+    /**
+     * @param  array{id: string, version: int}  $record
+     * @param  array<string, mixed>  $payload
+     * @return TestResponse<Response>
+     */
     private function patchMaster(string $resource, array $record, array $payload): TestResponse
     {
         $permissions = [];

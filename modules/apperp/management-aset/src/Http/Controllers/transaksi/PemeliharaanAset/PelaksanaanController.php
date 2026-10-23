@@ -321,6 +321,10 @@ class PelaksanaanController extends Controller
         return response()->json(['data' => $this->workOrder($request, $id)]);
     }
 
+    /**
+     * @param  list<array{id: string, nilai?: ?string, tidak_berlaku?: bool, catatan_teknisi?: ?string}>  $rows
+     * @param  Collection<array-key, stdClass>  $existing
+     */
     private function writeChecklist(array $rows, Collection $existing, string $userId): void
     {
         foreach ($rows as $baris) {
@@ -350,6 +354,7 @@ class PelaksanaanController extends Controller
         }
     }
 
+    /** @param array<string, mixed> $data */
     private function writeExecution(string $id, string $jobId, array $data, ?string $sebabKeterangan, ?string $tindakanKeterangan): void
     {
         PemeliharaanAsetDetail::query()->where([

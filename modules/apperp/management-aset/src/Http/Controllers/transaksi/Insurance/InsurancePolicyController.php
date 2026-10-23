@@ -415,6 +415,7 @@ class InsurancePolicyController extends Controller
                     'end' => $this->endCoveragePayload($request, $id, $operation['coverage_id'], $operation, $version),
                     'replace' => $this->replaceCoveragePayload($request, $id, $operation['coverage_id'], $operation, $version),
                     'archive' => $this->archiveCoveragePayload($request, $id, $operation['coverage_id'], $operation, $version),
+                    default => throw ValidationException::withMessages(['kind' => 'Pilih tindakan pertanggungan yang tersedia.']),
                 };
             } catch (ValidationException $failure) {
                 $errors = [];
