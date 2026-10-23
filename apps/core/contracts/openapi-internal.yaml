@@ -2559,6 +2559,135 @@ paths:
                 $ref: '#/components/schemas/ValidationError'
         '429':
           $ref: '#/components/responses/RateLimited'
+  /operators/{user}/verify-second-factor:
+    post:
+      tags:
+      - Pusat admin
+      operationId: internal.operators.verifySecondFactor
+      summary: Periksa kode MFA operator memakai kunci enkripsi Core
+      description: |
+        Hanya untuk akun person dengan hak provider_admin, tanpa kewajiban mengganti password,
+        serta MFA yang telah dikonfirmasi. Kode pemulihan dikonsumsi sekali dalam transaksi
+        dengan kunci baris user. Rahasia MFA tidak pernah dikirim ke konsol. Maksimal lima
+        percobaan per user per menit, termasuk percobaan berhasil; batas grup 30/menit tetap berlaku.
+        Respons tidak memakai envelope data.
+      security:
+      - controlPlaneToken: []
+      parameters:
+      - name: user
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - code
+              properties:
+                code:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+      responses:
+        '200':
+          description: Kode benar dan akun masih diizinkan masuk.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - verified
+                - user_id
+                properties:
+                  verified:
+                    type: boolean
+                    const: true
+                  user_id:
+                    type: integer
+        '401':
+          description: Token pusat admin tidak sah.
+        '422':
+          description: Kode salah, bentuk input salah, akun tidak ada atau tidak memenuhi syarat masuk.
+        '429':
+          description: Batas percobaan tercapai; Retry-After menyatakan detik sampai boleh mencoba lagi.
+  /environments:
+    post:
+      tags:
+      - Pusat admin
+      operationId: createEnvironment
+      summary: Mencatat lingkungan baru milik tenant
+      description: |
+        Core mencatat lingkungan berstatus provisioning, operasi pencatatan yang selesai, dan audit operator dalam satu transaksi.
+        Belum menyiapkan database. Satu lingkungan aktif per jenis per tenant; slug yang bentrok dicoba dengan akhiran angka.
+        Token menyatakan proses konsol. requested_by adalah operator yang diteruskan konsol tepercaya.
+      security:
+      - controlPlaneToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - tenant_id
+              - kind
+              - name
+              - requested_by
+              properties:
+                tenant_id:
+                  type: string
+                kind:
+                  type: string
+                  enum:
+                  - production
+                  - demo
+                  - sandbox
+                name:
+                  type: string
+                  maxLength: 100
+                requested_by:
+                  type: integer
+                  description: Id user operator yang ada di Core.
+                expires_at:
+                  type:
+                  - string
+                  - 'null'
+                  format: date
+                  description: Wajib untuk demo dan harus setelah hari ini.
+                hosting:
+                  type:
+                  - string
+                  - 'null'
+                  enum:
+                  - provider
+                  - client_server
+                  - null
+                  default: provider
+                  description: Server klien hanya untuk produksi.
+      responses:
+        '201':
+          description: Lingkungan tercatat dan belum disiapkan.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - environment_id
+                - tenant_id
+                properties:
+                  environment_id:
+                    type: string
+                  tenant_id:
+                    type: string
+        '401':
+          description: Token konsol tidak sah.
+        '422':
+          description: Isian tidak sah atau tenant sudah memiliki lingkungan jenis ini.
   /tenants:
     post:
       tags:
@@ -2877,9 +3006,8 @@ paths:
                     type: array
                     description: |
                       Dibaca dari database lingkungan itu, bukan disimpulkan dari entitlement
-                      tenantnya. Kosong bila tenantnya tidak membeli satu pun module yang ada
-                      di edisi ini — atau bila daftarnya tidak terbaca, yang sengaja tidak
-                      menggagalkan penyiapan yang sudah berhasil.
+                      tenantnya. Kosong berarti tidak ada pemasangan tambahan yang terbaca.
+                      Bila pembacaan gagal, modules_error menjelaskan kegagalannya.
                     items:
                       type: object
                       required:
@@ -2901,6 +3029,11 @@ paths:
                         seeded:
                           type: boolean
                           description: Data awal module ini sudah pernah diisi.
+                  modules_error:
+                    type: string
+                    nullable: true
+                    description: Penyiapan berhasil tetapi daftar aplikasi belum dapat dibaca; bukan bukti
+                      daftar kosong.
                   output:
                     type: string
                     description: Keluaran mentah perintahnya, untuk ditempel ke laporan.
@@ -3016,6 +3149,7 @@ paths:
                       - database
                       - fingerprint
                       - state
+                      - queued
                       - last_operation
                       properties:
                         id:
@@ -3056,6 +3190,12 @@ paths:
                             Satu kata yang dapat dijadikan lencana. `unknown` mencakup dua keadaan
                             yang keduanya bukan "tertinggal": sedang dikerjakan, dan belum pernah
                             punya skema sama sekali.
+                        queued:
+                          type: boolean
+                          description: |
+                            Pembaruan sudah dipesan dalam antrean dan belum memiliki operasi berjalan.
+                            Tetap true selama jeda percobaan ulang; kembali false setelah job selesai
+                            atau gagal permanen. Dibaca dari kunci unik job yang sama dengan pengantrean.
                         last_operation:
                           type: object
                           nullable: true

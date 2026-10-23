@@ -1,6 +1,13 @@
 import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import { Button } from '@apperp/ui/button';
 import {
+    Card,
+    CardHeader,
+    CardTitle,
+    CardContent,
+    CardAction,
+} from '@apperp/ui/card';
+import {
     Table,
     TableBody,
     TableCell,
@@ -9,6 +16,7 @@ import {
     TableRow,
 } from '@apperp/ui/table';
 import { Head, router, usePage } from '@inertiajs/react';
+import { RefreshCw, CircleCheck, CircleAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { FleetStateBadge, KindBadge } from '@/components/badges';
 import Shell from '@/components/shell';
@@ -35,6 +43,7 @@ type Row = {
     fingerprint: string | null;
     state: string;
     lastOperation: Operation | null;
+    queued: boolean;
 };
 
 type Counts = {
@@ -87,10 +96,11 @@ export default function Index({
     const running = environments.filter(
         (row) => row.lastOperation?.status === 'running',
     ).length;
+    const queued = environments.filter((row) => row.queued).length;
     const stale = counts.behind + counts.failed;
 
     /*
-     * Bertanya lagi hanya selama ada yang berjalan.
+     * Bertanya lagi selama pekerjaan menunggu atau sedang berjalan.
      *
      * Antrean tidak dapat memberi tahu layar ini kapan ia selesai — tidak ada saluran dari pekerja
      * ke peramban di sini — jadi yang tersisa adalah bertanya. Yang membuatnya tidak boros:
@@ -102,7 +112,7 @@ export default function Index({
      * berarti menghitung ulang sidik seluruh armada sepanjang hari demi tabel yang tidak berubah.
      */
     useEffect(() => {
-        if (running === 0) {
+        if (running === 0 && queued === 0) {
             return;
         }
 
@@ -118,7 +128,7 @@ export default function Index({
         }, POLL_MS);
 
         return () => clearInterval(timer);
-    }, [running]);
+    }, [running, queued]);
 
     function upgrade(environmentId?: string) {
         router.post(
@@ -135,17 +145,7 @@ export default function Index({
     return (
         <Shell
             title="Pembaruan"
-            description="Versi skema tiap lingkungan dibandingkan dengan versi yang dibawa image Core yang sedang berjalan."
-            actions={
-                <Button
-                    onClick={() => upgrade()}
-                    disabled={sending || stale === 0 || unreachable !== null}
-                >
-                    {stale === 0
-                        ? 'Tidak ada yang tertinggal'
-                        : `Perbarui ${stale} yang tertinggal`}
-                </Button>
-            }
+            description="Lihat lingkungan yang perlu diperbarui dan pantau hasilnya."
         >
             {routerRequestSummary}
             <Head title="Pembaruan" />
@@ -158,98 +158,172 @@ export default function Index({
             {(unreachable ?? upgradeError) && (
                 <div
                     role="alert"
-                    className="rounded-md border border-destructive/40 bg-red-50 px-4 py-3 text-sm break-words whitespace-pre-line text-destructive dark:bg-red-950/40 dark:text-red-200"
+                    className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm break-words whitespace-pre-line text-destructive"
                 >
                     {unreachable ?? upgradeError}
                 </div>
             )}
 
-            <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <Count label="Mutakhir" value={counts.current} />
-                <Count label="Tertinggal" value={counts.behind} tone="amber" />
-                <Count label="Bermasalah" value={counts.failed} tone="red" />
-                <Count label="Belum terbaca" value={counts.unknown} />
-            </section>
-
-            <p className="text-sm text-muted-foreground">
-                Versi image yang sedang berjalan:{' '}
-                <span className="font-mono text-xs break-all text-foreground">
-                    {platformFingerprint ?? '—'}
-                </span>
-                {running > 0 && (
-                    <span className="ms-2">
-                        · {running} operasi sedang berjalan, halaman ini memuat
-                        ulang sendiri.
-                    </span>
-                )}
-            </p>
-
-            <div className="overflow-x-auto rounded-lg border bg-background">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Lingkungan</TableHead>
-                            <TableHead>Tenant</TableHead>
-                            <TableHead>Jenis</TableHead>
-                            <TableHead>Keadaan</TableHead>
-                            <TableHead>Sidik skema</TableHead>
-                            <TableHead>Operasi terakhir</TableHead>
-                            <TableHead />
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {environments.length === 0 && (
-                            <TableRow>
-                                <TableCell
-                                    colSpan={7}
-                                    className="py-10 text-center text-sm text-muted-foreground"
-                                >
-                                    {unreachable
-                                        ? 'Keadaan armada tidak dapat dibaca karena Core tidak menjawab.'
-                                        : 'Belum ada lingkungan yang tercatat.'}
-                                </TableCell>
-                            </TableRow>
+            <Card>
+                <CardHeader>
+                    <CardTitle>
+                        {unreachable
+                            ? 'Status belum dapat diperiksa'
+                            : stale > 0
+                              ? `${stale} lingkungan perlu diperbarui`
+                              : counts.unknown > 0
+                                ? 'Ada lingkungan yang belum terbaca'
+                                : 'Tidak ada pembaruan tertunda'}
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex items-start gap-3 text-sm">
+                        {stale > 0 || unreachable || counts.unknown > 0 ? (
+                            <CircleAlert className="mt-0.5 size-5 shrink-0 text-warning" />
+                        ) : (
+                            <CircleCheck className="mt-0.5 size-5 shrink-0 text-success" />
                         )}
-                        {environments.map((row) => (
-                            <TableRow key={row.id}>
-                                <TableCell className="font-medium">
-                                    {row.name}
-                                    <span className="ms-2 text-xs text-muted-foreground">
-                                        {row.slug}
-                                    </span>
-                                </TableCell>
-                                <TableCell>{row.tenant}</TableCell>
-                                <TableCell>
-                                    <KindBadge kind={row.kind} />
-                                </TableCell>
-                                <TableCell>
-                                    <FleetStateBadge state={row.state} />
-                                </TableCell>
-                                <TableCell className="max-w-[18rem] text-xs">
-                                    <Fingerprint
-                                        value={row.fingerprint}
-                                        platform={platformFingerprint}
-                                    />
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    <LastOperation
-                                        operation={row.lastOperation}
-                                    />
-                                </TableCell>
-                                <TableCell className="text-end">
-                                    <RowAction
-                                        row={row}
-                                        disabled={
-                                            sending || unreachable !== null
-                                        }
-                                        onUpgrade={() => upgrade(row.id)}
-                                    />
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </div>
+                        <p className="text-muted-foreground">
+                            {unreachable
+                                ? 'Hubungan ke Core perlu dipulihkan sebelum pembaruan dapat dimulai.'
+                                : queued > 0
+                                  ? `${queued} pembaruan menunggu pekerja. Status diperbarui otomatis.`
+                                  : running > 0
+                                    ? `${running} operasi sedang berjalan. Status diperbarui otomatis.`
+                                    : counts.failed > 0
+                                      ? 'Periksa alasan kegagalan di daftar, lalu coba pembaruan kembali.'
+                                      : stale > 0
+                                        ? 'Mulai pembaruan untuk lingkungan yang tertinggal atau pilih satu lingkungan di daftar.'
+                                        : counts.unknown > 0
+                                          ? 'Periksa lingkungan yang belum terbaca sebelum menyimpulkan semua sudah mutakhir.'
+                                          : 'Semua lingkungan yang terbaca telah memakai skema saat ini.'}
+                        </p>
+                    </div>
+                    <section
+                        aria-label="Ringkasan pembaruan"
+                        className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+                    >
+                        <Count label="Mutakhir" value={counts.current} />
+                        <Count
+                            label="Tertinggal"
+                            value={counts.behind}
+                            tone="amber"
+                        />
+                        <Count
+                            label="Bermasalah"
+                            value={counts.failed}
+                            tone="red"
+                        />
+                        <Count label="Belum terbaca" value={counts.unknown} />
+                    </section>
+                    <details className="text-xs text-muted-foreground">
+                        <summary className="cursor-pointer py-1">
+                            Lihat sidik skema acuan
+                        </summary>
+                        <p className="mt-2 font-mono break-all">
+                            {platformFingerprint ?? 'Belum terbaca'}
+                        </p>
+                    </details>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Lingkungan</CardTitle>
+                    <CardAction>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => upgrade()}
+                            disabled={
+                                sending || stale === 0 || unreachable !== null
+                            }
+                        >
+                            <RefreshCw className="size-4" />
+                            {sending
+                                ? 'Mengirim...'
+                                : `Perbarui yang tertinggal (${stale})`}
+                        </Button>
+                    </CardAction>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="overflow-x-auto rounded-lg border bg-background">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Lingkungan</TableHead>
+                                    <TableHead>Keadaan</TableHead>
+                                    <TableHead>Operasi terakhir</TableHead>
+                                    <TableHead />
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {environments.length === 0 && (
+                                    <TableRow>
+                                        <TableCell
+                                            colSpan={4}
+                                            className="py-10 text-center text-sm text-muted-foreground"
+                                        >
+                                            {unreachable
+                                                ? 'Keadaan armada tidak dapat dibaca karena Core tidak menjawab.'
+                                                : 'Belum ada lingkungan yang tercatat.'}
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                                {environments.map((row) => (
+                                    <TableRow key={row.id}>
+                                        <TableCell className="min-w-44">
+                                            <p className="font-medium">
+                                                {row.name}
+                                            </p>
+                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                {row.tenant} / {row.slug}
+                                            </p>
+                                            <div className="mt-2">
+                                                <KindBadge kind={row.kind} />
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <FleetStateBadge
+                                                state={row.state}
+                                            />
+                                        </TableCell>
+                                        <TableCell className="text-sm">
+                                            <LastOperation
+                                                operation={row.lastOperation}
+                                            />
+                                            <details className="mt-2 max-w-xs text-xs text-muted-foreground">
+                                                <summary className="cursor-pointer">
+                                                    Sidik skema
+                                                </summary>
+                                                <div className="mt-1">
+                                                    <Fingerprint
+                                                        value={row.fingerprint}
+                                                        platform={
+                                                            platformFingerprint
+                                                        }
+                                                    />
+                                                </div>
+                                            </details>
+                                        </TableCell>
+                                        <TableCell className="text-end">
+                                            <RowAction
+                                                row={row}
+                                                disabled={
+                                                    sending ||
+                                                    unreachable !== null
+                                                }
+                                                onUpgrade={() =>
+                                                    upgrade(row.id)
+                                                }
+                                            />
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </CardContent>
+            </Card>
         </Shell>
     );
 }
@@ -305,9 +379,9 @@ function Count({
         value === 0
             ? 'text-foreground'
             : tone === 'red'
-              ? 'text-red-700 dark:text-red-300'
+              ? 'text-destructive '
               : tone === 'amber'
-                ? 'text-amber-700 dark:text-amber-300'
+                ? 'text-warning '
                 : 'text-foreground';
 
     return (
@@ -370,6 +444,14 @@ function RowAction({
     disabled: boolean;
     onUpgrade: () => void;
 }) {
+    if (row.queued) {
+        return (
+            <span className="text-xs text-muted-foreground">
+                Menunggu pekerja
+            </span>
+        );
+    }
+
     if (row.lastOperation?.status === 'running') {
         return (
             <span className="text-xs text-muted-foreground">
@@ -389,6 +471,7 @@ function RowAction({
             disabled={disabled}
             onClick={onUpgrade}
         >
+            <RefreshCw className="size-3.5" />
             {row.state === 'failed' ? 'Coba lagi' : 'Perbarui'}
         </Button>
     );

@@ -1,0 +1,11 @@
+ts	phase	decision	why	evidence	result
+2026-10-23T00:00:00Z	frame	membatasi audit pada console dan integrasi yang benar-benar dipanggilnya	membuktikan perilaku aktual tanpa merombak arsitektur spekulatif	apps/control-plane/routes/web.php; apps/control-plane/routes/api.php	open
+2026-10-23T07:37:14.930803+00:00	correction	timestamp baris frame pertama adalah placeholder dan tidak digunakan sebagai bukti waktu	mencatat koreksi tanpa menghapus riwayat	plan.md	supersedes frame timestamp
+2026-10-23T07:37:14.931477+00:00	regression	empat pengujian baru gagal pada kode lama lalu diperbaiki	membuktikan cacat lisensi rilis dan retry DNS sebelum perubahan	baseline-regressions.log	4 failures reproduced
+2026-10-23T07:37:14.931477+00:00	integration	menjalankan adapter konsol ke Core HTTP nyata pada PostgreSQL khusus audit	membuktikan kontrak dan persistensi di luar Http::fake	http-smoke.log	5 paths passed
+2026-10-23T07:37:14.931477+00:00	worker	menjalankan worker Core untuk satu upgrade yang benar-benar diantrekan	memastikan lock dilepas sesudah pekerjaan selesai	queue-worker.log; http-worker-verified.log	DONE; reservation released
+2026-10-23T07:37:14.931477+00:00	review	menutup log akun darurat MFA yang terlewat dan membatasi kredensial registry setelah revoke	review menemukan cabang keamanan yang belum tertutup	TwoFactorLoginTest.php; RegistryCredentialTest.php	final verification running
+2026-10-23T08:46:57.1833093+00:00	mfa-boundary	verifikasi secret tetap pada Core dengan APP_KEY terpisah	deploy memakai CORE_APP_KEY dan CONSOLE_APP_KEY berbeda	mfa-real-http.log	VERIFIED
+2026-10-23T08:46:57.1833093+00:00	mfa-review	menggunakan provider Fortify dan menolak OTP yang sudah dipakai	menyamakan kebijakan MFA dengan login Core	OperatorSecondFactorTest; core-targeted.log	VERIFIED
+2026-10-23T08:46:57.1833093+00:00	verification	menutup pemeriksaan jalur konsol dengan batas eksplisit	full console dan scoped Core lulus; PHPOffice masih terbuka	report.md	VERIFIED scoped; dependencies partially open
+2026-10-23T08:47:41.8268755+00:00	cleanup	menghentikan server HTTP audit dan menghapus container PostgreSQL tmpfs khusus audit	mengakhiri resource sementara tanpa menyentuh runtime UI	report.md	complete

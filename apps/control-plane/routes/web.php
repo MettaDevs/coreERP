@@ -20,6 +20,7 @@ use ControlPlane\Http\Controllers\Sites\SiteScreens;
 use ControlPlane\Http\Controllers\Sites\SiteSettings;
 use ControlPlane\Http\Controllers\Sso\SsoBackchannelLogout;
 use ControlPlane\Http\Controllers\Sso\SsoLogin;
+use ControlPlane\Http\Controllers\TwoFactorLogin;
 use ControlPlane\Http\Controllers\Updates\Index as UpdateIndex;
 use ControlPlane\Http\Controllers\Updates\Upgrade as UpdateUpgrade;
 use Illuminate\Support\Facades\Route;
@@ -41,6 +42,8 @@ Route::middleware('throttle:60,1')->group(function (): void {
 });
 
 Route::middleware('guest')->group(function (): void {
+    Route::get('/login/verifikasi', [TwoFactorLogin::class, 'form']);
+    Route::post('/login/verifikasi', [TwoFactorLogin::class, 'submit'])->middleware('throttle:10,1');
     Route::get('/login', [Login::class, 'form'])->name('login');
     Route::post('/login', [Login::class, 'submit']);
     Route::get('/sso/masuk', [SsoLogin::class, 'start'])->middleware('throttle:30,1')->name('sso.start');

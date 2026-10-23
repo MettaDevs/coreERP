@@ -1,6 +1,14 @@
 import { FormErrorHeader } from '@/components/form-error-header';
 import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
+import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
+import {
+    Card,
+    CardHeader,
+    CardTitle,
+    CardContent,
+    CardAction,
+} from '@apperp/ui/card';
 import {
     CollapsibleSection,
     CollapsibleSectionGroup,
@@ -56,18 +64,17 @@ const POLL_MS = 5000;
  */
 function InstallCommandCard({ issued }: { issued: InstallCommand }) {
     return (
-        <section className="space-y-4 rounded-lg border border-amber-300 bg-amber-50 p-5 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-50">
+        <section className="space-y-4 rounded-lg border border-warning/30 bg-card p-5 text-card-foreground">
             <div>
                 <h3 className="text-base font-semibold">
                     Perintah pasang siap
                 </h3>
                 <p className="mt-1 text-sm">
                     <strong className="font-semibold">
-                        Perintah dan kata sandi ini tidak akan muncul lagi.
+                        Salin perintah dan kata sandi sebelum meninggalkan
+                        halaman.
                     </strong>{' '}
-                    Salin sekarang. Menutup atau memuat ulang halaman ini
-                    menghilangkannya; membuat perintah baru membatalkan yang
-                    ini.
+                    Perintah baru akan membatalkan perintah sebelumnya.
                 </p>
             </div>
 
@@ -80,31 +87,31 @@ function InstallCommandCard({ issued }: { issued: InstallCommand }) {
                     <CopyButton text={issued.command} label="Salin perintah" />
                 </div>
                 <pre
-                    className="overflow-x-auto rounded-md border border-amber-200 bg-background p-3 font-mono text-xs break-all whitespace-pre-wrap dark:border-amber-900/60"
+                    className="overflow-x-auto rounded-md border border-warning/30 bg-background p-3 font-mono text-xs break-all whitespace-pre-wrap"
                     data-test="install-command"
                 >
                     {issued.command}
                 </pre>
             </div>
 
-            <dl className="space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-background px-4 py-3 dark:border-amber-900/60">
+            <dl className="grid gap-3 sm:grid-cols-2">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-warning/30 bg-background px-4 py-3">
                     <div className="min-w-0">
                         <dt className="text-xs text-muted-foreground">
                             Email admin klien
                         </dt>
-                        <dd className="truncate font-mono text-sm">
+                        <dd className="font-mono text-sm break-all">
                             {issued.email}
                         </dd>
                     </div>
                     <CopyButton text={issued.email} label="Salin" />
                 </div>
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-background px-4 py-3 dark:border-amber-900/60">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-warning/30 bg-background px-4 py-3">
                     <div className="min-w-0">
                         <dt className="text-xs text-muted-foreground">
                             Kata sandi sementara
                         </dt>
-                        <dd className="truncate font-mono text-lg font-semibold tracking-wide">
+                        <dd className="font-mono text-lg font-semibold tracking-wide break-all">
                             {issued.password}
                         </dd>
                     </div>
@@ -215,7 +222,13 @@ function EditSettings({
     ].join(' · ');
 
     return (
-        <CollapsibleSectionGroup>
+        <CollapsibleSectionGroup
+            defaultValue={
+                !site.serverAddress || Object.keys(errors).length > 0
+                    ? ['setelan']
+                    : []
+            }
+        >
             <CollapsibleSection
                 value="setelan"
                 title="Setelan server"
@@ -250,13 +263,11 @@ function EditSettings({
                         setData={setData}
                         errors={errors}
                     />
-                    <Button
+                    <ActionButton
+                        action="save"
                         type="submit"
-                        variant="outline"
-                        disabled={processing}
-                    >
-                        Simpan setelan
-                    </Button>
+                        pending={processing}
+                    />
                 </form>
             </CollapsibleSection>
         </CollapsibleSectionGroup>
@@ -265,7 +276,7 @@ function EditSettings({
 
 function Line({ label, children }: { label: string; children: ReactNode }) {
     return (
-        <div className="flex flex-wrap justify-between gap-4 border-b py-2.5 last:border-b-0">
+        <div className="min-w-0 space-y-1 border-b py-3 last:border-b-0">
             <dt className="text-sm text-muted-foreground">{label}</dt>
             <dd className="text-sm font-medium break-all">{children}</dd>
         </div>
@@ -402,170 +413,172 @@ export default function ClientServerPanel({
               : 'Buat perintah pasang baru';
 
     return (
-        <section
-            className="space-y-4 rounded-lg border bg-background p-5"
-            data-test="server-client-panel"
-        >
+        <Card data-test="server-client-panel">
             {routerRequestSummary}
-            <div className="flex flex-wrap items-start justify-between gap-3">
+            <CardHeader>
                 <div>
-                    <h2 className="text-sm font-semibold">Server klien</h2>
+                    <CardTitle>Pemasangan server klien</CardTitle>
                     <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
                         <StateSentence serverClient={serverClient} />
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
-                    {!progress.final && (
-                        <Spinner aria-label="Memantau keadaan pemasangan" />
-                    )}
-                    <InstallStateBadge state={progress.state} />
-                </div>
-            </div>
-
-            {error && (
-                <div
-                    role="alert"
-                    className="rounded-md border border-destructive/40 bg-red-50 px-4 py-3 text-sm break-words whitespace-pre-line text-destructive dark:bg-red-950/40 dark:text-red-200"
-                >
-                    {error}
-                </div>
-            )}
-
-            {installCommand && <InstallCommandCard issued={installCommand} />}
-
-            {progress.state === 'not_prepared' ? (
-                <Prepare environmentId={environmentId} />
-            ) : (
-                <>
-                    <dl>
-                        {site && (
-                            <Line label="Server klien">
-                                <Link
-                                    href={`/situs/${site.id}`}
-                                    className="underline underline-offset-4"
-                                >
-                                    {site.name}
-                                </Link>
-                            </Line>
+                <CardAction>
+                    <div className="flex items-center gap-2">
+                        {!progress.final && (
+                            <Spinner aria-label="Memantau keadaan pemasangan" />
                         )}
-                        {site && (
-                            <Line label="Alamat server">
-                                {site.serverAddress ? (
-                                    <span className="inline-flex items-center gap-1">
-                                        <span className="font-mono text-xs">
-                                            {site.serverAddress}
+                        <InstallStateBadge state={progress.state} />
+                    </div>
+                </CardAction>
+            </CardHeader>
+            <CardContent className="space-y-5">
+                {error && (
+                    <div
+                        role="alert"
+                        className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm break-words whitespace-pre-line text-destructive"
+                    >
+                        {error}
+                    </div>
+                )}
+
+                {installCommand && (
+                    <InstallCommandCard issued={installCommand} />
+                )}
+
+                {progress.state === 'not_prepared' ? (
+                    <Prepare environmentId={environmentId} />
+                ) : (
+                    <>
+                        <dl className="grid gap-x-6 sm:grid-cols-2">
+                            {site && (
+                                <Line label="Server klien">
+                                    <Link
+                                        href={`/situs/${site.id}`}
+                                        className="underline underline-offset-4"
+                                    >
+                                        {site.name}
+                                    </Link>
+                                </Line>
+                            )}
+                            {site && (
+                                <Line label="Alamat server">
+                                    {site.serverAddress ? (
+                                        <span className="inline-flex items-center gap-1">
+                                            <span className="font-mono text-xs">
+                                                {site.serverAddress}
+                                            </span>
+                                            <CopyButton
+                                                text={site.serverAddress}
+                                                label="Salin alamat server"
+                                                iconOnly
+                                            />
                                         </span>
-                                        <CopyButton
-                                            text={site.serverAddress}
-                                            label="Salin alamat server"
-                                            iconOnly
-                                        />
+                                    ) : (
+                                        <span className="font-normal text-warning">
+                                            Belum dicatat — wajib sebelum
+                                            perintah pasang, isi di Setelan
+                                            server
+                                        </span>
+                                    )}
+                                </Line>
+                            )}
+                            {site && (
+                                <Line label="Alamat aplikasi (otomatis)">
+                                    <DnsStatus
+                                        siteId={site.id}
+                                        appUrl={site.appUrl}
+                                        dns={site.dns}
+                                        serverAddress={site.serverAddress}
+                                        revoked={progress.state === 'revoked'}
+                                    />
+                                </Line>
+                            )}
+                            {(progress.release ||
+                                progress.state === 'awaiting_release') && (
+                                <Line label="Rilis yang dipasang">
+                                    {progress.release ??
+                                        'Belum ada rilis yang terdaftar'}
+                                </Line>
+                            )}
+                            {progress.reportedRelease && (
+                                <Line label="Rilis terpasang">
+                                    {progress.reportedRelease}
+                                </Line>
+                            )}
+                            {progress.step && (
+                                <Line label="Langkah">
+                                    <span className="font-mono text-xs">
+                                        {progress.step}
                                     </span>
-                                ) : (
-                                    <span className="font-normal text-amber-700 dark:text-amber-300">
-                                        Belum dicatat — wajib sebelum perintah
-                                        pasang, isi di Setelan server
+                                </Line>
+                            )}
+                            {progress.failureMessage && (
+                                <Line label="Sebab">
+                                    <span className="whitespace-pre-line text-destructive">
+                                        {progress.failureMessage}
                                     </span>
-                                )}
-                            </Line>
-                        )}
-                        {site && (
-                            <Line label="Alamat aplikasi (otomatis)">
-                                <DnsStatus
-                                    siteId={site.id}
-                                    appUrl={site.appUrl}
-                                    dns={site.dns}
-                                    serverAddress={site.serverAddress}
-                                    revoked={progress.state === 'revoked'}
-                                />
-                            </Line>
-                        )}
-                        {(progress.release ||
-                            progress.state === 'awaiting_release') && (
-                            <Line label="Rilis yang dipasang">
-                                {progress.release ??
-                                    'Belum ada rilis yang terdaftar'}
-                            </Line>
-                        )}
-                        {progress.reportedRelease && (
-                            <Line label="Rilis terpasang">
-                                {progress.reportedRelease}
-                            </Line>
-                        )}
-                        {progress.step && (
-                            <Line label="Langkah">
-                                <span className="font-mono text-xs">
-                                    {progress.step}
-                                </span>
-                            </Line>
-                        )}
-                        {progress.failureMessage && (
-                            <Line label="Sebab">
-                                <span className="whitespace-pre-line text-destructive">
-                                    {progress.failureMessage}
-                                </span>
-                            </Line>
-                        )}
-                        {progress.lastSeenAt && (
-                            <Line label="Terakhir terlihat">
-                                {progress.lastSeenAt}
-                            </Line>
-                        )}
-                    </dl>
+                                </Line>
+                            )}
+                            {progress.lastSeenAt && (
+                                <Line label="Terakhir terlihat">
+                                    {progress.lastSeenAt}
+                                </Line>
+                            )}
+                        </dl>
 
-                    {canIssue && (
-                        <InstallOptionsFields
-                            value={options}
-                            onChange={setOptions}
-                            portError={portError}
-                            disabled={issuing}
-                        />
-                    )}
+                        {site && progress.state !== 'revoked' && (
+                            <EditSettings
+                                environmentId={environmentId}
+                                site={site}
+                            />
+                        )}
+                        {canIssue && (
+                            <InstallOptionsFields
+                                value={options}
+                                onChange={setOptions}
+                                portError={portError}
+                                disabled={issuing}
+                            />
+                        )}
 
-                    {canIssue && (
-                        <div className="flex flex-wrap items-center gap-3">
-                            {/*
+                        {canIssue && (
+                            <div className="flex flex-wrap items-center gap-3">
+                                {/*
                                 Tombolnya mati tanpa alamat server, dan server menolaknya juga: record DNS
                                 alamat aplikasi dibuat menunjuk alamat itu saat perintah dibuat.
                             */}
-                            <Button
-                                type="button"
-                                onClick={issueCommand}
-                                disabled={issuing || !site?.serverAddress}
-                                variant={
-                                    progress.state === 'awaiting_command'
-                                        ? 'outline'
-                                        : 'default'
-                                }
-                            >
-                                {issuing && <Spinner />}
-                                {issueLabel}
-                            </Button>
-                            {!site?.serverAddress && (
-                                <p className="max-w-xl text-xs text-amber-700 dark:text-amber-300">
-                                    Catat alamat server (IP VPS) di Setelan
-                                    server lebih dulu.
-                                </p>
-                            )}
-                            {site?.serverAddress &&
-                                progress.state !== 'no_command' && (
-                                    <p className="max-w-xl text-xs text-muted-foreground">
-                                        Perintah baru membatalkan perintah dan
-                                        kata sandi sementara yang dibuat
-                                        sebelumnya.
+                                <Button
+                                    type="button"
+                                    onClick={issueCommand}
+                                    disabled={issuing || !site?.serverAddress}
+                                    variant={
+                                        progress.state === 'awaiting_command'
+                                            ? 'outline'
+                                            : 'default'
+                                    }
+                                >
+                                    {issuing && <Spinner />}
+                                    {issueLabel}
+                                </Button>
+                                {!site?.serverAddress && (
+                                    <p className="max-w-xl text-xs text-warning">
+                                        Catat alamat server (IP VPS) di Setelan
+                                        server lebih dulu.
                                     </p>
                                 )}
-                        </div>
-                    )}
-
-                    {site && progress.state !== 'revoked' && (
-                        <EditSettings
-                            environmentId={environmentId}
-                            site={site}
-                        />
-                    )}
-                </>
-            )}
-        </section>
+                                {site?.serverAddress &&
+                                    progress.state !== 'no_command' && (
+                                        <p className="max-w-xl text-xs text-muted-foreground">
+                                            Perintah baru membatalkan perintah
+                                            dan kata sandi sementara yang dibuat
+                                            sebelumnya.
+                                        </p>
+                                    )}
+                            </div>
+                        )}
+                    </>
+                )}
+            </CardContent>
+        </Card>
     );
 }

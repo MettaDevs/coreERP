@@ -53,9 +53,9 @@ class Provision extends Controller
             'Lingkungan "%s" disiapkan di database "%s". %s',
             $row->name,
             $result['database'] ?? '—',
-            $modules === []
-                ? 'Tidak ada module yang dibeli tenant ini, jadi hanya skema Core yang dipasang.'
-                : 'Module terpasang: '.implode(', ', $modules).'.',
+            $result['modules_error'] ?? ($modules === []
+                ? 'Belum ada aplikasi tambahan yang tercatat pada hasil penyiapan.'
+                : 'Module terpasang: '.implode(', ', $modules).'.'),
         ));
     }
 }

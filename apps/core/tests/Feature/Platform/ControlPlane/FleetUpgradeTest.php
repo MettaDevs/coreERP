@@ -10,9 +10,12 @@ use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Models\EnvironmentOperation;
 use App\Platform\Tenant\Models\Tenant;
 use Illuminate\Console\Command;
+use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
+use Mockery\MockInterface;
+use RuntimeException;
 use Tests\TestCase;
 
 /**
@@ -202,6 +205,50 @@ final class FleetUpgradeTest extends TestCase
 
         Queue::assertPushed(UpgradeEnvironmentJob::class, 1);
         Queue::assertPushed(fn (UpgradeEnvironmentJob $job): bool => $job->environmentId === $behind->id);
+    }
+
+    public function test_repeated_requests_only_enqueue_one_job_and_report_it_before_it_starts(): void
+    {
+        Queue::fake();
+        $environment = $this->environment('production', 'produksi');
+
+        $this->withToken(self::TOKEN)->getJson('/api/internal/v1/fleet')
+            ->assertOk()->assertJsonPath('environments.0.queued', false);
+
+        $this->withToken(self::TOKEN)
+            ->postJson('/api/internal/v1/environments/upgrade', ['force' => true])
+            ->assertStatus(202)->assertJsonPath('queued_count', 1);
+        $this->withToken(self::TOKEN)
+            ->postJson('/api/internal/v1/environments/'.$environment->id.'/upgrade', ['force' => true])
+            ->assertStatus(202)->assertJsonPath('queued_count', 0);
+
+        Queue::assertPushed(UpgradeEnvironmentJob::class, 1);
+        $this->assertSame(0, EnvironmentOperation::query()->count());
+        $this->withToken(self::TOKEN)->getJson('/api/internal/v1/fleet')
+            ->assertOk()->assertJsonPath('environments.0.queued', true)
+            ->assertJsonPath('environments.0.last_operation', null);
+    }
+
+    public function test_an_enqueue_failure_releases_the_reservation_for_retry(): void
+    {
+        Queue::fake();
+        $this->environment('production', 'produksi');
+        $dispatcher = app(Dispatcher::class);
+        $this->mock(Dispatcher::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('dispatch')->once()->andThrow(new RuntimeException('Antrean terputus'));
+        });
+
+        $this->withToken(self::TOKEN)
+            ->postJson('/api/internal/v1/environments/upgrade', ['force' => true])
+            ->assertStatus(500);
+        $this->app->instance(Dispatcher::class, $dispatcher);
+
+        $this->withToken(self::TOKEN)->getJson('/api/internal/v1/fleet')
+            ->assertOk()->assertJsonPath('environments.0.queued', false);
+        $this->withToken(self::TOKEN)
+            ->postJson('/api/internal/v1/environments/upgrade', ['force' => true])
+            ->assertStatus(202)->assertJsonPath('queued_count', 1);
+        Queue::assertPushed(UpgradeEnvironmentJob::class, 1);
     }
 
     /**

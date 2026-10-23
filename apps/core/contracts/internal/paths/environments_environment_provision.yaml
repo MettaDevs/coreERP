@@ -66,9 +66,8 @@ post:
                 type: array
                 description: |
                   Dibaca dari database lingkungan itu, bukan disimpulkan dari entitlement
-                  tenantnya. Kosong bila tenantnya tidak membeli satu pun module yang ada
-                  di edisi ini — atau bila daftarnya tidak terbaca, yang sengaja tidak
-                  menggagalkan penyiapan yang sudah berhasil.
+                  tenantnya. Kosong berarti tidak ada pemasangan tambahan yang terbaca.
+                  Bila pembacaan gagal, modules_error menjelaskan kegagalannya.
                 items:
                   type: object
                   required: [id, version, status, seeded]
@@ -81,6 +80,10 @@ post:
                     seeded:
                       type: boolean
                       description: Data awal module ini sudah pernah diisi.
+              modules_error:
+                type: string
+                nullable: true
+                description: Penyiapan berhasil tetapi daftar aplikasi belum dapat dibaca; bukan bukti daftar kosong.
               output:
                 type: string
                 description: Keluaran mentah perintahnya, untuk ditempel ke laporan.

@@ -41,6 +41,8 @@ class SharedIdentityProvider
     /** Kelonggaran jam antara server ini dan penyedia, dalam detik. */
     private const CLOCK_LEEWAY = 60;
 
+    private const LOGOUT_MAX_AGE = 300;
+
     private const BACKCHANNEL_LOGOUT_EVENT = 'http://schemas.openid.net/event/backchannel-logout';
 
     public function isConfigured(): bool
@@ -170,6 +172,25 @@ class SharedIdentityProvider
 
         if (! isset($claims['sub']) || ! is_string($claims['sub']) || $claims['sub'] === '') {
             throw new SsoFailure(SsoFailure::INVALID_TOKEN, 'Logout token tidak memuat sub.');
+        }
+
+        $issuedAt = $claims['iat'] ?? null;
+        $expiresAt = $claims['exp'] ?? null;
+        $tokenId = $claims['jti'] ?? null;
+        $now = time();
+
+        if (! is_int($issuedAt) || $issuedAt > $now + self::CLOCK_LEEWAY
+            || $issuedAt < $now - self::LOGOUT_MAX_AGE
+            || ! is_int($expiresAt) || $expiresAt <= $issuedAt
+            || ! is_string($tokenId) || $tokenId === '') {
+            throw new SsoFailure(SsoFailure::INVALID_TOKEN, 'Logout token tidak memuat waktu dan identitas token yang sah.');
+        }
+
+        // Klaim sekali pakai tetap hidup sampai batas terakhir iat dapat diterima.
+        $replayKey = 'sso.logout.used.'.hash('sha256', json_encode([$this->issuer(), $this->clientId(), $tokenId], JSON_THROW_ON_ERROR));
+
+        if (! Cache::add($replayKey, true, self::LOGOUT_MAX_AGE + self::CLOCK_LEEWAY + 1)) {
+            throw new SsoFailure(SsoFailure::INVALID_TOKEN, 'Logout token sudah dipakai.');
         }
 
         return $claims;

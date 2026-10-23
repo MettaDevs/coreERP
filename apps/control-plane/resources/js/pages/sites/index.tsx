@@ -1,5 +1,12 @@
 import { Button } from '@apperp/ui/button';
 import {
+    Card,
+    CardHeader,
+    CardTitle,
+    CardContent,
+    CardFooter,
+} from '@apperp/ui/card';
+import {
     Empty,
     EmptyContent,
     EmptyDescription,
@@ -135,12 +142,11 @@ function StatCard({
     onClick: () => void;
 }) {
     const tones = {
-        slate: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
-        emerald:
-            'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200',
-        red: 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-200',
-        amber: 'bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200',
-        sky: 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-200',
+        slate: 'bg-muted text-muted-foreground  ',
+        emerald: 'bg-success/10 text-success  ',
+        red: 'bg-destructive/10 text-destructive  ',
+        amber: 'bg-warning/10 text-warning  ',
+        sky: 'bg-primary/10 text-primary  ',
     };
 
     return (
@@ -149,7 +155,7 @@ function StatCard({
             onClick={onClick}
             aria-pressed={active}
             className={`flex items-start gap-3 rounded-lg border bg-background p-4 text-start transition-colors outline-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring/50 ${
-                active ? 'border-sky-600 ring-1 ring-sky-600' : ''
+                active ? 'border-primary/30 ring-1 ring-ring' : ''
             }`}
         >
             <span
@@ -158,7 +164,7 @@ function StatCard({
                 {icon}
             </span>
             <span className="min-w-0">
-                <span className="block text-2xl leading-none font-semibold tabular-nums">
+                <span className="block text-lg leading-none font-semibold tabular-nums">
                     {value}
                 </span>
                 <span className="mt-1 block text-sm font-medium">{label}</span>
@@ -195,9 +201,9 @@ function LicenseCell({ row }: { row: SiteRow }) {
     const days = daysUntil(row.licenseValidUntil) ?? 0;
     const tone =
         days < 0
-            ? 'text-red-700 dark:text-red-300'
+            ? 'text-destructive '
             : days <= LICENSE_WARNING_DAYS
-              ? 'text-amber-700 dark:text-amber-300'
+              ? 'text-warning '
               : '';
 
     return (
@@ -307,7 +313,7 @@ export default function Index({
     return (
         <Shell
             title="Server klien"
-            description="Setiap VPS milik klien yang dikelola dari sini lewat agen: alamatnya, keadaan pemasangan, rilis yang berjalan, dan masa lisensinya."
+            description="Pantau server milik klien, selesaikan pemasangan, dan tindak lanjuti server yang perlu perhatian."
             actions={
                 sites.length > 0 && <AddServerDialog candidates={candidates} />
             }
@@ -333,7 +339,7 @@ export default function Index({
                             onClick={() => setFilter('all')}
                         />
                         <StatCard
-                            label="Jalan"
+                            label="Terhubung"
                             value={counts.running}
                             hint="Terpasang dan melapor"
                             icon={<CircleCheck className="size-4" />}
@@ -365,100 +371,136 @@ export default function Index({
                         />
                     </div>
 
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div
-                            role="group"
-                            aria-label="Saring server"
-                            className="flex flex-wrap gap-1 rounded-lg border bg-background p-1"
-                        >
-                            {(
-                                [
-                                    ['all', 'Semua', counts.all],
-                                    [
-                                        'attention',
-                                        'Perlu perhatian',
-                                        counts.attention,
-                                    ],
-                                    ['running', 'Jalan', counts.running],
-                                    ['waiting', 'Menunggu', counts.waiting],
-                                    [
-                                        'outdated',
-                                        'Perlu pembaruan',
-                                        counts.outdated,
-                                    ],
-                                    ['revoked', 'Dicabut', counts.revoked],
-                                ] as [Filter, string, number][]
-                            ).map(([key, label, total]) => (
-                                <button
-                                    key={key}
-                                    type="button"
-                                    aria-pressed={filter === key}
-                                    onClick={() => setFilter(key)}
-                                    className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-                                        filter === key
-                                            ? 'bg-sky-600 text-white'
-                                            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                                    }`}
+                    <Card className="min-w-0">
+                        <CardHeader>
+                            <CardTitle>Daftar server</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {' '}
+                            <div className="flex flex-col gap-3">
+                                <div className="relative w-full sm:w-72">
+                                    <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                                    <Input
+                                        type="search"
+                                        aria-label="Cari server"
+                                        placeholder="Cari nama, tenant, atau alamat"
+                                        value={query}
+                                        onChange={(e) =>
+                                            setQuery(e.target.value)
+                                        }
+                                        className="ps-9"
+                                    />
+                                </div>
+                                <div
+                                    role="group"
+                                    aria-label="Saring server"
+                                    className="flex flex-wrap gap-1"
                                 >
-                                    {label}
-                                    <span
-                                        className={`ms-1.5 tabular-nums ${filter === key ? 'text-white/80' : 'text-muted-foreground'}`}
-                                    >
-                                        {total}
-                                    </span>
-                                </button>
-                            ))}
-                        </div>
-                        <div className="relative w-full sm:w-72">
-                            <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                                type="search"
-                                aria-label="Cari server"
-                                placeholder="Cari nama, tenant, atau alamat"
-                                value={query}
-                                onChange={(e) => setQuery(e.target.value)}
-                                className="ps-9"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="overflow-x-auto rounded-lg border bg-background">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Server</TableHead>
-                                    <TableHead>Keadaan</TableHead>
-                                    <TableHead>Rilis</TableHead>
-                                    <TableHead>Lisensi</TableHead>
-                                    <TableHead>Terakhir terlihat</TableHead>
-                                    <TableHead>
-                                        <span className="sr-only">Rincian</span>
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {shown.length === 0 && (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={6}
-                                            className="py-10 text-center text-sm text-muted-foreground"
+                                    {(
+                                        [
+                                            ['all', 'Semua', counts.all],
+                                            [
+                                                'attention',
+                                                'Perlu perhatian',
+                                                counts.attention,
+                                            ],
+                                            [
+                                                'running',
+                                                'Terhubung',
+                                                counts.running,
+                                            ],
+                                            [
+                                                'waiting',
+                                                'Menunggu',
+                                                counts.waiting,
+                                            ],
+                                            [
+                                                'outdated',
+                                                'Perlu pembaruan',
+                                                counts.outdated,
+                                            ],
+                                            [
+                                                'revoked',
+                                                'Dicabut',
+                                                counts.revoked,
+                                            ],
+                                        ] as [Filter, string, number][]
+                                    ).map(([key, label, total]) => (
+                                        <button
+                                            key={key}
+                                            type="button"
+                                            aria-pressed={filter === key}
+                                            onClick={() => setFilter(key)}
+                                            className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+                                                filter === key
+                                                    ? 'bg-primary text-primary-foreground'
+                                                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                                            }`}
                                         >
-                                            Tidak ada server yang cocok dengan
-                                            penyaring ini.
-                                        </TableCell>
+                                            {label}
+                                            <span
+                                                className={`ms-1.5 tabular-nums ${filter === key ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}
+                                            >
+                                                {total}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </CardContent>
+                        <div className="overflow-x-auto border-y">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Server</TableHead>
+                                        <TableHead>Keadaan</TableHead>
+                                        <TableHead>Rilis</TableHead>
+                                        <TableHead>Lisensi</TableHead>
+                                        <TableHead>Terakhir terlihat</TableHead>
+                                        <TableHead>
+                                            <span className="sr-only">
+                                                Rincian
+                                            </span>
+                                        </TableHead>
                                     </TableRow>
-                                )}
-                                {shown.map((row) => {
-                                    const detail = progressDetail(row.progress);
-                                    const newer = newerRelease(
-                                        row.reportedRelease,
-                                        row.newestRelease,
-                                    );
-                                    const seen = relativeTime(row.lastSeenIso);
+                                </TableHeader>
+                                <TableBody>
+                                    {shown.length === 0 && (
+                                        <TableRow>
+                                            <TableCell
+                                                colSpan={6}
+                                                className="py-10 text-center text-sm text-muted-foreground"
+                                            >
+                                                Tidak ada server yang cocok
+                                                dengan penyaring ini.
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    onClick={() => {
+                                                        setQuery('');
+                                                        setFilter('all');
+                                                    }}
+                                                >
+                                                    Tampilkan semua server
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                    {shown.map((row) => {
+                                        const detail = progressDetail(
+                                            row.progress,
+                                        );
+                                        const newer = newerRelease(
+                                            row.reportedRelease,
+                                            row.newestRelease,
+                                        );
+                                        const seen = relativeTime(
+                                            row.lastSeenIso,
+                                        );
 
-                                    return (
-                                        <TableRow key={row.id}>
-                                            {/*
+                                        return (
+                                            <TableRow key={row.id}>
+                                                {/*
                                                 Sel tabel bawaan tidak membungkus teks. Nama dan keadaan dibiarkan
                                                 membungkus supaya daftar muat di layar laptop tanpa gulir ke samping;
                                                 alamat tetap satu baris.
@@ -468,139 +510,150 @@ export default function Index({
                                                 tetap tertulis di bawah nama, bersama tautan lingkungannya, untuk
                                                 situs lama yang namanya bebas.
                                             */}
-                                            <TableCell className="min-w-[15rem] align-top whitespace-normal">
-                                                <Link
-                                                    href={`/situs/${row.id}`}
-                                                    className="font-medium hover:underline hover:underline-offset-4"
-                                                >
-                                                    {row.name}
-                                                </Link>
-                                                {row.serverAddress ? (
-                                                    <span className="mt-0.5 flex items-center gap-1">
-                                                        <span className="font-mono text-xs text-muted-foreground">
-                                                            {row.serverAddress}
-                                                        </span>
-                                                        <CopyButton
-                                                            text={
-                                                                row.serverAddress
-                                                            }
-                                                            label="Salin alamat server"
-                                                            iconOnly
-                                                        />
-                                                    </span>
-                                                ) : (
-                                                    <Link
-                                                        href={`/situs/${row.id}#setelan`}
-                                                        className="mt-0.5 block text-xs text-amber-700 hover:underline dark:text-amber-300"
-                                                    >
-                                                        Alamat server belum
-                                                        dicatat
-                                                    </Link>
-                                                )}
-                                                {row.appUrl && (
-                                                    <a
-                                                        href={row.appUrl}
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        className="mt-0.5 block font-mono text-xs break-all text-muted-foreground hover:underline"
-                                                    >
-                                                        {row.appUrl.replace(
-                                                            /^https?:\/\//,
-                                                            '',
-                                                        )}
-                                                    </a>
-                                                )}
-                                                {row.dns.state ===
-                                                    'outdated' && (
-                                                    <span className="mt-0.5 block text-xs text-amber-700 dark:text-amber-300">
-                                                        DNS belum mengikuti
-                                                        alamat server
-                                                    </span>
-                                                )}
-                                                <span className="mt-0.5 block text-xs text-muted-foreground">
-                                                    {row.tenant} ·{' '}
-                                                    {row.environment ? (
-                                                        <Link
-                                                            href={`/lingkungan/${row.environment.id}`}
-                                                            className="underline-offset-4 hover:underline"
-                                                        >
-                                                            lingkungan{' '}
-                                                            {
-                                                                row.environment
-                                                                    .name
-                                                            }
-                                                        </Link>
-                                                    ) : (
-                                                        'tanpa lingkungan'
-                                                    )}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell className="max-w-[12rem] align-top whitespace-normal">
-                                                <InstallStateBadge
-                                                    state={row.progress.state}
-                                                />
-                                                {detail && (
-                                                    <p className="mt-1 text-xs text-muted-foreground">
-                                                        {detail}
-                                                    </p>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="align-top">
-                                                <span className="font-mono text-sm">
-                                                    {row.reportedRelease ?? '—'}
-                                                </span>
-                                                {newer && (
-                                                    <span className="mt-1 flex items-center gap-1 text-xs text-amber-700 dark:text-amber-300">
-                                                        <ArrowUpCircle className="size-3.5" />
-                                                        {newer} tersedia
-                                                    </span>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="align-top">
-                                                <LicenseCell row={row} />
-                                            </TableCell>
-                                            <TableCell className="align-top text-sm">
-                                                {seen ? (
-                                                    <span
-                                                        title={
-                                                            row.lastSeenAt ??
-                                                            undefined
-                                                        }
-                                                    >
-                                                        {seen}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-muted-foreground">
-                                                        Belum pernah
-                                                    </span>
-                                                )}
-                                                {row.lastSeenIp && (
-                                                    <span className="block font-mono text-xs text-muted-foreground">
-                                                        dari {row.lastSeenIp}
-                                                    </span>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="w-0 text-end align-top">
-                                                <Button
-                                                    asChild
-                                                    size="icon-sm"
-                                                    variant="ghost"
-                                                >
+                                                <TableCell className="min-w-[15rem] align-top whitespace-normal">
                                                     <Link
                                                         href={`/situs/${row.id}`}
-                                                        aria-label={`Rincian ${row.name}`}
-                                                        title="Rincian"
+                                                        className="font-medium hover:underline hover:underline-offset-4"
                                                     >
-                                                        <ChevronRight />
+                                                        {row.name}
                                                     </Link>
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })}
-                            </TableBody>
-                        </Table>
-                    </div>
+                                                    {row.serverAddress ? (
+                                                        <span className="mt-0.5 flex items-center gap-1">
+                                                            <span className="font-mono text-xs text-muted-foreground">
+                                                                {
+                                                                    row.serverAddress
+                                                                }
+                                                            </span>
+                                                            <CopyButton
+                                                                text={
+                                                                    row.serverAddress
+                                                                }
+                                                                label="Salin alamat server"
+                                                                iconOnly
+                                                            />
+                                                        </span>
+                                                    ) : (
+                                                        <Link
+                                                            href={`/situs/${row.id}#setelan`}
+                                                            className="mt-0.5 block text-xs text-warning hover:underline"
+                                                        >
+                                                            Alamat server belum
+                                                            dicatat
+                                                        </Link>
+                                                    )}
+                                                    {row.appUrl && (
+                                                        <a
+                                                            href={row.appUrl}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="mt-0.5 block font-mono text-xs break-all text-muted-foreground hover:underline"
+                                                        >
+                                                            {row.appUrl.replace(
+                                                                /^https?:\/\//,
+                                                                '',
+                                                            )}
+                                                        </a>
+                                                    )}
+                                                    {row.dns.state ===
+                                                        'outdated' && (
+                                                        <span className="mt-0.5 block text-xs text-warning">
+                                                            DNS belum mengikuti
+                                                            alamat server
+                                                        </span>
+                                                    )}
+                                                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                                                        {row.tenant} ·{' '}
+                                                        {row.environment ? (
+                                                            <Link
+                                                                href={`/lingkungan/${row.environment.id}`}
+                                                                className="underline-offset-4 hover:underline"
+                                                            >
+                                                                lingkungan{' '}
+                                                                {
+                                                                    row
+                                                                        .environment
+                                                                        .name
+                                                                }
+                                                            </Link>
+                                                        ) : (
+                                                            'tanpa lingkungan'
+                                                        )}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell className="max-w-[12rem] align-top whitespace-normal">
+                                                    <InstallStateBadge
+                                                        state={
+                                                            row.progress.state
+                                                        }
+                                                    />
+                                                    {detail && (
+                                                        <p className="mt-1 text-xs text-muted-foreground">
+                                                            {detail}
+                                                        </p>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="align-top">
+                                                    <span className="font-mono text-sm">
+                                                        {row.reportedRelease ??
+                                                            '—'}
+                                                    </span>
+                                                    {newer && (
+                                                        <span className="mt-1 flex items-center gap-1 text-xs text-warning">
+                                                            <ArrowUpCircle className="size-3.5" />
+                                                            {newer} tersedia
+                                                        </span>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="align-top">
+                                                    <LicenseCell row={row} />
+                                                </TableCell>
+                                                <TableCell className="align-top text-sm">
+                                                    {seen ? (
+                                                        <span
+                                                            title={
+                                                                row.lastSeenAt ??
+                                                                undefined
+                                                            }
+                                                        >
+                                                            {seen}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-muted-foreground">
+                                                            Belum pernah
+                                                        </span>
+                                                    )}
+                                                    {row.lastSeenIp && (
+                                                        <span className="block font-mono text-xs text-muted-foreground">
+                                                            dari{' '}
+                                                            {row.lastSeenIp}
+                                                        </span>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="w-0 text-end align-top">
+                                                    <Button
+                                                        asChild
+                                                        size="icon-sm"
+                                                        variant="ghost"
+                                                    >
+                                                        <Link
+                                                            href={`/situs/${row.id}`}
+                                                            aria-label={`Rincian ${row.name}`}
+                                                            title="Rincian"
+                                                        >
+                                                            <ChevronRight />
+                                                        </Link>
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                        </div>
+                        <CardFooter className="text-xs text-muted-foreground">
+                            Laporan diperbarui otomatis setiap 30 detik.
+                        </CardFooter>
+                    </Card>
                 </>
             )}
         </Shell>

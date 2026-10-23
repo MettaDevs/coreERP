@@ -7,8 +7,10 @@ use App\Foundation\NumberSequence\Http\Controllers\InternalNumberSequenceControl
 use App\Foundation\UnitOfMeasure\Http\Controllers\Internal\UnitOfMeasureDirectoryController;
 use App\Foundation\Vendor\Http\Controllers\Internal\VendorDirectoryController;
 use App\Foundation\Workflow\Http\Controllers\Internal\InternalWorkflowInstanceController;
+use App\Platform\ControlPlane\Http\Controllers\Internal\EnvironmentCreationController;
 use App\Platform\ControlPlane\Http\Controllers\Internal\EnvironmentProvisioningController;
 use App\Platform\ControlPlane\Http\Controllers\Internal\FleetController;
+use App\Platform\ControlPlane\Http\Controllers\Internal\OperatorSecondFactorController;
 use App\Platform\Organization\Http\Controllers\Internal\HrPositionAssignmentController;
 use App\Platform\Organization\Http\Controllers\Internal\OrganizationDirectoryController;
 use App\Platform\Tenant\Http\Controllers\Internal\MemberDirectoryController;
@@ -84,6 +86,8 @@ Route::prefix('internal/v1')->middleware(['throttle:integration-client', 'integr
  * migration beserta pemasangan module di belakangnya.
  */
 Route::prefix('internal/v1')->middleware(['throttle:30,1', 'control-plane'])->group(function (): void {
+    Route::post('operators/{user}/verify-second-factor', OperatorSecondFactorController::class)->whereNumber('user');
+    Route::post('environments', [EnvironmentCreationController::class, 'store']);
     Route::post('tenants', [TenantProvisioningController::class, 'store']);
     // Dibaca admin.erp saat menerbitkan lisensi situs; lihat TenantEntitlementController.
     Route::get('tenants/{tenant}/entitlements', [TenantEntitlementController::class, 'show']);

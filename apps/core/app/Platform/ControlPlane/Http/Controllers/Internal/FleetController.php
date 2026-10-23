@@ -9,9 +9,13 @@ use App\Platform\ControlPlane\Jobs\UpgradeEnvironment as UpgradeEnvironmentJob;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Models\EnvironmentOperation;
 use App\Platform\Identity\Models\User;
+use Illuminate\Bus\UniqueLock;
+use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 /**
  * Keadaan seluruh armada dalam satu jawaban, dan satu pintu untuk memperbaruinya.
@@ -67,6 +71,7 @@ final class FleetController extends Controller
                 'database' => $own ? $environment->database_name : null,
                 'fingerprint' => $fingerprint,
                 'state' => $state,
+                'queued' => $operation?->status !== 'running' && $this->upgradeQueued($environment->id),
                 'last_operation' => $operation === null ? null : [
                     'kind' => $operation->operation,
                     'status' => $operation->status,
@@ -158,7 +163,21 @@ final class FleetController extends Controller
                 continue;
             }
 
-            UpgradeEnvironmentJob::dispatch($environment->id, $requestedBy);
+            $job = new UpgradeEnvironmentJob($environment->id, $requestedBy);
+            $lock = new UniqueLock(Cache::store());
+
+            if (! $lock->acquire($job)) {
+                continue;
+            }
+
+            try {
+                // Dispatch langsung: reservasi di atas sudah mengambil kunci ShouldBeUnique.
+                app(Dispatcher::class)->dispatch($job);
+            } catch (Throwable $exception) {
+                $lock->release($job);
+
+                throw $exception;
+            }
             $queued[] = $environment->id;
         }
 
@@ -321,5 +340,15 @@ final class FleetController extends Controller
         $id = (int) $id;
 
         return User::query()->whereKey($id)->exists() ? $id : null;
+    }
+
+    private function upgradeQueued(string $environmentId): bool
+    {
+        $lock = Cache::lock(UniqueLock::getKey(new UpgradeEnvironmentJob($environmentId)));
+        if (! method_exists($lock, 'isLocked')) {
+            throw new \RuntimeException('Cache tidak mendukung pemeriksaan antrean pembaruan.');
+        }
+
+        return $lock->isLocked() === true;
     }
 }

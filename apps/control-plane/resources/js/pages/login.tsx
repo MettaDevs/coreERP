@@ -3,6 +3,7 @@ import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import { Button } from '@apperp/ui/button';
 import { Input } from '@apperp/ui/input';
 import { Head, useForm } from '@inertiajs/react';
+import { Eye, EyeOff, LogIn } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 
@@ -30,6 +31,7 @@ export default function Login({
     const [showPassword, setShowPassword] = useState(
         !ssoAvailable || passwordLoginOpen,
     );
+    const [passwordVisible, setPasswordVisible] = useState(false);
     const { data, setData, post, processing, errors } = useForm({
         email: '',
         password: '',
@@ -41,18 +43,24 @@ export default function Login({
     }
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-muted/30 px-6 text-foreground">
+        <main className="flex min-h-svh items-center justify-center bg-muted/30 px-4 py-8 text-foreground">
             <Head title="Masuk" />
-            <div className="w-full max-w-sm space-y-5 rounded-lg border bg-background p-8 shadow-sm">
+            <div className="w-full max-w-md space-y-6 rounded-xl border bg-card p-6 shadow-sm sm:p-8">
                 <div>
+                    <LogIn
+                        aria-hidden="true"
+                        className="mb-4 size-6 text-primary"
+                    />
                     <h1 className="text-xl font-semibold">Pusat Admin</h1>
                     <p className="mt-1 text-sm text-muted-foreground">
-                        Konsol operator. Masuk dengan akun Core Anda.
+                        Masuk dengan akun operator Anda untuk mengelola tenant,
+                        lingkungan, dan server klien.
                     </p>
                 </div>
 
                 {ssoError && (
                     <p
+                        role="alert"
                         className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive"
                         data-test="sso-error"
                     >
@@ -75,7 +83,7 @@ export default function Login({
                         className="w-full text-center text-xs text-muted-foreground underline-offset-4 hover:underline"
                         onClick={() => setShowPassword(true)}
                     >
-                        Akun darurat
+                        Gunakan akun darurat dengan kata sandi
                     </button>
                 )}
 
@@ -118,13 +126,39 @@ export default function Login({
                                 id="password"
                                 label="Kata sandi"
                                 required
-                                type="password"
+                                type={passwordVisible ? 'text' : 'password'}
                                 autoComplete="current-password"
                                 value={data.password}
                                 onChange={(e) =>
                                     setData('password', e.target.value)
                                 }
                             />
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                aria-pressed={passwordVisible}
+                                onClick={() =>
+                                    setPasswordVisible((visible) => !visible)
+                                }
+                            >
+                                {passwordVisible ? (
+                                    <EyeOff aria-hidden="true" />
+                                ) : (
+                                    <Eye aria-hidden="true" />
+                                )}
+                                {passwordVisible
+                                    ? 'Sembunyikan kata sandi'
+                                    : 'Tampilkan kata sandi'}
+                            </Button>
+                            {errors.password && (
+                                <p
+                                    role="alert"
+                                    className="text-sm text-destructive"
+                                >
+                                    {errors.password}
+                                </p>
+                            )}
                         </div>
 
                         <Button
@@ -132,12 +166,15 @@ export default function Login({
                             variant={ssoAvailable ? 'outline' : 'default'}
                             className="w-full"
                             disabled={processing}
+                            aria-busy={processing}
                         >
-                            Masuk dengan kata sandi
+                            {processing
+                                ? 'Sedang masuk…'
+                                : 'Masuk dengan kata sandi'}
                         </Button>
                     </form>
                 )}
             </div>
-        </div>
+        </main>
     );
 }
