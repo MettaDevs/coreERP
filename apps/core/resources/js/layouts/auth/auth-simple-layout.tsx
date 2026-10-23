@@ -30,7 +30,7 @@ export default function AuthSimpleLayout({
                 </Link>
                 <Card>
                     <CardHeader>
-                        <div className="col-span-full flex flex-col gap-2 text-center">
+                        <div className="flex w-full flex-col gap-2 text-center">
                             <h1 className="text-xl font-semibold">{title}</h1>
                             {description && (
                                 <p className="text-sm text-balance text-muted-foreground">
