@@ -61,6 +61,11 @@ export default withMermaid({
     'todo/workflow-temporal/README.md': 'todo/workflow-temporal/index.md',
     'todo/master-bersama/README.md': 'todo/master-bersama/index.md',
     'todo/lapis-core/README.md': 'todo/lapis-core/index.md',
+    'todo/procurement/README.md': 'todo/procurement/index.md',
+    'todo/procurement/00-kerangka-berjalan/README.md':
+      'todo/procurement/00-kerangka-berjalan/index.md',
+    'todo/procurement/01-vendor-dan-akses-eksternal/README.md':
+      'todo/procurement/01-vendor-dan-akses-eksternal/index.md',
   },
 
   // Tautan yang memang bukan halaman dokumen. Selain pola ini, tautan mati
@@ -443,6 +448,28 @@ export default withMermaid({
                 {
                   text: 'K-W: identitas Worker di Foundation',
                   link: '/todo/master-bersama/k-w-worker',
+                },
+              ],
+            },
+            {
+              text: 'Procurement',
+              collapsed: false,
+              items: [
+                {
+                  text: 'Peta procurement',
+                  link: '/todo/procurement/',
+                },
+                {
+                  text: 'Part 0 — kerangka berjalan',
+                  link: '/todo/procurement/00-kerangka-berjalan/',
+                },
+                {
+                  text: 'Part 1 — vendor dan akses dari luar',
+                  link: '/todo/procurement/01-vendor-dan-akses-eksternal/',
+                },
+                {
+                  text: 'TODO part 1',
+                  link: '/todo/procurement/01-vendor-dan-akses-eksternal/TODO',
                 },
               ],
             },
