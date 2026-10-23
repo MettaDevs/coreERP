@@ -164,7 +164,7 @@ function TwoFactorVerificationStep({
             onSuccess={() => onClose()}
             resetOnError
             resetOnSuccess
-            {...wrapFormResponse1({})}
+            options={wrapFormResponse1({})}
         >
             {({
                 processing,

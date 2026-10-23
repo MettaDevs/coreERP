@@ -61,7 +61,7 @@ export default function TwoFactorChallenge() {
                     className="space-y-4"
                     resetOnError
                     resetOnSuccess={!showRecoveryInput}
-                    {...wrapFormResponse1({})}
+                    options={wrapFormResponse1({})}
                 >
                     {({ errors, processing, clearErrors }) => (
                         <>

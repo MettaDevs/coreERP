@@ -19,7 +19,7 @@ export default function ConfirmPassword() {
                 noValidate
                 {...store.form()}
                 resetOnSuccess={['password']}
-                {...wrapFormResponse1({})}
+                options={wrapFormResponse1({})}
             >
                 {({ processing, errors }) => (
                     <div className="space-y-6">

@@ -26,7 +26,7 @@ export default function VerifyEmail({ status }: { status?: string }) {
                 noValidate
                 {...send.form()}
                 className="space-y-6 text-center"
-                {...wrapFormResponse1({})}
+                options={wrapFormResponse1({})}
             >
                 {({ processing, errors }) => (
                     <>

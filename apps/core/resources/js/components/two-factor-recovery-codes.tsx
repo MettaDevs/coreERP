@@ -88,9 +88,10 @@ export default function TwoFactorRecoveryCodes({
                         <Form
                             noValidate
                             {...regenerateRecoveryCodes.form()}
-                            options={{ preserveScroll: true }}
+                            options={wrapFormResponse1({
+                                preserveScroll: true,
+                            })}
                             onSuccess={fetchRecoveryCodes}
-                            {...wrapFormResponse1({})}
                         >
                             {({ processing, errors }) => (
                                 <>
