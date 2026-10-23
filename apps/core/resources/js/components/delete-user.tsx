@@ -64,15 +64,14 @@ export default function DeleteUser() {
                         <Form
                             noValidate
                             {...ProfileController.destroy.form()}
-                            options={{
+                            options={wrapFormResponse1({
                                 preserveScroll: true,
-                            }}
+                            })}
                             onError={() => passwordInput.current?.focus()}
                             resetOnSuccess
                             /* `contents` membuat body dan footer tetap menjadi
                                anak langsung flex milik DialogContent. */
                             className="contents"
-                            {...wrapFormResponse1({})}
                         >
                             {({ resetAndClearErrors, processing, errors }) => (
                                 <>

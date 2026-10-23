@@ -189,11 +189,10 @@ export default function Profile(
                         <Form
                             noValidate
                             {...ProfileController.update.form()}
-                            options={{
+                            options={wrapFormResponse1({
                                 preserveScroll: true,
-                            }}
+                            })}
                             className="space-y-6"
-                            {...wrapFormResponse1({})}
                         >
                             {({ processing, errors }) => (
                                 <>

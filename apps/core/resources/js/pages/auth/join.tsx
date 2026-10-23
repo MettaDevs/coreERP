@@ -79,7 +79,7 @@ export default function Join({
                         action="/sso/gabung"
                         method="post"
                         disableWhileProcessing
-                        {...wrapFormResponse1({})}
+                        options={wrapFormResponse1({})}
                     >
                         {({ processing, errors }) => (
                             <>
@@ -126,7 +126,7 @@ export default function Join({
                 method="post"
                 resetOnSuccess={['password', 'password_confirmation']}
                 disableWhileProcessing
-                {...wrapFormResponse2({})}
+                options={wrapFormResponse2({})}
             >
                 {({ processing, errors }) => (
                     <FieldGroup>

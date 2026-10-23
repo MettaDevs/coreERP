@@ -70,7 +70,7 @@ export default function ManageTwoFactor(props: Props) {
                         <Form
                             noValidate
                             {...disable.form()}
-                            {...wrapFormResponse1({})}
+                            options={wrapFormResponse1({})}
                         >
                             {({ processing, errors }) => (
                                 <>
@@ -116,7 +116,7 @@ export default function ManageTwoFactor(props: Props) {
                                 noValidate
                                 {...enable.form()}
                                 onSuccess={() => setShowSetupModal(true)}
-                                {...wrapFormResponse2({})}
+                                options={wrapFormResponse2({})}
                             >
                                 {({ processing, errors }) => (
                                     <>

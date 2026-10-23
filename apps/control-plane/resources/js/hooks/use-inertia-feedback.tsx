@@ -7,6 +7,18 @@ type FailureCallbacks = Pick<
     VisitCallbacks,
     'onStart' | 'onHttpException' | 'onNetworkError'
 >;
+type FormRequestWrapper = {
+    (): UseFormSubmitOptions & FailureCallbacks;
+    <T extends UseFormSubmitOptions>(
+        options: T,
+    ): T & UseFormSubmitOptions & FailureCallbacks;
+};
+type RouterRequestWrapper = {
+    (): FailureCallbacks & Pick<VisitCallbacks, 'onError'>;
+    <T extends UseFormSubmitOptions>(
+        options: T,
+    ): T & FailureCallbacks & Pick<VisitCallbacks, 'onError'>;
+};
 
 export function createInertiaFeedbackCallbacks(
     operation: string,
@@ -44,21 +56,29 @@ export function createInertiaFeedbackCallbacks(
     };
 }
 
-export function useInertiaFeedback(
-    operation = 'Tindakan belum dapat diselesaikan',
-) {
-    const [feedback, setFeedback] = useState<FormFeedback | null>(null);
-
-    function wrap(): FailureCallbacks;
+function createFormRequestWrapper(
+    operation: string,
+    report: (feedback: FormFeedback | null) => void,
+): FormRequestWrapper {
+    function wrap(): UseFormSubmitOptions & FailureCallbacks;
     function wrap<T extends UseFormSubmitOptions>(
         options: T,
-    ): T & FailureCallbacks;
+    ): T & UseFormSubmitOptions & FailureCallbacks;
     function wrap(options: UseFormSubmitOptions = {}) {
         return {
             ...options,
-            ...createInertiaFeedbackCallbacks(operation, setFeedback, options),
+            ...createInertiaFeedbackCallbacks(operation, report, options),
         };
     }
+
+    return wrap;
+}
+
+function createRouterRequestWrapper(
+    operation: string,
+    report: (feedback: FormFeedback | null) => void,
+): RouterRequestWrapper {
+    const wrap = createFormRequestWrapper(operation, report);
 
     function wrapRouter(): FailureCallbacks & Pick<VisitCallbacks, 'onError'>;
     function wrapRouter<T extends UseFormSubmitOptions>(
@@ -71,7 +91,7 @@ export function useInertiaFeedback(
                 if (options.onError) {
                     options.onError(...args);
                 } else {
-                    setFeedback(
+                    report(
                         createSaveFeedback({
                             operation,
                             message: 'Periksa data yang ditandai.',
@@ -83,6 +103,16 @@ export function useInertiaFeedback(
             },
         };
     }
+
+    return wrapRouter;
+}
+
+export function useInertiaFeedback(
+    operation = 'Tindakan belum dapat diselesaikan',
+) {
+    const [feedback, setFeedback] = useState<FormFeedback | null>(null);
+    const wrap = createFormRequestWrapper(operation, setFeedback);
+    const wrapRouter = createRouterRequestWrapper(operation, setFeedback);
 
     return {
         wrap,

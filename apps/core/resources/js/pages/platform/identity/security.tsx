@@ -58,9 +58,9 @@ export default function Security(props: Props) {
                     <Form
                         noValidate
                         {...SecurityController.update.form()}
-                        options={{
+                        options={wrapFormResponse1({
                             preserveScroll: true,
-                        }}
+                        })}
                         resetOnError={[
                             'password',
                             'password_confirmation',
@@ -77,7 +77,6 @@ export default function Security(props: Props) {
                             }
                         }}
                         className="space-y-6"
-                        {...wrapFormResponse1({})}
                     >
                         {({ errors, processing }) => (
                             <>
