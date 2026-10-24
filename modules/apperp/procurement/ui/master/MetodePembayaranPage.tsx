@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
-import { ActionButton } from '@apperp/ui/action-button';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { ActionButton } from "@apperp/ui/action-button";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -10,30 +10,29 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-} from '@apperp/ui/alert-dialog';
-import { Badge } from '@apperp/ui/badge';
+} from "@apperp/ui/alert-dialog";
 import {
     Card,
     CardAction,
     CardContent,
     CardHeader,
     CardTitle,
-} from '@apperp/ui/card';
-import { DataTable } from '@apperp/ui/data-table';
+} from "@apperp/ui/card";
+import { DataTable } from "@apperp/ui/data-table";
 import type {
     DataTableColumn,
     DataTableRowAction,
-} from '@apperp/ui/data-table';
+} from "@apperp/ui/data-table";
 import {
     Empty,
     EmptyDescription,
     EmptyHeader,
     EmptyTitle,
-} from '@apperp/ui/empty';
-import { Input } from '@apperp/ui/input';
-import { api, toastSaveError } from '../api';
-import { MetodePembayaranModal } from './metode-pembayaran/MetodePembayaranModal';
-import type { MetodePembayaranItem } from './metode-pembayaran/MetodePembayaranModal';
+} from "@apperp/ui/empty";
+import { Input } from "@apperp/ui/input";
+import { api, toastSaveError } from "../api";
+import { MetodePembayaranModal } from "./metode-pembayaran/MetodePembayaranModal";
+import type { MetodePembayaranItem } from "./metode-pembayaran/MetodePembayaranModal";
 
 type PageProps = {
     view?: string;
@@ -52,7 +51,7 @@ export default function MetodePembayaranPage(_props?: PageProps) {
     void _props;
     const [items, setItems] = useState<MetodePembayaranItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [search, setSearch] = useState('');
+    const [search, setSearch] = useState("");
 
     const [meta, setMeta] = useState<PaginationMeta>({
         current_page: 1,
@@ -77,10 +76,10 @@ export default function MetodePembayaranPage(_props?: PageProps) {
 
             try {
                 const params = new URLSearchParams();
-                params.set('page', String(page));
+                params.set("page", String(page));
 
                 if (search.trim()) {
-                    params.set('search', search.trim());
+                    params.set("search", search.trim());
                 }
 
                 const res = await api<{
@@ -99,7 +98,7 @@ export default function MetodePembayaranPage(_props?: PageProps) {
                     },
                 );
             } catch (err) {
-                toastSaveError(err, 'Gagal memuat data metode pembayaran.');
+                toastSaveError(err, "Gagal memuat data metode pembayaran.");
             } finally {
                 setLoading(false);
             }
@@ -145,7 +144,7 @@ export default function MetodePembayaranPage(_props?: PageProps) {
                 message: string;
                 data: MetodePembayaranItem;
             }>(`/metode-pembayaran/${item.id}/toggle-status`, {
-                method: 'PATCH',
+                method: "PATCH",
             });
 
             toast.success(res.message);
@@ -155,7 +154,7 @@ export default function MetodePembayaranPage(_props?: PageProps) {
                 ),
             );
         } catch (err) {
-            toastSaveError(err, 'Gagal mengubah status metode pembayaran.');
+            toastSaveError(err, "Gagal mengubah status metode pembayaran.");
         }
     };
 
@@ -168,9 +167,9 @@ export default function MetodePembayaranPage(_props?: PageProps) {
 
         try {
             await api(`/metode-pembayaran/${deleteId}`, {
-                method: 'DELETE',
+                method: "DELETE",
             });
-            toast.success('Metode pembayaran berhasil dihapus.');
+            toast.success("Metode pembayaran berhasil dihapus.");
             setItems((prev) => prev.filter((it) => it.id !== deleteId));
             setMeta((prev) => ({
                 ...prev,
@@ -178,7 +177,7 @@ export default function MetodePembayaranPage(_props?: PageProps) {
             }));
             setDeleteId(null);
         } catch (err) {
-            toastSaveError(err, 'Gagal menghapus metode pembayaran.');
+            toastSaveError(err, "Gagal menghapus metode pembayaran.");
         } finally {
             setDeleting(false);
         }
@@ -187,47 +186,34 @@ export default function MetodePembayaranPage(_props?: PageProps) {
     const columns: DataTableColumn<MetodePembayaranItem>[] = useMemo(
         () => [
             {
-                id: 'kode_bayar',
-                header: 'Kode Bayar',
+                id: "kode_bayar",
+                header: "Kode Bayar",
                 cell: (row) => (
                     <span className="font-mono text-xs font-semibold">
                         {row.kode_bayar}
                     </span>
                 ),
-                width: 160,
+                width: 180,
             },
             {
-                id: 'nama_metode_bayar',
-                header: 'Nama Metode Bayar',
+                id: "nama_metode_bayar",
+                header: "Nama Metode Bayar",
                 cell: (row) => (
                     <span className="text-xs font-medium">
                         {row.nama_metode_bayar}
                     </span>
                 ),
-                width: 260,
+                width: 280,
             },
             {
-                id: 'keterangan',
-                header: 'Keterangan',
+                id: "keterangan",
+                header: "Keterangan",
                 cell: (row) => (
                     <span className="text-muted-foreground text-xs">
-                        {row.keterangan || '—'}
+                        {row.keterangan || "—"}
                     </span>
                 ),
-                width: 260,
-            },
-            {
-                id: 'status',
-                header: 'Status',
-                cell: (row) => (
-                    <Badge
-                        variant={row.aktif ? 'default' : 'secondary'}
-                        className="text-[11px]"
-                    >
-                        {row.aktif ? 'Aktif' : 'Tidak aktif'}
-                    </Badge>
-                ),
-                width: 120,
+                width: 380,
             },
         ],
         [],
@@ -235,11 +221,11 @@ export default function MetodePembayaranPage(_props?: PageProps) {
 
     const rowActions: DataTableRowAction[] = useMemo(
         () => [
-            { id: 'edit', label: 'Ubah' },
-            { id: 'toggle', label: 'Ubah status' },
+            { id: "edit", label: "Edit" },
+            { id: "toggle", label: "Aktif/Non Aktif" },
             {
-                id: 'archive',
-                label: 'Delete',
+                id: "archive",
+                label: "Hapus",
                 destructive: true,
                 separatorBefore: true,
             },
@@ -304,24 +290,27 @@ export default function MetodePembayaranPage(_props?: PageProps) {
                         <DataTable
                             scrollMode="viewport"
                             className="min-h-0 flex-1"
+                            showRowNumbers
                             columns={columns}
                             data={items}
                             getRowKey={(row) => row.id}
                             getRowLabel={(row) => row.nama_metode_bayar}
+                            actionsPlacement="trailing"
                             actions={rowActions}
                             onRowAction={(actionId, row) => {
-                                if (actionId === 'edit') {
+                                if (actionId === "edit") {
                                     handleEdit(row);
                                 }
 
-                                if (actionId === 'toggle') {
+                                if (actionId === "toggle") {
                                     void handleToggleStatus(row);
                                 }
 
-                                if (actionId === 'archive') {
+                                if (actionId === "archive") {
                                     setDeleteId(row.id);
                                 }
                             }}
+                            onRowClick={(row) => handleEdit(row)}
                         />
                     )}
                 </CardContent>
@@ -360,7 +349,7 @@ export default function MetodePembayaranPage(_props?: PageProps) {
                             disabled={deleting}
                             className="bg-rose-600 text-white hover:bg-rose-700"
                         >
-                            {deleting ? 'Menghapus...' : 'Hapus'}
+                            {deleting ? "Menghapus..." : "Hapus"}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

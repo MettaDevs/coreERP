@@ -1,4 +1,4 @@
-import { PlaceholderPage } from '../_shared/PlaceholderPage';
+import { PlaceholderPage } from "../_shared/PlaceholderPage";
 
 type PageProps = {
     view: string;
