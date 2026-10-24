@@ -1,21 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Badge } from '@apperp/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
-import { DataTable } from '@apperp/ui/data-table';
-import type {
-    DataTableColumn,
-    DataTableRowAction,
-} from '@apperp/ui/data-table';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Badge } from "@apperp/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@apperp/ui/card";
+import { DataTable } from "@apperp/ui/data-table";
+import type { DataTableColumn } from "@apperp/ui/data-table";
 import {
     Empty,
     EmptyDescription,
     EmptyHeader,
     EmptyTitle,
-} from '@apperp/ui/empty';
-import { Input } from '@apperp/ui/input';
-import { api, toastSaveError } from '../api';
-import { PrakualifikasiDetailModal } from './prakualifikasi/PrakualifikasiDetailModal';
-import type { PrakualifikasiFormData } from './prakualifikasi/PrakualifikasiFormModal';
+} from "@apperp/ui/empty";
+import { Input } from "@apperp/ui/input";
+import { api, toastSaveError } from "../api";
+import { PrakualifikasiDetailModal } from "./prakualifikasi/PrakualifikasiDetailModal";
+import type { PrakualifikasiFormData } from "./prakualifikasi/PrakualifikasiFormModal";
 
 type KualifikasiRow = PrakualifikasiFormData & {
     id: string;
@@ -33,14 +30,14 @@ type PaginationMeta = {
 
 function formatDisplayDate(dateStr: string): string {
     if (!dateStr) {
-        return '—';
+        return "—";
     }
 
-    if (dateStr.includes('/')) {
+    if (dateStr.includes("/")) {
         return dateStr;
     }
 
-    const parts = dateStr.split('-');
+    const parts = dateStr.split("-");
 
     if (parts.length === 3) {
         return `${parts[2]}/${parts[1]}/${parts[0]}`;
@@ -59,7 +56,7 @@ export default function KualifikasiPage(_props?: PageProps) {
     void _props;
     const [items, setItems] = useState<KualifikasiRow[]>([]);
     const [loading, setLoading] = useState(true);
-    const [search, setSearch] = useState('');
+    const [search, setSearch] = useState("");
 
     const [meta, setMeta] = useState<PaginationMeta>({
         current_page: 1,
@@ -78,13 +75,13 @@ export default function KualifikasiPage(_props?: PageProps) {
 
             try {
                 const params = new URLSearchParams();
-                params.set('page', String(page));
+                params.set("page", String(page));
 
                 if (search.trim()) {
-                    params.set('search', search.trim());
+                    params.set("search", search.trim());
                 }
 
-                params.set('status_kualifikasi', 'Lolos');
+                params.set("status_kualifikasi", "Lolos");
 
                 const res = await api<{
                     status: string;
@@ -104,7 +101,7 @@ export default function KualifikasiPage(_props?: PageProps) {
             } catch (err) {
                 toastSaveError(
                     err,
-                    'Gagal memuat daftar rekanan lolos kualifikasi.',
+                    "Gagal memuat daftar rekanan lolos kualifikasi.",
                 );
             } finally {
                 setLoading(false);
@@ -129,84 +126,89 @@ export default function KualifikasiPage(_props?: PageProps) {
     const columns: DataTableColumn<KualifikasiRow>[] = useMemo(
         () => [
             {
-                id: 'nomor_prakualifikasi',
-                header: 'No. Dokumen',
+                id: "info_prakualifikasi",
+                header: "Info Prakualifikasi",
                 cell: (row) => (
                     <div className="space-y-0.5">
+                        <div className="text-muted-foreground text-xs font-medium">
+                            {formatDisplayDate(row.tanggal_prakualifikasi)}
+                        </div>
                         <span className="font-mono text-xs font-semibold">
                             {row.nomor_prakualifikasi}
                         </span>
-                        <div className="text-muted-foreground text-[11px]">
-                            {formatDisplayDate(row.tanggal_prakualifikasi)}
-                        </div>
                     </div>
                 ),
-                width: 170,
+                width: 180,
             },
             {
-                id: 'vendor',
-                header: 'Vendor / Rekanan',
+                id: "kode_vendor",
+                header: "Kode Vendor/Supplier",
                 cell: (row) => (
-                    <div className="space-y-0.5">
-                        <div className="text-xs font-semibold">
-                            {row.nama_vendor}
-                        </div>
-                        <div className="text-muted-foreground font-mono text-[11px]">
-                            {row.kode_vendor}
-                        </div>
-                    </div>
-                ),
-                width: 220,
-            },
-            {
-                id: 'pic',
-                header: 'Kontak / PIC',
-                cell: (row) => (
-                    <div className="space-y-0.5 text-xs">
-                        <div>{row.nama_pic || '—'}</div>
-                        <div className="text-muted-foreground font-mono text-[11px]">
-                            {row.telepon || '—'}
-                        </div>
-                    </div>
+                    <span className="font-mono text-xs font-semibold">
+                        {row.kode_vendor}
+                    </span>
                 ),
                 width: 160,
             },
             {
-                id: 'alamat',
-                header: 'Alamat',
+                id: "nama_vendor",
+                header: "Nama Vendor/Supplier",
+                cell: (row) => (
+                    <span className="text-xs font-semibold">
+                        {row.nama_vendor}
+                    </span>
+                ),
+                width: 220,
+            },
+            {
+                id: "nama_pic",
+                header: "Contact Person",
+                cell: (row) => (
+                    <span className="text-xs">{row.nama_pic || "—"}</span>
+                ),
+                width: 150,
+            },
+            {
+                id: "telepon",
+                header: "Telp/HP",
+                cell: (row) => (
+                    <span className="font-mono text-xs">
+                        {row.telepon || "—"}
+                    </span>
+                ),
+                width: 150,
+            },
+            {
+                id: "alamat",
+                header: "Alamat Vendor/Supplier",
                 cell: (row) => (
                     <span className="text-muted-foreground line-clamp-2 text-xs">
-                        {row.alamat || '—'}
+                        {row.alamat || "—"}
                     </span>
                 ),
                 width: 240,
             },
             {
-                id: 'status_vendor',
-                header: 'Status Rekanan',
+                id: "status_vendor",
+                header: "Status Vendor/Supplier",
                 cell: (row) => (
                     <Badge variant="secondary" className="text-[11px]">
-                        {row.status_vendor || 'Vendor Resmi'}
+                        {row.status_vendor || "Vendor Resmi"}
+                    </Badge>
+                ),
+                width: 160,
+            },
+            {
+                id: "status_kualifikasi",
+                header: "Status Kualifikasi",
+                cell: (row) => (
+                    <Badge variant="default" className="text-[11px]">
+                        {row.status_kualifikasi || "Lolos"}
                     </Badge>
                 ),
                 width: 140,
             },
-            {
-                id: 'status_kualifikasi',
-                header: 'Hasil Evaluasi',
-                cell: (row) => (
-                    <Badge variant="default" className="text-[11px]">
-                        {row.status_kualifikasi || 'Lolos'}
-                    </Badge>
-                ),
-                width: 130,
-            },
         ],
-        [],
-    );
-
-    const rowActions: DataTableRowAction[] = useMemo(
-        () => [{ id: 'view', label: 'Lihat Detail' }],
         [],
     );
 
@@ -269,12 +271,7 @@ export default function KualifikasiPage(_props?: PageProps) {
                             data={items}
                             getRowKey={(row) => row.id}
                             getRowLabel={(row) => row.nomor_prakualifikasi}
-                            actions={rowActions}
-                            onRowAction={(actionId, row) => {
-                                if (actionId === 'view') {
-                                    handleView(row);
-                                }
-                            }}
+                            onRowClick={(row) => handleView(row)}
                         />
                     )}
                 </CardContent>
