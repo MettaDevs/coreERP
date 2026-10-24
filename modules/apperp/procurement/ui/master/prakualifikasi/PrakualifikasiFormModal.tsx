@@ -6,59 +6,58 @@ import {
     RotateCcw,
     Search,
     Trash2,
-} from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import { toast } from "sonner";
-import { Badge } from "@apperp/ui/badge";
-import { Button } from "@apperp/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@apperp/ui/card";
-import { DataTable } from "@apperp/ui/data-table";
+} from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import { Badge } from '@apperp/ui/badge';
+import { Button } from '@apperp/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
+import { DataTable } from '@apperp/ui/data-table';
 import {
     Dialog,
     DialogAction,
-    DialogCancel,
     DialogContent,
     DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from "@apperp/ui/dialog";
-import { Input } from "@apperp/ui/input";
-import { Label } from "@apperp/ui/label";
-import { NativeSelect, NativeSelectOption } from "@apperp/ui/native-select";
-import { TableCell, TableRow } from "@apperp/ui/table";
-import { Textarea } from "@apperp/ui/textarea";
-import { api, toastSaveError } from "../../api";
-import { VendorLookupModal } from "./VendorLookupModal";
-import type { VendorLookupItem } from "./VendorLookupModal";
+} from '@apperp/ui/dialog';
+import { Input } from '@apperp/ui/input';
+import { Label } from '@apperp/ui/label';
+import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
+import { TableCell, TableRow } from '@apperp/ui/table';
+import { Textarea } from '@apperp/ui/textarea';
+import { api, toastSaveError } from '../../api';
+import { VendorLookupModal } from './VendorLookupModal';
+import type { VendorLookupItem } from './VendorLookupModal';
 
 const standardDocColumns = [
-    { id: "no", header: "No.", cell: () => null },
-    { id: "uraian", header: "Uraian", cell: () => null },
-    { id: "ada", header: "Ada", cell: () => null },
-    { id: "tidak", header: "Tidak", cell: () => null },
+    { id: 'no', header: 'No.', cell: () => null },
+    { id: 'uraian', header: 'Uraian', cell: () => null },
+    { id: 'ada', header: 'Ada', cell: () => null },
+    { id: 'tidak', header: 'Tidak', cell: () => null },
 ];
 
 const additionalDocColumns = [
-    { id: "no", header: "No.", cell: () => null },
-    { id: "nama_dokumen", header: "Nama Dokumen", cell: () => null },
-    { id: "keterangan", header: "Ket.", cell: () => null },
-    { id: "aksi", header: "Aksi", cell: () => null },
+    { id: 'no', header: 'No.', cell: () => null },
+    { id: 'nama_dokumen', header: 'Nama Dokumen', cell: () => null },
+    { id: 'keterangan', header: 'Ket.', cell: () => null },
+    { id: 'aksi', header: 'Aksi', cell: () => null },
 ];
 
 const itemFormColumns = [
-    { id: "no", header: "No.", cell: () => null },
-    { id: "jenis_item", header: "Jenis Item", cell: () => null },
-    { id: "kode_item", header: "Kode Item", cell: () => null },
-    { id: "nama_item", header: "Nama Item", cell: () => null },
-    { id: "satuan", header: "Satuan", cell: () => null },
-    { id: "kesediaan", header: "Kesediaan", cell: () => null },
-    { id: "aksi", header: "Aksi", cell: () => null },
+    { id: 'no', header: 'No.', cell: () => null },
+    { id: 'jenis_item', header: 'Jenis Item', cell: () => null },
+    { id: 'kode_item', header: 'Kode Item', cell: () => null },
+    { id: 'nama_item', header: 'Nama Item', cell: () => null },
+    { id: 'satuan', header: 'Satuan', cell: () => null },
+    { id: 'kesediaan', header: 'Kesediaan', cell: () => null },
+    { id: 'aksi', header: 'Aksi', cell: () => null },
 ];
 
 export type PrakualifikasiDokumenForm = {
     id?: string;
-    kategori: "wajib" | "tambahan";
+    kategori: 'wajib' | 'tambahan';
     urutan: number;
     nama_dokumen: string;
     ada: boolean;
@@ -101,16 +100,16 @@ export type PrakualifikasiFormData = {
 };
 
 export const STANDARD_DOCUMENTS = [
-    "Surat Penunjukan Keagenan",
-    "Sertifikat Produk/Mutu",
-    "Referensi Bank",
-    "Kemampuan Modal Usaha",
-    "Sertifikat",
-    "Akte Pendirian",
-    "NIB",
-    "TDP (Tanda Daftar Perusahaan)",
-    "SIUP",
-    "SITU",
+    'Surat Penunjukan Keagenan',
+    'Sertifikat Produk/Mutu',
+    'Referensi Bank',
+    'Kemampuan Modal Usaha',
+    'Sertifikat',
+    'Akte Pendirian',
+    'NIB',
+    'TDP (Tanda Daftar Perusahaan)',
+    'SIUP',
+    'SITU',
 ];
 
 type Props = {
@@ -132,29 +131,29 @@ export function PrakualifikasiFormModal({
 
     // Form fields (Left column: 7 fields)
     const [qualificationDate, setQualificationDate] = useState(
-        () => new Date().toISOString().split("T")[0],
+        () => new Date().toISOString().split('T')[0],
     );
-    const [vendorCode, setVendorCode] = useState("");
-    const [vendorName, setVendorName] = useState("");
-    const [vendorType, setVendorType] = useState("");
-    const [picName, setPicName] = useState("");
-    const [taxOrIdNumber, setTaxOrIdNumber] = useState("");
-    const [phone, setPhone] = useState("");
+    const [vendorCode, setVendorCode] = useState('');
+    const [vendorName, setVendorName] = useState('');
+    const [vendorType, setVendorType] = useState('');
+    const [picName, setPicName] = useState('');
+    const [taxOrIdNumber, setTaxOrIdNumber] = useState('');
+    const [phone, setPhone] = useState('');
 
     // Form fields (Right column: 7 fields)
-    const [qualificationNumber, setQualificationNumber] = useState("");
-    const [email, setEmail] = useState("");
-    const [socialMedia, setSocialMedia] = useState("");
-    const [address, setAddress] = useState("");
-    const [legalStatus, setLegalStatus] = useState("Badan Hukum");
-    const [leadTime, setLeadTime] = useState("");
-    const [employeeCount, setEmployeeCount] = useState<string>("");
+    const [qualificationNumber, setQualificationNumber] = useState('');
+    const [email, setEmail] = useState('');
+    const [socialMedia, setSocialMedia] = useState('');
+    const [address, setAddress] = useState('');
+    const [legalStatus, setLegalStatus] = useState('Badan Hukum');
+    const [leadTime, setLeadTime] = useState('');
+    const [employeeCount, setEmployeeCount] = useState<string>('');
 
     // Additional metadata
     const [vendorId, setVendorId] = useState<string | null>(null);
-    const [vendorStatus, setVendorStatus] = useState("Vendor Resmi");
-    const [qualificationStatus, setQualificationStatus] = useState("Lolos");
-    const [notes, setNotes] = useState("");
+    const [vendorStatus, setVendorStatus] = useState('Vendor Resmi');
+    const [qualificationStatus, setQualificationStatus] = useState('Lolos');
+    const [notes, setNotes] = useState('');
 
     // Dynamic Lists (Dokumen & Items)
     const [documentList, setDocumentList] = useState<
@@ -167,11 +166,11 @@ export function PrakualifikasiFormModal({
 
     function getEmptyStandardDocs(): PrakualifikasiDokumenForm[] {
         return STANDARD_DOCUMENTS.map((name, idx) => ({
-            kategori: "wajib",
+            kategori: 'wajib',
             urutan: idx + 1,
             nama_dokumen: name,
             ada: false,
-            keterangan: "",
+            keterangan: '',
         }));
     }
 
@@ -179,36 +178,36 @@ export function PrakualifikasiFormModal({
         return [
             {
                 urutan: 1,
-                jenis_item: "Obat",
-                kode_item: "",
-                nama_item: "",
-                satuan: "",
-                kesediaan: "",
-                keterangan: "",
+                jenis_item: 'Obat',
+                kode_item: '',
+                nama_item: '',
+                satuan: '',
+                kesediaan: '',
+                keterangan: '',
             },
         ];
     }
 
     const resetToEmptyForm = useCallback(() => {
-        const today = new Date().toISOString().split("T")[0];
+        const today = new Date().toISOString().split('T')[0];
         setQualificationDate(today);
-        setQualificationNumber("");
+        setQualificationNumber('');
         setVendorId(null);
-        setVendorCode("");
-        setVendorName("");
-        setVendorType("");
-        setPicName("");
-        setTaxOrIdNumber("");
-        setPhone("");
-        setEmail("");
-        setSocialMedia("");
-        setAddress("");
-        setLegalStatus("Badan Hukum");
-        setVendorStatus("Vendor Resmi");
-        setQualificationStatus("Lolos");
-        setLeadTime("");
-        setEmployeeCount("");
-        setNotes("");
+        setVendorCode('');
+        setVendorName('');
+        setVendorType('');
+        setPicName('');
+        setTaxOrIdNumber('');
+        setPhone('');
+        setEmail('');
+        setSocialMedia('');
+        setAddress('');
+        setLegalStatus('Badan Hukum');
+        setVendorStatus('Vendor Resmi');
+        setQualificationStatus('Lolos');
+        setLeadTime('');
+        setEmployeeCount('');
+        setNotes('');
         setDocumentList(getEmptyStandardDocs());
         setAdditionalDocuments([]);
         setItems(getEmptyInitialItems());
@@ -223,32 +222,32 @@ export function PrakualifikasiFormModal({
             if (initialData) {
                 setQualificationDate(
                     initialData.tanggal_prakualifikasi ||
-                        new Date().toISOString().split("T")[0],
+                        new Date().toISOString().split('T')[0],
                 );
-                setQualificationNumber(initialData.nomor_prakualifikasi || "");
+                setQualificationNumber(initialData.nomor_prakualifikasi || '');
                 setVendorId(initialData.vendor_id || null);
-                setVendorCode(initialData.kode_vendor || "");
-                setVendorName(initialData.nama_vendor || "");
-                setVendorType(initialData.jenis_vendor || "");
-                setPicName(initialData.nama_pic || "");
-                setTaxOrIdNumber(initialData.npwp_ktp || "");
-                setPhone(initialData.telepon || "");
-                setEmail(initialData.email || "");
-                setSocialMedia(initialData.media_sosial || "");
-                setAddress(initialData.alamat || "");
-                setVendorStatus(initialData.status_vendor || "Vendor Resmi");
-                setLegalStatus(initialData.status_badan_hukum || "Badan Hukum");
+                setVendorCode(initialData.kode_vendor || '');
+                setVendorName(initialData.nama_vendor || '');
+                setVendorType(initialData.jenis_vendor || '');
+                setPicName(initialData.nama_pic || '');
+                setTaxOrIdNumber(initialData.npwp_ktp || '');
+                setPhone(initialData.telepon || '');
+                setEmail(initialData.email || '');
+                setSocialMedia(initialData.media_sosial || '');
+                setAddress(initialData.alamat || '');
+                setVendorStatus(initialData.status_vendor || 'Vendor Resmi');
+                setLegalStatus(initialData.status_badan_hukum || 'Badan Hukum');
                 setQualificationStatus(
-                    initialData.status_kualifikasi || "Lolos",
+                    initialData.status_kualifikasi || 'Lolos',
                 );
-                setLeadTime(initialData.waktu_kesediaan_item || "");
+                setLeadTime(initialData.waktu_kesediaan_item || '');
                 setEmployeeCount(
                     initialData.jumlah_karyawan !== null &&
                         initialData.jumlah_karyawan !== undefined
                         ? String(initialData.jumlah_karyawan)
-                        : "",
+                        : '',
                 );
-                setNotes(initialData.catatan || "");
+                setNotes(initialData.catatan || '');
 
                 const allDocs = initialData.dokumen || [];
                 const standardDocs: PrakualifikasiDokumenForm[] =
@@ -259,11 +258,11 @@ export function PrakualifikasiFormModal({
 
                         return {
                             id: match?.id,
-                            kategori: "wajib",
+                            kategori: 'wajib',
                             urutan: idx + 1,
                             nama_dokumen: name,
                             ada: match ? Boolean(match.ada) : false,
-                            keterangan: match?.keterangan || "",
+                            keterangan: match?.keterangan || '',
                         };
                     });
                 setDocumentList(standardDocs);
@@ -272,11 +271,11 @@ export function PrakualifikasiFormModal({
                     .filter((d) => !STANDARD_DOCUMENTS.includes(d.nama_dokumen))
                     .map((d, idx) => ({
                         id: d.id,
-                        kategori: "tambahan" as const,
+                        kategori: 'tambahan' as const,
                         urutan: idx + 1,
                         nama_dokumen: d.nama_dokumen,
                         ada: Boolean(d.ada),
-                        keterangan: d.keterangan || "",
+                        keterangan: d.keterangan || '',
                     }));
                 setAdditionalDocuments(extraDocs);
 
@@ -285,12 +284,12 @@ export function PrakualifikasiFormModal({
                         initialData.items.map((it, idx) => ({
                             id: it.id,
                             urutan: idx + 1,
-                            jenis_item: it.jenis_item || "",
-                            kode_item: it.kode_item || "",
-                            nama_item: it.nama_item || "",
-                            satuan: it.satuan || "",
-                            kesediaan: it.kesediaan || "",
-                            keterangan: it.keterangan || "",
+                            jenis_item: it.jenis_item || '',
+                            kode_item: it.kode_item || '',
+                            nama_item: it.nama_item || '',
+                            satuan: it.satuan || '',
+                            kesediaan: it.kesediaan || '',
+                            keterangan: it.keterangan || '',
                         })),
                     );
                 } else {
@@ -310,8 +309,8 @@ export function PrakualifikasiFormModal({
 
     const handleSelectVendor = (v: VendorLookupItem) => {
         setVendorId(v.vendor_id || null);
-        setVendorCode(v.kode_vendor || "");
-        setVendorName(v.nama_vendor || "");
+        setVendorCode(v.kode_vendor || '');
+        setVendorName(v.nama_vendor || '');
 
         if (v.alamat) {
             setAddress(v.alamat);
@@ -341,12 +340,12 @@ export function PrakualifikasiFormModal({
             setItems(
                 v.items.map((it, idx) => ({
                     urutan: idx + 1,
-                    jenis_item: it.jenis_item || "Barang",
-                    kode_item: it.kode_item || "",
-                    nama_item: it.nama_item || "",
-                    satuan: it.satuan || "",
-                    kesediaan: it.kesediaan || "",
-                    keterangan: it.keterangan || "",
+                    jenis_item: it.jenis_item || 'Barang',
+                    kode_item: it.kode_item || '',
+                    nama_item: it.nama_item || '',
+                    satuan: it.satuan || '',
+                    kesediaan: it.kesediaan || '',
+                    keterangan: it.keterangan || '',
                 })),
             );
         }
@@ -367,11 +366,11 @@ export function PrakualifikasiFormModal({
         setAdditionalDocuments((prev) => [
             ...prev,
             {
-                kategori: "tambahan",
+                kategori: 'tambahan',
                 urutan: prev.length + 1,
-                nama_dokumen: "",
+                nama_dokumen: '',
                 ada: true,
-                keterangan: "",
+                keterangan: '',
             },
         ]);
     };
@@ -382,7 +381,7 @@ export function PrakualifikasiFormModal({
 
     const handleExtraDocChange = (
         index: number,
-        field: "nama_dokumen" | "keterangan",
+        field: 'nama_dokumen' | 'keterangan',
         val: string,
     ) => {
         setAdditionalDocuments((prev) => {
@@ -398,19 +397,19 @@ export function PrakualifikasiFormModal({
             ...prev,
             {
                 urutan: prev.length + 1,
-                jenis_item: "BMHP",
+                jenis_item: 'BMHP',
                 kode_item: `Bahan 0${prev.length + 1}`,
-                nama_item: "",
-                satuan: "Pcs",
-                kesediaan: "100",
-                keterangan: "",
+                nama_item: '',
+                satuan: 'Pcs',
+                kesediaan: '100',
+                keterangan: '',
             },
         ]);
     };
 
     const handleRemoveItem = (index: number) => {
         if (items.length <= 1) {
-            toast.error("Daftar item minimal memiliki 1 baris.");
+            toast.error('Daftar item minimal memiliki 1 baris.');
 
             return;
         }
@@ -436,15 +435,15 @@ export function PrakualifikasiFormModal({
 
         if (!vendorCode.trim() || !vendorName.trim()) {
             toast.error(
-                "Mohon lengkapi Kode Vendor/Supp dan Nama Vendor/Supp.",
+                'Mohon lengkapi Kode Vendor/Supp dan Nama Vendor/Supp.',
             );
 
             return;
         }
 
-        const validItems = items.filter((it) => it.nama_item.trim() !== "");
+        const validItems = items.filter((it) => it.nama_item.trim() !== '');
         const validExtraDocs = additionalDocuments.filter(
-            (d) => d.nama_dokumen.trim() !== "",
+            (d) => d.nama_dokumen.trim() !== '',
         );
 
         const payload = {
@@ -478,22 +477,22 @@ export function PrakualifikasiFormModal({
         try {
             if (isEdit && initialData?.id) {
                 await api(`/prakualifikasi/${initialData.id}`, {
-                    method: "PUT",
+                    method: 'PUT',
                     body: JSON.stringify(payload),
                 });
-                toast.success("Data prakualifikasi berhasil diperbarui.");
+                toast.success('Data prakualifikasi berhasil diperbarui.');
             } else {
-                await api("/prakualifikasi", {
-                    method: "POST",
+                await api('/prakualifikasi', {
+                    method: 'POST',
                     body: JSON.stringify(payload),
                 });
-                toast.success("Data prakualifikasi berhasil disimpan.");
+                toast.success('Data prakualifikasi berhasil disimpan.');
             }
 
             onSuccess();
             onOpenChange(false);
         } catch (err) {
-            toastSaveError(err, "Gagal menyimpan data prakualifikasi.");
+            toastSaveError(err, 'Gagal menyimpan data prakualifikasi.');
         } finally {
             setSubmitting(false);
         }
@@ -516,7 +515,7 @@ export function PrakualifikasiFormModal({
                                     size="sm"
                                     onClick={() => {
                                         resetToEmptyForm();
-                                        toast.info("Form telah dikosongkan.");
+                                        toast.info('Form telah dikosongkan.');
                                     }}
                                     className="text-muted-foreground hover:text-foreground h-7 text-xs"
                                     title="Kosongkan form"
@@ -548,7 +547,7 @@ export function PrakualifikasiFormModal({
                                     <div className="space-y-3">
                                         <div>
                                             <Label className="text-xs font-medium">
-                                                Tanggal Prakualifikasi{" "}
+                                                Tanggal Prakualifikasi{' '}
                                                 <span className="text-destructive">
                                                     *
                                                 </span>
@@ -568,7 +567,7 @@ export function PrakualifikasiFormModal({
 
                                         <div>
                                             <Label className="text-xs font-medium">
-                                                Kode Vendor/Supp{" "}
+                                                Kode Vendor/Supp{' '}
                                                 <span className="text-destructive">
                                                     *
                                                 </span>
@@ -607,7 +606,7 @@ export function PrakualifikasiFormModal({
 
                                         <div>
                                             <Label className="text-xs font-medium">
-                                                Nama Vendor/Supp{" "}
+                                                Nama Vendor/Supp{' '}
                                                 <span className="text-destructive">
                                                     *
                                                 </span>
@@ -853,7 +852,7 @@ export function PrakualifikasiFormModal({
                                                     documentList.filter(
                                                         (d) => d.ada,
                                                     ).length
-                                                }{" "}
+                                                }{' '}
                                                 / {documentList.length} Ada
                                             </Badge>
                                         </div>
@@ -998,7 +997,7 @@ export function PrakualifikasiFormModal({
                                                                                 ) =>
                                                                                     handleExtraDocChange(
                                                                                         idx,
-                                                                                        "nama_dokumen",
+                                                                                        'nama_dokumen',
                                                                                         e
                                                                                             .target
                                                                                             .value,
@@ -1012,14 +1011,14 @@ export function PrakualifikasiFormModal({
                                                                             <Input
                                                                                 value={
                                                                                     doc.keterangan ||
-                                                                                    ""
+                                                                                    ''
                                                                                 }
                                                                                 onChange={(
                                                                                     e,
                                                                                 ) =>
                                                                                     handleExtraDocChange(
                                                                                         idx,
-                                                                                        "keterangan",
+                                                                                        'keterangan',
                                                                                         e
                                                                                             .target
                                                                                             .value,
@@ -1123,7 +1122,7 @@ export function PrakualifikasiFormModal({
                                                                 onChange={(e) =>
                                                                     handleItemChange(
                                                                         idx,
-                                                                        "jenis_item",
+                                                                        'jenis_item',
                                                                         e.target
                                                                             .value,
                                                                     )
@@ -1140,7 +1139,7 @@ export function PrakualifikasiFormModal({
                                                                 onChange={(e) =>
                                                                     handleItemChange(
                                                                         idx,
-                                                                        "kode_item",
+                                                                        'kode_item',
                                                                         e.target
                                                                             .value,
                                                                     )
@@ -1157,7 +1156,7 @@ export function PrakualifikasiFormModal({
                                                                 onChange={(e) =>
                                                                     handleItemChange(
                                                                         idx,
-                                                                        "nama_item",
+                                                                        'nama_item',
                                                                         e.target
                                                                             .value,
                                                                     )
@@ -1174,7 +1173,7 @@ export function PrakualifikasiFormModal({
                                                                 onChange={(e) =>
                                                                     handleItemChange(
                                                                         idx,
-                                                                        "satuan",
+                                                                        'satuan',
                                                                         e.target
                                                                             .value,
                                                                     )
@@ -1191,7 +1190,7 @@ export function PrakualifikasiFormModal({
                                                                 onChange={(e) =>
                                                                     handleItemChange(
                                                                         idx,
-                                                                        "kesediaan",
+                                                                        'kesediaan',
                                                                         e.target
                                                                             .value,
                                                                     )
@@ -1249,7 +1248,7 @@ export function PrakualifikasiFormModal({
                                     type="button"
                                     variant="secondary"
                                     onClick={() => {
-                                        toast.info("Mode ubah data aktif.");
+                                        toast.info('Mode ubah data aktif.');
                                     }}
                                     disabled={submitting}
                                     className="h-8 text-xs font-medium"
@@ -1261,7 +1260,7 @@ export function PrakualifikasiFormModal({
                                 type="submit"
                                 disabled={submitting || !vendorCode}
                             >
-                                {submitting ? "Menyimpan…" : "Simpan"}
+                                {submitting ? 'Menyimpan…' : 'Simpan'}
                             </DialogAction>
                         </DialogFooter>
                     </form>
