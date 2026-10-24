@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import {
     Dialog,
     DialogAction,
@@ -9,10 +9,10 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from "@apperp/ui/dialog";
-import { Input } from "@apperp/ui/input";
-import { Label } from "@apperp/ui/label";
-import { api, toastSaveError } from "../../api";
+} from '@apperp/ui/dialog';
+import { Input } from '@apperp/ui/input';
+import { Label } from '@apperp/ui/label';
+import { api, toastSaveError } from '../../api';
 
 export type HargaPerkiraanItem = {
     id: string;
@@ -36,29 +36,29 @@ type Props = {
 };
 
 const BULAN_INDONESIA = [
-    "Januari",
-    "Februari",
-    "Maret",
-    "April",
-    "Mei",
-    "Juni",
-    "Juli",
-    "Agustus",
-    "September",
-    "Oktober",
-    "November",
-    "Desember",
+    'Januari',
+    'Februari',
+    'Maret',
+    'April',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
+    'September',
+    'Oktober',
+    'November',
+    'Desember',
 ];
 
 export function formatIndonesianDate(
     dateStr: string | null | undefined,
 ): string {
     if (!dateStr) {
-        return "";
+        return '';
     }
 
     try {
-        const parts = dateStr.split("-");
+        const parts = dateStr.split('-');
 
         if (parts.length === 3) {
             const day = parseInt(parts[2], 10);
@@ -72,24 +72,24 @@ export function formatIndonesianDate(
 
         return dateStr;
     } catch {
-        return dateStr || "";
+        return dateStr || '';
     }
 }
 
 export function formatRupiah(
     value: number | string | null | undefined,
 ): string {
-    if (value === null || value === undefined || value === "") {
-        return "Rp. 0";
+    if (value === null || value === undefined || value === '') {
+        return 'Rp. 0';
     }
 
-    const num = typeof value === "string" ? parseFloat(value) : value;
+    const num = typeof value === 'string' ? parseFloat(value) : value;
 
     if (isNaN(num)) {
-        return "Rp. 0";
+        return 'Rp. 0';
     }
 
-    return `Rp. ${new Intl.NumberFormat("id-ID").format(num)}`;
+    return `Rp. ${new Intl.NumberFormat('id-ID').format(num)}`;
 }
 
 export function HargaPerkiraanEditModal({
@@ -98,12 +98,12 @@ export function HargaPerkiraanEditModal({
     item,
     onSuccess,
 }: Props) {
-    const [priceInput, setPriceInput] = useState("");
-    const [dateInput, setDateInput] = useState("");
-    const [code, setCode] = useState("");
-    const [name, setName] = useState("");
-    const [group, setGroup] = useState("");
-    const [unit, setUnit] = useState("");
+    const [priceInput, setPriceInput] = useState('');
+    const [dateInput, setDateInput] = useState('');
+    const [code, setCode] = useState('');
+    const [name, setName] = useState('');
+    const [group, setGroup] = useState('');
+    const [unit, setUnit] = useState('');
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
@@ -112,10 +112,10 @@ export function HargaPerkiraanEditModal({
         }
 
         const timer = setTimeout(() => {
-            setCode(item.kode_item || "");
-            setName(item.nama_item || "");
-            setGroup(item.group_item || "");
-            setUnit(item.satuan || "");
+            setCode(item.kode_item || '');
+            setName(item.nama_item || '');
+            setGroup(item.group_item || '');
+            setUnit(item.satuan || '');
             const today = new Date().toISOString().slice(0, 10);
 
             setDateInput(item.tanggal_update || today);
@@ -125,12 +125,12 @@ export function HargaPerkiraanEditModal({
                 item.harga_perkiraan !== null
             ) {
                 setPriceInput(
-                    new Intl.NumberFormat("id-ID").format(
+                    new Intl.NumberFormat('id-ID').format(
                         Number(item.harga_perkiraan),
                     ),
                 );
             } else {
-                setPriceInput("");
+                setPriceInput('');
             }
         }, 0);
 
@@ -142,24 +142,24 @@ export function HargaPerkiraanEditModal({
     }
 
     const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const raw = e.target.value.replace(/[^0-9]/g, "");
+        const raw = e.target.value.replace(/[^0-9]/g, '');
 
         if (!raw) {
-            setPriceInput("");
+            setPriceInput('');
 
             return;
         }
 
         const num = parseInt(raw, 10);
-        setPriceInput(new Intl.NumberFormat("id-ID").format(num));
+        setPriceInput(new Intl.NumberFormat('id-ID').format(num));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const numericPrice = parseFloat(priceInput.replace(/[^0-9]/g, ""));
+        const numericPrice = parseFloat(priceInput.replace(/[^0-9]/g, ''));
 
         if (isNaN(numericPrice) || numericPrice < 0) {
-            toast.error("Harga perkiraan harus berupa nominal angka valid.");
+            toast.error('Harga perkiraan harus berupa nominal angka valid.');
 
             return;
         }
@@ -172,7 +172,7 @@ export function HargaPerkiraanEditModal({
                 message: string;
                 data: HargaPerkiraanItem;
             }>(`/harga-perkiraan/${item.id}`, {
-                method: "PUT",
+                method: 'PUT',
                 body: JSON.stringify({
                     harga_perkiraan: numericPrice,
                     tanggal_update:
@@ -184,11 +184,11 @@ export function HargaPerkiraanEditModal({
                 }),
             });
 
-            toast.success("Data harga perkiraan berhasil diperbarui.");
+            toast.success('Data harga perkiraan berhasil diperbarui.');
             onSuccess(res.data);
             onOpenChange(false);
         } catch (err) {
-            toastSaveError(err, "Gagal memperbarui data harga perkiraan.");
+            toastSaveError(err, 'Gagal memperbarui data harga perkiraan.');
         } finally {
             setSaving(false);
         }
@@ -217,11 +217,11 @@ export function HargaPerkiraanEditModal({
                                 value={
                                     formatIndonesianDate(dateInput) ||
                                     dateInput ||
-                                    "—"
+                                    '—'
                                 }
                                 readOnly
                                 tabIndex={-1}
-                                className="h-8 bg-muted text-xs"
+                                className="bg-muted h-8 text-xs"
                             />
                         </div>
 
@@ -234,7 +234,7 @@ export function HargaPerkiraanEditModal({
                                 value={code}
                                 readOnly
                                 tabIndex={-1}
-                                className="h-8 bg-muted font-mono text-xs"
+                                className="bg-muted h-8 font-mono text-xs"
                             />
                         </div>
 
@@ -247,7 +247,7 @@ export function HargaPerkiraanEditModal({
                                 value={name}
                                 readOnly
                                 tabIndex={-1}
-                                className="h-8 bg-muted text-xs font-medium"
+                                className="bg-muted h-8 text-xs font-medium"
                             />
                         </div>
 
@@ -260,7 +260,7 @@ export function HargaPerkiraanEditModal({
                                 value={group}
                                 readOnly
                                 tabIndex={-1}
-                                className="h-8 bg-muted text-xs"
+                                className="bg-muted h-8 text-xs"
                             />
                         </div>
 
@@ -273,7 +273,7 @@ export function HargaPerkiraanEditModal({
                                 value={unit}
                                 readOnly
                                 tabIndex={-1}
-                                className="h-8 bg-muted text-xs"
+                                className="bg-muted h-8 text-xs"
                             />
                         </div>
 
@@ -307,7 +307,7 @@ export function HargaPerkiraanEditModal({
                             Batal
                         </DialogCancel>
                         <DialogAction type="submit" disabled={saving}>
-                            {saving ? "Menyimpan…" : "Edit"}
+                            {saving ? 'Menyimpan…' : 'Edit'}
                         </DialogAction>
                     </DialogFooter>
                 </form>
