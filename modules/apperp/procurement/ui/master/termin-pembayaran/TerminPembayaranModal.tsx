@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import {
     Dialog,
     DialogAction,
@@ -9,11 +9,11 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from "@apperp/ui/dialog";
-import { Input } from "@apperp/ui/input";
-import { Label } from "@apperp/ui/label";
-import { Textarea } from "@apperp/ui/textarea";
-import { api, toastSaveError } from "../../api";
+} from '@apperp/ui/dialog';
+import { Input } from '@apperp/ui/input';
+import { Label } from '@apperp/ui/label';
+import { Textarea } from '@apperp/ui/textarea';
+import { api, toastSaveError } from '../../api';
 
 export type TerminPembayaranItem = {
     id: string;
@@ -38,9 +38,9 @@ export function TerminPembayaranModal({
     editingItem,
     onSuccess,
 }: Props) {
-    const [kodeTermin, setKodeTermin] = useState("");
-    const [namaTerminBayar, setNamaTerminBayar] = useState("");
-    const [keterangan, setKeterangan] = useState("");
+    const [kodeTermin, setKodeTermin] = useState('');
+    const [namaTerminBayar, setNamaTerminBayar] = useState('');
+    const [keterangan, setKeterangan] = useState('');
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
@@ -48,11 +48,11 @@ export function TerminPembayaranModal({
             if (editingItem) {
                 setKodeTermin(editingItem.kode_termin);
                 setNamaTerminBayar(editingItem.nama_termin_bayar);
-                setKeterangan(editingItem.keterangan || "");
+                setKeterangan(editingItem.keterangan || '');
             } else {
-                setKodeTermin("");
-                setNamaTerminBayar("");
-                setKeterangan("");
+                setKodeTermin('');
+                setNamaTerminBayar('');
+                setKeterangan('');
             }
         }, 0);
 
@@ -63,13 +63,13 @@ export function TerminPembayaranModal({
         e.preventDefault();
 
         if (!kodeTermin.trim()) {
-            toast.error("Kode termin wajib diisi.");
+            toast.error('Kode termin wajib diisi.');
 
             return;
         }
 
         if (!namaTerminBayar.trim()) {
-            toast.error("Nama termin bayar wajib diisi.");
+            toast.error('Nama termin bayar wajib diisi.');
 
             return;
         }
@@ -83,7 +83,7 @@ export function TerminPembayaranModal({
                     message: string;
                     data: TerminPembayaranItem;
                 }>(`/termin-pembayaran/${editingItem.id}`, {
-                    method: "PUT",
+                    method: 'PUT',
                     body: JSON.stringify({
                         kode_termin: kodeTermin.trim(),
                         nama_termin_bayar: namaTerminBayar.trim(),
@@ -91,7 +91,7 @@ export function TerminPembayaranModal({
                     }),
                 });
 
-                toast.success("Termin pembayaran berhasil diperbarui.");
+                toast.success('Termin pembayaran berhasil diperbarui.');
                 onSuccess(res.data, false);
             } else {
                 const res = await api<{
@@ -99,7 +99,7 @@ export function TerminPembayaranModal({
                     message: string;
                     data: TerminPembayaranItem;
                 }>(`/termin-pembayaran`, {
-                    method: "POST",
+                    method: 'POST',
                     body: JSON.stringify({
                         kode_termin: kodeTermin.trim(),
                         nama_termin_bayar: namaTerminBayar.trim(),
@@ -108,13 +108,13 @@ export function TerminPembayaranModal({
                     }),
                 });
 
-                toast.success("Termin pembayaran berhasil ditambahkan.");
+                toast.success('Termin pembayaran berhasil ditambahkan.');
                 onSuccess(res.data, true);
             }
 
             onOpenChange(false);
         } catch (err) {
-            toastSaveError(err, "Gagal menyimpan termin pembayaran.");
+            toastSaveError(err, 'Gagal menyimpan termin pembayaran.');
         } finally {
             setSaving(false);
         }
@@ -127,8 +127,8 @@ export function TerminPembayaranModal({
                     <DialogHeader>
                         <DialogTitle>
                             {editingItem
-                                ? "Ubah Termin Pembayaran"
-                                : "Tambah Termin Pembayaran"}
+                                ? 'Ubah Termin Pembayaran'
+                                : 'Tambah Termin Pembayaran'}
                         </DialogTitle>
                         <DialogDescription>
                             Isi kode dan nama termin pembayaran yang digunakan
@@ -191,10 +191,10 @@ export function TerminPembayaranModal({
                         </DialogCancel>
                         <DialogAction type="submit" disabled={saving}>
                             {saving
-                                ? "Menyimpan…"
+                                ? 'Menyimpan…'
                                 : editingItem
-                                  ? "Simpan"
-                                  : "Tambah"}
+                                  ? 'Simpan'
+                                  : 'Tambah'}
                         </DialogAction>
                     </DialogFooter>
                 </form>

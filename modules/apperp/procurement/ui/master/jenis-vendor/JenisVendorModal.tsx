@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import {
     Dialog,
     DialogAction,
@@ -9,11 +9,11 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from "@apperp/ui/dialog";
-import { Input } from "@apperp/ui/input";
-import { Label } from "@apperp/ui/label";
-import { Textarea } from "@apperp/ui/textarea";
-import { api, toastSaveError } from "../../api";
+} from '@apperp/ui/dialog';
+import { Input } from '@apperp/ui/input';
+import { Label } from '@apperp/ui/label';
+import { Textarea } from '@apperp/ui/textarea';
+import { api, toastSaveError } from '../../api';
 
 export type JenisVendorItem = {
     id: string;
@@ -38,9 +38,9 @@ export function JenisVendorModal({
     editingItem,
     onSuccess,
 }: Props) {
-    const [kodeJenis, setKodeJenis] = useState("");
-    const [namaJenisVendor, setNamaJenisVendor] = useState("");
-    const [keterangan, setKeterangan] = useState("");
+    const [kodeJenis, setKodeJenis] = useState('');
+    const [namaJenisVendor, setNamaJenisVendor] = useState('');
+    const [keterangan, setKeterangan] = useState('');
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
@@ -48,11 +48,11 @@ export function JenisVendorModal({
             if (editingItem) {
                 setKodeJenis(editingItem.kode_jenis);
                 setNamaJenisVendor(editingItem.nama_jenis_vendor);
-                setKeterangan(editingItem.keterangan || "");
+                setKeterangan(editingItem.keterangan || '');
             } else {
-                setKodeJenis("");
-                setNamaJenisVendor("");
-                setKeterangan("");
+                setKodeJenis('');
+                setNamaJenisVendor('');
+                setKeterangan('');
             }
         }, 0);
 
@@ -63,13 +63,13 @@ export function JenisVendorModal({
         e.preventDefault();
 
         if (!kodeJenis.trim()) {
-            toast.error("Kode jenis wajib diisi.");
+            toast.error('Kode jenis wajib diisi.');
 
             return;
         }
 
         if (!namaJenisVendor.trim()) {
-            toast.error("Nama jenis vendor wajib diisi.");
+            toast.error('Nama jenis vendor wajib diisi.');
 
             return;
         }
@@ -83,7 +83,7 @@ export function JenisVendorModal({
                     message: string;
                     data: JenisVendorItem;
                 }>(`/jenis-vendor/${editingItem.id}`, {
-                    method: "PUT",
+                    method: 'PUT',
                     body: JSON.stringify({
                         kode_jenis: kodeJenis.trim(),
                         nama_jenis_vendor: namaJenisVendor.trim(),
@@ -91,7 +91,7 @@ export function JenisVendorModal({
                     }),
                 });
 
-                toast.success("Jenis vendor berhasil diperbarui.");
+                toast.success('Jenis vendor berhasil diperbarui.');
                 onSuccess(res.data, false);
             } else {
                 const res = await api<{
@@ -99,7 +99,7 @@ export function JenisVendorModal({
                     message: string;
                     data: JenisVendorItem;
                 }>(`/jenis-vendor`, {
-                    method: "POST",
+                    method: 'POST',
                     body: JSON.stringify({
                         kode_jenis: kodeJenis.trim(),
                         nama_jenis_vendor: namaJenisVendor.trim(),
@@ -108,13 +108,13 @@ export function JenisVendorModal({
                     }),
                 });
 
-                toast.success("Jenis vendor berhasil ditambahkan.");
+                toast.success('Jenis vendor berhasil ditambahkan.');
                 onSuccess(res.data, true);
             }
 
             onOpenChange(false);
         } catch (err) {
-            toastSaveError(err, "Gagal menyimpan jenis vendor.");
+            toastSaveError(err, 'Gagal menyimpan jenis vendor.');
         } finally {
             setSaving(false);
         }
@@ -127,8 +127,8 @@ export function JenisVendorModal({
                     <DialogHeader>
                         <DialogTitle>
                             {editingItem
-                                ? "Ubah Jenis Vendor"
-                                : "Tambah Jenis Vendor"}
+                                ? 'Ubah Jenis Vendor'
+                                : 'Tambah Jenis Vendor'}
                         </DialogTitle>
                         <DialogDescription>
                             Isi kode dan nama kategori klasifikasi
@@ -191,10 +191,10 @@ export function JenisVendorModal({
                         </DialogCancel>
                         <DialogAction type="submit" disabled={saving}>
                             {saving
-                                ? "Menyimpan…"
+                                ? 'Menyimpan…'
                                 : editingItem
-                                  ? "Simpan"
-                                  : "Tambah"}
+                                  ? 'Simpan'
+                                  : 'Tambah'}
                         </DialogAction>
                     </DialogFooter>
                 </form>
