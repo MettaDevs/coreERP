@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Eye } from "lucide-react";
-import { toast } from "sonner";
-import { ActionButton } from "@apperp/ui/action-button";
+import { Eye } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import { ActionButton } from '@apperp/ui/action-button';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -11,30 +11,30 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-} from "@apperp/ui/alert-dialog";
+} from '@apperp/ui/alert-dialog';
 import {
     Card,
     CardAction,
     CardContent,
     CardHeader,
     CardTitle,
-} from "@apperp/ui/card";
-import { DataTable } from "@apperp/ui/data-table";
+} from '@apperp/ui/card';
+import { DataTable } from '@apperp/ui/data-table';
 import type {
     DataTableColumn,
     DataTableRowAction,
-} from "@apperp/ui/data-table";
+} from '@apperp/ui/data-table';
 import {
     Empty,
     EmptyDescription,
     EmptyHeader,
     EmptyTitle,
-} from "@apperp/ui/empty";
-import { Input } from "@apperp/ui/input";
-import { api, toastSaveError } from "../api";
-import { ItemJasaDetailModal } from "./item-jasa/ItemJasaDetailModal";
-import { ItemJasaModal } from "./item-jasa/ItemJasaModal";
-import type { ItemJasaRecord } from "./item-jasa/ItemJasaModal";
+} from '@apperp/ui/empty';
+import { Input } from '@apperp/ui/input';
+import { api, toastSaveError } from '../api';
+import { ItemJasaDetailModal } from './item-jasa/ItemJasaDetailModal';
+import { ItemJasaModal } from './item-jasa/ItemJasaModal';
+import type { ItemJasaRecord } from './item-jasa/ItemJasaModal';
 
 type PageProps = {
     view?: string;
@@ -53,7 +53,7 @@ export default function ItemJasaPage(_props?: PageProps) {
     void _props;
     const [items, setItems] = useState<ItemJasaRecord[]>([]);
     const [loading, setLoading] = useState(true);
-    const [search, setSearch] = useState("");
+    const [search, setSearch] = useState('');
 
     const [meta, setMeta] = useState<PaginationMeta>({
         current_page: 1,
@@ -80,10 +80,10 @@ export default function ItemJasaPage(_props?: PageProps) {
 
             try {
                 const params = new URLSearchParams();
-                params.set("page", String(page));
+                params.set('page', String(page));
 
                 if (search.trim()) {
-                    params.set("search", search.trim());
+                    params.set('search', search.trim());
                 }
 
                 const res = await api<{
@@ -102,7 +102,7 @@ export default function ItemJasaPage(_props?: PageProps) {
                     },
                 );
             } catch (err) {
-                toastSaveError(err, "Gagal memuat data item jasa/upah.");
+                toastSaveError(err, 'Gagal memuat data item jasa/upah.');
             } finally {
                 setLoading(false);
             }
@@ -153,7 +153,7 @@ export default function ItemJasaPage(_props?: PageProps) {
                 message: string;
                 data: ItemJasaRecord;
             }>(`/item-jasa/${item.id}/toggle-status`, {
-                method: "PATCH",
+                method: 'PATCH',
             });
 
             toast.success(res.message);
@@ -163,7 +163,7 @@ export default function ItemJasaPage(_props?: PageProps) {
                 ),
             );
         } catch (err) {
-            toastSaveError(err, "Gagal mengubah status item upah.");
+            toastSaveError(err, 'Gagal mengubah status item upah.');
         }
     };
 
@@ -176,9 +176,9 @@ export default function ItemJasaPage(_props?: PageProps) {
 
         try {
             await api(`/item-jasa/${deleteId}`, {
-                method: "DELETE",
+                method: 'DELETE',
             });
-            toast.success("Item upah berhasil dihapus.");
+            toast.success('Item upah berhasil dihapus.');
             setItems((prev) => prev.filter((it) => it.id !== deleteId));
             setMeta((prev) => ({
                 ...prev,
@@ -186,7 +186,7 @@ export default function ItemJasaPage(_props?: PageProps) {
             }));
             setDeleteId(null);
         } catch (err) {
-            toastSaveError(err, "Gagal menghapus item upah.");
+            toastSaveError(err, 'Gagal menghapus item upah.');
         } finally {
             setDeleting(false);
         }
@@ -195,8 +195,8 @@ export default function ItemJasaPage(_props?: PageProps) {
     const columns: DataTableColumn<ItemJasaRecord>[] = useMemo(
         () => [
             {
-                id: "kode_upah",
-                header: "Kode Upah",
+                id: 'kode_upah',
+                header: 'Kode Upah',
                 cell: (row) => (
                     <span className="font-mono text-xs font-semibold">
                         {row.kode_upah}
@@ -205,16 +205,16 @@ export default function ItemJasaPage(_props?: PageProps) {
                 width: 180,
             },
             {
-                id: "nama_upah",
-                header: "Nama Upah",
+                id: 'nama_upah',
+                header: 'Nama Upah',
                 cell: (row) => (
                     <span className="text-xs font-medium">{row.nama_upah}</span>
                 ),
                 width: 380,
             },
             {
-                id: "satuan",
-                header: "Satuan",
+                id: 'satuan',
+                header: 'Satuan',
                 cell: (row) => (
                     <span className="text-muted-foreground text-xs font-medium">
                         {row.satuan}
@@ -229,15 +229,15 @@ export default function ItemJasaPage(_props?: PageProps) {
     const rowActions: DataTableRowAction[] = useMemo(
         () => [
             {
-                id: "view",
-                label: "View",
+                id: 'view',
+                label: 'View',
                 icon: <Eye className="mr-2 h-4 w-4" />,
             },
-            { id: "edit", label: "Edit" },
-            { id: "toggle", label: "Aktif/Non Aktif" },
+            { id: 'edit', label: 'Edit' },
+            { id: 'toggle', label: 'Aktif/Non Aktif' },
             {
-                id: "archive",
-                label: "Hapus",
+                id: 'archive',
+                label: 'Hapus',
                 destructive: true,
                 separatorBefore: true,
             },
@@ -308,19 +308,19 @@ export default function ItemJasaPage(_props?: PageProps) {
                             actionsPlacement="trailing"
                             actions={rowActions}
                             onRowAction={(actionId, row) => {
-                                if (actionId === "view") {
+                                if (actionId === 'view') {
                                     handleView(row);
                                 }
 
-                                if (actionId === "edit") {
+                                if (actionId === 'edit') {
                                     handleEdit(row);
                                 }
 
-                                if (actionId === "toggle") {
+                                if (actionId === 'toggle') {
                                     void handleToggleStatus(row);
                                 }
 
-                                if (actionId === "archive") {
+                                if (actionId === 'archive') {
                                     setDeleteId(row.id);
                                 }
                             }}
@@ -369,7 +369,7 @@ export default function ItemJasaPage(_props?: PageProps) {
                             disabled={deleting}
                             className="bg-rose-600 text-white hover:bg-rose-700"
                         >
-                            {deleting ? "Menghapus..." : "Hapus"}
+                            {deleting ? 'Menghapus...' : 'Hapus'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
