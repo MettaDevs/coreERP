@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import {
     Dialog,
     DialogAction,
@@ -9,11 +9,11 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from "@apperp/ui/dialog";
-import { Input } from "@apperp/ui/input";
-import { Label } from "@apperp/ui/label";
-import { Textarea } from "@apperp/ui/textarea";
-import { api, toastSaveError } from "../../api";
+} from '@apperp/ui/dialog';
+import { Input } from '@apperp/ui/input';
+import { Label } from '@apperp/ui/label';
+import { Textarea } from '@apperp/ui/textarea';
+import { api, toastSaveError } from '../../api';
 
 export type KategoriPengadaanItem = {
     id: string;
@@ -38,9 +38,9 @@ export function KategoriPengadaanModal({
     editingItem,
     onSuccess,
 }: Props) {
-    const [kodePengadaan, setKodePengadaan] = useState("");
-    const [kategoriPengadaan, setKategoriPengadaan] = useState("");
-    const [keterangan, setKeterangan] = useState("");
+    const [kodePengadaan, setKodePengadaan] = useState('');
+    const [kategoriPengadaan, setKategoriPengadaan] = useState('');
+    const [keterangan, setKeterangan] = useState('');
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
@@ -48,11 +48,11 @@ export function KategoriPengadaanModal({
             if (editingItem) {
                 setKodePengadaan(editingItem.kode_pengadaan);
                 setKategoriPengadaan(editingItem.kategori_pengadaan);
-                setKeterangan(editingItem.keterangan || "");
+                setKeterangan(editingItem.keterangan || '');
             } else {
-                setKodePengadaan("");
-                setKategoriPengadaan("");
-                setKeterangan("");
+                setKodePengadaan('');
+                setKategoriPengadaan('');
+                setKeterangan('');
             }
         }, 0);
 
@@ -63,13 +63,13 @@ export function KategoriPengadaanModal({
         e.preventDefault();
 
         if (!kodePengadaan.trim()) {
-            toast.error("Kode pengadaan wajib diisi.");
+            toast.error('Kode pengadaan wajib diisi.');
 
             return;
         }
 
         if (!kategoriPengadaan.trim()) {
-            toast.error("Kategori pengadaan wajib diisi.");
+            toast.error('Kategori pengadaan wajib diisi.');
 
             return;
         }
@@ -83,7 +83,7 @@ export function KategoriPengadaanModal({
                     message: string;
                     data: KategoriPengadaanItem;
                 }>(`/kategori-pengadaan/${editingItem.id}`, {
-                    method: "PUT",
+                    method: 'PUT',
                     body: JSON.stringify({
                         kode_pengadaan: kodePengadaan.trim(),
                         kategori_pengadaan: kategoriPengadaan.trim(),
@@ -91,7 +91,7 @@ export function KategoriPengadaanModal({
                     }),
                 });
 
-                toast.success("Kategori pengadaan berhasil diperbarui.");
+                toast.success('Kategori pengadaan berhasil diperbarui.');
                 onSuccess(res.data, false);
             } else {
                 const res = await api<{
@@ -99,7 +99,7 @@ export function KategoriPengadaanModal({
                     message: string;
                     data: KategoriPengadaanItem;
                 }>(`/kategori-pengadaan`, {
-                    method: "POST",
+                    method: 'POST',
                     body: JSON.stringify({
                         kode_pengadaan: kodePengadaan.trim(),
                         kategori_pengadaan: kategoriPengadaan.trim(),
@@ -108,13 +108,13 @@ export function KategoriPengadaanModal({
                     }),
                 });
 
-                toast.success("Kategori pengadaan berhasil ditambahkan.");
+                toast.success('Kategori pengadaan berhasil ditambahkan.');
                 onSuccess(res.data, true);
             }
 
             onOpenChange(false);
         } catch (err) {
-            toastSaveError(err, "Gagal menyimpan kategori pengadaan.");
+            toastSaveError(err, 'Gagal menyimpan kategori pengadaan.');
         } finally {
             setSaving(false);
         }
@@ -126,7 +126,7 @@ export function KategoriPengadaanModal({
                 <form onSubmit={handleSubmit} className="flex flex-col">
                     <DialogHeader>
                         <DialogTitle>
-                            {editingItem ? "Ubah Kategori" : "Tambah Kategori"}
+                            {editingItem ? 'Ubah Kategori' : 'Tambah Kategori'}
                         </DialogTitle>
                         <DialogDescription>
                             Isi kode dan nama kategori pengadaan yang digunakan
@@ -191,10 +191,10 @@ export function KategoriPengadaanModal({
                         </DialogCancel>
                         <DialogAction type="submit" disabled={saving}>
                             {saving
-                                ? "Menyimpan…"
+                                ? 'Menyimpan…'
                                 : editingItem
-                                  ? "Simpan"
-                                  : "Tambah"}
+                                  ? 'Simpan'
+                                  : 'Tambah'}
                         </DialogAction>
                     </DialogFooter>
                 </form>
