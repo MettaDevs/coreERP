@@ -163,7 +163,7 @@ final class HargaPerkiraanController extends Controller
         if (! $record) {
             $fallbackItem = collect(self::DEFAULT_ITEMS)->first(function ($it, $idx) use ($id) {
                 return sprintf('01JHGP0000000000000000000%d', $idx + 1) === $id
-                    || ($it['kode_item'] ?? '') === $id;
+                    || $it['kode_item'] === $id;
             });
 
             if ($fallbackItem) {
@@ -247,7 +247,7 @@ final class HargaPerkiraanController extends Controller
         if (! $record) {
             $fallbackItem = collect(self::DEFAULT_ITEMS)->first(function ($it, $idx) use ($id) {
                 return sprintf('01JHGP0000000000000000000%d', $idx + 1) === $id
-                    || ($it['kode_item'] ?? '') === $id;
+                    || $it['kode_item'] === $id;
             });
 
             $record = HargaPerkiraan::create([
