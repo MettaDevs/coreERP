@@ -1,26 +1,26 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button } from "@apperp/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@apperp/ui/card";
-import { DataTable } from "@apperp/ui/data-table";
+import { Pencil, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button } from '@apperp/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
+import { DataTable } from '@apperp/ui/data-table';
 import type {
     DataTableColumn,
     DataTableRowAction,
-} from "@apperp/ui/data-table";
+} from '@apperp/ui/data-table';
 import {
     Empty,
     EmptyDescription,
     EmptyHeader,
     EmptyTitle,
-} from "@apperp/ui/empty";
-import { Input } from "@apperp/ui/input";
-import { Pencil, RefreshCw } from "lucide-react";
-import { api, toastSaveError } from "../api";
+} from '@apperp/ui/empty';
+import { Input } from '@apperp/ui/input';
+import { api, toastSaveError } from '../api';
 import {
     HargaPerkiraanEditModal,
     formatIndonesianDate,
     formatRupiah,
-} from "./harga-perkiraan/HargaPerkiraanEditModal";
-import type { HargaPerkiraanItem } from "./harga-perkiraan/HargaPerkiraanEditModal";
+} from './harga-perkiraan/HargaPerkiraanEditModal';
+import type { HargaPerkiraanItem } from './harga-perkiraan/HargaPerkiraanEditModal';
 
 type PageProps = {
     view?: string;
@@ -39,7 +39,7 @@ export default function HargaPerkiraanPage(_props?: PageProps) {
     void _props;
     const [items, setItems] = useState<HargaPerkiraanItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [search, setSearch] = useState("");
+    const [search, setSearch] = useState('');
 
     const [meta, setMeta] = useState<PaginationMeta>({
         current_page: 1,
@@ -60,10 +60,10 @@ export default function HargaPerkiraanPage(_props?: PageProps) {
 
             try {
                 const params = new URLSearchParams();
-                params.set("page", String(page));
+                params.set('page', String(page));
 
                 if (search.trim()) {
-                    params.set("search", search.trim());
+                    params.set('search', search.trim());
                 }
 
                 const res = await api<{
@@ -82,7 +82,7 @@ export default function HargaPerkiraanPage(_props?: PageProps) {
                     },
                 );
             } catch (err) {
-                toastSaveError(err, "Gagal memuat data harga perkiraan.");
+                toastSaveError(err, 'Gagal memuat data harga perkiraan.');
             } finally {
                 setLoading(false);
             }
@@ -112,8 +112,8 @@ export default function HargaPerkiraanPage(_props?: PageProps) {
     const columns: DataTableColumn<HargaPerkiraanItem>[] = useMemo(
         () => [
             {
-                id: "group_item",
-                header: "Group Item",
+                id: 'group_item',
+                header: 'Group Item',
                 cell: (row) => (
                     <span className="text-xs font-medium">
                         {row.group_item}
@@ -122,16 +122,16 @@ export default function HargaPerkiraanPage(_props?: PageProps) {
                 width: 140,
             },
             {
-                id: "jenis_item",
-                header: "Jenis Item",
+                id: 'jenis_item',
+                header: 'Jenis Item',
                 cell: (row) => (
                     <span className="text-xs">{row.jenis_item}</span>
                 ),
                 width: 140,
             },
             {
-                id: "kode_item",
-                header: "Kode Item",
+                id: 'kode_item',
+                header: 'Kode Item',
                 cell: (row) => (
                     <span className="font-mono text-xs font-semibold">
                         {row.kode_item}
@@ -140,8 +140,8 @@ export default function HargaPerkiraanPage(_props?: PageProps) {
                 width: 140,
             },
             {
-                id: "nama_item",
-                header: "Nama Item",
+                id: 'nama_item',
+                header: 'Nama Item',
                 cell: (row) => (
                     <span className="text-xs font-semibold">
                         {row.nama_item}
@@ -150,14 +150,14 @@ export default function HargaPerkiraanPage(_props?: PageProps) {
                 width: 180,
             },
             {
-                id: "satuan",
-                header: "Satuan",
+                id: 'satuan',
+                header: 'Satuan',
                 cell: (row) => <span className="text-xs">{row.satuan}</span>,
                 width: 100,
             },
             {
-                id: "harga_perkiraan",
-                header: "Harga Per Satuan",
+                id: 'harga_perkiraan',
+                header: 'Harga Per Satuan',
                 cell: (row) => (
                     <span className="font-mono text-xs font-semibold">
                         {formatRupiah(row.harga_perkiraan)}
@@ -166,13 +166,13 @@ export default function HargaPerkiraanPage(_props?: PageProps) {
                 width: 160,
             },
             {
-                id: "tanggal_update",
-                header: "Tgl Update",
+                id: 'tanggal_update',
+                header: 'Tgl Update',
                 cell: (row) => (
                     <span className="text-muted-foreground text-xs">
                         {row.tanggal_update
                             ? formatIndonesianDate(row.tanggal_update)
-                            : "—"}
+                            : '—'}
                     </span>
                 ),
                 width: 160,
@@ -184,8 +184,8 @@ export default function HargaPerkiraanPage(_props?: PageProps) {
     const rowActions: DataTableRowAction[] = useMemo(
         () => [
             {
-                id: "edit",
-                label: "Edit",
+                id: 'edit',
+                label: 'Edit',
                 icon: <Pencil className="size-3.5" />,
             },
         ],
@@ -226,8 +226,8 @@ export default function HargaPerkiraanPage(_props?: PageProps) {
                                 <RefreshCw
                                     className={
                                         loading
-                                            ? "size-3.5 animate-spin"
-                                            : "size-3.5"
+                                            ? 'size-3.5 animate-spin'
+                                            : 'size-3.5'
                                     }
                                 />
                                 Refresh
@@ -274,7 +274,7 @@ export default function HargaPerkiraanPage(_props?: PageProps) {
                             actionsPlacement="trailing"
                             actions={rowActions}
                             onRowAction={(actionId, row) => {
-                                if (actionId === "edit") {
+                                if (actionId === 'edit') {
                                     handleEdit(row);
                                 }
                             }}

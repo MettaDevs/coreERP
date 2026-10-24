@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
-import { ActionButton } from "@apperp/ui/action-button";
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import { ActionButton } from '@apperp/ui/action-button';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -10,29 +10,29 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-} from "@apperp/ui/alert-dialog";
-import { Badge } from "@apperp/ui/badge";
+} from '@apperp/ui/alert-dialog';
+import { Badge } from '@apperp/ui/badge';
 import {
     Card,
     CardAction,
     CardContent,
     CardHeader,
     CardTitle,
-} from "@apperp/ui/card";
-import { DataTable } from "@apperp/ui/data-table";
-import type { DataTableColumn } from "@apperp/ui/data-table";
+} from '@apperp/ui/card';
+import { DataTable } from '@apperp/ui/data-table';
+import type { DataTableColumn } from '@apperp/ui/data-table';
 import {
     Empty,
     EmptyDescription,
     EmptyHeader,
     EmptyTitle,
-} from "@apperp/ui/empty";
-import { Input } from "@apperp/ui/input";
-import { Select } from "@apperp/ui/select";
-import { api, toastSaveError } from "../api";
-import { PrakualifikasiDetailModal } from "./prakualifikasi/PrakualifikasiDetailModal";
-import { PrakualifikasiFormModal } from "./prakualifikasi/PrakualifikasiFormModal";
-import type { PrakualifikasiFormData } from "./prakualifikasi/PrakualifikasiFormModal";
+} from '@apperp/ui/empty';
+import { Input } from '@apperp/ui/input';
+import { Select } from '@apperp/ui/select';
+import { api, toastSaveError } from '../api';
+import { PrakualifikasiDetailModal } from './prakualifikasi/PrakualifikasiDetailModal';
+import { PrakualifikasiFormModal } from './prakualifikasi/PrakualifikasiFormModal';
+import type { PrakualifikasiFormData } from './prakualifikasi/PrakualifikasiFormModal';
 
 type PrakualifikasiRow = PrakualifikasiFormData & {
     id: string;
@@ -50,14 +50,14 @@ type PaginationMeta = {
 
 function formatDisplayDate(dateStr: string): string {
     if (!dateStr) {
-        return "—";
+        return '—';
     }
 
-    if (dateStr.includes("/")) {
+    if (dateStr.includes('/')) {
         return dateStr;
     }
 
-    const parts = dateStr.split("-");
+    const parts = dateStr.split('-');
 
     if (parts.length === 3) {
         return `${parts[2]}/${parts[1]}/${parts[0]}`;
@@ -76,8 +76,8 @@ export default function PrakualifikasiPage(_props?: PageProps) {
     void _props;
     const [items, setItems] = useState<PrakualifikasiRow[]>([]);
     const [loading, setLoading] = useState(true);
-    const [search, setSearch] = useState("");
-    const [statusFilter, setStatusFilter] = useState("semua");
+    const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('semua');
 
     const [meta, setMeta] = useState<PaginationMeta>({
         current_page: 1,
@@ -107,14 +107,14 @@ export default function PrakualifikasiPage(_props?: PageProps) {
 
             try {
                 const params = new URLSearchParams();
-                params.set("page", String(page));
+                params.set('page', String(page));
 
                 if (search.trim()) {
-                    params.set("search", search.trim());
+                    params.set('search', search.trim());
                 }
 
-                if (statusFilter !== "semua") {
-                    params.set("status_kualifikasi", statusFilter);
+                if (statusFilter !== 'semua') {
+                    params.set('status_kualifikasi', statusFilter);
                 }
 
                 const res = await api<{
@@ -135,7 +135,7 @@ export default function PrakualifikasiPage(_props?: PageProps) {
             } catch (err) {
                 toastSaveError(
                     err,
-                    "Gagal memuat daftar prakualifikasi vendor.",
+                    'Gagal memuat daftar prakualifikasi vendor.',
                 );
             } finally {
                 setLoading(false);
@@ -180,9 +180,9 @@ export default function PrakualifikasiPage(_props?: PageProps) {
 
         try {
             await api(`/prakualifikasi/${deleteId}`, {
-                method: "DELETE",
+                method: 'DELETE',
             });
-            toast.success("Data prakualifikasi berhasil diarsipkan.");
+            toast.success('Data prakualifikasi berhasil diarsipkan.');
             setItems((prev) => prev.filter((it) => it.id !== deleteId));
             setMeta((prev) => ({
                 ...prev,
@@ -190,7 +190,7 @@ export default function PrakualifikasiPage(_props?: PageProps) {
             }));
             setDeleteId(null);
         } catch (err) {
-            toastSaveError(err, "Gagal menghapus data prakualifikasi.");
+            toastSaveError(err, 'Gagal menghapus data prakualifikasi.');
         } finally {
             setDeleting(false);
         }
@@ -199,8 +199,8 @@ export default function PrakualifikasiPage(_props?: PageProps) {
     const columns: DataTableColumn<PrakualifikasiRow>[] = useMemo(
         () => [
             {
-                id: "info_prakualifikasi",
-                header: "Info Prakualifikasi",
+                id: 'info_prakualifikasi',
+                header: 'Info Prakualifikasi',
                 cell: (row) => (
                     <div className="space-y-0.5">
                         <div className="text-muted-foreground text-xs font-medium">
@@ -214,8 +214,8 @@ export default function PrakualifikasiPage(_props?: PageProps) {
                 width: 180,
             },
             {
-                id: "kode_vendor",
-                header: "Kode Vendor/Supplier",
+                id: 'kode_vendor',
+                header: 'Kode Vendor/Supplier',
                 cell: (row) => (
                     <span className="font-mono text-xs font-semibold">
                         {row.kode_vendor}
@@ -224,8 +224,8 @@ export default function PrakualifikasiPage(_props?: PageProps) {
                 width: 160,
             },
             {
-                id: "nama_vendor",
-                header: "Nama Vendor/Supplier",
+                id: 'nama_vendor',
+                header: 'Nama Vendor/Supplier',
                 cell: (row) => (
                     <span className="text-xs font-semibold">
                         {row.nama_vendor}
@@ -234,53 +234,53 @@ export default function PrakualifikasiPage(_props?: PageProps) {
                 width: 220,
             },
             {
-                id: "nama_pic",
-                header: "Contact Person",
+                id: 'nama_pic',
+                header: 'Contact Person',
                 cell: (row) => (
-                    <span className="text-xs">{row.nama_pic || "—"}</span>
+                    <span className="text-xs">{row.nama_pic || '—'}</span>
                 ),
                 width: 150,
             },
             {
-                id: "telepon",
-                header: "Telp/HP",
+                id: 'telepon',
+                header: 'Telp/HP',
                 cell: (row) => (
                     <span className="font-mono text-xs">
-                        {row.telepon || "—"}
+                        {row.telepon || '—'}
                     </span>
                 ),
                 width: 150,
             },
             {
-                id: "alamat",
-                header: "Alamat Vendor/Supplier",
+                id: 'alamat',
+                header: 'Alamat Vendor/Supplier',
                 cell: (row) => (
                     <span className="text-muted-foreground line-clamp-2 text-xs">
-                        {row.alamat || "—"}
+                        {row.alamat || '—'}
                     </span>
                 ),
                 width: 240,
             },
             {
-                id: "status_vendor",
-                header: "Status Vendor/Supplier",
+                id: 'status_vendor',
+                header: 'Status Vendor/Supplier',
                 cell: (row) => (
                     <Badge variant="secondary" className="text-[11px]">
-                        {row.status_vendor || "Vendor Resmi"}
+                        {row.status_vendor || 'Vendor Resmi'}
                     </Badge>
                 ),
                 width: 160,
             },
             {
-                id: "status_kualifikasi",
-                header: "Status Kualifikasi",
+                id: 'status_kualifikasi',
+                header: 'Status Kualifikasi',
                 cell: (row) => {
-                    const status = row.status_kualifikasi || "Lolos";
-                    const isLolos = status.toLowerCase() === "lolos";
+                    const status = row.status_kualifikasi || 'Lolos';
+                    const isLolos = status.toLowerCase() === 'lolos';
 
                     return (
                         <Badge
-                            variant={isLolos ? "default" : "destructive"}
+                            variant={isLolos ? 'default' : 'destructive'}
                             className="text-[11px]"
                         >
                             {status}
@@ -327,10 +327,10 @@ export default function PrakualifikasiPage(_props?: PageProps) {
                             />
                             <div className="w-full sm:w-44">
                                 <Select
-                                    items={["Semua status", "Lolos", "Batal"]}
+                                    items={['Semua status', 'Lolos', 'Batal']}
                                     value={
-                                        statusFilter === "semua"
-                                            ? "Semua status"
+                                        statusFilter === 'semua'
+                                            ? 'Semua status'
                                             : statusFilter
                                     }
                                     searchPlaceholder="Cari status"
@@ -338,8 +338,8 @@ export default function PrakualifikasiPage(_props?: PageProps) {
                                     ariaLabel="Saring berdasarkan status kualifikasi"
                                     onValueChange={(val) => {
                                         setStatusFilter(
-                                            !val || val === "Semua status"
-                                                ? "semua"
+                                            !val || val === 'Semua status'
+                                                ? 'semua'
                                                 : val,
                                         );
                                     }}
@@ -426,7 +426,7 @@ export default function PrakualifikasiPage(_props?: PageProps) {
                             disabled={deleting}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
-                            {deleting ? "Menghapus…" : "Hapus"}
+                            {deleting ? 'Menghapus…' : 'Hapus'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
