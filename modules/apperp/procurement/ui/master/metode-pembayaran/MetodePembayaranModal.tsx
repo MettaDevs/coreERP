@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import {
     Dialog,
     DialogAction,
@@ -9,11 +9,11 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from "@apperp/ui/dialog";
-import { Input } from "@apperp/ui/input";
-import { Label } from "@apperp/ui/label";
-import { Textarea } from "@apperp/ui/textarea";
-import { api, toastSaveError } from "../../api";
+} from '@apperp/ui/dialog';
+import { Input } from '@apperp/ui/input';
+import { Label } from '@apperp/ui/label';
+import { Textarea } from '@apperp/ui/textarea';
+import { api, toastSaveError } from '../../api';
 
 export type MetodePembayaranItem = {
     id: string;
@@ -38,9 +38,9 @@ export function MetodePembayaranModal({
     editingItem,
     onSuccess,
 }: Props) {
-    const [kodeBayar, setKodeBayar] = useState("");
-    const [namaMetodeBayar, setNamaMetodeBayar] = useState("");
-    const [keterangan, setKeterangan] = useState("");
+    const [kodeBayar, setKodeBayar] = useState('');
+    const [namaMetodeBayar, setNamaMetodeBayar] = useState('');
+    const [keterangan, setKeterangan] = useState('');
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
@@ -48,11 +48,11 @@ export function MetodePembayaranModal({
             if (editingItem) {
                 setKodeBayar(editingItem.kode_bayar);
                 setNamaMetodeBayar(editingItem.nama_metode_bayar);
-                setKeterangan(editingItem.keterangan || "");
+                setKeterangan(editingItem.keterangan || '');
             } else {
-                setKodeBayar("");
-                setNamaMetodeBayar("");
-                setKeterangan("");
+                setKodeBayar('');
+                setNamaMetodeBayar('');
+                setKeterangan('');
             }
         }, 0);
 
@@ -63,13 +63,13 @@ export function MetodePembayaranModal({
         e.preventDefault();
 
         if (!kodeBayar.trim()) {
-            toast.error("Kode bayar wajib diisi.");
+            toast.error('Kode bayar wajib diisi.');
 
             return;
         }
 
         if (!namaMetodeBayar.trim()) {
-            toast.error("Nama metode bayar wajib diisi.");
+            toast.error('Nama metode bayar wajib diisi.');
 
             return;
         }
@@ -83,7 +83,7 @@ export function MetodePembayaranModal({
                     message: string;
                     data: MetodePembayaranItem;
                 }>(`/metode-pembayaran/${editingItem.id}`, {
-                    method: "PUT",
+                    method: 'PUT',
                     body: JSON.stringify({
                         kode_bayar: kodeBayar.trim(),
                         nama_metode_bayar: namaMetodeBayar.trim(),
@@ -91,7 +91,7 @@ export function MetodePembayaranModal({
                     }),
                 });
 
-                toast.success("Metode pembayaran berhasil diperbarui.");
+                toast.success('Metode pembayaran berhasil diperbarui.');
                 onSuccess(res.data, false);
             } else {
                 const res = await api<{
@@ -99,7 +99,7 @@ export function MetodePembayaranModal({
                     message: string;
                     data: MetodePembayaranItem;
                 }>(`/metode-pembayaran`, {
-                    method: "POST",
+                    method: 'POST',
                     body: JSON.stringify({
                         kode_bayar: kodeBayar.trim(),
                         nama_metode_bayar: namaMetodeBayar.trim(),
@@ -108,13 +108,13 @@ export function MetodePembayaranModal({
                     }),
                 });
 
-                toast.success("Metode pembayaran berhasil ditambahkan.");
+                toast.success('Metode pembayaran berhasil ditambahkan.');
                 onSuccess(res.data, true);
             }
 
             onOpenChange(false);
         } catch (err) {
-            toastSaveError(err, "Gagal menyimpan metode pembayaran.");
+            toastSaveError(err, 'Gagal menyimpan metode pembayaran.');
         } finally {
             setSaving(false);
         }
@@ -127,8 +127,8 @@ export function MetodePembayaranModal({
                     <DialogHeader>
                         <DialogTitle>
                             {editingItem
-                                ? "Ubah Metode Pembayaran"
-                                : "Tambah Metode Pembayaran"}
+                                ? 'Ubah Metode Pembayaran'
+                                : 'Tambah Metode Pembayaran'}
                         </DialogTitle>
                         <DialogDescription>
                             Isi kode dan nama metode pembayaran yang digunakan
@@ -191,10 +191,10 @@ export function MetodePembayaranModal({
                         </DialogCancel>
                         <DialogAction type="submit" disabled={saving}>
                             {saving
-                                ? "Menyimpan…"
+                                ? 'Menyimpan…'
                                 : editingItem
-                                  ? "Simpan"
-                                  : "Tambah"}
+                                  ? 'Simpan'
+                                  : 'Tambah'}
                         </DialogAction>
                     </DialogFooter>
                 </form>
