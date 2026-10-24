@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import {
     Dialog,
     DialogAction,
@@ -9,11 +9,11 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from "@apperp/ui/dialog";
-import { Input } from "@apperp/ui/input";
-import { Label } from "@apperp/ui/label";
-import { Textarea } from "@apperp/ui/textarea";
-import { api, toastSaveError } from "../../api";
+} from '@apperp/ui/dialog';
+import { Input } from '@apperp/ui/input';
+import { Label } from '@apperp/ui/label';
+import { Textarea } from '@apperp/ui/textarea';
+import { api, toastSaveError } from '../../api';
 
 export type ItemJasaRecord = {
     id: string;
@@ -39,10 +39,10 @@ export function ItemJasaModal({
     editingItem,
     onSuccess,
 }: Props) {
-    const [kodeUpah, setKodeUpah] = useState("");
-    const [namaUpah, setNamaUpah] = useState("");
-    const [satuan, setSatuan] = useState("");
-    const [keterangan, setKeterangan] = useState("");
+    const [kodeUpah, setKodeUpah] = useState('');
+    const [namaUpah, setNamaUpah] = useState('');
+    const [satuan, setSatuan] = useState('');
+    const [keterangan, setKeterangan] = useState('');
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
@@ -51,12 +51,12 @@ export function ItemJasaModal({
                 setKodeUpah(editingItem.kode_upah);
                 setNamaUpah(editingItem.nama_upah);
                 setSatuan(editingItem.satuan);
-                setKeterangan(editingItem.keterangan || "");
+                setKeterangan(editingItem.keterangan || '');
             } else {
-                setKodeUpah("");
-                setNamaUpah("");
-                setSatuan("");
-                setKeterangan("");
+                setKodeUpah('');
+                setNamaUpah('');
+                setSatuan('');
+                setKeterangan('');
             }
         }, 0);
 
@@ -67,19 +67,19 @@ export function ItemJasaModal({
         e.preventDefault();
 
         if (!kodeUpah.trim()) {
-            toast.error("Kode upah wajib diisi.");
+            toast.error('Kode upah wajib diisi.');
 
             return;
         }
 
         if (!namaUpah.trim()) {
-            toast.error("Nama upah wajib diisi.");
+            toast.error('Nama upah wajib diisi.');
 
             return;
         }
 
         if (!satuan.trim()) {
-            toast.error("Satuan wajib diisi.");
+            toast.error('Satuan wajib diisi.');
 
             return;
         }
@@ -93,7 +93,7 @@ export function ItemJasaModal({
                     message: string;
                     data: ItemJasaRecord;
                 }>(`/item-jasa/${editingItem.id}`, {
-                    method: "PUT",
+                    method: 'PUT',
                     body: JSON.stringify({
                         kode_upah: kodeUpah.trim(),
                         nama_upah: namaUpah.trim(),
@@ -102,7 +102,7 @@ export function ItemJasaModal({
                     }),
                 });
 
-                toast.success("Item upah berhasil diperbarui.");
+                toast.success('Item upah berhasil diperbarui.');
                 onSuccess(res.data, false);
             } else {
                 const res = await api<{
@@ -110,7 +110,7 @@ export function ItemJasaModal({
                     message: string;
                     data: ItemJasaRecord;
                 }>(`/item-jasa`, {
-                    method: "POST",
+                    method: 'POST',
                     body: JSON.stringify({
                         kode_upah: kodeUpah.trim(),
                         nama_upah: namaUpah.trim(),
@@ -120,13 +120,13 @@ export function ItemJasaModal({
                     }),
                 });
 
-                toast.success("Item upah berhasil ditambahkan.");
+                toast.success('Item upah berhasil ditambahkan.');
                 onSuccess(res.data, true);
             }
 
             onOpenChange(false);
         } catch (err) {
-            toastSaveError(err, "Gagal menyimpan item upah.");
+            toastSaveError(err, 'Gagal menyimpan item upah.');
         } finally {
             setSaving(false);
         }
@@ -139,8 +139,8 @@ export function ItemJasaModal({
                     <DialogHeader>
                         <DialogTitle>
                             {editingItem
-                                ? "Ubah Item Upah"
-                                : "Tambah Item Upah"}
+                                ? 'Ubah Item Upah'
+                                : 'Tambah Item Upah'}
                         </DialogTitle>
                         <DialogDescription>
                             Isi kode, nama upah, satuan, dan keterangan untuk
@@ -215,10 +215,10 @@ export function ItemJasaModal({
                         </DialogCancel>
                         <DialogAction type="submit" disabled={saving}>
                             {saving
-                                ? "Menyimpan…"
+                                ? 'Menyimpan…'
                                 : editingItem
-                                  ? "Simpan"
-                                  : "Tambah"}
+                                  ? 'Simpan'
+                                  : 'Tambah'}
                         </DialogAction>
                     </DialogFooter>
                 </form>

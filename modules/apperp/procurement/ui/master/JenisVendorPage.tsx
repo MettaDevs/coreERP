@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
-import { ActionButton } from "@apperp/ui/action-button";
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import { ActionButton } from '@apperp/ui/action-button';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -10,29 +10,29 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-} from "@apperp/ui/alert-dialog";
+} from '@apperp/ui/alert-dialog';
 import {
     Card,
     CardAction,
     CardContent,
     CardHeader,
     CardTitle,
-} from "@apperp/ui/card";
-import { DataTable } from "@apperp/ui/data-table";
+} from '@apperp/ui/card';
+import { DataTable } from '@apperp/ui/data-table';
 import type {
     DataTableColumn,
     DataTableRowAction,
-} from "@apperp/ui/data-table";
+} from '@apperp/ui/data-table';
 import {
     Empty,
     EmptyDescription,
     EmptyHeader,
     EmptyTitle,
-} from "@apperp/ui/empty";
-import { Input } from "@apperp/ui/input";
-import { api, toastSaveError } from "../api";
-import { JenisVendorModal } from "./jenis-vendor/JenisVendorModal";
-import type { JenisVendorItem } from "./jenis-vendor/JenisVendorModal";
+} from '@apperp/ui/empty';
+import { Input } from '@apperp/ui/input';
+import { api, toastSaveError } from '../api';
+import { JenisVendorModal } from './jenis-vendor/JenisVendorModal';
+import type { JenisVendorItem } from './jenis-vendor/JenisVendorModal';
 
 type PageProps = {
     view?: string;
@@ -51,7 +51,7 @@ export default function JenisVendorPage(_props?: PageProps) {
     void _props;
     const [items, setItems] = useState<JenisVendorItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [search, setSearch] = useState("");
+    const [search, setSearch] = useState('');
 
     const [meta, setMeta] = useState<PaginationMeta>({
         current_page: 1,
@@ -76,10 +76,10 @@ export default function JenisVendorPage(_props?: PageProps) {
 
             try {
                 const params = new URLSearchParams();
-                params.set("page", String(page));
+                params.set('page', String(page));
 
                 if (search.trim()) {
-                    params.set("search", search.trim());
+                    params.set('search', search.trim());
                 }
 
                 const res = await api<{
@@ -98,7 +98,7 @@ export default function JenisVendorPage(_props?: PageProps) {
                     },
                 );
             } catch (err) {
-                toastSaveError(err, "Gagal memuat data jenis vendor.");
+                toastSaveError(err, 'Gagal memuat data jenis vendor.');
             } finally {
                 setLoading(false);
             }
@@ -144,7 +144,7 @@ export default function JenisVendorPage(_props?: PageProps) {
                 message: string;
                 data: JenisVendorItem;
             }>(`/jenis-vendor/${item.id}/toggle-status`, {
-                method: "PATCH",
+                method: 'PATCH',
             });
 
             toast.success(res.message);
@@ -154,7 +154,7 @@ export default function JenisVendorPage(_props?: PageProps) {
                 ),
             );
         } catch (err) {
-            toastSaveError(err, "Gagal mengubah status jenis vendor.");
+            toastSaveError(err, 'Gagal mengubah status jenis vendor.');
         }
     };
 
@@ -167,9 +167,9 @@ export default function JenisVendorPage(_props?: PageProps) {
 
         try {
             await api(`/jenis-vendor/${deleteId}`, {
-                method: "DELETE",
+                method: 'DELETE',
             });
-            toast.success("Jenis vendor berhasil dihapus.");
+            toast.success('Jenis vendor berhasil dihapus.');
             setItems((prev) => prev.filter((it) => it.id !== deleteId));
             setMeta((prev) => ({
                 ...prev,
@@ -177,7 +177,7 @@ export default function JenisVendorPage(_props?: PageProps) {
             }));
             setDeleteId(null);
         } catch (err) {
-            toastSaveError(err, "Gagal menghapus jenis vendor.");
+            toastSaveError(err, 'Gagal menghapus jenis vendor.');
         } finally {
             setDeleting(false);
         }
@@ -186,8 +186,8 @@ export default function JenisVendorPage(_props?: PageProps) {
     const columns: DataTableColumn<JenisVendorItem>[] = useMemo(
         () => [
             {
-                id: "kode_jenis",
-                header: "Kode Jenis",
+                id: 'kode_jenis',
+                header: 'Kode Jenis',
                 cell: (row) => (
                     <span className="font-mono text-xs font-semibold">
                         {row.kode_jenis}
@@ -196,8 +196,8 @@ export default function JenisVendorPage(_props?: PageProps) {
                 width: 180,
             },
             {
-                id: "nama_jenis_vendor",
-                header: "Nama Jenis Vendor",
+                id: 'nama_jenis_vendor',
+                header: 'Nama Jenis Vendor',
                 cell: (row) => (
                     <span className="text-xs font-medium">
                         {row.nama_jenis_vendor}
@@ -206,11 +206,11 @@ export default function JenisVendorPage(_props?: PageProps) {
                 width: 280,
             },
             {
-                id: "keterangan",
-                header: "Keterangan",
+                id: 'keterangan',
+                header: 'Keterangan',
                 cell: (row) => (
                     <span className="text-muted-foreground text-xs">
-                        {row.keterangan || "—"}
+                        {row.keterangan || '—'}
                     </span>
                 ),
                 width: 380,
@@ -221,11 +221,11 @@ export default function JenisVendorPage(_props?: PageProps) {
 
     const rowActions: DataTableRowAction[] = useMemo(
         () => [
-            { id: "edit", label: "Edit" },
-            { id: "toggle", label: "Aktif/Non Aktif" },
+            { id: 'edit', label: 'Edit' },
+            { id: 'toggle', label: 'Aktif/Non Aktif' },
             {
-                id: "archive",
-                label: "Hapus",
+                id: 'archive',
+                label: 'Hapus',
                 destructive: true,
                 separatorBefore: true,
             },
@@ -296,15 +296,15 @@ export default function JenisVendorPage(_props?: PageProps) {
                             actionsPlacement="trailing"
                             actions={rowActions}
                             onRowAction={(actionId, row) => {
-                                if (actionId === "edit") {
+                                if (actionId === 'edit') {
                                     handleEdit(row);
                                 }
 
-                                if (actionId === "toggle") {
+                                if (actionId === 'toggle') {
                                     void handleToggleStatus(row);
                                 }
 
-                                if (actionId === "archive") {
+                                if (actionId === 'archive') {
                                     setDeleteId(row.id);
                                 }
                             }}
@@ -345,7 +345,7 @@ export default function JenisVendorPage(_props?: PageProps) {
                             disabled={deleting}
                             className="bg-rose-600 text-white hover:bg-rose-700"
                         >
-                            {deleting ? "Menghapus..." : "Hapus"}
+                            {deleting ? 'Menghapus...' : 'Hapus'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

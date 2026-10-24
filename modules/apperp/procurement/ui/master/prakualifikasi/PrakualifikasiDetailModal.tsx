@@ -10,10 +10,10 @@ import {
     User,
     X,
     XCircle,
-} from "lucide-react";
-import { Badge } from "@apperp/ui/badge";
-import { Button } from "@apperp/ui/button";
-import { DataTable } from "@apperp/ui/data-table";
+} from 'lucide-react';
+import { Badge } from '@apperp/ui/badge';
+import { Button } from '@apperp/ui/button';
+import { DataTable } from '@apperp/ui/data-table';
 import {
     Dialog,
     DialogContent,
@@ -21,24 +21,24 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from "@apperp/ui/dialog";
-import { TableCell, TableRow } from "@apperp/ui/table";
-import type { PrakualifikasiFormData } from "./PrakualifikasiFormModal";
+} from '@apperp/ui/dialog';
+import { TableCell, TableRow } from '@apperp/ui/table';
+import type { PrakualifikasiFormData } from './PrakualifikasiFormModal';
 
 const docColumns = [
-    { id: "no", header: "No.", cell: () => null },
-    { id: "nama_dokumen", header: "Uraian Dokumen", cell: () => null },
-    { id: "status", header: "Status", cell: () => null },
-    { id: "keterangan", header: "Keterangan", cell: () => null },
+    { id: 'no', header: 'No.', cell: () => null },
+    { id: 'nama_dokumen', header: 'Uraian Dokumen', cell: () => null },
+    { id: 'status', header: 'Status', cell: () => null },
+    { id: 'keterangan', header: 'Keterangan', cell: () => null },
 ];
 
 const itemColumns = [
-    { id: "no", header: "No.", cell: () => null },
-    { id: "jenis_item", header: "Jenis Item", cell: () => null },
-    { id: "kode_item", header: "Kode Item", cell: () => null },
-    { id: "nama_item", header: "Nama Item", cell: () => null },
-    { id: "satuan", header: "Satuan", cell: () => null },
-    { id: "kesediaan", header: "Kesediaan", cell: () => null },
+    { id: 'no', header: 'No.', cell: () => null },
+    { id: 'jenis_item', header: 'Jenis Item', cell: () => null },
+    { id: 'kode_item', header: 'Kode Item', cell: () => null },
+    { id: 'nama_item', header: 'Nama Item', cell: () => null },
+    { id: 'satuan', header: 'Satuan', cell: () => null },
+    { id: 'kesediaan', header: 'Kesediaan', cell: () => null },
 ];
 
 type Props = {
@@ -51,14 +51,14 @@ type Props = {
 
 function formatDisplayDate(dateStr: string): string {
     if (!dateStr) {
-        return "";
+        return '';
     }
 
-    if (dateStr.includes("/")) {
+    if (dateStr.includes('/')) {
         return dateStr;
     }
 
-    const parts = dateStr.split("-");
+    const parts = dateStr.split('-');
 
     if (parts.length === 3) {
         return `${parts[2]}/${parts[1]}/${parts[0]}`;
@@ -84,9 +84,9 @@ export function PrakualifikasiDetailModal({
 
     const getStatusBadge = (status: string) => {
         if (
-            status === "Lolos" ||
-            status === "Memenuhi Syarat" ||
-            status === "1. Lolos"
+            status === 'Lolos' ||
+            status === 'Memenuhi Syarat' ||
+            status === '1. Lolos'
         ) {
             return (
                 <Badge className="bg-emerald-600 font-medium text-white hover:bg-emerald-600/90">
@@ -97,9 +97,9 @@ export function PrakualifikasiDetailModal({
         }
 
         if (
-            status === "Batal" ||
-            status === "Tidak Memenuhi Syarat" ||
-            status === "2. Batal"
+            status === 'Batal' ||
+            status === 'Tidak Memenuhi Syarat' ||
+            status === '2. Batal'
         ) {
             return (
                 <Badge variant="destructive" className="font-medium">
@@ -115,7 +115,7 @@ export function PrakualifikasiDetailModal({
                 className="border-amber-500/30 bg-amber-500/15 font-medium text-amber-700 dark:text-amber-400"
             >
                 <Clock className="mr-1 h-3 w-3" />
-                {status || "Dalam Proses"}
+                {status || 'Dalam Proses'}
             </Badge>
         );
     };
@@ -132,11 +132,11 @@ export function PrakualifikasiDetailModal({
                         <div>{getStatusBadge(data.status_kualifikasi)}</div>
                     </div>
                     <DialogDescription className="text-muted-foreground font-mono text-xs">
-                        Nomor Dokumen:{" "}
+                        Nomor Dokumen:{' '}
                         <strong className="text-foreground">
                             {data.nomor_prakualifikasi}
-                        </strong>{" "}
-                        · Tanggal:{" "}
+                        </strong>{' '}
+                        · Tanggal:{' '}
                         {formatDisplayDate(data.tanggal_prakualifikasi)}
                     </DialogDescription>
                 </DialogHeader>
@@ -152,17 +152,17 @@ export function PrakualifikasiDetailModal({
                                 {data.nama_vendor}
                             </div>
                             <div className="text-muted-foreground font-mono text-xs">
-                                Kode: {data.kode_vendor} ·{" "}
-                                {data.jenis_vendor || "Supplier"}
+                                Kode: {data.kode_vendor} ·{' '}
+                                {data.jenis_vendor || 'Supplier'}
                             </div>
                             <div className="text-muted-foreground mt-2 flex items-center gap-2 text-xs">
                                 <MapPin className="h-3.5 w-3.5 shrink-0" />
-                                <span>{data.alamat || "-"}</span>
+                                <span>{data.alamat || '-'}</span>
                             </div>
                             <div className="text-muted-foreground flex items-center gap-2 text-xs">
                                 <User className="h-3.5 w-3.5 shrink-0" />
                                 <span>
-                                    Nama PIC Vendor/Supp: {data.nama_pic || "-"}
+                                    Nama PIC Vendor/Supp: {data.nama_pic || '-'}
                                 </span>
                             </div>
                         </div>
@@ -177,7 +177,7 @@ export function PrakualifikasiDetailModal({
                                         Status Vendor:
                                     </span>
                                     <div className="text-foreground font-semibold">
-                                        {data.status_vendor || "Vendor Resmi"}
+                                        {data.status_vendor || 'Vendor Resmi'}
                                     </div>
                                 </div>
                                 <div>
@@ -193,7 +193,7 @@ export function PrakualifikasiDetailModal({
                                         NPWP/KTP:
                                     </span>
                                     <div className="text-foreground font-mono">
-                                        {data.npwp_ktp || "-"}
+                                        {data.npwp_ktp || '-'}
                                     </div>
                                 </div>
                                 <div>
@@ -201,7 +201,7 @@ export function PrakualifikasiDetailModal({
                                         Telepon/HP:
                                     </span>
                                     <div className="text-foreground font-mono">
-                                        {data.telepon || "-"}
+                                        {data.telepon || '-'}
                                     </div>
                                 </div>
                                 <div>
@@ -209,7 +209,7 @@ export function PrakualifikasiDetailModal({
                                         Email:
                                     </span>
                                     <div className="text-foreground">
-                                        {data.email || "-"}
+                                        {data.email || '-'}
                                     </div>
                                 </div>
                                 <div>
@@ -217,7 +217,7 @@ export function PrakualifikasiDetailModal({
                                         Waktu Kesediaan Item:
                                     </span>
                                     <div className="text-foreground font-medium">
-                                        {data.waktu_kesediaan_item || "-"}
+                                        {data.waktu_kesediaan_item || '-'}
                                     </div>
                                 </div>
                                 <div>
@@ -227,7 +227,7 @@ export function PrakualifikasiDetailModal({
                                     <div className="text-foreground font-medium">
                                         {data.jumlah_karyawan
                                             ? `${data.jumlah_karyawan} Orang`
-                                            : "-"}
+                                            : '-'}
                                     </div>
                                 </div>
                             </div>
@@ -242,7 +242,7 @@ export function PrakualifikasiDetailModal({
                                 Kelengkapan Dokumen
                             </h4>
                             <span className="text-muted-foreground text-xs">
-                                {data.dokumen?.filter((d) => d.ada).length || 0}{" "}
+                                {data.dokumen?.filter((d) => d.ada).length || 0}{' '}
                                 dari {data.dokumen?.length || 0} Dokumen
                                 Terpenuhi
                             </span>
@@ -284,18 +284,18 @@ export function PrakualifikasiDetailModal({
                                                     <TableCell className="text-center">
                                                         {doc.ada ? (
                                                             <span className="inline-flex items-center rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-                                                                <Check className="mr-1 h-3 w-3" />{" "}
+                                                                <Check className="mr-1 h-3 w-3" />{' '}
                                                                 Ada
                                                             </span>
                                                         ) : (
                                                             <span className="inline-flex items-center rounded bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-800 dark:bg-rose-900/40 dark:text-rose-300">
-                                                                <X className="mr-1 h-3 w-3" />{" "}
+                                                                <X className="mr-1 h-3 w-3" />{' '}
                                                                 Tidak Ada
                                                             </span>
                                                         )}
                                                     </TableCell>
                                                     <TableCell className="text-muted-foreground">
-                                                        {doc.keterangan || "-"}
+                                                        {doc.keterangan || '-'}
                                                     </TableCell>
                                                 </TableRow>
                                             ))
@@ -359,20 +359,20 @@ export function PrakualifikasiDetailModal({
                                                         {idx + 1}
                                                     </TableCell>
                                                     <TableCell className="text-center">
-                                                        {item.jenis_item || "-"}
+                                                        {item.jenis_item || '-'}
                                                     </TableCell>
                                                     <TableCell className="text-muted-foreground text-center font-mono">
-                                                        {item.kode_item || "-"}
+                                                        {item.kode_item || '-'}
                                                     </TableCell>
                                                     <TableCell className="text-foreground text-center font-semibold">
                                                         {item.nama_item}
                                                     </TableCell>
                                                     <TableCell className="text-center">
-                                                        {item.satuan || "-"}
+                                                        {item.satuan || '-'}
                                                     </TableCell>
                                                     <TableCell className="text-center font-mono">
                                                         {item.kesediaan ||
-                                                            "Tersedia"}
+                                                            'Tersedia'}
                                                     </TableCell>
                                                 </TableRow>
                                             ))
