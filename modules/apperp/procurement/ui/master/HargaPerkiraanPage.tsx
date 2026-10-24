@@ -1,24 +1,26 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
-import { DataTable } from '@apperp/ui/data-table';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Button } from "@apperp/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@apperp/ui/card";
+import { DataTable } from "@apperp/ui/data-table";
 import type {
     DataTableColumn,
     DataTableRowAction,
-} from '@apperp/ui/data-table';
+} from "@apperp/ui/data-table";
 import {
     Empty,
     EmptyDescription,
     EmptyHeader,
     EmptyTitle,
-} from '@apperp/ui/empty';
-import { Input } from '@apperp/ui/input';
-import { api, toastSaveError } from '../api';
+} from "@apperp/ui/empty";
+import { Input } from "@apperp/ui/input";
+import { Pencil, RefreshCw } from "lucide-react";
+import { api, toastSaveError } from "../api";
 import {
     HargaPerkiraanEditModal,
     formatIndonesianDate,
     formatRupiah,
-} from './harga-perkiraan/HargaPerkiraanEditModal';
-import type { HargaPerkiraanItem } from './harga-perkiraan/HargaPerkiraanEditModal';
+} from "./harga-perkiraan/HargaPerkiraanEditModal";
+import type { HargaPerkiraanItem } from "./harga-perkiraan/HargaPerkiraanEditModal";
 
 type PageProps = {
     view?: string;
@@ -37,7 +39,7 @@ export default function HargaPerkiraanPage(_props?: PageProps) {
     void _props;
     const [items, setItems] = useState<HargaPerkiraanItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [search, setSearch] = useState('');
+    const [search, setSearch] = useState("");
 
     const [meta, setMeta] = useState<PaginationMeta>({
         current_page: 1,
@@ -58,10 +60,10 @@ export default function HargaPerkiraanPage(_props?: PageProps) {
 
             try {
                 const params = new URLSearchParams();
-                params.set('page', String(page));
+                params.set("page", String(page));
 
                 if (search.trim()) {
-                    params.set('search', search.trim());
+                    params.set("search", search.trim());
                 }
 
                 const res = await api<{
@@ -80,7 +82,7 @@ export default function HargaPerkiraanPage(_props?: PageProps) {
                     },
                 );
             } catch (err) {
-                toastSaveError(err, 'Gagal memuat data harga perkiraan.');
+                toastSaveError(err, "Gagal memuat data harga perkiraan.");
             } finally {
                 setLoading(false);
             }
@@ -110,71 +112,83 @@ export default function HargaPerkiraanPage(_props?: PageProps) {
     const columns: DataTableColumn<HargaPerkiraanItem>[] = useMemo(
         () => [
             {
-                id: 'item',
-                header: 'Item Barang / Jasa',
+                id: "group_item",
+                header: "Group Item",
                 cell: (row) => (
-                    <div className="space-y-0.5">
-                        <div className="text-xs font-semibold">
-                            {row.nama_item}
-                        </div>
-                        <div className="text-muted-foreground font-mono text-[11px]">
-                            {row.kode_item}
-                        </div>
-                    </div>
+                    <span className="text-xs font-medium">
+                        {row.group_item}
+                    </span>
                 ),
-                width: 250,
+                width: 140,
             },
             {
-                id: 'group_item',
-                header: 'Group & Jenis Item',
+                id: "jenis_item",
+                header: "Jenis Item",
                 cell: (row) => (
-                    <div className="space-y-0.5 text-xs">
-                        <div className="font-medium">{row.group_item}</div>
-                        <div className="text-muted-foreground text-[11px]">
-                            {row.jenis_item}
-                        </div>
-                    </div>
+                    <span className="text-xs">{row.jenis_item}</span>
+                ),
+                width: 140,
+            },
+            {
+                id: "kode_item",
+                header: "Kode Item",
+                cell: (row) => (
+                    <span className="font-mono text-xs font-semibold">
+                        {row.kode_item}
+                    </span>
+                ),
+                width: 140,
+            },
+            {
+                id: "nama_item",
+                header: "Nama Item",
+                cell: (row) => (
+                    <span className="text-xs font-semibold">
+                        {row.nama_item}
+                    </span>
                 ),
                 width: 180,
             },
             {
-                id: 'satuan',
-                header: 'Satuan',
-                cell: (row) => (
-                    <span className="text-muted-foreground text-xs">
-                        {row.satuan}
-                    </span>
-                ),
+                id: "satuan",
+                header: "Satuan",
+                cell: (row) => <span className="text-xs">{row.satuan}</span>,
                 width: 100,
             },
             {
-                id: 'harga_perkiraan',
-                header: 'Harga Estimasi (HPS)',
+                id: "harga_perkiraan",
+                header: "Harga Per Satuan",
                 cell: (row) => (
-                    <span className="font-mono text-xs font-bold">
+                    <span className="font-mono text-xs font-semibold">
                         {formatRupiah(row.harga_perkiraan)}
                     </span>
                 ),
-                width: 180,
+                width: 160,
             },
             {
-                id: 'tanggal_update',
-                header: 'Tgl Pembaruan',
+                id: "tanggal_update",
+                header: "Tgl Update",
                 cell: (row) => (
                     <span className="text-muted-foreground text-xs">
                         {row.tanggal_update
                             ? formatIndonesianDate(row.tanggal_update)
-                            : '—'}
+                            : "—"}
                     </span>
                 ),
-                width: 150,
+                width: 160,
             },
         ],
         [],
     );
 
     const rowActions: DataTableRowAction[] = useMemo(
-        () => [{ id: 'edit', label: 'Ubah' }],
+        () => [
+            {
+                id: "edit",
+                label: "Edit",
+                icon: <Pencil className="size-3.5" />,
+            },
+        ],
         [],
     );
 
@@ -189,21 +203,40 @@ export default function HargaPerkiraanPage(_props?: PageProps) {
                 </CardHeader>
 
                 <CardContent className="flex min-h-0 flex-1 flex-col px-0">
-                    <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end sm:justify-between">
-                        <div className="space-y-1">
+                    <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="space-y-0.5">
                             <p className="text-sm font-semibold">
-                                Daftar Harga Perkiraan Sendiri (HPS)
+                                Daftar Harga Perkiraan
                             </p>
                             <p className="text-muted-foreground text-xs">
-                                {meta.total} data dimuat
+                                {meta.total} data
                             </p>
                         </div>
                         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                    void fetchData(meta.current_page)
+                                }
+                                disabled={loading}
+                                className="h-8 gap-1.5 text-xs"
+                            >
+                                <RefreshCw
+                                    className={
+                                        loading
+                                            ? "size-3.5 animate-spin"
+                                            : "size-3.5"
+                                    }
+                                />
+                                Refresh
+                            </Button>
                             <Input
                                 className="h-8 w-full text-xs sm:w-64"
                                 type="search"
-                                placeholder="Cari item, kode, atau group..."
-                                aria-label="Cari harga perkiraan"
+                                placeholder="Pencarian..."
+                                aria-label="Pencarian harga perkiraan"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                             />
@@ -233,16 +266,19 @@ export default function HargaPerkiraanPage(_props?: PageProps) {
                         <DataTable
                             scrollMode="viewport"
                             className="min-h-0 flex-1"
+                            showRowNumbers
                             columns={columns}
                             data={items}
                             getRowKey={(row) => row.id}
                             getRowLabel={(row) => row.nama_item}
+                            actionsPlacement="trailing"
                             actions={rowActions}
                             onRowAction={(actionId, row) => {
-                                if (actionId === 'edit') {
+                                if (actionId === "edit") {
                                     handleEdit(row);
                                 }
                             }}
+                            onRowClick={(row) => handleEdit(row)}
                         />
                     )}
                 </CardContent>
