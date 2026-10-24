@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import {
     Dialog,
     DialogAction,
@@ -9,11 +9,11 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from "@apperp/ui/dialog";
-import { Input } from "@apperp/ui/input";
-import { Label } from "@apperp/ui/label";
-import { Textarea } from "@apperp/ui/textarea";
-import { api, toastSaveError } from "../../api";
+} from '@apperp/ui/dialog';
+import { Input } from '@apperp/ui/input';
+import { Label } from '@apperp/ui/label';
+import { Textarea } from '@apperp/ui/textarea';
+import { api, toastSaveError } from '../../api';
 
 export type ItemSubkontRecord = {
     id: string;
@@ -39,10 +39,10 @@ export function ItemSubkontModal({
     editingItem,
     onSuccess,
 }: Props) {
-    const [kodeSubkont, setKodeSubkont] = useState("");
-    const [namaSubkont, setNamaSubkont] = useState("");
-    const [satuan, setSatuan] = useState("");
-    const [keterangan, setKeterangan] = useState("");
+    const [kodeSubkont, setKodeSubkont] = useState('');
+    const [namaSubkont, setNamaSubkont] = useState('');
+    const [satuan, setSatuan] = useState('');
+    const [keterangan, setKeterangan] = useState('');
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
@@ -51,12 +51,12 @@ export function ItemSubkontModal({
                 setKodeSubkont(editingItem.kode_subkont);
                 setNamaSubkont(editingItem.nama_subkont);
                 setSatuan(editingItem.satuan);
-                setKeterangan(editingItem.keterangan || "");
+                setKeterangan(editingItem.keterangan || '');
             } else {
-                setKodeSubkont("");
-                setNamaSubkont("");
-                setSatuan("");
-                setKeterangan("");
+                setKodeSubkont('');
+                setNamaSubkont('');
+                setSatuan('');
+                setKeterangan('');
             }
         }, 0);
 
@@ -67,19 +67,19 @@ export function ItemSubkontModal({
         e.preventDefault();
 
         if (!kodeSubkont.trim()) {
-            toast.error("Kode subkont wajib diisi.");
+            toast.error('Kode subkont wajib diisi.');
 
             return;
         }
 
         if (!namaSubkont.trim()) {
-            toast.error("Nama subkont wajib diisi.");
+            toast.error('Nama subkont wajib diisi.');
 
             return;
         }
 
         if (!satuan.trim()) {
-            toast.error("Satuan wajib diisi.");
+            toast.error('Satuan wajib diisi.');
 
             return;
         }
@@ -93,7 +93,7 @@ export function ItemSubkontModal({
                     message: string;
                     data: ItemSubkontRecord;
                 }>(`/item-subkont/${editingItem.id}`, {
-                    method: "PUT",
+                    method: 'PUT',
                     body: JSON.stringify({
                         kode_subkont: kodeSubkont.trim(),
                         nama_subkont: namaSubkont.trim(),
@@ -102,7 +102,7 @@ export function ItemSubkontModal({
                     }),
                 });
 
-                toast.success("Item subkontraktor berhasil diperbarui.");
+                toast.success('Item subkontraktor berhasil diperbarui.');
                 onSuccess(res.data, false);
             } else {
                 const res = await api<{
@@ -110,7 +110,7 @@ export function ItemSubkontModal({
                     message: string;
                     data: ItemSubkontRecord;
                 }>(`/item-subkont`, {
-                    method: "POST",
+                    method: 'POST',
                     body: JSON.stringify({
                         kode_subkont: kodeSubkont.trim(),
                         nama_subkont: namaSubkont.trim(),
@@ -120,13 +120,13 @@ export function ItemSubkontModal({
                     }),
                 });
 
-                toast.success("Item subkontraktor berhasil ditambahkan.");
+                toast.success('Item subkontraktor berhasil ditambahkan.');
                 onSuccess(res.data, true);
             }
 
             onOpenChange(false);
         } catch (err) {
-            toastSaveError(err, "Gagal menyimpan item subkontraktor.");
+            toastSaveError(err, 'Gagal menyimpan item subkontraktor.');
         } finally {
             setSaving(false);
         }
@@ -139,8 +139,8 @@ export function ItemSubkontModal({
                     <DialogHeader>
                         <DialogTitle>
                             {editingItem
-                                ? "Ubah Item Subkont"
-                                : "Tambah Item Subkont"}
+                                ? 'Ubah Item Subkont'
+                                : 'Tambah Item Subkont'}
                         </DialogTitle>
                         <DialogDescription>
                             Isi kode, nama subkont, satuan, dan keterangan untuk
@@ -215,10 +215,10 @@ export function ItemSubkontModal({
                         </DialogCancel>
                         <DialogAction type="submit" disabled={saving}>
                             {saving
-                                ? "Menyimpan…"
+                                ? 'Menyimpan…'
                                 : editingItem
-                                  ? "Simpan"
-                                  : "Tambah"}
+                                  ? 'Simpan'
+                                  : 'Tambah'}
                         </DialogAction>
                     </DialogFooter>
                 </form>

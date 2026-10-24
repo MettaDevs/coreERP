@@ -1,12 +1,12 @@
-import { CheckCircle2, HardHat, Pencil, XCircle } from "lucide-react";
-import { Button } from "@apperp/ui/button";
+import { CheckCircle2, HardHat, Pencil, XCircle } from 'lucide-react';
+import { Button } from '@apperp/ui/button';
 import {
     Dialog,
     DialogContent,
     DialogFooter,
     DialogTitle,
-} from "@apperp/ui/dialog";
-import type { ItemSubkontRecord } from "./ItemSubkontModal";
+} from '@apperp/ui/dialog';
+import type { ItemSubkontRecord } from './ItemSubkontModal';
 
 type Props = {
     open: boolean;
@@ -89,7 +89,7 @@ export function ItemSubkontDetailModal({
                             Keterangan:
                         </span>
                         <div className="bg-muted/40 text-foreground rounded-md border p-2.5">
-                            {item.keterangan || "-"}
+                            {item.keterangan || '-'}
                         </div>
                     </div>
                 </div>
