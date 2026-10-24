@@ -1,7 +1,7 @@
-import { Search } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { Button } from '@apperp/ui/button';
-import { DataTable } from '@apperp/ui/data-table';
+import { Search } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Button } from "@apperp/ui/button";
+import { DataTable } from "@apperp/ui/data-table";
 import {
     Dialog,
     DialogContent,
@@ -9,10 +9,10 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from '@apperp/ui/dialog';
-import { Input } from '@apperp/ui/input';
-import { TableCell, TableRow } from '@apperp/ui/table';
-import { api } from '../../api';
+} from "@apperp/ui/dialog";
+import { Input } from "@apperp/ui/input";
+import { TableCell, TableRow } from "@apperp/ui/table";
+import { api } from "../../api";
 
 export type VendorLookupItem = {
     vendor_id: string;
@@ -42,10 +42,10 @@ type VendorLookupModalProps = {
 };
 
 const lookupColumns = [
-    { id: 'select', header: '', cell: () => null },
-    { id: 'kode_vendor', header: 'Kode Vendor/Supplier', cell: () => null },
-    { id: 'nama_vendor', header: 'Nama Vendor/Supplier', cell: () => null },
-    { id: 'alamat', header: 'Alamat Vendor/Supplier', cell: () => null },
+    { id: "select", header: "", cell: () => null },
+    { id: "kode_vendor", header: "Kode Vendor/Supplier", cell: () => null },
+    { id: "nama_vendor", header: "Nama Vendor/Supplier", cell: () => null },
+    { id: "alamat", header: "Alamat Vendor/Supplier", cell: () => null },
 ];
 
 export function VendorLookupModal({
@@ -54,7 +54,7 @@ export function VendorLookupModal({
     onSelect,
 }: VendorLookupModalProps) {
     const [vendors, setVendors] = useState<VendorLookupItem[]>([]);
-    const [search, setSearch] = useState('');
+    const [search, setSearch] = useState("");
     const [loading, setLoading] = useState(false);
     const [selectedCode, setSelectedCode] = useState<string | null>(null);
 
@@ -184,8 +184,8 @@ export function VendorLookupModal({
                                                     }
                                                     className={`h-9 cursor-pointer text-xs transition-colors ${
                                                         isSelected
-                                                            ? 'bg-primary/10 font-medium'
-                                                            : 'hover:bg-muted/50'
+                                                            ? "bg-primary/10 font-medium"
+                                                            : "hover:bg-muted/50"
                                                     }`}
                                                 >
                                                     <TableCell className="py-1 text-center">
@@ -208,7 +208,7 @@ export function VendorLookupModal({
                                                         {v.nama_vendor}
                                                     </TableCell>
                                                     <TableCell className="text-muted-foreground py-1 text-xs">
-                                                        {v.alamat || '-'}
+                                                        {v.alamat || "-"}
                                                     </TableCell>
                                                 </TableRow>
                                             );
