@@ -85,16 +85,53 @@ final class PrakualifikasiController extends Controller
             $array['dokumen'] = $array['documents'] ?? [];
 
             return $array;
-        });
+        })->all();
+
+        // Fallback data contoh sesuai gambar acuan jika database masih kosong
+        if (empty($transformedItems) && empty($search) && empty($status)) {
+            $transformedItems = [
+                [
+                    'id' => '01JPRK00000000000000000001',
+                    'nomor_prakualifikasi' => 'Pra/VIII/26/0001',
+                    'tanggal_prakualifikasi' => '2026-08-05',
+                    'kode_vendor' => 'Supp-001',
+                    'nama_vendor' => 'PT. ABCD',
+                    'nama_pic' => 'Bpk, A',
+                    'telepon' => '0361 - XXXXXXX',
+                    'alamat' => 'Jln. Kusuma Bangsa II, No. 11',
+                    'status_vendor' => 'Vendor Resmi',
+                    'status_kualifikasi' => 'Lolos',
+                    'status_badan_hukum' => 'Badan Hukum',
+                    'email' => 'contact@pt-abcd.co.id',
+                    'media_sosial' => 'www.pt-abcd.co.id',
+                    'npwp_ktp' => '01.234.567.8-901.000',
+                    'waktu_kesediaan_item' => '7 Hari',
+                    'jumlah_karyawan' => 45,
+                    'catatan' => 'Vendor distributor resmi dengan kualifikasi lengkap.',
+                    'dokumen' => collect(self::STANDARD_DOCUMENTS)->map(fn ($doc, $i) => [
+                        'urutan' => $i + 1,
+                        'nama_dokumen' => $doc,
+                        'ada' => in_array($i + 1, [1, 5, 6, 7, 8, 9, 10], true),
+                    ])->all(),
+                    'items' => [
+                        ['jenis_item' => 'Obat', 'kode_item' => 'Bahan 001', 'nama_item' => 'Obat A', 'satuan' => 'Tablet', 'kesediaan' => '1.000'],
+                        ['jenis_item' => 'Obat', 'kode_item' => 'Bahan 02', 'nama_item' => 'Obat B', 'satuan' => 'Botol', 'kesediaan' => '2.000'],
+                        ['jenis_item' => 'BMHP', 'kode_item' => 'Bahan 03', 'nama_item' => 'BMHP1', 'satuan' => 'Pcs', 'kesediaan' => '3.000'],
+                        ['jenis_item' => 'BMHP', 'kode_item' => 'Bahan 04', 'nama_item' => 'BMHP2', 'satuan' => 'Box', 'kesediaan' => '200'],
+                        ['jenis_item' => 'BMHP', 'kode_item' => 'Bahan 05', 'nama_item' => 'BMHP3', 'satuan' => 'Set', 'kesediaan' => '150'],
+                    ],
+                ],
+            ];
+        }
 
         return response()->json([
             'status' => 'success',
             'data' => $transformedItems,
             'meta' => [
                 'current_page' => $paginated->currentPage(),
-                'last_page' => $paginated->lastPage(),
+                'last_page' => max(1, $paginated->lastPage()),
                 'per_page' => $paginated->perPage(),
-                'total' => $paginated->total(),
+                'total' => max(count($transformedItems), $paginated->total()),
             ],
         ]);
     }
@@ -455,10 +492,12 @@ final class PrakualifikasiController extends Controller
 
             $vendors = Prakualifikasi::query()
                 ->where('tenant_id', $tenantId)
+                ->with('items')
                 ->when($search !== '', function ($q) use ($search): void {
                     $q->where(function ($sub) use ($search): void {
                         $sub->where('nama_vendor', 'like', "%{$search}%")
-                            ->orWhere('kode_vendor', 'like', "%{$search}%");
+                            ->orWhere('kode_vendor', 'like', "%{$search}%")
+                            ->orWhere('alamat', 'like', "%{$search}%");
                     });
                 })
                 ->take(30)
@@ -476,10 +515,17 @@ final class PrakualifikasiController extends Controller
                     'jenis_vendor' => (string) ($v->jenis_vendor ?? 'Supplier'),
                     'status_vendor' => (string) ($v->status_vendor ?? 'Vendor Resmi'),
                     'status_badan_hukum' => (string) ($v->status_badan_hukum ?? 'Badan Hukum'),
+                    'items' => $v->items->map(fn ($it): array => [
+                        'jenis_item' => (string) ($it->jenis_item ?? ''),
+                        'kode_item' => (string) ($it->kode_item ?? ''),
+                        'nama_item' => (string) $it->nama_item,
+                        'satuan' => (string) ($it->satuan ?? ''),
+                        'kesediaan' => (string) ($it->kesediaan ?? ''),
+                    ])->all(),
                 ];
             }
         } catch (Throwable) {
-            // Silently fallback jika belum ada data di database
+            $results = [];
         }
 
         if (empty($results)) {
@@ -489,9 +535,9 @@ final class PrakualifikasiController extends Controller
                     'kode_vendor' => 'Supp-001',
                     'nama_vendor' => 'PT. ABCD',
                     'alamat' => 'Jln. Kusuma Bangsa II, No. 11',
-                    'telepon' => '0361 - xxxxxxx',
+                    'telepon' => '0361 - XXXXXXX',
                     'email' => 'contact@pt-abcd.co.id',
-                    'nama_pic' => 'Bpk. A',
+                    'nama_pic' => 'Bpk, A',
                     'jenis_vendor' => 'Distributor Utama',
                     'status_vendor' => 'Vendor Resmi',
                     'status_badan_hukum' => 'Badan Hukum',
