@@ -342,7 +342,7 @@ class IdentityProvider
         return trim((is_string($error) ? $error : 'tanpa-kode').' '.(is_string($description) ? $description : ''));
     }
 
-    private function setting(string $key): string
+    protected function setting(string $key): string
     {
         $value = config('sso.'.$key);
 

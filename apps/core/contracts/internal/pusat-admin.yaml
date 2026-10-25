@@ -6,7 +6,7 @@ x-portal:
   urutan: 90
 openapi: 3.1.0
 info:
-  title: CoreERP — perintah pusat admin
+  title: CoreERP â€” perintah pusat admin
   version: 1.0.0
   description: |
     Perintah dari konsol operator vendor ke Core: melahirkan tenant, menyiapkan dan memutakhirkan
@@ -28,6 +28,10 @@ tags:
     description: Perintah dari konsol operator vendor.
 
 paths:
+  /managed-products: { $ref: 'paths/managed-products.yaml' }
+  /product-tenants: { $ref: 'paths/product-tenants.yaml' }
+  /product-tenants/{id}: { $ref: 'paths/product-tenants_id.yaml' }
+  /product-tenants/{id}/retry: { $ref: 'paths/product-tenants_id_retry.yaml' }
   /operators/{user}/verify-second-factor: { $ref: 'paths/operators_user_verify-second-factor.yaml' }
   /environments: { $ref: 'paths/environments.yaml' }
   /tenants: { $ref: 'paths/tenants.yaml' }

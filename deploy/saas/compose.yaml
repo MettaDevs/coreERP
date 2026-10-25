@@ -46,6 +46,8 @@ x-app-environment: &app-environment
   APP_DEBUG: ${APP_DEBUG:-false}
   APP_URL: ${APP_URL:?APP_URL wajib}
   APP_KEY: ${CORE_APP_KEY:?CORE_APP_KEY wajib}
+  MANAGED_FASKES_WORKER_URL: ${MANAGED_FASKES_WORKER_URL:-}
+  MANAGED_FASKES_WORKER_TOKEN: ${MANAGED_FASKES_WORKER_TOKEN:-}
 
   # Di node aplikasi yang TIDAK menjalankan database, ini menunjuk IP privat node data.
   # Bawaannya nama layanan, yang benar hanya ketika keduanya satu mesin.
