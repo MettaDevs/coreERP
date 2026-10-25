@@ -16,6 +16,7 @@ import OperatorMenu from '@/components/operator-menu';
 import { activeItem, navigation } from '@/lib/navigation';
 
 const navigationIcons = {
+    '/produk/tenant': Building2,
     '/tenant': Building2,
     '/lingkungan': Layers,
     '/pembaruan': RefreshCw,

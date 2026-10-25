@@ -1,0 +1,46 @@
+get:
+  tags:
+  - Pusat admin
+  operationId: internal.managedProducts.index
+  summary: Daftar produk terkelola dan jenis fasilitas yang tersedia
+  security:
+  - controlPlaneToken: []
+  responses:
+    '200':
+      description: Katalog tanpa rahasia worker.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+            - products
+            properties:
+              products:
+                type: array
+                items:
+                  type: object
+                  required:
+                  - code
+                  - name
+                  - profiles
+                  properties:
+                    code:
+                      type: string
+                    name:
+                      type: string
+                    profiles:
+                      type: array
+                      items:
+                        type: object
+                        required:
+                        - code
+                        - name
+                        properties:
+                          code:
+                            type: string
+                          name:
+                            type: string
+                          description:
+                            type: string
+    '401':
+      description: Token pusat admin salah.

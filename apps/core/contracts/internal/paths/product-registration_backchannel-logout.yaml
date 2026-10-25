@@ -1,0 +1,39 @@
+post:
+  tags:
+  - Product registration
+  operationId: internal.productRegistration.backchannelLogout
+  summary: Cabut sesi customer lewat logout token penyedia
+  security:
+  - productRegistrationGateway: []
+  responses:
+    '200':
+      description: Permintaan berhasil.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+            - ok
+            properties:
+              ok:
+                type: boolean
+    '401':
+      description: Sesi atau kredensial bridge tidak berlaku.
+    '422':
+      description: Isian belum sesuai atau verifikasi belum selesai.
+    '429':
+      description: Batas permintaan tercapai.
+    '503':
+      description: Penyedia atau konfigurasi belum tersedia.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+          - logout_token
+          properties:
+            logout_token:
+              type: string
+              maxLength: 16384

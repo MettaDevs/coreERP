@@ -11,6 +11,9 @@ use App\Platform\ControlPlane\Http\Controllers\Internal\EnvironmentCreationContr
 use App\Platform\ControlPlane\Http\Controllers\Internal\EnvironmentProvisioningController;
 use App\Platform\ControlPlane\Http\Controllers\Internal\FleetController;
 use App\Platform\ControlPlane\Http\Controllers\Internal\OperatorSecondFactorController;
+use App\Platform\ControlPlane\Http\Controllers\Internal\ProductRegistrationController;
+use App\Platform\ControlPlane\Http\Controllers\Internal\ProductTenantController;
+use App\Platform\ControlPlane\Http\Middleware\ProductRegistrationGateway;
 use App\Platform\Organization\Http\Controllers\Internal\HrPositionAssignmentController;
 use App\Platform\Organization\Http\Controllers\Internal\OrganizationDirectoryController;
 use App\Platform\Tenant\Http\Controllers\Internal\MemberDirectoryController;
@@ -89,10 +92,27 @@ Route::prefix('internal/v1')->middleware(['throttle:30,1', 'control-plane'])->gr
     Route::post('operators/{user}/verify-second-factor', OperatorSecondFactorController::class)->whereNumber('user');
     Route::post('environments', [EnvironmentCreationController::class, 'store']);
     Route::post('tenants', [TenantProvisioningController::class, 'store']);
+    Route::get('managed-products', [ProductTenantController::class, 'catalog']);
+    Route::get('product-tenants', [ProductTenantController::class, 'index']);
+    Route::post('product-tenants', [ProductTenantController::class, 'store']);
+    Route::get('product-tenants/{id}', [ProductTenantController::class, 'show'])->whereUuid('id');
+    Route::post('product-tenants/{id}/retry', [ProductTenantController::class, 'retry'])->whereUuid('id');
     // Dibaca admin.erp saat menerbitkan lisensi situs; lihat TenantEntitlementController.
     Route::get('tenants/{tenant}/entitlements', [TenantEntitlementController::class, 'show']);
     Route::post('environments/{environment}/provision', [EnvironmentProvisioningController::class, 'store']);
     Route::get('fleet', [FleetController::class, 'index']);
     Route::post('environments/upgrade', [FleetController::class, 'upgrade']);
     Route::post('environments/{environment}/upgrade', [FleetController::class, 'upgrade']);
+});
+
+Route::prefix('internal/v1/product-registration')->middleware([ProductRegistrationGateway::class, 'throttle:600,1'])->group(function (): void {
+    Route::post('auth/start', [ProductRegistrationController::class, 'start']);
+    Route::post('auth/exchange', [ProductRegistrationController::class, 'exchange']);
+    Route::get('session', [ProductRegistrationController::class, 'session']);
+    Route::post('email-challenge', [ProductRegistrationController::class, 'emailChallenge']);
+    Route::post('email-verification', [ProductRegistrationController::class, 'emailVerification']);
+    Route::post('tenants', [ProductRegistrationController::class, 'storeTenant']);
+    Route::post('launch', [ProductRegistrationController::class, 'launch']);
+    Route::post('logout', [ProductRegistrationController::class, 'logout']);
+    Route::post('backchannel-logout', [ProductRegistrationController::class, 'backchannelLogout']);
 });
