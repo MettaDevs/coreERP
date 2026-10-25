@@ -1,5 +1,4 @@
 import { FormErrorHeader } from '@/components/form-error-header';
-import Shell from '@/components/shell';
 import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import { Button } from '@apperp/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
@@ -7,6 +6,7 @@ import { Head, Link, router, usePage, usePoll } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { statusLabels } from './types';
 import type { Product, ProductTenant } from './types';
+import Shell from '@/components/shell';
 
 export default function Show({
     tenant,
@@ -33,14 +33,20 @@ export default function Show({
         },
     );
     useEffect(() => {
-        if (tenant.status === 'queued' || tenant.status === 'provisioning')
+        if (tenant.status === 'queued' || tenant.status === 'provisioning') {
             start();
-        else stop();
+        } else {
+            stop();
+        }
+
         return stop;
     }, [tenant.status, start, stop]);
 
     async function copyOwner() {
-        if (!tenant.credentials) return;
+        if (!tenant.credentials) {
+            return;
+        }
+
         try {
             await navigator.clipboard.writeText(
                 `Alamat: ${tenant.public_url ?? ''}\nPengguna: ${tenant.credentials.username}\nKata sandi: ${tenant.credentials.password}`,

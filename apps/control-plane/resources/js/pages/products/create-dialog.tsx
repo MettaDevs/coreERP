@@ -36,7 +36,10 @@ export default function CreateDialog({ products }: { products: Product[] }) {
     );
 
     async function close() {
-        if (form.processing) return;
+        if (form.processing) {
+            return;
+        }
+
         if (
             form.isDirty &&
             !(await confirm({
@@ -45,8 +48,10 @@ export default function CreateDialog({ products }: { products: Product[] }) {
                 confirmLabel: 'Buang perubahan',
                 destructive: true,
             }))
-        )
+        ) {
             return;
+        }
+
         form.reset();
         form.clearErrors();
         setOpen(false);
@@ -72,7 +77,9 @@ export default function CreateDialog({ products }: { products: Product[] }) {
                 if (next) {
                     form.setData('idempotency_key', crypto.randomUUID());
                     setOpen(true);
-                } else void close();
+                } else {
+                    void close();
+                }
             }}
         >
             {confirmation}

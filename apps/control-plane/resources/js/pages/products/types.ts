@@ -84,5 +84,6 @@ export function parseTenantBatch(value: unknown): {
             'Daftar tenant belum dapat dibaca. Coba muat ulang daftar.',
         );
     }
+
     return { items: value.data, nextCursor: value.next_cursor };
 }

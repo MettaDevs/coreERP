@@ -1,4 +1,3 @@
-import Shell from '@/components/shell';
 import { Button } from '@apperp/ui/button';
 import { DataTable } from '@apperp/ui/data-table';
 import { Input } from '@apperp/ui/input';
@@ -9,6 +8,7 @@ import { useCallback, useState } from 'react';
 import CreateDialog from './create-dialog';
 import { parseTenantBatch, statusLabels } from './types';
 import type { Product, ProductTenant } from './types';
+import Shell from '@/components/shell';
 
 export default function Index({
     products,
@@ -29,17 +29,25 @@ export default function Index({
             signal: AbortSignal;
         }) => {
             const params = new URLSearchParams({ search: query });
-            if (cursor) params.set('cursor', cursor);
+
+            if (cursor) {
+                params.set('cursor', cursor);
+            }
+
             const response = await fetch(`/produk/tenant?${params}`, {
                 signal,
                 headers: { Accept: 'application/json' },
                 credentials: 'same-origin',
             });
-            if (!response.ok)
+
+            if (!response.ok) {
                 throw new Error(
                     'Daftar tenant belum dapat dimuat. Periksa koneksi lalu coba lagi.',
                 );
+            }
+
             const body: unknown = await response.json();
+
             return parseTenantBatch(body);
         },
         [],
