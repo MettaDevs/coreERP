@@ -20,9 +20,9 @@ return [
             'owner_username' => 'owner',
             'base_domain' => env('MANAGED_FASKES_BASE_DOMAIN', 'demo.faskes.mettamedic.id'),
             'release' => [
-                'version' => env('MANAGED_FASKES_RELEASE', '20261024.2'),
+                'version' => env('MANAGED_FASKES_RELEASE', '0.1.0'),
                 'seed_sha256' => env('MANAGED_FASKES_SEED_SHA256', '6e41e2f24317cdfbaa3a992f7f3a8b6632f6b21161bde5d3a72156931f22bc3d'),
-                'image_digest' => env('MANAGED_FASKES_IMAGE_DIGEST', 'sha256:ae2b6595fd2821a0c48b8da9ee1e2a5ec64a547df4cf737e6e8b5a14b7f9e54e'),
+                'image_digest' => env('MANAGED_FASKES_IMAGE_DIGEST', 'sha256:ebb9bb5f66d3412927067e9fb7dd7e99ebcf7bc3d539ad1e06585cd880617dbd'),
                 'profile_sha256' => env('MANAGED_FASKES_PROFILE_SHA256', '030af6c0b253d06817101fb4ef1ff5f251a1229a8aa9d6b6cda28c414b732777'),
             ],
             'worker_url' => env('MANAGED_FASKES_WORKER_URL'),
