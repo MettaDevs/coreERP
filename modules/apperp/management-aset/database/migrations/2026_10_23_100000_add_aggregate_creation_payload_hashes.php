@@ -15,6 +15,10 @@ return new class extends Migration
     public function up(): void
     {
         foreach (self::TABLES as $table) {
+            if (Schema::hasColumn($table, 'creation_payload_hash')) {
+                continue;
+            }
+
             Schema::table($table, fn (Blueprint $blueprint) => $blueprint->char('creation_payload_hash', 64)->nullable());
         }
     }
