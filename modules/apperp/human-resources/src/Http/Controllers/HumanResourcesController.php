@@ -212,8 +212,9 @@ final class HumanResourcesController extends Controller
         $hash = $this->creationHash($data);
 
         return $this->saveAccountLink(function () use ($core, $numbers, $tenantId, $data, $idempotencyKey, $hash): JsonResponse {
-            $this->lockCreation($tenantId, 'worker', $idempotencyKey);
-            if ($existing = Worker::withTrashed()->where('creation_key', $idempotencyKey)->first()) {
+            $creation = Worker::withTrashed()->where('creation_key', $idempotencyKey);
+            RowVersion::lockCreation($creation);
+            if ($existing = $creation->first()) {
                 return $this->replayCreation($existing, $hash);
             }
             if ($data['core_membership_id'] !== null) {
@@ -242,8 +243,9 @@ final class HumanResourcesController extends Controller
         $hash = $this->creationHash($data);
 
         return DB::transaction(function () use ($numbers, $tenantId, $data, $idempotencyKey, $hash): JsonResponse {
-            $this->lockCreation($tenantId, 'job', $idempotencyKey);
-            if ($existing = Job::withTrashed()->where('creation_key', $idempotencyKey)->first()) {
+            $creation = Job::withTrashed()->where('creation_key', $idempotencyKey);
+            RowVersion::lockCreation($creation);
+            if ($existing = $creation->first()) {
                 return $this->replayCreation($existing, $hash);
             }
             $job = Job::query()->create([
@@ -278,8 +280,9 @@ final class HumanResourcesController extends Controller
         $hash = $this->creationHash($data);
 
         return DB::transaction(function () use ($request, $numbers, $tenantId, $data, $idempotencyKey, $hash): JsonResponse {
-            $this->lockCreation($tenantId, 'position', $idempotencyKey);
-            if ($existing = Position::withTrashed()->where('creation_key', $idempotencyKey)->first()) {
+            $creation = Position::withTrashed()->where('creation_key', $idempotencyKey);
+            RowVersion::lockCreation($creation);
+            if ($existing = $creation->first()) {
                 $this->requireOperatingUnit($request, $existing->operating_unit_id);
 
                 return $this->replayCreation($existing, $hash);
@@ -435,11 +438,6 @@ final class HumanResourcesController extends Controller
         ksort($data);
 
         return hash('sha256', json_encode($data, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION));
-    }
-
-    private function lockCreation(string $tenantId, string $resource, string $key): void
-    {
-        DB::select('select pg_advisory_xact_lock(hashtextextended(?, 0))', [$tenantId.':hr-create:'.$resource.':'.$key]);
     }
 
     private function replayCreation(Model $record, string $hash): JsonResponse

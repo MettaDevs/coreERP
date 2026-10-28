@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
+use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -107,8 +108,9 @@ class MaintenanceJobTypeDefaultController extends MasterDataController
         $hash = CreationPayload::hash(['source_id' => $id, 'nama' => $name]);
         try {
             return DB::transaction(function () use ($tenantId, $id, $creationKey, $name, $hash): JsonResponse {
-                DB::select('select pg_advisory_xact_lock(hashtextextended(?, 0))', [$tenantId.':maintenance-default-copy:'.$creationKey]);
-                $existing = MaintenanceJobTypeDefault::withTrashed()->where('tenant_id', $tenantId)->where('creation_key', $creationKey)->first();
+                $creation = MaintenanceJobTypeDefault::withTrashed()->where('tenant_id', $tenantId)->where('creation_key', $creationKey);
+                RowVersion::lockCreation($creation);
+                $existing = $creation->first();
                 if ($existing !== null) {
                     $stored = $existing->getAttribute('creation_payload_hash');
                     if ($existing->trashed() || ! is_string($stored) || ! hash_equals($stored, $hash)) {
