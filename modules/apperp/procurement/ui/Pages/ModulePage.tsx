@@ -1,14 +1,14 @@
-import { Suspense } from 'react';
-import { Card, CardContent } from '@apperp/ui/card';
-import App from '../App';
-import type { PropsModul } from '../App';
+import { Suspense } from "react";
+import { Card, CardContent } from "@apperp/ui/card";
+import App from "../App";
+import type { ModulePageProps } from "../App";
 
 /**
  * Titik masuk Inertia untuk seluruh layar modul Procurement.
  *
- * Didaftarkan dan dipanggil oleh Core melalui resolusi `procurement::Modul`.
+ * Didaftarkan dan dipanggil oleh Core melalui resolusi `procurement::ModulePage`.
  */
-export default function Modul(props: PropsModul) {
+export default function ModulePage(props: ModulePageProps) {
     return (
         <Suspense
             fallback={
@@ -27,3 +27,4 @@ export default function Modul(props: PropsModul) {
         </Suspense>
     );
 }
+

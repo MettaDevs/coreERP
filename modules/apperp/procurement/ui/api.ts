@@ -1,4 +1,5 @@
-import { toast } from 'sonner';
+import { createSaveFeedback } from "@apperp/ui/form-feedback";
+import type { FormFeedback } from "@apperp/ui/form-feedback";
 
 export type ApiValidationErrors = Record<string, string[]>;
 
@@ -10,12 +11,12 @@ export class ApiError extends Error {
         public readonly code: string | null = null,
     ) {
         super(message);
-        this.name = 'ApiError';
+        this.name = "ApiError";
     }
 }
 
 function normalizeValidationErrors(value: unknown): ApiValidationErrors {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
         return {};
     }
 
@@ -25,9 +26,9 @@ function normalizeValidationErrors(value: unknown): ApiValidationErrors {
                 const normalized = Array.isArray(messages)
                     ? messages.filter(
                           (message): message is string =>
-                              typeof message === 'string',
+                              typeof message === "string",
                       )
-                    : typeof messages === 'string'
+                    : typeof messages === "string"
                       ? [messages]
                       : [];
 
@@ -40,7 +41,7 @@ function normalizeValidationErrors(value: unknown): ApiValidationErrors {
 export function newIdempotencyKey(): string {
     const webCrypto = globalThis.crypto;
 
-    if (typeof webCrypto?.randomUUID === 'function') {
+    if (typeof webCrypto?.randomUUID === "function") {
         try {
             return webCrypto.randomUUID();
         } catch {
@@ -54,39 +55,39 @@ export function newIdempotencyKey(): string {
 /**
  * Awalan rute API procurement.
  */
-const AWALAN_API = '/api/modules/procurement/v1';
+const API_PREFIX = "/api/modules/procurement/v1";
 
-const METODE_AMAN = ['GET', 'HEAD', 'OPTIONS'];
+const SAFE_METHODS = ["GET", "HEAD", "OPTIONS"];
 
-function tokenCsrf(): string {
-    const awalan = 'XSRF-TOKEN=';
+function csrfToken(): string {
+    const prefix = "XSRF-TOKEN=";
     const cookie = document.cookie
-        .split('; ')
-        .find((bagian) => bagian.startsWith(awalan));
+        .split("; ")
+        .find((part) => part.startsWith(prefix));
 
-    return cookie ? decodeURIComponent(cookie.slice(awalan.length)) : '';
+    return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : "";
 }
 
 export function api<T>(path: string, init?: RequestInit): Promise<T> {
-    return request<T>(AWALAN_API, path, init);
+    return request<T>(API_PREFIX, path, init);
 }
 
 async function request<T>(
-    awalan: string,
+    prefix: string,
     path: string,
     init?: RequestInit,
 ): Promise<T> {
-    const metode = (init?.method ?? 'GET').toUpperCase();
-    const unggahan = init?.body instanceof FormData;
+    const method = (init?.method ?? "GET").toUpperCase();
+    const isFormData = init?.body instanceof FormData;
 
-    const response = await fetch(`${awalan}${path}`, {
+    const response = await fetch(`${prefix}${path}`, {
         ...init,
-        credentials: 'same-origin',
+        credentials: "same-origin",
         headers: {
-            ...(unggahan ? {} : { 'Content-Type': 'application/json' }),
-            ...(METODE_AMAN.includes(metode)
+            ...(isFormData ? {} : { "Content-Type": "application/json" }),
+            ...(SAFE_METHODS.includes(method)
                 ? {}
-                : { 'X-XSRF-TOKEN': tokenCsrf() }),
+                : { "X-XSRF-TOKEN": csrfToken() }),
             ...init?.headers,
         },
     });
@@ -105,17 +106,17 @@ async function request<T>(
             body?.errors ?? body?.error?.errors,
         );
         const message =
-            typeof body?.error?.message === 'string'
+            typeof body?.error?.message === "string"
                 ? body.error.message
-                : typeof body?.message === 'string'
+                : typeof body?.message === "string"
                   ? body.message
-                  : 'Permintaan belum berhasil.';
+                  : "Permintaan belum berhasil.";
 
         throw new ApiError(
             message,
             validationErrors,
             response.status,
-            typeof body?.error?.code === 'string' ? body.error.code : null,
+            typeof body?.error?.code === "string" ? body.error.code : null,
         );
     }
 
@@ -123,17 +124,33 @@ async function request<T>(
 }
 
 export function errorMessage(caught: unknown, fallback: string): string {
-    return caught instanceof Error ? caught.message : fallback;
-}
-
-export function toastSaveError(caught: unknown, fallback: string): void {
-    if (caught instanceof ApiError && caught.status >= 500) {
-        toast.error(
-            `${fallback} Terjadi kendala sistem. Silakan coba kembali nanti.`,
-        );
-
-        return;
+    if (caught instanceof ApiError) {
+        return caught.status >= 500
+            ? `${fallback} Terjadi gangguan sistem. Hubungi pengelola aplikasi.`
+            : caught.message || fallback;
     }
 
-    toast.error(errorMessage(caught, fallback));
+    return fallback;
+}
+
+export function saveErrorMessage(caught: unknown, fallback: string): string {
+    return caught instanceof ApiError && caught.status >= 500
+        ? `${fallback} Terjadi kesalahan sistem. Hubungi pengelola aplikasi agar dapat diperiksa.`
+        : caught instanceof ApiError
+          ? caught.message
+          : fallback;
+}
+
+export function saveErrorFeedback(
+    caught: unknown,
+    operation: string,
+): FormFeedback {
+    return createSaveFeedback({
+        operation,
+        message: caught instanceof ApiError ? caught.message : operation,
+        status: caught instanceof ApiError ? caught.status : undefined,
+        code: caught instanceof ApiError ? caught.code : null,
+        errors: caught instanceof ApiError ? caught.validationErrors : {},
+        details: `${operation}\n${caught instanceof ApiError ? `Status: ${caught.status}\nKode: ${caught.code ?? "-"}` : "Jenis gangguan belum diketahui."}`,
+    });
 }
