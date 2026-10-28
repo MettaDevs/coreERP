@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Platform\ControlPlane\Jobs;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -49,7 +50,7 @@ use RuntimeException;
  * yang membawa model sisi tenant sebagai properti akan mencoba me-resolve-nya tanpa lingkungan
  * terikat — dan pada saat itu "database bawaan" bisa berarti database mana pun.
  */
-final class UpgradeEnvironment implements ShouldQueue
+final class UpgradeEnvironment implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -62,6 +63,11 @@ final class UpgradeEnvironment implements ShouldQueue
         public readonly string $environmentId,
         public readonly ?int $requestedBy = null,
     ) {}
+
+    public function uniqueId(): string
+    {
+        return $this->environmentId;
+    }
 
     /**
      * Jeda antar percobaan, dalam detik.

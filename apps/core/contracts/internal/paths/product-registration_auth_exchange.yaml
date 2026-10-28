@@ -1,0 +1,52 @@
+post:
+  tags:
+  - Product registration
+  operationId: internal.productRegistration.exchange
+  summary: Tukar kode OIDC sekali pakai
+  security:
+  - productRegistrationGateway: []
+  responses:
+    '200':
+      description: Permintaan berhasil.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+            - session_token
+            - session
+            properties:
+              session_token:
+                type: string
+                description: Rahasia sesi hanya untuk bridge landing.
+              session:
+                $ref: '#/components/schemas/ProductRegistrationSession'
+    '401':
+      description: Sesi atau kredensial bridge tidak berlaku.
+    '422':
+      description: Isian belum sesuai atau verifikasi belum selesai.
+    '429':
+      description: Batas permintaan tercapai.
+    '503':
+      description: Penyedia atau konfigurasi belum tersedia.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+          - state
+          - code
+          - browser_secret
+          properties:
+            state:
+              type: string
+              pattern: ^[a-f0-9]{64}$
+            code:
+              type: string
+              maxLength: 4096
+            browser_secret:
+              type: string
+              minLength: 32
+              maxLength: 128

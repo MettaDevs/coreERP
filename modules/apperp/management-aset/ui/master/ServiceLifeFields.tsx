@@ -1,4 +1,4 @@
-import { Field, FieldDescription } from '@apperp/ui/field';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { monthsPerPeriod, serviceLifeMonths } from './serviceLife';
 
@@ -9,12 +9,14 @@ export default function ServiceLifeFields({
     onChange,
     required = false,
     readOnly = false,
+    error,
 }: {
     value: unknown;
     frequency: unknown;
     onChange: (value: string | number) => void;
     required?: boolean;
     readOnly?: boolean;
+    error?: string;
 }) {
     const months = serviceLifeMonths(value, frequency);
     const periodMonths = monthsPerPeriod(frequency);
@@ -27,11 +29,20 @@ export default function ServiceLifeFields({
     };
 
     return (
-        <Field
+        <FormControl
             data-field-name="useful_life_periods"
+            data-error-field="useful_life_periods"
+            error={error}
             data-readonly={readOnly || undefined}
+            hint={
+                <>
+                    {periodMonths
+                        ? `Cukup isi tahun atau bulan; keduanya menunjukkan umur yang sama. Frekuensi tidak mengubah umur aset.${periodMonths > 1 ? ` Gunakan kelipatan ${periodMonths} bulan untuk frekuensi ini.` : ''}`
+                        : 'Pilih frekuensi terlebih dahulu.'}
+                </>
+            }
         >
-            <div className="grid gap-3 sm:grid-cols-2">
+            <FormGrid>
                 <Input
                     label="Masa manfaat (tahun)"
                     type="number"
@@ -56,12 +67,7 @@ export default function ServiceLifeFields({
                     value={months ?? ''}
                     onChange={(event) => change(event.target.value, 1)}
                 />
-            </div>
-            <FieldDescription>
-                {periodMonths
-                    ? `Cukup isi tahun atau bulan; keduanya menunjukkan umur yang sama. Frekuensi tidak mengubah umur aset.${periodMonths > 1 ? ` Gunakan kelipatan ${periodMonths} bulan untuk frekuensi ini.` : ''}`
-                    : 'Pilih frekuensi terlebih dahulu.'}
-            </FieldDescription>
-        </Field>
+            </FormGrid>
+        </FormControl>
     );
 }

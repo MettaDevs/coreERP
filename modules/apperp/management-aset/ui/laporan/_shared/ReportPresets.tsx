@@ -1,5 +1,5 @@
 import { BookmarkPlus } from 'lucide-react';
-import { useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { ActionButton } from '@apperp/ui/action-button';
 import {
@@ -24,21 +24,16 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@apperp/ui/dialog';
-import { Field, FieldDescription, FieldError } from '@apperp/ui/field';
+import { FieldDescription, FieldError } from '@apperp/ui/field';
+import { FormControl } from '@apperp/ui/form-control';
+import { InlineLookup } from '@apperp/ui/inline-lookup';
 import { Input } from '@apperp/ui/input';
-import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
 import { Select } from '@apperp/ui/select';
-import { errorMessage } from '../../api';
+import { ApiError } from '../../api';
+import { useSaveFeedback } from '../../use-save-feedback';
 import { cleanFilters } from './reportOptions';
-import type { Filters } from './reportOptions';
+import type { Filters, ReportDateParameters } from './reportOptions';
 import type { ReportPresetState } from './useReportData';
-
-/**
- * Parameter tanggal sebuah laporan: rentang dua tanggal, atau satu bulan. Dipakai untuk menawarkan tanggal
- * relatif saat menyimpan preset.
- */
-export type ReportDateParameters =
-    { from: string; to: string } | { month: string };
 
 const NONE = '__none__';
 
@@ -98,6 +93,14 @@ export function ReportPresets({
     state: ReportPresetState;
     dates?: ReportDateParameters;
 }) {
+    const portal = useRef<HTMLDivElement>(null);
+    const archiveScope = useRef<HTMLDivElement>(null);
+    const nameErrorId = useId();
+    const {
+        feedbackSummary: saveFeedback,
+        reportSaveError: reportSaveError,
+        clearSaveFeedback: clearSaveFeedback,
+    } = useSaveFeedback(portal, `${state.reportCode}:new-preset`);
     const [saving, setSaving] = useState(false);
     const [archiving, setArchiving] = useState(false);
     const [name, setName] = useState('');
@@ -105,9 +108,18 @@ export function ReportPresets({
     const [shared, setShared] = useState(false);
     const [nameError, setNameError] = useState('');
     const [busy, setBusy] = useState(false);
+    const [archiveBusy, setArchiveBusy] = useState(false);
 
     const selected =
         state.presets.find((preset) => preset.id === state.selectedId) ?? null;
+    const {
+        feedbackSummary: archiveFeedback,
+        reportSaveError: reportArchiveError,
+        clearSaveFeedback: clearArchiveFeedback,
+    } = useSaveFeedback(
+        archiveScope,
+        `${state.reportCode}:${selected?.id ?? 'none'}`,
+    );
     const items = [
         { value: NONE, label: 'Tanpa preset' },
         ...state.presets.map((preset) => ({
@@ -129,17 +141,28 @@ export function ReportPresets({
         setChoice('fixed');
         setShared(false);
         setNameError('');
+        clearSaveFeedback();
         setSaving(true);
     };
 
     const save = async () => {
         if (!name.trim()) {
             setNameError('Nama preset wajib diisi.');
+            reportSaveError(
+                new ApiError(
+                    'Nama preset wajib diisi.',
+                    { name: ['Nama preset wajib diisi.'] },
+                    422,
+                ),
+                'Preset belum dapat disimpan.',
+            );
 
             return;
         }
 
         setBusy(true);
+        setNameError('');
+        clearSaveFeedback();
 
         try {
             await state.save(
@@ -153,8 +176,14 @@ export function ReportPresets({
                     : 'Preset disimpan. Pilih lagi kapan saja dari daftar Preset.',
             );
             setSaving(false);
+            clearSaveFeedback();
         } catch (caught) {
-            setNameError(errorMessage(caught, 'Preset belum dapat disimpan.'));
+            setNameError(
+                caught instanceof ApiError
+                    ? (caught.validationErrors.name?.[0] ?? '')
+                    : '',
+            );
+            reportSaveError(caught, 'Preset belum dapat disimpan.');
         } finally {
             setBusy(false);
         }
@@ -165,33 +194,55 @@ export function ReportPresets({
             return;
         }
 
+        setArchiveBusy(true);
+        clearArchiveFeedback();
+
         try {
             await state.archive(selected);
             toast.success('Preset diarsipkan.');
-        } catch (caught) {
-            toast.error(errorMessage(caught, 'Preset belum dapat diarsipkan.'));
-        } finally {
+            clearArchiveFeedback();
             setArchiving(false);
+        } catch (caught) {
+            reportArchiveError(caught, 'Preset belum dapat diarsipkan.');
+        } finally {
+            setArchiveBusy(false);
         }
     };
 
     return (
         <>
-            <div className="w-full sm:w-56">
-                <Select
+            <div className="w-full">
+                <InlineLookup
                     label="Preset"
                     items={items}
-                    value={state.selectedId ?? NONE}
-                    onValueChange={(next) =>
-                        state.apply(
-                            next === null || next === NONE ? null : next,
-                        )
+                    value={
+                        items.find(
+                            (item) => item.value === (state.selectedId ?? NONE),
+                        ) ?? null
                     }
-                    searchPlaceholder="Cari preset"
+                    columns={[
+                        {
+                            id: 'name',
+                            header: 'Nama',
+                            cell: (item) => item.label,
+                        },
+                    ]}
+                    getItemValue={(item) => item.value}
+                    getItemLabel={(item) => item.label}
+                    onValueChange={(item) =>
+                        state.apply(item.value === NONE ? null : item.value)
+                    }
+                    onCreate={openSave}
+                    showDetails={false}
                     emptyMessage="Belum ada preset untuk laporan ini."
                 />
             </div>
-            <Button type="button" variant="outline" onClick={openSave}>
+            <Button
+                type="button"
+                variant="outline"
+                onClick={openSave}
+                className="w-full justify-start"
+            >
                 <BookmarkPlus />
                 Simpan preset
             </Button>
@@ -199,12 +250,26 @@ export function ReportPresets({
                 <ActionButton
                     action="archive"
                     type="button"
-                    onClick={() => setArchiving(true)}
+                    onClick={() => {
+                        clearArchiveFeedback();
+                        setArchiving(true);
+                    }}
                 />
             )}
 
-            <Dialog open={saving} onOpenChange={setSaving}>
-                <DialogContent size="compact">
+            <Dialog
+                open={saving}
+                onOpenChange={(open) => {
+                    if (!busy) {
+                        setSaving(open);
+
+                        if (!open) {
+                            clearSaveFeedback();
+                        }
+                    }
+                }}
+            >
+                <DialogContent ref={portal} size="compact">
                     <DialogHeader>
                         <DialogTitle>Simpan filter sebagai preset</DialogTitle>
                         <DialogDescription>
@@ -213,47 +278,49 @@ export function ReportPresets({
                             filternya sekaligus.
                         </DialogDescription>
                     </DialogHeader>
+                    {saveFeedback && <div className="px-4">{saveFeedback}</div>}
                     <DialogBody className="space-y-4">
-                        <Field>
+                        <FormControl data-error-field="name">
                             <Input
                                 label="Nama preset"
                                 required
                                 maxLength={80}
                                 value={name}
+                                aria-invalid={!!nameError}
+                                aria-describedby={
+                                    nameError ? nameErrorId : undefined
+                                }
                                 onChange={(event) => {
                                     setName(event.target.value);
                                     setNameError('');
                                 }}
                             />
-                            {nameError && <FieldError>{nameError}</FieldError>}
-                        </Field>
+                            {nameError && (
+                                <FieldError id={nameErrorId}>
+                                    {nameError}
+                                </FieldError>
+                            )}
+                        </FormControl>
                         {dates && (
-                            <Field>
-                                <NativeSelect
-                                    label="Periode pada preset"
+                            <FormControl>
+                                <Select
+                                    label="Tanggal dalam preset"
+                                    items={[...choices]}
                                     value={choice}
-                                    onChange={(event) =>
-                                        setChoice(event.target.value)
+                                    onValueChange={(value) =>
+                                        setChoice(value ?? 'fixed')
                                     }
-                                >
-                                    {choices.map((item) => (
-                                        <NativeSelectOption
-                                            key={item.value}
-                                            value={item.value}
-                                        >
-                                            {item.label}
-                                        </NativeSelectOption>
-                                    ))}
-                                </NativeSelect>
+                                    portalContainer={portal}
+                                />
                                 <FieldDescription>
                                     Pilihan seperti “Bulan ini” dihitung ulang
                                     setiap kali preset dipakai, menurut zona
                                     waktu Anda.
                                 </FieldDescription>
-                            </Field>
+                            </FormControl>
                         )}
                         {state.canShare && (
-                            <Field>
+                            <FormControl>
                                 <label className="flex items-center gap-2 text-sm">
                                     <Checkbox
                                         checked={shared}
@@ -269,7 +336,7 @@ export function ReportPresets({
                                     Anda. Dengan centang, semua orang yang boleh
                                     menjalankan laporan ini dapat memakainya.
                                 </FieldDescription>
-                            </Field>
+                            </FormControl>
                         )}
                     </DialogBody>
                     <DialogFooter>
@@ -281,7 +348,11 @@ export function ReportPresets({
                             pending={busy}
                         />
                         <DialogClose asChild>
-                            <ActionButton action="cancel" type="button" />
+                            <ActionButton
+                                action="cancel"
+                                type="button"
+                                disabled={busy}
+                            />
                         </DialogClose>
                     </DialogFooter>
                 </DialogContent>
@@ -289,9 +360,14 @@ export function ReportPresets({
 
             <AlertDialog
                 open={archiving}
-                onOpenChange={(open) => !open && setArchiving(false)}
+                onOpenChange={(open) => {
+                    if (!open && !archiveBusy) {
+                        setArchiving(false);
+                        clearArchiveFeedback();
+                    }
+                }}
             >
-                <AlertDialogContent>
+                <AlertDialogContent ref={archiveScope}>
                     <AlertDialogHeader>
                         <AlertDialogTitle>
                             Delete preset {selected?.name ?? ''}?
@@ -304,13 +380,23 @@ export function ReportPresets({
                             diekspor tidak berubah.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
+                    {archiveFeedback}
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Batal</AlertDialogCancel>
+                        <AlertDialogCancel disabled={archiveBusy}>
+                            Batal
+                        </AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={() => void archive()}
+                            onClick={(event) => {
+                                event.preventDefault();
+                                void archive();
+                            }}
                             asChild
                         >
-                            <ActionButton action="archive" />
+                            <ActionButton
+                                action="archive"
+                                pending={archiveBusy}
+                                disabled={archiveBusy}
+                            />
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

@@ -12,6 +12,10 @@ export type FilterValue = string | string[];
 
 export type Filters = Record<string, FilterValue>;
 
+/** Tanggal relatif yang dapat dipakai kembali saat menyimpan preset laporan. */
+export type ReportDateParameters =
+    { from: string; to: string } | { month: string };
+
 /**
  * Filter tambahan pengguna (K-30) di dalam `Filters` berkunci datar `filters.<data item>.<kolom>`, supaya
  * setiap filter tetap satu nilai di state halaman. Ke luar halaman — pratinjau, cetak, preset, dan opsi

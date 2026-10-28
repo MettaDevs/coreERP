@@ -1,6 +1,6 @@
 import { usePage } from '@inertiajs/react';
-import { Info } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { ChangeHistoryPage } from '@/components/change-history';
 import { ChangeHistory } from '@/components/change-history';
@@ -14,19 +14,25 @@ import {
     CollapsibleSection,
     CollapsibleSectionGroup,
 } from '@apperp/ui/collapsible-section';
-import { FieldHint, Field, FieldDescription } from '@apperp/ui/field';
+import { DatePicker } from '@apperp/ui/date-picker';
+import { FieldError } from '@apperp/ui/field';
+
+import { FormControl } from '@apperp/ui/form-control';
+import { getFormValidationErrors } from '@apperp/ui/form-feedback';
 import { Input } from '@apperp/ui/input';
 import { usePageDialogRecord } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
-import { Select } from '@apperp/ui/select';
+
 import { Textarea } from '@apperp/ui/textarea';
 import EditShield from '../../_shared/EditShield';
-import { api, errorMessage, toastSaveError } from '../../api';
+import { RecordLookup } from '../../_shared/RecordLookup';
+import { ApiError, api, errorMessage } from '../../api';
 import DynamicField from '../../master/DynamicField';
 import type { FieldValue } from '../../master/fields';
 import { emptyValue, payloadValue } from '../../master/fields';
 import { useMasterOptions } from '../../master/useMasterOptions';
 import { useRecordOptions } from '../../use-record-list';
+import { useSaveFeedback } from '../../use-save-feedback';
 import { RecordCardHeader } from '../_shared/record-card';
 import type { RecordCardControls } from '../_shared/record-card';
 import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
@@ -92,7 +98,38 @@ export default function AsetDetailPage({
     asetId?: string;
     mode: Mode;
 } & RecordCardControls) {
+    const [feedbackSections, setFeedbackSections] = useState<string[]>([
+        'klasifikasi',
+        'perolehan',
+    ]);
+
+    const {
+        scopeRef: feedbackScopeRef,
+        feedbackSummary,
+        reportSaveError,
+        clearSaveFeedback,
+        fieldError,
+    } = useSaveFeedback(undefined, asetId, () =>
+        setFeedbackSections([
+            'klasifikasi',
+            'pabrikan',
+            'bukti-perolehan',
+            'atribut',
+            'perolehan',
+            'penyusutan',
+            'penempatan',
+            'struktur',
+            'riwayat',
+            'asuransi',
+            'garansi',
+            'downtime',
+            'riwayat-perubahan',
+            'catatan',
+        ]),
+    );
+
     const embedded = usePageDialogRecord(undefined);
+    const bodyRef = useRef<HTMLDivElement>(null);
 
     const bukaAset = (id: string) => (onRequestView ?? navigateView)(id);
     const bukaAsetUbah = (id: string) => (onRequestEdit ?? navigateEdit)(id);
@@ -332,6 +369,24 @@ export default function AsetDetailPage({
         }));
 
     async function simpan() {
+        clearSaveFeedback();
+        const validationErrors = bodyRef.current
+            ? getFormValidationErrors(bodyRef.current)
+            : {};
+
+        if (Object.keys(validationErrors).length) {
+            reportSaveError(
+                new ApiError(
+                    'Periksa isian yang ditandai.',
+                    validationErrors,
+                    422,
+                ),
+                'Data belum dapat disimpan.',
+            );
+
+            return;
+        }
+
         setMenyimpan(true);
 
         try {
@@ -369,10 +424,11 @@ export default function AsetDetailPage({
                     ? { ...sebelumnya, version: jawab.data.version }
                     : sebelumnya,
             );
+            clearSaveFeedback();
             toast.success(pesanKoreksi(jawab.data.adjustment));
             (onSaved ?? bukaAset)(String(asetId));
         } catch (caught) {
-            toastSaveError(caught, 'Koreksi belum dapat disimpan.');
+            reportSaveError(caught, 'Koreksi belum dapat disimpan.');
         } finally {
             setMenyimpan(false);
         }
@@ -383,7 +439,7 @@ export default function AsetDetailPage({
         label: string,
         extra: Record<string, unknown> = {},
     ) => (
-        <Field>
+        <FormControl>
             <Input
                 label={label}
                 readOnly={readOnly}
@@ -391,7 +447,7 @@ export default function AsetDetailPage({
                 onChange={(event) => setValue(name, event.target.value)}
                 {...extra}
             />
-        </Field>
+        </FormControl>
     );
 
     /** Kelompok penunjuk; pada mode baca ia dibungkus perisai, bukan dinonaktifkan. */
@@ -469,7 +525,10 @@ export default function AsetDetailPage({
     const sudahDilepas = detail?.lifecycle_state === 'disposed';
 
     return (
-        <div className="flex h-full min-h-0 flex-col overflow-hidden">
+        <div
+            ref={feedbackScopeRef}
+            className="flex h-full min-h-0 flex-col overflow-hidden"
+        >
             <RecordCardHeader
                 recordTitle={
                     detail ? `${detail.kode} · ${detail.nama}` : 'Baru'
@@ -487,6 +546,7 @@ export default function AsetDetailPage({
                 }
             />
             <RecordActionBar
+                feedback={feedbackSummary}
                 title={embedded ? undefined : judul}
                 trailing={
                     status ? (
@@ -545,6 +605,7 @@ export default function AsetDetailPage({
             </RecordActionBar>
 
             <div
+                ref={bodyRef}
                 data-page-dialog-body
                 className="min-h-0 flex-1 overflow-y-auto"
             >
@@ -566,7 +627,8 @@ export default function AsetDetailPage({
 
                     <CollapsibleSectionGroup
                         className="min-w-0"
-                        defaultValue={['klasifikasi', 'perolehan']}
+                        value={feedbackSections}
+                        onValueChange={setFeedbackSections}
                     >
                         <CollapsibleSection
                             value="klasifikasi"
@@ -679,43 +741,45 @@ export default function AsetDetailPage({
                                     di sini. Nilai perolehan boleh dikoreksi selama belum ada
                                     periode penyusutan; koreksinya menerbitkan jurnal koreksi ke
                                     aplikasi finance (TODO 12). */}
-                                {textField('acquired_on', 'Tanggal perolehan', {
-                                    type: 'date',
-                                    readOnly: true,
-                                })}
-                                <Field>
-                                    <Input
+                                <FormControl
+                                    data-error-field="acquired_on"
+                                    error={fieldError('acquired_on')}
+                                >
+                                    <DatePicker
+                                        label="Tanggal perolehan"
+                                        value={values.acquired_on ?? ''}
+                                        readOnly
+                                        portalContainer={portalContainer}
+                                    />
+                                </FormControl>
+                                <FormControl
+                                    data-error-field="placed_in_service_on"
+                                    error={fieldError('placed_in_service_on')}
+                                    hint={
+                                        <>
+                                            Dasar perhitungan awal penyusutan.
+                                            Kosong berarti sama dengan tanggal
+                                            perolehan.
+                                        </>
+                                    }
+                                >
+                                    <DatePicker
                                         label="Tanggal mulai digunakan"
-                                        type="date"
+                                        portalContainer={portalContainer}
                                         readOnly={readOnly}
                                         value={values.placed_in_service_on}
-                                        onChange={(event) =>
+                                        onValueChange={(value) =>
                                             setValue(
                                                 'placed_in_service_on',
-                                                event.target.value,
+                                                value,
                                             )
                                         }
                                     />
-                                    <FieldHint
-                                        hint={
-                                            <>
-                                                Dasar perhitungan awal
-                                                penyusutan. Kosong berarti sama
-                                                dengan tanggal perolehan.
-                                            </>
-                                        }
-                                    >
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            aria-label="Bantuan field"
-                                        >
-                                            <Info aria-hidden="true" />
-                                        </Button>
-                                    </FieldHint>
-                                </Field>
-                                <Field>
+                                </FormControl>
+                                <FormControl
+                                    data-error-field="acquisition_value"
+                                    error={fieldError('acquisition_value')}
+                                >
                                     <Input
                                         label="Nilai perolehan"
                                         type="number"
@@ -731,14 +795,14 @@ export default function AsetDetailPage({
                                         }
                                     />
                                     {!readOnly && (
-                                        <FieldDescription>
+                                        <FieldError>
                                             Mengubahnya menerbitkan jurnal
                                             koreksi ke aplikasi finance. Hanya
                                             dapat diubah sebelum ada periode
                                             penyusutan.
-                                        </FieldDescription>
+                                        </FieldError>
                                     )}
-                                </Field>
+                                </FormControl>
                                 {nilaiBerubah && asetId && (
                                     <AcquisitionAdjustmentPreview
                                         asetId={asetId}
@@ -829,52 +893,37 @@ export default function AsetDetailPage({
                                     )?.label ?? 'Tanpa aset induk'}
                                 </p>
                             ) : (
-                                <Field>
-                                    <Select
+                                <FormControl
+                                    hint={
+                                        <>
+                                            Isi bila aset ini bagian dari aset
+                                            lain, misalnya mesin yang terpasang
+                                            pada satu gedung.
+                                        </>
+                                    }
+                                >
+                                    <RecordLookup
                                         portalContainer={portalContainer}
-                                        {...assetSource.selectProps}
+                                        source={assetSource}
                                         label="Aset induk"
-                                        items={parentOptions.map(
-                                            (option) => option.label,
-                                        )}
-                                        value={
-                                            parentOptions.find(
-                                                (option) =>
-                                                    option.id === parentAsetId,
-                                            )?.label ?? null
-                                        }
+                                        items={parentOptions.map((record) => ({
+                                            value: record.id,
+                                            label: record.label,
+                                        }))}
+                                        value={parentAsetId || null}
                                         placeholder="Tanpa induk"
                                         searchPlaceholder="Cari aset induk"
                                         emptyMessage="Aset tidak ditemukan."
                                         ariaLabel="Pilih aset induk"
                                         onValueChange={(item) =>
-                                            setParentAsetId(
-                                                parentOptions.find(
-                                                    (option) =>
-                                                        option.label === item,
-                                                )?.id ?? '',
-                                            )
+                                            setParentAsetId(item ?? '')
+                                        }
+                                        filterKey={asetId ?? ''}
+                                        filterRecord={(record) =>
+                                            record.id !== asetId
                                         }
                                     />
-                                    <FieldHint
-                                        hint={
-                                            <>
-                                                Isi bila aset ini bagian dari
-                                                aset lain, misalnya mesin yang
-                                                terpasang pada satu gedung.
-                                            </>
-                                        }
-                                    >
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            aria-label="Bantuan field"
-                                        >
-                                            <Info aria-hidden="true" />
-                                        </Button>
-                                    </FieldHint>
-                                </Field>
+                                </FormControl>
                             )}
                         </CollapsibleSection>
 
@@ -992,7 +1041,7 @@ export default function AsetDetailPage({
                         )}
 
                         <CollapsibleSection value="catatan" title="Keterangan">
-                            <Field>
+                            <FormControl data-error-field="keterangan">
                                 <Textarea
                                     rows={3}
                                     maxLength={2000}
@@ -1006,7 +1055,7 @@ export default function AsetDetailPage({
                                         )
                                     }
                                 />
-                            </Field>
+                            </FormControl>
                         </CollapsibleSection>
                     </CollapsibleSectionGroup>
                 </RecordFactBox>

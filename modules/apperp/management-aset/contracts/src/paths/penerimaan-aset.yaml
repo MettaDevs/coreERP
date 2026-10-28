@@ -81,8 +81,22 @@
       `responsible_org_unit_id` boleh kosong bila `lokasi_aset_id` punya unit kerja bawaan
       (milik sendiri atau warisan lokasi induk terdekat); unit itulah yang dipakai. Bila keduanya
       kosong, 422 pada `responsible_org_unit_id`. Aturan yang sama berlaku pada `PATCH`.
+
+      Lampiran draf dapat dikirim bersama dokumen melalui multipart: `payload` berisi JSON
+      dokumen dan `attachments[]` berisi berkas. Hak ubah penerimaan diperlukan untuk
+      melampirkan berkas. Kepala, rincian, dan metadata lampiran disimpan dalam satu transaksi;
+      kegagalan membatalkan semuanya dan membersihkan berkas baru. Replay idempotensi tidak
+      membuat lampiran atau dokumen ganda. Batas unggah dibaca dari `attachment-limits`.
     parameters:
     - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema: { type: object }
+        multipart/form-data:
+          schema:
+            $ref: '#/components/schemas/AssetReceiptMultipartInput'
     responses:
       '200':
         description: 'Permintaan ulang dengan kunci idempotensi yang sama; header `Idempotent-Replayed: true`'
@@ -103,6 +117,28 @@
           legal lain, mata uang yang presisinya belum disetel, harga satuan atau PPN per unit
           yang lebih halus dari presisi harga satuannya, dan pelanggaran aturan saldo awal di atas
           (kuncinya menunjuk baris dan bukunya, misalnya `details.0.saldo_awal_buku.1.buku_id`).
+/api/v1/penerimaan-aset/attachment-limits:
+  get:
+    tags: [Penerimaan aset]
+    operationId: getAssetReceiptAttachmentLimits
+    summary: Membaca batas unggah sebelum draf penerimaan disimpan
+    responses:
+      '200':
+        description: Batas unggah Core; memerlukan izin baca penerimaan.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: object
+                  properties:
+                    max_kb: { type: integer }
+                    max_total_kb: { type: integer }
+                    max_files: { type: integer }
+                    extensions: { type: array, items: { type: string } }
+      '403':
+        $ref: '#/components/responses/Forbidden'
 /api/v1/penerimaan-aset/vendor:
   get:
     tags:
@@ -228,7 +264,10 @@
 
       `purchase_order_reference` berisi nomor PO manual atau null. Lampiran dokumen memakai
       record Core `aset_tr_penerimaan_aset` dengan ID penerimaan, mengikuti izin baca/ubah
-      Penerimaan dan lingkup organisasi yang sama. Lampiran tidak disalin per aset atau bulan.
+      Penerimaan dan lingkup organisasi yang sama. Saat penerimaan diselesaikan, metadata dan
+      referensi berkas diteruskan ke aset hasilnya tanpa menyalin isi berkas. Lampiran kepala
+      berlaku untuk seluruh aset; lampiran baris hanya untuk aset dari baris tersebut.
+      Penambahan lampiran setelah penyelesaian tetap berada pada dokumen asal.
 
       `vendor` berisi `{id, number, name, status}` vendor Core, atau `null`. `posting` berisi
       keadaan jurnalnya di feed posting finance sesudah diselesaikan — jurnal perolehan, atau
@@ -260,6 +299,9 @@
         application/json:
           schema:
             $ref: '#/components/schemas/VersionInput'
+        multipart/form-data:
+          schema:
+            $ref: '#/components/schemas/AssetReceiptMultipartInput'
     responses:
       '200':
         description: Penerimaan setelah diubah

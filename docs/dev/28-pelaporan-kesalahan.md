@@ -90,12 +90,33 @@ belum berarti pengguna melihat bahwa penyimpanannya gagal. UI harus menyebut tin
 berhasil, mempertahankan isian bila belum tersimpan, dan menyediakan pesan yang tetap terlihat atau
 bisa ditutup pengguna. Toast singkat saja tidak cukup untuk kegagalan 5xx pada tindakan penyimpanan.
 
-Handler `toastSaveError` bersama di `modules/apperp/management-aset/ui/api.ts` membuat pesan error 5xx
-menetap sampai ditutup, memakai kalimat tindakan dari pemanggil dan pesan sehari-hari. Form penerimaan
-juga menampilkan pesan dalam form dan mengarahkan scroll ke sana. Detail SQL dan exception tetap di
-laporan server, bukan pada layar bisnis. Pelaporan exception asli tetap berjalan; jangan mengubah bug
-indeks database menjadi validasi 422 agar hilang dari pemantauan, dan jangan mengirim exception yang
-sama dua kali ke Sentry.
+SDK `@apperp/ui/form-feedback` menyediakan `FormErrorSummary` dan `createSaveFeedback`.
+State tetap milik tiap form; popup anak tidak memakai state error induknya. `RecordActionBar`
+memiliki slot `feedback` di bawah tombol, sedangkan kartu popup menempatkan ringkasan di bawah
+toolbar, sebelum body yang bergulir. Field tetap menampilkan pesan validasinya sendiri.
+Tautan ringkasan mencari field hanya di dalam form terkait melalui `name`, `id`, atau
+`data-error-field`. Bagian yang belum terbuka perlu dibuka pemilik form sebelum fokus dipindahkan.
+
+Adapter `saveErrorFeedback` di klien Core dan module menyusun pesan aman dari status, kode,
+dan seluruh masalah field. Pesan 5xx menyembunyikan teks exception. Tombol Salin detail bantuan
+langsung menyalin rincian aman dan menampilkan status inline, tanpa popup. Nomor referensi kejadian
+hanya boleh dicantumkan bila benar-benar mengarah ke laporan server. SDK tidak membuat mekanisme
+pemulihan koneksi terputus atau menebak tindakan bisnis dari kalimat error.
+
+Konfirmasi menggunakan `useConfirmation` atau `useRecordTransition` dari SDK, bukan `alert`,
+`confirm`, atau `prompt` browser. Form memakai `noValidate` agar bubble validasi browser tidak
+menghentikan submit sebelum ringkasan aplikasi tampil. Pemeriksaan lokal dapat membaca
+`getFormValidationErrors` lalu meneruskan seluruh pesan ke state header dan field; validasi server
+tetap berlaku. `reportValidity()` tidak digunakan. Penjaga `scripts/check-browser-dialogs.mjs`
+menolak pemanggilan lama, aliasnya, dan form yang belum menonaktifkan validasi browser; CI
+menjalankan penjaga yang sama dengan pengujian contohnya.
+
+Konflik versi mempertahankan draft dan meminta pengguna meninjau data terbaru. Jangan memasang
+reload otomatis yang membuang isian. Tindakan menuju pengaturan atau memperbaiki nilai berasal
+dari pemilik proses dan tetap tunduk pada izin serta validasi server. Detail SQL dan exception
+tetap di laporan server, bukan pada layar bisnis. Pelaporan exception asli tetap berjalan;
+jangan mengubah bug indeks database menjadi validasi 422 agar hilang dari pemantauan, dan jangan
+mengirim exception yang sama dua kali ke Sentry.
 
 Adapter penomoran aset hanya membungkus `ValidationException` sebagai penolakan 422. Exception database,
 bug internal, dan hasil penerbit yang melanggar kontrak diteruskan ke handler Laravel sebagai 500;

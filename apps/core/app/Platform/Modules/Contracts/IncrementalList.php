@@ -94,7 +94,8 @@ final class IncrementalList
             if ($sort !== $identity) {
                 $list->orderBy($identity, $direction);
             }
-            $batch = $list->cursorPaginate((int) ($input['per_page'] ?? 40), ['*'], 'cursor', $cursor);
+            // Null membuat Laravel mengambil cursor request luar, termasuk pada lookup internal.
+            $batch = $list->cursorPaginate((int) ($input['per_page'] ?? 40), ['*'], 'cursor', $cursor ?? '');
             $items = collect($batch->items());
             $nextCursor = $batch->nextCursor()?->encode();
         }

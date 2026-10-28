@@ -159,7 +159,7 @@ lebih dahulu setelah area 0.
 - [ ] 5.2 Tampilkan menunggu/diproses/gagal/selesai dan tautan hasil; payload Temporal teknis tidak tampil ke pengguna bisnis.
 - [ ] 5.3 Polling/backoff dan retry UI tidak membuat intent kedua; refresh memulangkan keadaan tersimpan.
 - [ ] 5.4 Endpoint menyaring tenant, environment, scope, dan permission; menyembunyikan tombol bukan pengaman.
-- [ ] 5.5 Rebuild/recreate runtime lewat `D:/Kerja/erp-dev/start.ps1 -Build`, health check, lalu buka layar terkait pada localhost:8000.
+- [ ] 5.5 Dengan HotReload aktif, biarkan source UI diterapkan ke runtime yang berjalan tanpa rebuild atau reload manual. Jika user/developer melaporkan layar stale, periksa Vite/mount dan lakukan fallback seperlunya; health check dilakukan setelah runtime direstart.
 - [ ] 5.6 Jika manifest berubah, register di container dan cek navigation runtime; jika route/contract berubah, bundle dan coverage wajib.
 - [ ] 5.7 Layout/editor round-trip mempertahankan IDs/semantik. Validator menunjukkan node/error
   publish; menu capability unsupported tidak menjanjikan tindakan yang belum berjalan.

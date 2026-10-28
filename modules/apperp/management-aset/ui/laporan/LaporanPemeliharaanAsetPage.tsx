@@ -1,20 +1,6 @@
 import { useMemo } from 'react';
 import { Badge } from '@apperp/ui/badge';
 import type { DataTableColumn } from '@apperp/ui/data-table';
-import { Field } from '@apperp/ui/field';
-import { MultiSelect } from '@apperp/ui/multi-select';
-import { ReportFilterBar } from './_shared/ReportFilterBar';
-import type { MultiFilterProps } from './_shared/ReportFilters';
-import {
-    AssetFilter,
-    AssetGroupFilter,
-    AssetTypeFilter,
-    DateFilter,
-    FiscalClassificationFilter,
-    LocationFilter,
-    MasterFilter,
-    OrganizationUnitFilter,
-} from './_shared/ReportFilters';
 import { ReportPageLayout } from './_shared/ReportPageLayout';
 import { useReportData } from './_shared/useReportData';
 
@@ -43,44 +29,9 @@ export type MaintenanceReportRow = {
 const teks = (value: unknown) =>
     value === null || value === undefined || value === '' ? '—' : String(value);
 
-/** Status work order; nilainya kode status yang dikenal server, labelnya sama dengan layar work order. */
-const STATUS_ITEMS = [
-    { value: 'draft', label: 'Draf' },
-    { value: 'dijadwalkan', label: 'Dijadwalkan' },
-    { value: 'dikerjakan', label: 'Dikerjakan' },
-    { value: 'selesai', label: 'Selesai' },
-    { value: 'ditutup', label: 'Ditutup' },
-    { value: 'dibatalkan', label: 'Dibatalkan' },
-];
-
-function StatusFilter({ value, onChange }: MultiFilterProps) {
-    return (
-        <Field className="w-full sm:w-56">
-            <MultiSelect
-                label="Status"
-                items={STATUS_ITEMS}
-                value={value}
-                onValueChange={onChange}
-                searchPlaceholder="Cari status"
-                emptyMessage="Status tidak ditemukan."
-            />
-        </Field>
-    );
-}
-
 export default function LaporanPemeliharaanAsetPage() {
-    const {
-        filters,
-        bindFilter,
-        bindMultiFilter,
-        additional,
-        hasActiveFilters,
-        resetFilters,
-        rows,
-        loading,
-        error,
-        refetch,
-    } = useReportData<MaintenanceReportRow>('laporan-pemeliharaan-aset');
+    const { filterState, rows, loading, error, refetch } =
+        useReportData<MaintenanceReportRow>('laporan-pemeliharaan-aset');
 
     const columns: DataTableColumn<MaintenanceReportRow>[] = useMemo(
         () => [
@@ -196,44 +147,8 @@ export default function LaporanPemeliharaanAsetPage() {
         <ReportPageLayout<MaintenanceReportRow>
             title="Laporan pemeliharaan aset"
             description="Riwayat perawatan dan perbaikan aset, satu baris per aset yang dikerjakan, beserta checklist, analisa perbaikan, dan teknisinya."
-            reportCode="laporan-pemeliharaan-aset"
-            filters={filters}
-            filterBar={
-                <ReportFilterBar
-                    canReset={hasActiveFilters}
-                    onReset={resetFilters}
-                    additional={additional}
-                >
-                    <DateFilter label="Dari tanggal" {...bindFilter('dari')} />
-                    <DateFilter
-                        label="Sampai tanggal"
-                        {...bindFilter('sampai')}
-                    />
-                    <AssetGroupFilter {...bindMultiFilter('group_aset_id')} />
-                    <FiscalClassificationFilter
-                        {...bindMultiFilter('kelompok_harta_fiskal_id')}
-                    />
-                    <AssetTypeFilter {...bindMultiFilter('jenis_aset_id')} />
-                    <AssetFilter {...bindFilter('asset_id')} />
-                    <LocationFilter {...bindMultiFilter('lokasi_aset_id')} />
-                    <StatusFilter {...bindMultiFilter('status')} />
-                    <MasterFilter
-                        {...bindMultiFilter('tingkat_layanan_id')}
-                        resource="tingkat-layanan"
-                        label="Tingkat layanan"
-                        unavailable="Pilihan tingkat layanan tidak dapat dimuat."
-                    />
-                    <MasterFilter
-                        {...bindMultiFilter('teknisi_user_id')}
-                        resource="reference-data/anggota"
-                        label="Teknisi"
-                        unavailable="Pilihan teknisi tidak dapat dimuat."
-                    />
-                    <OrganizationUnitFilter
-                        {...bindMultiFilter('org_unit_id')}
-                    />
-                </ReportFilterBar>
-            }
+            filterState={filterState}
+
             columns={columns}
             rows={rows}
             loading={loading}

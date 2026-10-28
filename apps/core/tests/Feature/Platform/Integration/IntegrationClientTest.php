@@ -354,7 +354,7 @@ class IntegrationClientTest extends TestCase
         $this->buat(['name' => 'Metadata', 'delivery_mode' => 'push', 'push_url' => 'https://169.254.169.254/latest'])
             ->assertStatus(422)->assertJsonValidationErrors('push_url');
 
-        $alamat = ['203.0.113.20'];
+        $alamat = ['8.8.8.8'];
         $this->buat(['name' => 'Publik', 'delivery_mode' => 'push', 'push_url' => 'https://finance.example.test/hook'])
             ->assertCreated();
 
@@ -373,7 +373,7 @@ class IntegrationClientTest extends TestCase
         config(['coreerp.base_domain' => 'erp.example.test']);
 
         // IPv4 publik tidak menyelamatkan host yang juga punya IPv6 privat.
-        foreach ([['203.0.113.20', 'fd00::5'], ['::ffff:10.0.0.5'], ['64:ff9b::a00:5'], ['::1']] as $urut => $daftar) {
+        foreach ([['8.8.8.8', 'fd00::5'], ['203.0.113.20'], ['::ffff:10.0.0.5'], ['64:ff9b::a00:5'], ['::1']] as $urut => $daftar) {
             $alamat = $daftar;
             $this->buat(['name' => 'Privat '.$urut, 'delivery_mode' => 'push', 'push_url' => 'https://finance.example.test/hook'])
                 ->assertStatus(422)->assertJsonValidationErrors('push_url');
@@ -381,14 +381,14 @@ class IntegrationClientTest extends TestCase
         $this->buat(['name' => 'Literal', 'delivery_mode' => 'push', 'push_url' => 'https://[fd00::5]/hook'])
             ->assertStatus(422)->assertJsonValidationErrors('push_url');
 
-        $alamat = ['203.0.113.20', '2001:4860::8888'];
+        $alamat = ['8.8.8.8', '2001:4860::8888'];
         $this->buat(['name' => 'Publik', 'delivery_mode' => 'push', 'push_url' => 'https://finance.example.test/hook'])
             ->assertCreated();
     }
 
     public function test_in_saas_a_push_goes_to_the_addresses_just_checked(): void
     {
-        $alamat = ['203.0.113.20', '2001:4860::8888'];
+        $alamat = ['8.8.8.8', '2001:4860::8888'];
         $this->app->instance(PushDestination::class, new PushDestination(function () use (&$alamat): array {
             return $alamat;
         }));
@@ -402,7 +402,7 @@ class IntegrationClientTest extends TestCase
         $id = (string) $this->buat(['delivery_mode' => 'push', 'push_url' => 'https://finance.example.test:8443/hook'])->json('data.id');
 
         $this->actingAs($this->owner)->postJson("/api/v1/integration-clients/{$id}/test-push")->assertOk()->assertJsonPath('data.ok', true);
-        $this->assertSame(['finance.example.test:8443:203.0.113.20,[2001:4860::8888]'], $opsi[0]['curl'][CURLOPT_RESOLVE] ?? null);
+        $this->assertSame(['finance.example.test:8443:8.8.8.8,[2001:4860::8888]'], $opsi[0]['curl'][CURLOPT_RESOLVE] ?? null);
         $this->assertFalse($opsi[0]['allow_redirects']);
 
         // DNS yang berganti ke alamat privat sesudah klien disimpan ditolak sebelum mengirim.

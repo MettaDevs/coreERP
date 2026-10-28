@@ -1,0 +1,48 @@
+x-portal:
+  judul: Pendaftaran trial produk (internal)
+  publik: false
+  urutan: 91
+openapi: 3.1.0
+info:
+  title: CoreERP - bridge pendaftaran trial produk
+  version: 1.0.0
+  description: Dipanggil hanya oleh bridge landing memakai token khusus. Identitas
+    issuer+subject berasal dari pertukaran kode OIDC oleh Core. Email_verified dari
+    provider tidak dipercaya; email dibuktikan lewat tautan independen. Surface ini
+    tidak membuat Core User/client/tenant bisnis dan tidak membuka endpoint operator.
+    Kredensial database, owner password dan metta tidak pernah disertakan. /session
+    tanpa sesi customer menjawab authenticated=false. Trial milik customer dibatasi
+    satu per produk, memakai release immutable dan jalur provisioning yang sama dengan
+    console.
+servers:
+- url: /api/internal/v1
+security:
+- productRegistrationGateway: []
+tags:
+- name: Product registration
+  description: Pendaftaran customer produk eksternal dari landing.
+paths:
+  /product-registration/auth/start:
+    $ref: paths/product-registration_auth_start.yaml
+  /product-registration/auth/exchange:
+    $ref: paths/product-registration_auth_exchange.yaml
+  /product-registration/session:
+    $ref: paths/product-registration_session.yaml
+  /product-registration/email-challenge:
+    $ref: paths/product-registration_email-challenge.yaml
+  /product-registration/email-verification:
+    $ref: paths/product-registration_email-verification.yaml
+  /product-registration/tenants:
+    $ref: paths/product-registration_tenants.yaml
+  /product-registration/launch:
+    $ref: paths/product-registration_launch.yaml
+  /product-registration/logout:
+    $ref: paths/product-registration_logout.yaml
+  /product-registration/backchannel-logout:
+    $ref: paths/product-registration_backchannel-logout.yaml
+components:
+  securitySchemes:
+    productRegistrationGateway:
+      $ref: components/securitySchemes/productRegistrationGateway.yaml
+    productRegistrationSession:
+      $ref: components/securitySchemes/productRegistrationSession.yaml

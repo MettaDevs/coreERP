@@ -1,0 +1,525 @@
+# Berkas hasil `python contracts/bundle.py` dari `contracts/internal/`.
+# Jangan diedit tangan: suntingan di sini hilang pada perakitan berikutnya, dan CI menolaknya.
+openapi: 3.1.0
+info:
+  title: CoreERP - bridge pendaftaran trial produk
+  version: 1.0.0
+  description: Dipanggil hanya oleh bridge landing memakai token khusus. Identitas issuer+subject berasal
+    dari pertukaran kode OIDC oleh Core. Email_verified dari provider tidak dipercaya; email dibuktikan
+    lewat tautan independen. Surface ini tidak membuat Core User/client/tenant bisnis dan tidak membuka
+    endpoint operator. Kredensial database, owner password dan metta tidak pernah disertakan. /session
+    tanpa sesi customer menjawab authenticated=false. Trial milik customer dibatasi satu per produk, memakai
+    release immutable dan jalur provisioning yang sama dengan console.
+servers:
+- url: /api/internal/v1
+security:
+- productRegistrationGateway: []
+tags:
+- name: Product registration
+  description: Pendaftaran customer produk eksternal dari landing.
+paths:
+  /product-registration/auth/start:
+    post:
+      tags:
+      - Product registration
+      operationId: internal.productRegistration.start
+      summary: Mulai login SSO terikat peramban
+      security:
+      - productRegistrationGateway: []
+      responses:
+        '200':
+          description: Permintaan berhasil.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - authorization_url
+                properties:
+                  authorization_url:
+                    type: string
+                    format: uri
+        '401':
+          description: Sesi atau kredensial bridge tidak berlaku.
+        '422':
+          description: Isian belum sesuai atau verifikasi belum selesai.
+        '429':
+          description: Batas permintaan tercapai.
+        '503':
+          description: Penyedia atau konfigurasi belum tersedia.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - browser_challenge
+              properties:
+                browser_challenge:
+                  type: string
+                  pattern: ^[a-f0-9]{64}$
+  /product-registration/auth/exchange:
+    post:
+      tags:
+      - Product registration
+      operationId: internal.productRegistration.exchange
+      summary: Tukar kode OIDC sekali pakai
+      security:
+      - productRegistrationGateway: []
+      responses:
+        '200':
+          description: Permintaan berhasil.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - session_token
+                - session
+                properties:
+                  session_token:
+                    type: string
+                    description: Rahasia sesi hanya untuk bridge landing.
+                  session:
+                    $ref: '#/components/schemas/ProductRegistrationSession'
+        '401':
+          description: Sesi atau kredensial bridge tidak berlaku.
+        '422':
+          description: Isian belum sesuai atau verifikasi belum selesai.
+        '429':
+          description: Batas permintaan tercapai.
+        '503':
+          description: Penyedia atau konfigurasi belum tersedia.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - state
+              - code
+              - browser_secret
+              properties:
+                state:
+                  type: string
+                  pattern: ^[a-f0-9]{64}$
+                code:
+                  type: string
+                  maxLength: 4096
+                browser_secret:
+                  type: string
+                  minLength: 32
+                  maxLength: 128
+  /product-registration/session:
+    get:
+      tags:
+      - Product registration
+      operationId: internal.productRegistration.session
+      summary: Baca sesi customer dan status tenant sendiri
+      security:
+      - productRegistrationGateway: []
+      responses:
+        '200':
+          description: Permintaan berhasil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductRegistrationSession'
+        '401':
+          description: Sesi atau kredensial bridge tidak berlaku.
+        '422':
+          description: Isian belum sesuai atau verifikasi belum selesai.
+        '429':
+          description: Batas permintaan tercapai.
+        '503':
+          description: Penyedia atau konfigurasi belum tersedia.
+  /product-registration/email-challenge:
+    post:
+      tags:
+      - Product registration
+      operationId: internal.productRegistration.emailChallenge
+      summary: Kirim tautan verifikasi email independen
+      security:
+      - productRegistrationGateway: []
+        productRegistrationSession: []
+      responses:
+        '200':
+          description: Permintaan berhasil.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - sent
+                - expires_at
+                properties:
+                  sent:
+                    type: boolean
+                  expires_at:
+                    type: string
+                    format: date-time
+        '401':
+          description: Sesi atau kredensial bridge tidak berlaku.
+        '422':
+          description: Isian belum sesuai atau verifikasi belum selesai.
+        '429':
+          description: Batas permintaan tercapai.
+        '503':
+          description: Penyedia atau konfigurasi belum tersedia.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  maxLength: 250
+  /product-registration/email-verification:
+    post:
+      tags:
+      - Product registration
+      operationId: internal.productRegistration.emailVerification
+      summary: Verifikasi email dengan identitas SSO yang sama
+      security:
+      - productRegistrationGateway: []
+        productRegistrationSession: []
+      responses:
+        '200':
+          description: Permintaan berhasil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductRegistrationSession'
+        '401':
+          description: Sesi atau kredensial bridge tidak berlaku.
+        '422':
+          description: Isian belum sesuai atau verifikasi belum selesai.
+        '429':
+          description: Batas permintaan tercapai.
+        '503':
+          description: Penyedia atau konfigurasi belum tersedia.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - token
+              properties:
+                token:
+                  type: string
+                  pattern: ^[a-f0-9]{64}$
+  /product-registration/tenants:
+    post:
+      tags:
+      - Product registration
+      operationId: internal.productRegistration.storeTenant
+      summary: Buat trial produk untuk customer terverifikasi
+      security:
+      - productRegistrationGateway: []
+        productRegistrationSession: []
+      responses:
+        '202':
+          description: Permintaan berhasil.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductRegistrationTenant'
+        '401':
+          description: Sesi atau kredensial bridge tidak berlaku.
+        '422':
+          description: Isian belum sesuai atau verifikasi belum selesai.
+        '429':
+          description: Batas permintaan tercapai.
+        '503':
+          description: Penyedia atau konfigurasi belum tersedia.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - product
+              - profile
+              - name
+              - slug
+              - idempotency_key
+              properties:
+                product:
+                  type: string
+                profile:
+                  type: string
+                name:
+                  type: string
+                  maxLength: 150
+                slug:
+                  type: string
+                  minLength: 3
+                  maxLength: 63
+                idempotency_key:
+                  type: string
+                  format: uuid
+  /product-registration/launch:
+    post:
+      tags:
+      - Product registration
+      operationId: internal.productRegistration.launch
+      summary: Terbitkan bukti login terikat tenant dan peramban
+      security:
+      - productRegistrationGateway: []
+        productRegistrationSession: []
+      responses:
+        '200':
+          description: Permintaan berhasil.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - ticket
+                - public_url
+                properties:
+                  ticket:
+                    type: string
+                    description: JWT RS256 dengan masa berlaku maksimal 60 detik; hanya dikirim ke tenant
+                      lewat POST.
+                  public_url:
+                    type: string
+                    format: uri
+        '401':
+          description: Sesi atau kredensial bridge tidak berlaku.
+        '422':
+          description: Isian belum sesuai atau verifikasi belum selesai.
+        '429':
+          description: Batas permintaan tercapai.
+        '503':
+          description: Penyedia atau konfigurasi belum tersedia.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - tenant_id
+              - browser_challenge
+              - state
+              properties:
+                tenant_id:
+                  type: string
+                  format: uuid
+                  description: Referensi registry produk eksternal milik customer; bukan tenant_id bisnis
+                    CoreERP.
+                browser_challenge:
+                  type: string
+                  pattern: ^[a-f0-9]{64}$
+                state:
+                  type: string
+                  minLength: 32
+                  maxLength: 128
+                  pattern: ^[A-Za-z0-9_-]+$
+  /product-registration/logout:
+    post:
+      tags:
+      - Product registration
+      operationId: internal.productRegistration.logout
+      summary: Cabut sesi customer saat ini
+      security:
+      - productRegistrationGateway: []
+        productRegistrationSession: []
+      responses:
+        '200':
+          description: Permintaan berhasil.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - ok
+                properties:
+                  ok:
+                    type: boolean
+        '401':
+          description: Sesi atau kredensial bridge tidak berlaku.
+        '422':
+          description: Isian belum sesuai atau verifikasi belum selesai.
+        '429':
+          description: Batas permintaan tercapai.
+        '503':
+          description: Penyedia atau konfigurasi belum tersedia.
+  /product-registration/backchannel-logout:
+    post:
+      tags:
+      - Product registration
+      operationId: internal.productRegistration.backchannelLogout
+      summary: Cabut sesi customer lewat logout token penyedia
+      security:
+      - productRegistrationGateway: []
+      responses:
+        '200':
+          description: Permintaan berhasil.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - ok
+                properties:
+                  ok:
+                    type: boolean
+        '401':
+          description: Sesi atau kredensial bridge tidak berlaku.
+        '422':
+          description: Isian belum sesuai atau verifikasi belum selesai.
+        '429':
+          description: Batas permintaan tercapai.
+        '503':
+          description: Penyedia atau konfigurasi belum tersedia.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - logout_token
+              properties:
+                logout_token:
+                  type: string
+                  maxLength: 16384
+components:
+  securitySchemes:
+    productRegistrationGateway:
+      type: http
+      scheme: bearer
+      description: Token khusus bridge landing. Tidak menerima token operator control plane.
+    productRegistrationSession:
+      type: apiKey
+      in: header
+      name: X-Registration-Session
+      description: Token opaque sesi customer yang disimpan pada cookie HttpOnly oleh landing. Bukan kredensial
+        operator.
+  schemas:
+    ProductRegistrationSession:
+      type: object
+      required:
+      - authenticated
+      - customer
+      - products
+      - tenant
+      properties:
+        authenticated:
+          type: boolean
+        customer:
+          oneOf:
+          - type: 'null'
+          - type: object
+            required:
+            - id
+            - name
+            - email
+            - email_verified
+            properties:
+              id:
+                type: string
+                format: uuid
+              name:
+                type: string
+              email:
+                type:
+                - string
+                - 'null'
+                format: email
+              email_verified:
+                type: boolean
+        products:
+          type: array
+          items:
+            type: object
+            required:
+            - code
+            - name
+            - trial_days
+            - profiles
+            properties:
+              code:
+                type: string
+              name:
+                type: string
+              trial_days:
+                type: integer
+                minimum: 1
+                maximum: 90
+              profiles:
+                type: array
+                items:
+                  type: object
+                  required:
+                  - code
+                  - name
+                  - description
+                  properties:
+                    code:
+                      type: string
+                    name:
+                      type: string
+                    description:
+                      type: string
+        tenant:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/ProductRegistrationTenant'
+    ProductRegistrationTenant:
+      type: object
+      required:
+      - id
+      - product
+      - profile
+      - name
+      - slug
+      - status
+      - public_url
+      - expires_at
+      - failure_message
+      properties:
+        id:
+          type: string
+          format: uuid
+        product:
+          type: string
+        profile:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        status:
+          type: string
+          enum:
+          - queued
+          - provisioning
+          - ready
+          - failed
+        public_url:
+          type:
+          - string
+          - 'null'
+          format: uri
+        expires_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        failure_message:
+          type:
+          - string
+          - 'null'

@@ -7,6 +7,9 @@ use App\Foundation\Workflow\Support\WorkflowParameters;
 use App\Foundation\Workflow\Support\WorkflowRuntime;
 use App\Platform\Access\Models\Role;
 use App\Platform\Access\Models\RoleAssignment;
+use App\Platform\Access\Models\SecurityDuty;
+use App\Platform\Access\Models\SecurityPrivilege;
+use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Models\TenantMembership;
@@ -17,11 +20,13 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Concerns\GrantsCoreRoles;
 use Tests\TestCase;
 use UnexpectedValueException;
 
 class WorkflowConfigurationTest extends TestCase
 {
+    use GrantsCoreRoles;
     use RefreshDatabase;
 
     private User $owner;
@@ -44,6 +49,148 @@ class WorkflowConfigurationTest extends TestCase
             'decision_context_schema' => json_encode(['required' => ['document_id', 'asset_id']], JSON_THROW_ON_ERROR),
             'created_at' => now(), 'updated_at' => now(),
         ]);
+    }
+
+    public function test_workflow_list_pages_without_per_record_version_queries_and_keeps_the_api_array(): void
+    {
+        $tenantId = $this->owner->activeMembership()->tenant_id;
+        for ($index = 0; $index < 53; $index++) {
+            $this->insertListWorkflow($tenantId, sprintf('Workflow %02d', $index));
+        }
+        $foreignTenantId = (string) Str::ulid();
+        $this->insertListWorkflow($foreignTenantId, 'Foreign workflow');
+        $queries = [];
+        DB::listen(function ($query) use (&$queries): void {
+            if (str_starts_with($query->sql, 'select') && str_contains($query->sql, 'workflow_configuration_versions')) {
+                $queries[] = $query->sql;
+            }
+        });
+        $this->actingAs($this->owner)->get('/settings/workflows')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->has('workflows.data', 50)
+            ->where('workflows.data.0.name', 'Workflow 00')
+            ->where('canManage', true));
+        $this->assertCount(1, $queries, 'Versi terbaru harus dibaca dalam query daftar, bukan per baris.');
+        $this->get('/settings/workflows?page=2')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->has('workflows.data', 3)
+            ->where('workflows.data.0.name', 'Workflow 50'));
+        $this->getJson('/api/v1/workflows')->assertOk()->assertJsonCount(53, 'data.workflows')->assertJsonMissingPath('data.workflows.data');
+    }
+
+    public function test_workflow_list_filters_and_sort_use_the_latest_version_and_literal_search(): void
+    {
+        $tenantId = $this->owner->activeMembership()->tenant_id;
+        $this->insertListWorkflow($tenantId, 'A % draft');
+        $inactive = $this->insertListWorkflow($tenantId, 'B published', false, 'published');
+        $this->insertListWorkflow($tenantId, 'C active', true, 'published');
+        $revised = $this->insertListWorkflow($tenantId, 'D revised', false, 'published');
+        DB::table('workflow_configuration_versions')->insert(['id' => (string) Str::ulid(), 'configuration_id' => $revised, 'version' => 2, 'status' => 'draft', 'created_at' => now(), 'updated_at' => now()]);
+        $appName = DB::table('apps')->where('id', 'app-uji')->value('name');
+        $this->actingAs($this->owner)->get('/settings/workflows?'.http_build_query(['q' => '%', 'app' => $appName]))->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->has('workflows.data', 1)->where('workflows.data.0.name', 'A % draft'));
+        $this->get('/settings/workflows?status=inactive')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->has('workflows.data', 1)->where('workflows.data.0.id', $inactive)->where('workflows.data.0.status', 'inactive'));
+        $this->get('/settings/workflows?status=draft&sort=name&direction=desc')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->has('workflows.data', 2)->where('workflows.data.0.id', $revised));
+        $this->get('/settings/workflows?status=active')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->has('workflows.data', 1)->where('workflows.data.0.status', 'active'));
+        $this->get('/settings/workflows?app=missing')->assertOk()->assertInertia(fn (Assert $page) => $page->has('workflows.data', 0));
+        $typeName = DB::table('workflow_types')->where('id', $this->workflowTypeId)->value('name');
+        foreach ([$typeName, $appName] as $keyword) {
+            $this->get('/settings/workflows?'.http_build_query(['q' => $keyword]))->assertOk()->assertInertia(fn (Assert $page) => $page->has('workflows.data', 4));
+        }
+        $this->getJson('/settings/workflows?sort=invalid')->assertUnprocessable();
+        $this->getJson('/settings/workflows?direction=invalid')->assertUnprocessable();
+    }
+
+    public function test_read_only_workflow_members_receive_read_only_list_and_editor(): void
+    {
+        $tenantId = $this->owner->activeMembership()->tenant_id;
+        $workflowId = $this->insertListWorkflow($tenantId, 'Read-only workflow');
+        $privilege = SecurityPrivilege::create(['code' => 'test.workflow.view', 'app_id' => CoreSecurityCatalog::APP_ID, 'tenant_id' => $tenantId, 'name' => 'Lihat workflow', 'source' => 'custom', 'status' => 'published']);
+        $privilege->permissions()->sync([CoreSecurityCatalog::WORKFLOW_READ]);
+        $duty = SecurityDuty::create(['code' => 'test.workflow.inquire', 'app_id' => CoreSecurityCatalog::APP_ID, 'tenant_id' => $tenantId, 'name' => 'Pantau workflow', 'source' => 'custom', 'status' => 'published']);
+        $duty->privileges()->sync([$privilege->code]);
+        $reader = User::factory()->create();
+        $membership = TenantMembership::create(['tenant_id' => $tenantId, 'user_id' => $reader->id, 'status' => 'active']);
+        $this->grantDuties($membership, [$duty->code]);
+        $this->actingAs($reader)->get('/settings/workflows')->assertOk()->assertInertia(fn (Assert $page) => $page->where('canManage', false));
+        $this->get("/settings/workflows/$workflowId/edit")->assertOk()->assertInertia(fn (Assert $page) => $page->where('canManage', false));
+        $this->getJson('/api/v1/workflows')->assertOk()->assertJsonPath('data.canManage', false);
+        $this->postJson('/settings/workflows', [])->assertForbidden();
+        $this->postJson('/settings/workflows/parameters', [])->assertForbidden();
+    }
+
+    private function insertListWorkflow(string $tenantId, string $name, bool $enabled = false, string $status = 'draft'): string
+    {
+        $id = (string) Str::ulid();
+        DB::table('workflow_configurations')->insert(['id' => $id, 'tenant_id' => $tenantId, 'workflow_type_id' => $this->workflowTypeId, 'name' => $name, 'enabled' => $enabled, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('workflow_configuration_versions')->insert(['id' => (string) Str::ulid(), 'configuration_id' => $id, 'version' => 1, 'status' => $status, 'created_at' => now(), 'updated_at' => now()]);
+
+        return $id;
+    }
+
+    public function test_inbox_batches_without_per_item_rule_queries_and_keeps_notification_target(): void
+    {
+        $ids = $this->insertInboxItems(45);
+        $this->actingAs($this->owner);
+        foreach ([1, 10, 25] as $size) {
+            DB::enableQueryLog();
+            DB::flushQueryLog();
+            $this->getJson('/workflow-inbox?per_page='.$size)->assertOk()->assertJsonCount($size, 'data');
+            $rules = collect(DB::getQueryLog())->filter(fn (array $query): bool => str_contains($query['query'], 'from "workflow_types"'));
+            $this->assertCount(1, $rules);
+            DB::disableQueryLog();
+        }
+        $first = $this->getJson('/workflow-inbox')->assertOk()->assertJsonCount(40, 'data');
+        $second = $this->getJson('/workflow-inbox?cursor='.urlencode($first->json('next_cursor')))
+            ->assertOk()->assertJsonCount(5, 'data')->assertJsonPath('next_cursor', null);
+        $this->assertCount(45, array_unique([...array_column($first->json('data'), 'id'), ...array_column($second->json('data'), 'id')]));
+        $this->get('/workflow-inbox?item='.$ids[44])->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('targetItem.id', $ids[44])->missing('items'));
+        $this->getJson('/workflow-inbox?per_page=100000')->assertUnprocessable()->assertJsonValidationErrors('per_page');
+        $this->getJson('/workflow-inbox?cursor=bad')->assertUnprocessable()->assertJsonValidationErrors('cursor');
+    }
+
+    public function test_inbox_fills_visible_batch_after_hidden_items_and_checks_each_submitter(): void
+    {
+        $ids = $this->insertInboxItems(45);
+        DB::table('workflow_types')->where('id', $this->workflowTypeId)->update(['decision_context_schema' => json_encode([
+            'x-approval-authority' => ['permission' => 'app-uji.entitas.read', 'disallow_submitter' => true],
+        ], JSON_THROW_ON_ERROR)]);
+        $membership = $this->owner->activeMembership();
+        DB::table('workflow_instances')->where('workflow_type_id', $this->workflowTypeId)->update(['initiator_membership_id' => $membership->id]);
+        $visibleInstance = DB::table('workflow_work_items')->where('id', $ids[44])->value('instance_id');
+        DB::table('workflow_instances')->where('id', $visibleInstance)->update(['initiator_membership_id' => null]);
+        $this->actingAs($this->owner)->getJson('/workflow-inbox?per_page=10')->assertOk()
+            ->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $ids[44])->assertJsonPath('next_cursor', null);
+        $this->get('/workflow-inbox?item='.$ids[0])->assertInertia(fn (Assert $page) => $page->where('targetItem', null));
+    }
+
+    /** @return list<string> */
+    private function insertInboxItems(int $count): array
+    {
+        $membership = $this->owner->activeMembership();
+        $configurationId = $this->insertListWorkflow($membership->tenant_id, 'Kotak masuk');
+        $versionId = DB::table('workflow_configuration_versions')->where('configuration_id', $configurationId)->value('id');
+        $ids = [];
+        foreach (range(1, $count) as $number) {
+            $instanceId = (string) Str::ulid();
+            $id = (string) Str::ulid();
+            $date = now()->subSeconds($number);
+            DB::table('workflow_instances')->insert([
+                'id' => $instanceId, 'tenant_id' => $membership->tenant_id, 'workflow_type_id' => $this->workflowTypeId,
+                'configuration_version_id' => $versionId, 'source_document_type' => 'fixture', 'source_document_id' => (string) Str::ulid(),
+                'idempotency_key' => 'inbox:'.$number, 'decision_context' => json_encode(['document_number' => 'DOC-'.$number], JSON_THROW_ON_ERROR),
+                'status' => 'pending', 'created_at' => $date, 'updated_at' => $date,
+            ]);
+            DB::table('workflow_work_items')->insert([
+                'id' => $id, 'tenant_id' => $membership->tenant_id, 'instance_id' => $instanceId, 'element_id' => (string) Str::ulid(),
+                'assigned_membership_id' => $membership->id, 'status' => 'pending', 'created_at' => $date, 'updated_at' => $date,
+            ]);
+            $ids[] = $id;
+        }
+
+        return $ids;
     }
 
     public function test_admin_can_draft_and_activate_a_role_assigned_workflow(): void

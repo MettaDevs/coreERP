@@ -1,5 +1,6 @@
+import { FormErrorSummary, createSaveFeedback } from '@apperp/ui/form-feedback';
 import { usePage } from '@inertiajs/react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 
 export default function FlashToasts() {
@@ -7,41 +8,39 @@ export default function FlashToasts() {
         flash?: { status?: string | null; error?: string | null };
         errors?: Record<string, string | string[]>;
     }>().props;
-    const lastMessage = useRef('');
+    const lastSuccess = useRef('');
+    const feedback = useMemo(() => {
+        if (!flash?.error && !Object.keys(errors ?? {}).length) {
+            return null;
+        }
+
+        return createSaveFeedback({
+            operation: 'Tindakan belum berhasil',
+            message:
+                flash?.error || 'Periksa isian yang ditandai pada halaman ini.',
+            errors,
+            code: errors?.version ? 'stale_version' : null,
+        });
+    }, [errors, flash]);
 
     useEffect(() => {
-        const validationError = Object.values(errors ?? {})[0];
-        const message =
-            flash?.error ??
-            (Array.isArray(validationError)
-                ? validationError[0]
-                : validationError) ??
-            flash?.status ??
-            '';
+        const message = flash?.status ?? '';
 
-        if (!message || message === lastMessage.current) {
+        if (!message) {
+            lastSuccess.current = '';
+
             return;
         }
 
-        lastMessage.current = message;
-
-        // Galat pada `version` berarti data sudah diubah sejak halaman dibuka. Muat ulang
-        // penuh, bukan `router.reload()`: isian form harus kembali ke data terbaru supaya
-        // pengguna melihat perubahan orang lain sebelum mengulang perubahannya sendiri.
-        if (errors?.version) {
-            toast.error(message, {
-                duration: Infinity,
-                action: {
-                    label: 'Muat ulang',
-                    onClick: () => window.location.reload(),
-                },
-            });
-        } else if (flash?.error || validationError) {
-            toast.error(message);
-        } else {
+        if (message !== lastSuccess.current) {
             toast.success(message);
+            lastSuccess.current = message;
         }
-    }, [errors, flash]);
+    }, [flash]);
 
-    return null;
+    return feedback ? (
+        <div className="shrink-0 p-4">
+            <FormErrorSummary feedback={feedback} />
+        </div>
+    ) : null;
 }

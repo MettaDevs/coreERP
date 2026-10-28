@@ -8,6 +8,7 @@ use Brick\Math\BigDecimal;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Carbon;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\BukuAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\Reclassification\AssetReclassificationLine;
 use Modules\Apperp\ManagementAset\Reporting\AdditionalFilters;
 use Modules\Apperp\ManagementAset\Reporting\AssetReportFilters;
@@ -106,21 +107,40 @@ final class AssetAcquisitionListReport implements ReportDefinition
     public function data(ReportContext $context, array $parameters): ReportData
     {
         $today = $context->now()->toDateString();
-        $dari = is_string($parameters['dari'] ?? null) && $parameters['dari'] !== '' ? $parameters['dari'] : Carbon::parse($today)->startOfYear()->toDateString();
-        $sampai = is_string($parameters['sampai'] ?? null) && $parameters['sampai'] !== '' ? $parameters['sampai'] : $today;
+        $dateExpression = $parameters['filters']['aset']['acquired_on'] ?? null;
+        $hasDateExpression = is_string($dateExpression) && trim($dateExpression) !== '';
+        $dari = is_string($parameters['dari'] ?? null) && $parameters['dari'] !== '' ? $parameters['dari'] : ($hasDateExpression ? null : Carbon::parse($today)->startOfYear()->toDateString());
+        $sampai = is_string($parameters['sampai'] ?? null) && $parameters['sampai'] !== '' ? $parameters['sampai'] : ($hasDateExpression ? null : $today);
 
         $query = Aset::query()
             ->leftJoin('aset_tr_penerimaan_aset as penerimaan', fn (JoinClause $join) => $join->on('penerimaan.id', '=', 'aset_tr_aset.penerimaan_aset_id')->on('penerimaan.tenant_id', '=', 'aset_tr_aset.tenant_id'))
             ->leftJoin('aset_m_group_aset as group_aset', fn (JoinClause $join) => $join->on('group_aset.id', '=', 'aset_tr_aset.group_aset_id')->on('group_aset.tenant_id', '=', 'aset_tr_aset.tenant_id'))
             ->leftJoin('aset_m_jenis_aset as jenis', fn (JoinClause $join) => $join->on('jenis.id', '=', 'aset_tr_aset.jenis_aset_id')->on('jenis.tenant_id', '=', 'aset_tr_aset.tenant_id'))
             ->leftJoin('aset_m_lokasi_aset as lokasi', fn (JoinClause $join) => $join->on('lokasi.id', '=', 'aset_tr_aset.lokasi_aset_id')->on('lokasi.tenant_id', '=', 'aset_tr_aset.tenant_id'))
-            ->whereBetween('aset_tr_aset.acquired_on', [$dari, $sampai])
             ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('aset_tr_reklasifikasi_aset_details as pecahan')
                 ->whereColumn('pecahan.tenant_id', 'aset_tr_aset.tenant_id')
                 ->whereColumn('pecahan.aset_baru_id', 'aset_tr_aset.id'));
 
+        // Ekspresi tanggal pada preset menggantikan isian periode. Jangan mempersempitnya lagi
+        // dengan rentang tahun berjalan yang tidak terlihat pada layar.
+        if ($dari !== null) {
+            $query->where('aset_tr_aset.acquired_on', '>=', $dari);
+        }
+        if ($sampai !== null) {
+            $query->where('aset_tr_aset.acquired_on', '<=', $sampai);
+        }
+
         app(OrganizationScope::class)->asetQuery($query, $context->request());
         AssetReportFilters::apply($query, $parameters, 'aset_tr_aset');
+        if (! empty($parameters['buku_id'])) {
+            // Seperti Depreciation Book pada Acquisition List BC: hanya aset yang mempunyai buku terpilih.
+            // EXISTS menjaga satu baris per aset meskipun aset memiliki beberapa buku.
+            $query->whereExists(BukuAset::query()
+                ->selectRaw('1')
+                ->whereColumn('aset_tr_buku_aset.aset_id', 'aset_tr_aset.id')
+                ->whereColumn('aset_tr_buku_aset.tenant_id', 'aset_tr_aset.tenant_id')
+                ->where('aset_tr_buku_aset.buku_id', $parameters['buku_id']));
+        }
         foreach ($this->dataItems() as $item) {
             AdditionalFilters::apply($query, $item, $parameters, $context);
         }
@@ -176,7 +196,7 @@ final class AssetAcquisitionListReport implements ReportDefinition
                 'dicetak_pada' => now('UTC')->toIso8601ZuluString(),
             ],
             tables: ['baris' => $lines],
-            fileName: 'daftar-perolehan-aset-'.$dari.'-'.$sampai,
+            fileName: 'daftar-perolehan-aset-'.($dari ?? 'semua').'-'.($sampai ?? $today),
         );
     }
 }

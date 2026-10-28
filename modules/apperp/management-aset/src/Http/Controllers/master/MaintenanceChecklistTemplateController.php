@@ -2,6 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 use Modules\Apperp\ManagementAset\Http\Controllers\MasterDataController;
 use Modules\Apperp\ManagementAset\Models\master\MaintenanceChecklistTemplate;
 use Modules\Apperp\ManagementAset\Models\master\MaintenanceChecklistTemplateLine;
@@ -30,6 +32,14 @@ class MaintenanceChecklistTemplateController extends MasterDataController
 
     protected function extraPresent(MasterData $record): array
     {
-        return ['checks_count' => MaintenanceChecklistTemplateLine::query()->where('template_id', $record->getKey())->count()];
+        return ['checks_count' => (int) ($record->getAttribute('checks_count') ?? MaintenanceChecklistTemplateLine::query()->where('template_id', $record->getKey())->count())];
+    }
+
+    protected function prepareQuery(Builder $query, ?Request $request = null): Builder
+    {
+        return $query->addSelect([
+            'checks_count' => MaintenanceChecklistTemplateLine::query()
+                ->whereColumn('template_id', 'aset_m_maintenance_checklist_template.id')->selectRaw('count(*)'),
+        ]);
     }
 }

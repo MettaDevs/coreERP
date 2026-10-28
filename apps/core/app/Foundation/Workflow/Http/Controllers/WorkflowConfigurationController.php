@@ -22,6 +22,8 @@ use Inertia\Response;
 
 class WorkflowConfigurationController extends Controller
 {
+    private const PER_PAGE = 50;
+
     public function index(Request $request, WorkflowParameters $parameter): JsonResponse|Response
     {
         $membership = $this->currentMembership($request);
@@ -31,30 +33,47 @@ class WorkflowConfigurationController extends Controller
             ->join('apps', 'apps.id', '=', 'types.app_id')
             ->orderBy('apps.name')->orderBy('types.name')
             ->get(['types.id', 'types.code', 'types.name', 'types.scope', 'apps.name as app_name']);
-        $workflows = DB::table('workflow_configurations as configurations')
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:120'],
+            'status' => ['nullable', Rule::in(['draft', 'active', 'inactive'])],
+            'app' => ['nullable', 'string', 'max:255'],
+            'sort' => ['nullable', Rule::in(['name', 'app_name', 'type_name', 'status'])],
+            'direction' => ['nullable', Rule::in(['asc', 'desc'])],
+        ]);
+        $keyword = trim((string) ($filters['q'] ?? ''));
+        $pattern = '%'.addcslashes($keyword, '\\%_').'%';
+        $latestVersions = DB::table('workflow_configuration_versions')
+            ->join('workflow_configurations as version_config', 'version_config.id', '=', 'workflow_configuration_versions.configuration_id')
+            ->where('version_config.tenant_id', $membership->tenant_id)
+            ->selectRaw('configuration_id, max(workflow_configuration_versions.version) as version')
+            ->groupBy('configuration_id');
+        $statusExpression = "case when configurations.enabled then 'active' when latest.status = 'published' then 'inactive' else 'draft' end";
+        $sort = $filters['sort'] ?? 'name';
+        $sortColumn = ['name' => 'configurations.name', 'app_name' => 'apps.name', 'type_name' => 'types.name', 'status' => 'status'][$sort];
+        $direction = $filters['direction'] ?? 'asc';
+        $query = DB::table('workflow_configurations as configurations')
             ->join('workflow_types as types', 'types.id', '=', 'configurations.workflow_type_id')
             ->join('apps', 'apps.id', '=', 'types.app_id')
+            ->leftJoinSub($latestVersions, 'latest_versions', fn ($join) => $join->on('latest_versions.configuration_id', '=', 'configurations.id'))
+            ->leftJoin('workflow_configuration_versions as latest', fn ($join) => $join
+                ->on('latest.configuration_id', '=', 'configurations.id')
+                ->on('latest.version', '=', 'latest_versions.version'))
             ->where('configurations.tenant_id', $membership->tenant_id)
-            ->orderBy('apps.name')->orderBy('configurations.name')
-            ->get(['configurations.id', 'configurations.name', 'configurations.enabled', 'configurations.legal_entity_id', 'configurations.version', 'types.name as type_name', 'types.scope', 'apps.name as app_name'])
-            ->map(function (object $workflow): array {
-                $latestVersion = DB::table('workflow_configuration_versions')->where('configuration_id', $workflow->id)->orderByDesc('version')->first(['status']);
-
-                return [
-                    'id' => $workflow->id,
-                    'name' => $workflow->name,
-                    'enabled' => (bool) $workflow->enabled,
-                    'version' => (int) $workflow->version,
-                    'status' => $workflow->enabled ? 'active' : ($latestVersion?->status === 'published' ? 'inactive' : 'draft'),
-                    'type_name' => $workflow->type_name,
-                    'app_name' => $workflow->app_name,
-                    'scope' => $workflow->scope,
-                    'legal_entity_id' => $workflow->legal_entity_id,
-                ];
-            });
+            ->when($keyword !== '', fn ($query) => $query->where(fn ($inner) => $inner
+                ->where('configurations.name', 'ilike', $pattern)
+                ->orWhere('types.name', 'ilike', $pattern)
+                ->orWhere('apps.name', 'ilike', $pattern)))
+            ->when($filters['status'] ?? null, fn ($query, $status) => $query->whereRaw("($statusExpression) = ?", [$status]))
+            ->when($filters['app'] ?? null, fn ($query, $app) => $query->where('apps.name', $app))
+            ->select(['configurations.id', 'configurations.name', 'configurations.enabled', 'configurations.legal_entity_id', 'configurations.version', 'types.name as type_name', 'types.scope', 'apps.name as app_name'])
+            ->selectRaw("$statusExpression as status")
+            ->orderBy($sortColumn, $direction)->orderBy('configurations.id');
+        $workflows = $request->is('api/*')
+            ? $query->get()
+            : Inertia::scroll($query->simplePaginate(self::PER_PAGE)->withQueryString())->matchOn('data.id');
 
         $payload = [
-            'canManage' => true,
+            'canManage' => $membership->hasCorePermission(CoreSecurityCatalog::WORKFLOW_UPDATE),
             // Disusun dari registry, bukan ditulis satu per satu. Layarnya merender dirinya
             // dari daftar ini, jadi parameter baru muncul di layar tanpa menyentuh berkas
             // controller maupun berkas halamannya.
@@ -63,6 +82,11 @@ class WorkflowConfigurationController extends Controller
             'legalEntities' => Organization::query()->where('tenant_id', $membership->tenant_id)->where('classification', 'legal_entity')->orderBy('name')->get(['id', 'name']),
             'workflows' => $workflows,
         ];
+
+        if (! $request->is('api/*')) {
+            $payload['filters'] = ['q' => $keyword, 'status' => $filters['status'] ?? null, 'app' => $filters['app'] ?? null, 'sort' => $sort, 'direction' => $direction];
+            $payload['workflowApps'] = $types->pluck('app_name')->unique()->values();
+        }
 
         return $request->is('api/*') ? response()->json(['data' => $payload]) : Inertia::render('foundation/workflow/workflows', $payload);
     }
@@ -127,7 +151,7 @@ class WorkflowConfigurationController extends Controller
         $type = DB::table('workflow_types as types')->join('apps', 'apps.id', '=', 'types.app_id')->where('types.id', $configuration->workflow_type_id)->first(['types.id', 'types.name', 'types.code', 'types.scope', 'types.decision_context_schema', 'apps.name as app_name']);
         $version = $this->latestVersion($configuration->id);
         $payload = [
-            'canManage' => true,
+            'canManage' => $membership->hasCorePermission(CoreSecurityCatalog::WORKFLOW_UPDATE),
             'workflow' => ['id' => $configuration->id, 'name' => $configuration->name, 'enabled' => (bool) $configuration->enabled, 'legal_entity_id' => $configuration->legal_entity_id, 'version' => $this->rowVersion($workflow)],
             'workflowType' => $type,
             'version' => ['id' => $version?->id, 'status' => $version?->status, 'version' => $version?->version],

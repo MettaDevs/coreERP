@@ -1,3 +1,5 @@
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
+import { FormErrorHeader } from '@/components/form-error-header';
 import { Button } from '@apperp/ui/button';
 import { Checkbox } from '@apperp/ui/checkbox';
 import { Input } from '@apperp/ui/input';
@@ -28,6 +30,9 @@ export default function Login({
     ssoLoginUrl,
     ssoError,
 }: Props) {
+    const { wrap: wrapFormResponse1, summary: formResponse1Summary } =
+        useInertiaFeedback();
+
     return (
         <>
             <Head title="Masuk" />
@@ -59,14 +64,24 @@ export default function Login({
             )}
 
             <Form
+                noValidate
                 {...store.form()}
                 resetOnSuccess={['password']}
                 className="flex flex-col gap-6"
+                options={wrapFormResponse1({})}
             >
                 {({ processing, errors }) => (
                     <>
+                        <>
+                            {formResponse1Summary}
+                            <FormErrorHeader errors={errors} />
+                        </>
+
                         <div className="grid gap-6">
-                            <div className="grid gap-2">
+                            <div
+                                className="grid gap-2"
+                                data-error-field={'email'}
+                            >
                                 <Input
                                     id="email"
                                     label="Email"
@@ -85,7 +100,10 @@ export default function Login({
                                 </FieldError>
                             </div>
 
-                            <div className="grid gap-2">
+                            <div
+                                className="grid gap-2"
+                                data-error-field={'password'}
+                            >
                                 {canResetPassword && (
                                     <TextLink
                                         href={request()}

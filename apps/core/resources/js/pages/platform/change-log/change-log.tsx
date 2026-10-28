@@ -24,7 +24,9 @@ import {
 } from '@apperp/ui/table';
 import { Head, useForm } from '@inertiajs/react';
 import { CircleHelp } from 'lucide-react';
+import { FormErrorHeader } from '@/components/form-error-header';
 import Heading from '@/components/heading';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import type { BreadcrumbItem } from '@/types/navigation';
 
 type Operation = 'log_insertion' | 'log_modification' | 'log_deletion';
@@ -78,6 +80,9 @@ function TableSetup({
     table: LoggedTable;
     canManage: boolean;
 }) {
+    const { wrap: wrapFormRequest, summary: formRequestSummary } =
+        useInertiaFeedback();
+
     const form = useForm({
         log_insertion: table.log_insertion,
         log_modification: table.log_modification,
@@ -103,15 +108,23 @@ function TableSetup({
 
     return (
         <form
+            noValidate
             className="space-y-4"
             onSubmit={(event) => {
                 event.preventDefault();
                 form.transform((data) => ({ ...data, version: table.version }));
-                form.put(`/settings/change-log/${table.table_name}`, {
-                    preserveScroll: true,
-                });
+                form.put(
+                    `/settings/change-log/${table.table_name}`,
+                    wrapFormRequest({
+                        preserveScroll: true,
+                    }),
+                );
             }}
         >
+            <>
+                {formRequestSummary}
+                <FormErrorHeader errors={form.errors} />
+            </>
             <div className="grid gap-3 sm:grid-cols-3">
                 {OPERATIONS.map((operation) => (
                     <Field key={operation.key} orientation="horizontal">

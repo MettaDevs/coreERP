@@ -1,0 +1,35 @@
+post:
+  tags:
+  - Product registration
+  operationId: internal.productRegistration.emailVerification
+  summary: Verifikasi email dengan identitas SSO yang sama
+  security:
+  - productRegistrationGateway: []
+    productRegistrationSession: []
+  responses:
+    '200':
+      description: Permintaan berhasil.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProductRegistrationSession'
+    '401':
+      description: Sesi atau kredensial bridge tidak berlaku.
+    '422':
+      description: Isian belum sesuai atau verifikasi belum selesai.
+    '429':
+      description: Batas permintaan tercapai.
+    '503':
+      description: Penyedia atau konfigurasi belum tersedia.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+          - token
+          properties:
+            token:
+              type: string
+              pattern: ^[a-f0-9]{64}$

@@ -29,7 +29,9 @@ import {
 } from '@apperp/ui/table';
 import { Head, useForm } from '@inertiajs/react';
 import { useState } from 'react';
+import { FormErrorHeader } from '@/components/form-error-header';
 import Heading from '@/components/heading';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import type { BreadcrumbItem } from '@/types/navigation';
 
 type Currency = {
@@ -69,6 +71,9 @@ function EditPrecisionDialog({
     limits: Props['limits'];
     onClose: () => void;
 }) {
+    const { wrap: wrapFormRequest, summary: formRequestSummary } =
+        useInertiaFeedback();
+
     const form = useForm({
         amount_decimals: String(currency.amount_decimals),
         unit_amount_decimals: String(currency.unit_amount_decimals),
@@ -87,16 +92,20 @@ function EditPrecisionDialog({
                     </DialogDescription>
                 </DialogHeader>
                 <form
+                    noValidate
                     onSubmit={(event) => {
                         event.preventDefault();
                         form.transform((data) => ({
                             ...data,
                             version: currency.version,
                         }));
-                        form.put(`/settings/currencies/${currency.code}`, {
-                            preserveScroll: true,
-                            onSuccess: onClose,
-                        });
+                        form.put(
+                            `/settings/currencies/${currency.code}`,
+                            wrapFormRequest({
+                                preserveScroll: true,
+                                onSuccess: onClose,
+                            }),
+                        );
                     }}
                 >
                     <DialogToolbar>
@@ -109,9 +118,15 @@ function EditPrecisionDialog({
                             <ActionButton action="cancel" type="button" />
                         </DialogClose>
                     </DialogToolbar>
+                    <>
+                        {formRequestSummary}
+                        <FormErrorHeader errors={form.errors} />
+                    </>
+
                     <DialogBody className="grid gap-4 py-3 md:grid-cols-2">
                         <Field
                             data-invalid={Boolean(form.errors.amount_decimals)}
+                            data-error-field={'amount_decimals'}
                         >
                             <NativeSelect
                                 label="Presisi nilai"
@@ -141,6 +156,7 @@ function EditPrecisionDialog({
                             data-invalid={Boolean(
                                 form.errors.unit_amount_decimals,
                             )}
+                            data-error-field={'unit_amount_decimals'}
                         >
                             <NativeSelect
                                 label="Presisi harga satuan"

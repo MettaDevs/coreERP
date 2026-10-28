@@ -14,12 +14,14 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
+import { FormControl } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { PageDialog, PageDialogContent } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
 import { requestPrint } from '../../print';
 import { useRecordList } from '../../use-record-list';
 import type { RecordCardState } from '../_shared/record-card';
@@ -52,31 +54,33 @@ export default function MutasiListPage({
     const [card, setCard] = useState<RecordCardState>(null);
     const [cardBusy, setCardBusy] = useState(false);
     const [cardDirty, setCardDirty] = useState(false);
-    const discardChanges = () =>
-        !cardDirty || window.confirm('Buang perubahan yang belum disimpan?');
+    const {
+        request: requestChangesTransition,
+        confirmation: changesTransitionConfirmation,
+    } = useRecordTransition(cardDirty, cardBusy);
     const openNewCard = () => {
-        if (!cardBusy && discardChanges()) {
+        requestChangesTransition(() => {
             setCardDirty(false);
             setCard({ mode: 'create' });
-        }
+        });
     };
     const closeCard = () => {
-        if (!cardBusy && discardChanges()) {
+        requestChangesTransition(() => {
             setCard(null);
             setCardDirty(false);
             list.reload();
-        }
+        });
     };
     const cardRef = useRef<HTMLDivElement>(null);
     const openView = (id: string) => {
-        if (!cardBusy && discardChanges()) {
+        requestChangesTransition(() => {
             setCard({ mode: 'view', id });
-        }
+        });
     };
     const openEdit = (id: string) => {
-        if (!cardBusy && discardChanges()) {
+        requestChangesTransition(() => {
             setCard({ mode: 'edit', id });
-        }
+        });
     };
     const [status, setStatus] = useState('');
     const [search, setSearch] = useState('');
@@ -186,6 +190,7 @@ export default function MutasiListPage({
 
     return (
         <>
+            {changesTransitionConfirmation}
             <ListPageLayout
                 header={
                     <RecordActionBar title="Mutasi aset">
@@ -194,9 +199,9 @@ export default function MutasiListPage({
                                 action="create"
                                 type="button"
                                 onClick={() => {
-                                    if (!cardBusy && discardChanges()) {
+                                    requestChangesTransition(() => {
                                         setCard({ mode: 'create' });
-                                    }
+                                    });
                                 }}
                             />
                         )}
@@ -219,37 +224,42 @@ export default function MutasiListPage({
                 filters={
                     <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end">
                         <div className="w-full sm:w-72">
-                            <Input
-                                label="Cari"
-                                type="search"
-                                placeholder="Nomor bukti, alasan, atau lokasi"
-                                value={search}
-                                onChange={(event) =>
-                                    setSearch(event.target.value)
-                                }
-                            />
+                            <FormControl>
+                                <Input
+                                    label="Cari"
+                                    type="search"
+                                    placeholder="Nomor bukti, alasan, atau lokasi"
+                                    value={search}
+                                    onChange={(event) =>
+                                        setSearch(event.target.value)
+                                    }
+                                />
+                            </FormControl>
                         </div>
                         <div className="w-full sm:w-52">
-                            <Select
-                                label="Status"
-                                items={PILIHAN_STATUS.map(
-                                    (pilihan) => pilihan.label,
-                                )}
-                                value={
-                                    PILIHAN_STATUS.find(
-                                        (pilihan) => pilihan.value === status,
-                                    )?.label ?? null
-                                }
-                                ariaLabel="Saring berdasarkan status"
-                                onValueChange={(value) =>
-                                    setStatus(
+                            <FormControl>
+                                <Select
+                                    label="Status"
+                                    items={PILIHAN_STATUS.map(
+                                        (pilihan) => pilihan.label,
+                                    )}
+                                    value={
                                         PILIHAN_STATUS.find(
                                             (pilihan) =>
-                                                pilihan.label === value,
-                                        )?.value ?? '',
-                                    )
-                                }
-                            />
+                                                pilihan.value === status,
+                                        )?.label ?? null
+                                    }
+                                    ariaLabel="Saring berdasarkan status"
+                                    onValueChange={(value) =>
+                                        setStatus(
+                                            PILIHAN_STATUS.find(
+                                                (pilihan) =>
+                                                    pilihan.label === value,
+                                            )?.value ?? '',
+                                        )
+                                    }
+                                />
+                            </FormControl>
                         </div>
                     </div>
                 }

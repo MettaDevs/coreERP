@@ -159,6 +159,15 @@ class ReleaseRegistrationTest extends SiteTestCase
         }
     }
 
+    public function test_releases_rejected_by_the_agent_are_rejected_at_registration(): void
+    {
+        foreach (['00.2.0', '0.02.0', '0.2.00', '0.2', '0.2.0.1', str_repeat('9', 41).'.0.0'] as $release) {
+            $this->register($this->releaseFiles(manifest: $this->manifestV2(['rilis' => $release])))
+                ->assertStatus(422)->assertJsonPath('error', 'manifest_invalid');
+        }
+        $this->assertSame(0, SiteRelease::query()->count());
+    }
+
     // ------------------------------------------------------------------ pembantu
 
     /**
