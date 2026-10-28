@@ -6,10 +6,12 @@ namespace Tests\Feature\Platform\Modules;
 
 use App\Foundation\NumberSequence\Models\NumberSequenceReference;
 use App\Foundation\NumberSequence\Models\TenantNumberSequence;
+use App\Platform\Identity\Models\User;
 use App\Platform\Modules\Contracts\FiscalCalendarDirectory;
 use App\Platform\Modules\Contracts\NumberSequenceIssuer;
 use App\Platform\Modules\Contracts\OrganizationDirectory;
 use App\Platform\Modules\Support\CoreServices;
+use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -100,6 +102,49 @@ class CoreServicesForModulesTest extends TestCase
         $this->assertCount(1, $unit);
         $this->assertSame(['id', 'nama', 'klasifikasi', 'tipe', 'nomor'], array_keys($unit[0]));
         $this->assertIsString($unit[0]['id']);
+    }
+
+    public function test_membership_lookup_uses_membership_ids_and_batch_queries(): void
+    {
+        [$context] = $this->sequenceContoh();
+        $tenant = $context['tenant_id'];
+        $active = [];
+        for ($i = 0; $i < 25; $i++) {
+            $user = User::factory()->create(['name' => 'Member '.str_pad((string) $i, 2, '0', STR_PAD_LEFT)]);
+            $active[] = (string) TenantMembership::create(['tenant_id' => $tenant, 'user_id' => $user->id, 'status' => 'active'])->id;
+        }
+        $inactiveUser = User::factory()->create();
+        $inactive = (string) TenantMembership::create(['tenant_id' => $tenant, 'user_id' => $inactiveUser->id, 'status' => 'inactive'])->id;
+        $directory = $this->app->make(OrganizationDirectory::class);
+        DB::enableQueryLog();
+        try {
+            foreach ([1, 10, 25] as $size) {
+                DB::flushQueryLog();
+                $found = $directory->membersById($tenant, [...array_slice($active, 0, $size), $inactive]);
+                $this->assertCount($size, $found);
+                $this->assertSame([], array_diff(array_keys($found), $active));
+                $this->assertCount(1, DB::getQueryLog());
+            }
+            DB::flushQueryLog();
+            $this->assertSame([], $directory->membersById($tenant, []));
+            $this->assertSame([], DB::getQueryLog());
+        } finally {
+            DB::disableQueryLog();
+        }
+        $batch = $directory->lookup($tenant, 'memberships', ['per_page' => 10]);
+        $this->assertCount(10, $batch['data']);
+        $this->assertContains((string) $batch['data'][0]->id, $active);
+        $this->assertNotNull($batch['next_cursor']);
+        $email = $batch['data'][0]->email;
+        $matched = $directory->lookup($tenant, 'memberships', ['email' => strtoupper($email)]);
+        $this->assertCount(1, $matched['data']);
+        $this->assertSame($email, $matched['data'][0]->email);
+        $publicLabels = $directory->lookup($tenant, 'members', ['per_page' => 10]);
+        $this->assertCount(10, $publicLabels['data']);
+        foreach ($publicLabels['data'] as $row) {
+            $this->assertFalse(property_exists($row, 'email'));
+        }
+        $this->assertSame([], $directory->membersById((string) Str::ulid(), $active));
     }
 
     /**

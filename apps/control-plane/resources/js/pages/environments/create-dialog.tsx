@@ -12,10 +12,15 @@ import {
     PageDialogBody,
     PageDialogToolbar,
 } from '@apperp/ui/page-dialog';
+import { Select } from '@apperp/ui/select';
 import { useConfirmation } from '@apperp/ui/use-confirmation';
+import {
+    assertListBatch,
+    useIncrementalList,
+} from '@apperp/ui/use-incremental-list';
 import { useForm } from '@inertiajs/react';
 import { Cloud, Server } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { kindLabels, labelFor } from '@/lib/display';
 
@@ -89,16 +94,82 @@ function HostingOption({
  * tombolnya ditekan — bukan sesudah.
  */
 export default function CreateDialog({
-    tenant,
+    hasTenants,
     kinds,
+    onCreated,
 }: {
-    tenant: { id: string; name: string }[];
+    hasTenants: boolean;
     kinds: string[];
+    onCreated?: () => void;
 }) {
     const { wrap: wrapLocalForm0Request, summary: localForm0RequestSummary } =
         useInertiaFeedback();
 
     const [open, setOpen] = useState(false);
+    const [tenantSearch, setTenantSearch] = useState('');
+    const [selectedTenant, setSelectedTenant] = useState<{
+        id: string;
+        name: string;
+    } | null>(null);
+    const loadTenants = useCallback(
+        async ({
+            query,
+            cursor,
+            signal,
+        }: {
+            query: string;
+            cursor: string | null;
+            signal: AbortSignal;
+        }) => {
+            const params = new URLSearchParams({ search: query });
+
+            if (cursor) {
+                params.set('cursor', cursor);
+            }
+
+            const response = await fetch(`/tenant?${params}`, {
+                signal,
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+            });
+
+            if (!response.ok) {
+                throw new Error(
+                    'Pilihan tenant belum dapat dimuat. Periksa koneksi lalu coba lagi.',
+                );
+            }
+
+            const body: unknown = await response.json();
+
+            if (
+                !body ||
+                typeof body !== 'object' ||
+                !('data' in body) ||
+                !('next_cursor' in body)
+            ) {
+                throw new Error(
+                    'Jawaban pilihan tenant tidak lengkap. Muat ulang pilihan.',
+                );
+            }
+
+            const batch = { items: body.data, nextCursor: body.next_cursor };
+            assertListBatch<{ id: string; name: string }>(batch);
+
+            return batch;
+        },
+        [],
+    );
+    const tenants = useIncrementalList<{ id: string; name: string }>({
+        loadItems: loadTenants,
+        query: tenantSearch,
+        active: open,
+        getKey: (row) => row.id,
+    });
+    const tenantItems =
+        selectedTenant &&
+        !tenants.items.some((item) => item.id === selectedTenant.id)
+            ? [...tenants.items, selectedTenant]
+            : tenants.items;
     const contentRef = useRef<HTMLDivElement>(null);
     const { confirm, confirmation } = useConfirmation();
     const {
@@ -113,7 +184,7 @@ export default function CreateDialog({
         isDirty,
     } = useForm({
         kind: 'demo',
-        tenant_id: tenant[0]?.id ?? '',
+        tenant_id: '',
         name: '',
         expires_at: '',
         hosting: 'provider' as Hosting,
@@ -157,6 +228,7 @@ export default function CreateDialog({
                 onSuccess: () => {
                     reset();
                     setOpen(false);
+                    onCreated?.();
                 },
             }),
         );
@@ -175,7 +247,7 @@ export default function CreateDialog({
         >
             {confirmation}
             <DialogTrigger asChild>
-                <ActionButton action="create" disabled={tenant.length === 0} />
+                <ActionButton action="create" disabled={!hasTenants} />
             </DialogTrigger>
             <DialogContent
                 ref={contentRef}
@@ -224,24 +296,40 @@ export default function CreateDialog({
                                         />
                                     </FormControl>
                                     <FormControl error={errors.tenant_id}>
-                                        <NativeSelect
-                                            id="tenant"
+                                        <Select
                                             label="Tenant"
                                             required
+                                            placeholder="Pilih tenant"
+                                            searchPlaceholder="Cari tenant"
+                                            emptyMessage="Tidak ada tenant yang cocok."
                                             value={data.tenant_id}
-                                            onChange={(e) =>
+                                            onValueChange={(value) => {
                                                 setData(
                                                     'tenant_id',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        >
-                                            {tenant.map((t) => (
-                                                <option key={t.id} value={t.id}>
-                                                    {t.name}
-                                                </option>
-                                            ))}
-                                        </NativeSelect>
+                                                    value ?? '',
+                                                );
+                                                setSelectedTenant(
+                                                    tenantItems.find(
+                                                        (item) =>
+                                                            item.id === value,
+                                                    ) ?? null,
+                                                );
+                                            }}
+                                            items={tenantItems.map((item) => ({
+                                                value: item.id,
+                                                label: item.name,
+                                            }))}
+                                            visibleValues={tenants.items.map(
+                                                (item) => item.id,
+                                            )}
+                                            knownValues={tenantItems.map(
+                                                (item) => item.id,
+                                            )}
+                                            searchValue={tenantSearch}
+                                            onSearchChange={setTenantSearch}
+                                            incremental={tenants}
+                                            portalContainer={contentRef}
+                                        />
                                     </FormControl>
                                     <FormControl error={errors.kind}>
                                         <NativeSelect

@@ -7,6 +7,8 @@ namespace ControlPlane\Tests\Feature\Sites;
 use Carbon\CarbonImmutable;
 use ControlPlane\Models\Site;
 use ControlPlane\Models\SiteOperation;
+use ControlPlane\Sites\SiteOperations;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -146,6 +148,30 @@ final class InstallOperationRulesTest extends SiteTestCase
         $upgrade->refresh();
         $this->assertSame('cancelled', $upgrade->status);
         $this->assertSame(['edition' => Site::SINGLE_IMAGE_EDITION, 'release' => '1.1.0'], $upgrade->parameters);
+    }
+
+    public function test_expiring_a_site_batch_is_bounded_and_preserves_other_sites(): void
+    {
+        $firstSite = $this->site();
+        $secondSite = $this->site();
+        $outsideSite = $this->site();
+        $first = $this->install($firstSite, '1.0.0');
+        $second = $this->install($secondSite, '1.0.0');
+        $outside = $this->install($outsideSite, '1.0.0');
+        foreach ([$first, $second, $outside] as $operation) {
+            $operation->forceFill(['expires_at' => now()->subMinute()])->save();
+        }
+
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+        app(SiteOperations::class)->expireStaleForSites([$firstSite, $secondSite]);
+        $queries = DB::getQueryLog();
+        DB::disableQueryLog();
+        $this->assertCount(2, $queries);
+        $this->assertClosedWithoutHash($first, 'expired');
+        $this->assertClosedWithoutHash($second, 'expired');
+        $this->assertSame('requested', $outside->refresh()->status);
+        $this->assertArrayHasKey('admin_password_hash', $outside->parameters);
     }
 
     // ------------------------------------------------------------------ perkakas

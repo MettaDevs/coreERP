@@ -2,6 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Modules\Apperp\ManagementAset\Http\Controllers\MasterDataController;
 use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobType;
@@ -54,10 +56,19 @@ class MaintenanceJobTypeController extends MasterDataController
 
     protected function extraPresent(MasterData $record): array
     {
+        if (! array_key_exists('variants_count', $record->getAttributes())) {
+            $record->loadCount('variants');
+        }
+
         return [
             'category_code' => $record->category_code,
             'maintenance_downtime_activities' => (bool) $record->maintenance_downtime_activities,
-            'variants_count' => $record->newQuery()->where('tenant_id', $record->tenant_id)->whereKey($record->getKey())->withCount(['variants'])->value('variants_count') ?? 0,
+            'variants_count' => (int) $record->getAttribute('variants_count'),
         ];
+    }
+
+    protected function prepareQuery(Builder $query, ?Request $request = null): Builder
+    {
+        return $query->withCount('variants');
     }
 }

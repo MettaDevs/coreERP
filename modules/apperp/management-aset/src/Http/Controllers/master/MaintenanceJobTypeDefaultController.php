@@ -4,12 +4,15 @@ namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Modules\Apperp\ManagementAset\Http\Controllers\MasterDataController;
 use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeDefault;
 use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeVariant;
 use Modules\Apperp\ManagementAset\Models\MasterData;
 use Modules\Apperp\ManagementAset\Services\AssetNumberSequenceIssuer;
+use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
+use Modules\Apperp\ManagementAset\Support\CreationPayload;
 use Modules\Apperp\ManagementAset\Support\MasterParent;
 
 /**
@@ -97,17 +100,35 @@ class MaintenanceJobTypeDefaultController extends MasterDataController
     {
         $this->requirePermissionForCopy($request);
         $tenantId = (string) $request->attributes->get('coreerp.tenant_id');
-        $source = MaintenanceJobTypeDefault::query()->where('tenant_id', $tenantId)->findOrFail($id);
         $data = $request->validate(['nama' => ['required', 'string', 'max:150']]);
         $creationKey = (string) $request->header('Idempotency-Key');
         validator(['key' => $creationKey], ['key' => ['required', 'string', 'max:133', 'regex:/^[A-Za-z0-9._:-]+$/']])->validate();
-        $numbers = app(AssetNumberSequenceIssuer::class);
-        $code = $numbers->issue('management-aset.maintenance-job-type-defaults', $tenantId, 'maintenance-job-type-defaults:'.$creationKey);
-        $copy = $source->replicate(['id', 'created_at', 'updated_at', 'deleted_at']);
-        $copy->fill(['tenant_id' => $tenantId, 'creation_key' => $creationKey, 'kode' => $code, 'nama' => trim($data['nama'])]);
-        $copy->save();
+        $name = trim($data['nama']);
+        $hash = CreationPayload::hash(['source_id' => $id, 'nama' => $name]);
+        try {
+            return DB::transaction(function () use ($tenantId, $id, $creationKey, $name, $hash): JsonResponse {
+                DB::select('select pg_advisory_xact_lock(hashtextextended(?, 0))', [$tenantId.':maintenance-default-copy:'.$creationKey]);
+                $existing = MaintenanceJobTypeDefault::withTrashed()->where('tenant_id', $tenantId)->where('creation_key', $creationKey)->first();
+                if ($existing !== null) {
+                    $stored = $existing->getAttribute('creation_payload_hash');
+                    if ($existing->trashed() || ! is_string($stored) || ! hash_equals($stored, $hash)) {
+                        return response()->json(['error' => ['code' => 'idempotency_conflict', 'message' => 'Permintaan ini sudah pernah diproses dan tidak dapat diulang. Periksa data yang sudah tersimpan.']], 409);
+                    }
 
-        return response()->json(['data' => $copy], 201);
+                    return response()->json(['data' => $existing], 200, ['Idempotent-Replayed' => 'true']);
+                }
+                $source = MaintenanceJobTypeDefault::query()->where('tenant_id', $tenantId)->sharedLock()->findOrFail($id);
+                $number = app(AssetNumberSequenceIssuer::class)->issue('management-aset.maintenance-job-type-defaults', $tenantId, 'maintenance-job-type-defaults:'.$creationKey);
+                $copy = $source->replicate(['id', 'created_at', 'updated_at', 'deleted_at', 'creation_payload_hash']);
+                $copy->fill(['tenant_id' => $tenantId, 'creation_key' => $creationKey, 'kode' => $number, 'nama' => $name]);
+                $copy->forceFill(['creation_payload_hash' => $hash]);
+                $copy->save();
+
+                return response()->json(['data' => $copy], 201);
+            });
+        } catch (NumberSequenceException $exception) {
+            return response()->json(['error' => ['code' => $exception->errorCode, 'message' => $exception->getMessage()]], NumberSequenceException::HTTP_STATUS);
+        }
     }
 
     private function requirePermissionForCopy(Request $request): void

@@ -66,6 +66,7 @@ import type {
 import Heading from '@/components/heading';
 import { RecordListScroll } from '@/components/record-list-scroll';
 import { useDateTimeFormat } from '@/hooks/use-date-time';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import { useSaveFeedback } from '@/hooks/use-save-feedback';
 import { apiJson, CoreApiError, errorText } from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
@@ -1410,6 +1411,8 @@ export default function FinancePostings({
     counts,
     postings,
 }: Props) {
+    const { wrapRouter: wrapFilterRequest, summary: filterSummary } =
+        useInertiaFeedback('Saringan belum dapat dipakai');
     const {
         report: reportActionError,
         clear: clearActionError,
@@ -1474,16 +1477,16 @@ export default function FinancePostings({
 
     const applyFilters = (next: Filters) => {
         setSelectedId(null);
-        router.get(PAGE_URL, toQuery(next), {
-            preserveState: true,
-            reset: ['postings'],
-            preserveScroll: true,
-            replace: true,
-            onError: (errors) =>
-                toast.error(
-                    Object.values(errors)[0] ?? 'Saringan belum dapat dipakai.',
-                ),
-        });
+        router.get(
+            PAGE_URL,
+            toQuery(next),
+            wrapFilterRequest({
+                preserveState: true,
+                reset: ['postings'],
+                preserveScroll: true,
+                replace: true,
+            }),
+        );
     };
 
     const refresh = (updated?: Posting) => {
@@ -1553,6 +1556,7 @@ export default function FinancePostings({
                     <CardHeader>
                         <CardTitle>Daftar posting</CardTitle>
                         {actionSummary}
+                        {filterSummary}
                         <CardDescription>
                             Posting tertahan diperbaiki di CoreERP lalu
                             divalidasi ulang. Posting yang ditolak dibukukan di

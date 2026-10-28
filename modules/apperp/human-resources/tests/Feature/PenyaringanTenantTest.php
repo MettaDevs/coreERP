@@ -219,7 +219,7 @@ class PenyaringanTenantTest extends TestCase
         $this->sebagaiPengguna($tenantId, $admin)
             ->getJson('/api/modules/human-resources/v1/core-members?email=rina@contoh.test')
             ->assertOk()
-            ->assertExactJson(['data' => []]);
+            ->assertExactJson(['data' => [], 'next_cursor' => null]);
 
         // Setelah ia juga menjadi anggota tenant ini, yang diusulkan hanya keanggotaan tenant ini, dan email
         // dicocokkan tanpa membedakan huruf besar.
@@ -234,7 +234,7 @@ class PenyaringanTenantTest extends TestCase
         // Email yang hanya mirip tidak diusulkan.
         $this->getJson('/api/modules/human-resources/v1/core-members?email=rina@contoh.tes')
             ->assertOk()
-            ->assertExactJson(['data' => []]);
+            ->assertExactJson(['data' => [], 'next_cursor' => null]);
     }
 
     public function test_one_account_is_linked_to_at_most_one_active_worker(): void
@@ -447,6 +447,70 @@ class PenyaringanTenantTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    public function test_master_creation_replay_uses_immutable_payload_after_edits(): void
+    {
+        $tenant = $this->buatTenantUji();
+        $unit = $this->buatUnitKerja($tenant);
+        $this->sebagaiPengguna($tenant, ['human-resources.workers.create', 'human-resources.jobs.create', 'human-resources.positions.create']);
+        $job = $this->postJson('/api/modules/human-resources/v1/jobs', ['name' => 'Position job', 'idempotency_key' => 'position-job'])->assertCreated()->json('data.id');
+        foreach ([
+            ['workers', 'hr_workers', ['name' => 'Original worker']],
+            ['jobs', 'hr_jobs', ['name' => 'Original job']],
+            ['positions', 'hr_positions', ['name' => 'Original position', 'job_id' => $job, 'operating_unit_id' => $unit, 'valid_from' => '2026-01-01']],
+        ] as [$resource, $table, $payload]) {
+            $payload['idempotency_key'] = 'replay-'.$resource;
+            $url = '/api/modules/human-resources/v1/'.$resource;
+            $created = $this->postJson($url, $payload)->assertCreated()->assertJsonMissingPath('data.creation_payload_hash')->json('data.id');
+            $this->postJson($url, [...$payload, 'name' => 'Changed request'])->assertConflict();
+            DB::table($table)->where('id', $created)->update(['name' => 'Edited afterwards']);
+            $this->postJson($url, $payload)->assertOk()->assertHeader('Idempotent-Replayed', 'true')->assertJsonPath('data.id', $created)->assertJsonPath('data.name', 'Edited afterwards');
+            $this->postJson($url, [...$payload, 'name' => 'Edited afterwards'])->assertConflict();
+            DB::table($table)->where('id', $created)->update(['deleted_at' => now()]);
+            $this->postJson($url, $payload)->assertConflict();
+            $this->assertSame(1, DB::table($table)->where('creation_key', $payload['idempotency_key'])->count());
+        }
+    }
+
+    public function test_position_assignment_rejects_overlap_and_keeps_nonoverlapping_periods(): void
+    {
+        $tenant = $this->buatTenantUji();
+        $unit = $this->buatUnitKerja($tenant);
+        $first = $this->seedPekerja($tenant, 'First worker');
+        $second = $this->seedPekerja($tenant, 'Second worker');
+        $position = $this->seedPosisi($tenant, $unit, 'Position');
+        $this->sebagaiPengguna($tenant, ['human-resources.assignments.create']);
+        $url = '/api/modules/human-resources/v1/worker-position-assignments';
+        $payload = ['worker_id' => $first, 'position_id' => $position, 'valid_from' => '2026-01-01', 'valid_until' => '2026-01-31', 'is_primary' => true];
+        $this->postJson($url, $payload)->assertCreated();
+        $this->postJson($url, [...$payload, 'worker_id' => $second])->assertUnprocessable();
+        $this->postJson($url, [...$payload, 'worker_id' => $second, 'valid_from' => '2026-02-01', 'valid_until' => '2026-02-28'])->assertCreated();
+        $this->assertSame(2, DB::table('hr_worker_position_assignments')->where('position_id', $position)->count());
+    }
+
+    public function test_hr_lists_are_bounded_and_resume_without_duplicate_rows(): void
+    {
+        $tenantId = $this->buatTenantUji();
+        $unit = $this->buatUnitKerja($tenantId);
+        for ($i = 0; $i < 101; $i++) {
+            $worker = $this->seedPekerja($tenantId, 'Worker '.$i);
+            $position = $this->seedPosisi($tenantId, $unit, 'Position '.$i);
+            $this->seedPenugasan($tenantId, $worker, $position);
+            $id = (string) Str::ulid();
+            DB::table('hr_jobs')->insert(['id' => $id, 'tenant_id' => $tenantId, 'creation_key' => 'job-'.$id, 'code' => $id, 'name' => 'Job '.$i, 'created_at' => now(), 'updated_at' => now()]);
+        }
+        $this->sebagaiPengguna($tenantId, ['human-resources.workers.read', 'human-resources.jobs.read', 'human-resources.positions.read', 'human-resources.assignments.read']);
+        foreach (['workers', 'jobs', 'positions', 'worker-position-assignments'] as $resource) {
+            $url = '/api/modules/human-resources/v1/'.$resource;
+            $first = $this->getJson($url)->assertOk()->assertJsonCount(40, 'data')->json();
+            $this->assertNotNull($first['next_cursor']);
+            $next = $this->getJson($url.'?'.http_build_query(['cursor' => $first['next_cursor'], 'per_page' => 100]))->assertOk()->assertJsonCount(61, 'data')->assertJsonPath('next_cursor', null)->json();
+            $this->assertSame([], array_intersect(array_column($first['data'], 'id'), array_column($next['data'], 'id')));
+            $this->getJson($url.'?per_page=101')->assertUnprocessable()->assertJsonValidationErrors('per_page');
+            $this->getJson($url.'?cursor=invalid')->assertUnprocessable()->assertJsonValidationErrors('cursor');
+        }
+        $this->getJson('/api/modules/human-resources/v1/jobs?q=not-present')->assertOk()->assertJsonCount(0, 'data');
     }
 
     private function buatTenantUji(): string

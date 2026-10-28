@@ -17,22 +17,18 @@ import {
     PageDialog as Dialog,
     PageDialogContent as DialogContent,
 } from '@apperp/ui/page-dialog';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
 import { router } from '@inertiajs/react';
 import { Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { FormErrorHeader } from '@/components/form-error-header';
 import { apiJson, apiRequest, CoreApiError, errorText } from '@/lib/core-api';
-import type { AddressBook, DirectoryMetadata } from '../types';
+import type { AddressBook } from '../types';
 import { AddressBookHint } from './address-book-hint';
+import { useAddressBooks } from './use-address-books';
 
-export function AddressBookManager({
-    metadata,
-    onClose,
-}: {
-    metadata: DirectoryMetadata;
-    onClose: () => void;
-}) {
-    const [items, setItems] = useState(metadata.addressBooks);
+export function AddressBookManager({ onClose }: { onClose: () => void }) {
+    const { list, query, setQuery } = useAddressBooks();
     const [editing, setEditing] = useState<AddressBook | null>(null);
     const [archiving, setArchiving] = useState<AddressBook | null>(null);
     const [name, setName] = useState('');
@@ -41,6 +37,10 @@ export function AddressBookManager({
     const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>(
         {},
     );
+    const transition = useRecordTransition(
+        name !== (editing?.name ?? ''),
+        busy,
+    );
     async function save(event: React.FormEvent) {
         setFieldErrors({});
         event.preventDefault();
@@ -48,7 +48,7 @@ export function AddressBookManager({
         setError('');
 
         try {
-            const result = await apiJson<{ data: AddressBook }>(
+            await apiJson<{ data: AddressBook }>(
                 editing
                     ? `/api/v1/address-books/${editing.id}`
                     : '/api/v1/address-books',
@@ -61,13 +61,10 @@ export function AddressBookManager({
                     }),
                 },
             );
-            setItems((current) => [
-                ...current.filter((item) => item.id !== result.data.id),
-                result.data,
-            ]);
+            list.reload();
             setEditing(null);
             setName('');
-            router.reload({ only: ['addressBooks'] });
+            router.reload({ only: ['selectedAddressBook'] });
         } catch (caught) {
             if (caught instanceof CoreApiError) {
                 setFieldErrors(caught.errors);
@@ -92,9 +89,7 @@ export function AddressBookManager({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ version: archiving.version }),
             });
-            setItems((current) =>
-                current.filter((item) => item.id !== archiving.id),
-            );
+            list.reload();
             setArchiving(null);
 
             if (editing?.id === archiving.id) {
@@ -102,7 +97,7 @@ export function AddressBookManager({
                 setName('');
             }
 
-            router.reload({ only: ['addressBooks'] });
+            router.reload({ only: ['selectedAddressBook'] });
         } catch (caught) {
             setError(errorText(caught, 'Buku alamat belum dapat diarsipkan.'));
         } finally {
@@ -115,7 +110,7 @@ export function AddressBookManager({
             open
             onOpenChange={(open) => {
                 if (!open && !busy) {
-                    onClose();
+                    transition.request(onClose);
                 }
             }}
         >
@@ -137,7 +132,7 @@ export function AddressBookManager({
                 }
             >
                 <FormErrorHeader
-                    message={archiving ? null : error}
+                    message={archiving ? null : error || list.error}
                     errors={archiving ? undefined : fieldErrors}
                 />
 
@@ -167,17 +162,25 @@ export function AddressBookManager({
                             action="cancel"
                             disabled={busy}
                             onClick={() => {
-                                setEditing(null);
-                                setName('');
+                                transition.request(() => {
+                                    setEditing(null);
+                                    setName('');
+                                });
                             }}
                             type="button"
                         />
                     )}
                 </form>
+                <Input
+                    label="Cari buku alamat"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                />
                 <div className="min-h-0 flex-1 overflow-hidden">
                     <DataTable
                         scrollMode="viewport"
-                        data={items}
+                        data={list.items}
+                        incremental={list}
                         getRowKey={(book) => book.id}
                         columns={[
                             {
@@ -203,8 +206,10 @@ export function AddressBookManager({
                             }
 
                             if (action === 'edit') {
-                                setEditing(book);
-                                setName(book.name);
+                                transition.request(() => {
+                                    setEditing(book);
+                                    setName(book.name);
+                                });
                             } else {
                                 setArchiving(book);
                             }
@@ -255,6 +260,7 @@ export function AddressBookManager({
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
+                {transition.confirmation}
             </DialogContent>
         </Dialog>
     );
