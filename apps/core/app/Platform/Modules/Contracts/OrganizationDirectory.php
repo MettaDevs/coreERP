@@ -15,7 +15,7 @@ use Illuminate\Database\Query\Builder;
  */
 interface OrganizationDirectory
 {
-    /** Pilihan database dibatasi sebelum dikirim; kind hanya `members` atau `operating_units`.
+    /** Pilihan database dibatasi sebelum dikirim; kind `members`, `legal_entities`, atau `operating_units`.
      * @param  array<string, mixed>  $input
      * @return array{data: mixed, next_cursor: ?string}
      */

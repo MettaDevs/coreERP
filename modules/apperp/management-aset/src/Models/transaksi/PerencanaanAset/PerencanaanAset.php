@@ -57,10 +57,8 @@ class PerencanaanAset extends Model
     public const FIELD_CAPTIONS = [
         'kode' => 'Nomor rencana',
         'planning_org_unit_id' => 'Unit organisasi',
-        'planned_on' => 'Tanggal rencana',
-        'planning_year' => 'Tahun anggaran',
-        'planning_type' => 'Jenis perencanaan',
-        'funding_source' => 'Sumber dana',
+        'planned_on' => 'Tanggal dokumen',
+        'planning_year' => 'Tahun rencana',
         'responsible_user_id' => 'Penanggung jawab',
         'total_estimated_value' => 'Nilai rencana',
         'status' => 'Status',
@@ -69,7 +67,6 @@ class PerencanaanAset extends Model
 
     /** @var array<string, array<string, string>> */
     public const FIELD_OPTIONS = [
-        'planning_type' => ['regular' => 'Reguler', 'additional' => 'Tambahan'],
         'status' => ['draft' => 'Draf'],
     ];
 
@@ -82,6 +79,8 @@ class PerencanaanAset extends Model
     /** @var array<string, string> Kolom yang sengaja tidak ditawarkan sebagai filter, dengan alasannya. */
     public const FIELD_HIDDEN = [
         'legal_entity_id' => 'Badan hukum dipilih lewat workspace, bukan filter laporan.',
+        'planning_type' => 'Nilai warisan yang dipertahankan untuk riwayat.',
+        'funding_source' => 'Teks sumber dana lama; sumber dana baru berada pada rincian.',
     ];
 
     protected $table = 'aset_tr_perencanaan_aset';
@@ -90,6 +89,8 @@ class PerencanaanAset extends Model
         'tenant_id', 'creation_key', 'kode', 'legal_entity_id', 'planning_org_unit_id',
         'planned_on', 'planning_year', 'planning_type', 'funding_source', 'responsible_user_id',
         'total_estimated_value', 'status', 'description', 'version',
+        'unestimated_line_count',
+        'planning_year_id',
     ];
 
     /** @return array<string, string> */

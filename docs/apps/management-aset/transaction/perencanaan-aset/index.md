@@ -4,6 +4,24 @@ Halaman ini untuk developer. Isinya dokumen rencana pengadaan aset — yang dibu
 
 Rencana aset adalah daftar barang yang akan diadakan beserta jumlah dan satuannya. Ia belum menjadi aset; aset baru lahir saat barangnya diterima.
 
+## Baseline tahunan
+
+`planned_on` adalah **Tanggal dokumen**, sedangkan `planning_year_id` menunjuk master **Tahun Rencana** Foundation milik perusahaan dokumen. `planning_year` menyimpan angka tahun dari master sebagai snapshot, bukan input bebas. Dokumen pada Oktober 2026 boleh berisi kebutuhan 2027. Setiap baris membawa `needed_on` yang wajib berada dalam angka tahun tersebut. Tahun Rencana tetap kalender Januari–Desember dan terpisah dari tahun buku; tidak ada daftar tahun buatan browser. Master dibuat sesuai kebutuhan melalui kartu Foundation. Tahun nonaktif hilang dari pilihan baru, tetapi dokumen yang sudah menunjuknya dapat mempertahankan referensi tersebut. Angka tahun master tidak dapat diubah maknanya setelah dibuat.
+
+Pada pembuatan dokumen, perusahaan dan unit pengusul dapat dipilih dari organisasi yang dijangkau kebijakan `management-aset.asset-responsibility`. Pemilihan perusahaan pada form adalah jalur lintas perusahaan yang eksplisit; ia tidak memperluas izin dan tidak mengubah penyaringan daftar biasa. Setelah dokumen untuk perusahaan lain berhasil disimpan, UI mengganti tempat kerja lewat endpoint Core agar dokumen itu tampil pada daftar normalnya. Bila pergantian tempat kerja gagal, dokumen tetap sudah tersimpan dan tidak dikirim ulang. Perusahaan dokumen tersimpan dikunci agar nomor dan hubungan transaksi tidak berpindah perusahaan. Unit pengusul masih dapat diubah sesuai hak pengguna selama dokumen dapat diedit. Pilihan tunggal ditampilkan baca saja.
+
+`responsible_user_id` dapat dipilih dari anggota aktif tenant; nilainya ID pengguna, bukan ID keanggotaan. Penanggung jawab rencana tidak otomatis menjadi pemegang aset atau pemberi persetujuan. Pemeriksaan keanggotaan tersebut tidak menggantikan pemeriksaan akses perusahaan dan unit.
+
+Setiap baris wajib menunjuk `funding_source_id` dari master **Sumber dana** Foundation pada tenant yang sama. Master dipelihara melalui **Nama**, **Deskripsi**, dan status aktif; kode lama tetap tersimpan tetapi tidak menjadi input baru atau kolom lookup. `funding_source_name` pada baris menyimpan nama saat dipilih agar dokumen lama tetap terbaca setelah master berganti nama. Baris tersimpan boleh mempertahankan sumber yang kemudian dinonaktifkan; baris baru atau pilihan pengganti wajib memakai sumber aktif. Sumber dana adalah informasi pembiayaan, bukan saldo, pagu, atau anggaran yang disahkan. Pembuatan dari lookup memakai form Foundation asli beserta izin pengelolaan data acuan.
+
+`estimated_unit_price` dan `estimated_total_price` boleh null. Null berarti **belum diestimasi**, sedangkan nol berarti estimasi memang nol. Total dokumen dan laporan hanya menjumlah nilai yang sudah diketahui dan menyertakan jumlah baris yang belum diestimasi.
+
+Pilihan Reguler/Tambahan tidak lagi menjadi input atau penentu proses. Kolom `planning_type` dan `funding_source` pada header lama tetap disimpan untuk riwayat. Migration memindahkan keterangan sumber dana lama ke master dan referensi per baris tanpa menghapus teks header asal. Tanggal kebutuhan lama dibiarkan null karena tanggal dokumen tidak membuktikan tanggal kebutuhan; petugas melengkapinya ketika mengubah dokumen. Rencana dan baris lama mempertahankan ID supaya permintaan pembelian tetap menunjuk kebutuhan asal.
+
+Migration `2026_10_27_150000_link_asset_planning_years` membuat atau memakai ulang master per pasangan tenant, perusahaan, dan angka tahun existing, lalu mengisi `planning_year_id`. Angka tahun lama, ID dokumen, dan ID rincian tidak diubah. Impor memakai kontrak `PlanningYearDirectory`, sehingga module tidak menulis tabel Foundation langsung.
+
+Baseline ini mengadaptasi pemisahan tanggal dan rincian dokumen pada Dynamics 365. Ia tidak membuat G/L Budget, kontrol pagu, atau workflow persetujuan baru.
+
 ## Mengenali rencana dan membuat permintaan
 
 Field **Kode perencanaan** mengikuti pengaturan nomor Core: otomatis menampilkan pesan bahwa kode dibuat saat disimpan, manual mewajibkan kode yang diketik, dan keduanya membolehkan kode kosong untuk nomor otomatis. Kode tidak berubah setelah dokumen disimpan.

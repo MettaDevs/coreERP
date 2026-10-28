@@ -78,7 +78,7 @@ class AssetProcurementReportTest extends TestCase
 
         // Laptop: 10 direncanakan, 8 diminta lewat dua permintaan, 7 diterima; penerimaan draf belum dihitung.
         $this->assertSame([
-            'tanggal_rencana' => '2026-02-10', 'tahun_anggaran' => '2026', 'sumber_dana' => 'Anggaran rutin',
+            'tanggal_rencana' => '2026-02-10', 'tanggal_kebutuhan' => null, 'tahun_anggaran' => '2026', 'sumber_dana' => 'Anggaran rutin',
             'spesifikasi' => 'Core i5, RAM 16 GB', 'satuan' => 'Unit', 'jumlah_rencana' => '10', 'nilai_rencana' => '150000000.00',
             'no_permintaan' => 'RPPA-1, RPPA-2', 'tanggal_permintaan' => '2026-03-01', 'jumlah_diminta' => '8', 'belum_diminta' => '2',
             'no_penerimaan' => 'PNA-1, PNA-2', 'tanggal_penerimaan' => '2026-04-05', 'vendor' => 'PT Pemasok Uji',
@@ -136,6 +136,23 @@ class AssetProcurementReportTest extends TestCase
         $this->assertGagal('Parameter laporan tidak diterima', fn () => $this->report(['status' => ['hilang']]));
     }
 
+    public function test_report_reads_line_funding_and_keeps_unknown_estimates_incomplete(): void
+    {
+        DB::table('aset_tr_perencanaan_aset_details')->where('tenant_id', $this->tenantId)
+            ->where('nama_aset', 'Laptop')->update([
+                'funding_source_name' => 'Pembiayaan baris uji', 'needed_on' => '2026-09-01',
+                'estimated_unit_price' => null, 'estimated_total_price' => null,
+            ]);
+
+        $report = $this->report();
+        $row = $report['tables']['baris'][0];
+        $this->assertSame('Pembiayaan baris uji', $row['sumber_dana']);
+        $this->assertSame('2026-09-01', $row['tanggal_kebutuhan']);
+        $this->assertNull($row['nilai_rencana']);
+        $this->assertSame(1, $report['fields']['jumlah_baris_belum_diestimasi']);
+        $this->assertSame('10000000.00', $report['fields']['total_nilai_rencana']);
+    }
+
     public function test_report_needs_the_request_permission_and_respects_scope_and_tenant(): void
     {
         $this->assertSame(self::PERMISSION, app(ReportRegistry::class)->get(self::CODE)->permission());
@@ -176,13 +193,13 @@ class AssetProcurementReportTest extends TestCase
         $file->cleanup();
 
         $this->assertSame('Pengadaan aset', $sheet->getTitle());
-        $this->assertSame(['No.', 'No. rencana', 'Tanggal rencana', 'Tahun anggaran', 'Sumber dana', 'Item aset'], array_slice($sheet->rangeToArray('A10:V10')[0], 0, 6));
+        $this->assertSame(['No.', 'No. rencana', 'Tanggal rencana', 'Tanggal kebutuhan', 'Tahun anggaran', 'Sumber dana', 'Item aset'], array_slice($sheet->rangeToArray('A10:W10')[0], 0, 7));
         $this->assertSame('PLNA-1', (string) $sheet->getCell('B11')->getValue());
-        $this->assertSame('RPPA-3', (string) $sheet->getCell('K12')->getValue());
+        $this->assertSame('RPPA-3', (string) $sheet->getCell('L12')->getValue());
         $this->assertSame('Diterima sebagian, Diterima penuh', (string) $sheet->getCell('F7')->getValue());
         $this->assertSame('Total', (string) $sheet->getCell('A14')->getValue());
-        $this->assertEqualsWithDelta(104250000, (float) $sheet->getCell('S14')->getValue(), 0.001);
-        foreach (['A11', 'V12', 'J14'] as $cell) {
+        $this->assertEqualsWithDelta(104250000, (float) $sheet->getCell('T14')->getValue(), 0.001);
+        foreach (['A11', 'W12', 'K14'] as $cell) {
             $this->assertStringNotContainsString('${', (string) $sheet->getCell($cell)->getValue(), $cell);
         }
     }

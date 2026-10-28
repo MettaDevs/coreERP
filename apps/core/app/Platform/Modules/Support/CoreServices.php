@@ -22,11 +22,13 @@ use App\Platform\Modules\Contracts\ChangeLogValueResolvers;
 use App\Platform\Modules\Contracts\CurrencyRounding;
 use App\Platform\Modules\Contracts\FinancePostingSettings;
 use App\Platform\Modules\Contracts\FiscalCalendarDirectory;
+use App\Platform\Modules\Contracts\FundingSourceDirectory;
 use App\Platform\Modules\Contracts\LinkedWorkerResolvers;
 use App\Platform\Modules\Contracts\ListExportSources;
 use App\Platform\Modules\Contracts\ModuleReportProviders;
 use App\Platform\Modules\Contracts\NumberSequenceIssuer;
 use App\Platform\Modules\Contracts\OrganizationDirectory;
+use App\Platform\Modules\Contracts\PlanningYearDirectory;
 use App\Platform\Modules\Contracts\PostingAccountResolvers;
 use App\Platform\Modules\Contracts\PostingFeed;
 use App\Platform\Modules\Contracts\RecordDocuments;
@@ -102,6 +104,8 @@ final class CoreServices
     public const FOUNDATION_CONTRACTS = [
         NumberSequenceIssuer::class,
         FiscalCalendarDirectory::class,
+        FundingSourceDirectory::class,
+        PlanningYearDirectory::class,
         UnitOfMeasureDirectory::class,
         WorkflowEngine::class,
         // Feed posting finance: module yang menyusun jurnal membaca kebijakan penyelesaian

@@ -8,6 +8,7 @@ use App\Platform\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
@@ -39,6 +40,7 @@ class PerencanaanAsetDetail extends Model
 {
     use BelongsToTenant;
     use HasUlids;
+    use SoftDeletes;
 
     /** @var array<string, DataClass> */
     public const COLUMN_CLASSIFICATION = [
@@ -51,6 +53,7 @@ class PerencanaanAsetDetail extends Model
         'tenant_id', 'planning_id', 'line_number', 'jenis_aset_id', 'satuan_id',
         'nama_aset', 'unit', 'quantity', 'requested_specification',
         'estimated_unit_price', 'estimated_total_price',
+        'needed_on', 'funding_source_id', 'funding_source_name',
     ];
 
     /** @return array<string, string> */
@@ -61,6 +64,7 @@ class PerencanaanAsetDetail extends Model
             'quantity' => 'decimal:4',
             'estimated_unit_price' => 'decimal:2',
             'estimated_total_price' => 'decimal:2',
+            'needed_on' => 'date:Y-m-d',
         ];
     }
 

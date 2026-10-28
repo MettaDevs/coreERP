@@ -227,6 +227,37 @@ paths:
           description: Daftar anggota dengan nama dan email
         '403':
           description: Pengguna tidak memegang satu pun izin layar yang memakai daftar ini
+  /api/modules/management-aset/v1/reference-data/funding-sources:
+    get:
+      tags:
+      - Reference data
+      operationId: listAssetPlanningFundingSources
+      summary: Pilihan sumber dana Foundation untuk perencanaan aset
+      description: |
+        Memerlukan izin lihat perencanaan. Pencarian dan sort dijalankan server dengan
+        cursor bertahap. record_ids[] memuat pilihan tersimpan yang tidak aktif agar nama
+        dokumen lama tetap terbaca. Pembuatan memakai form dan izin Foundation asli.
+      parameters:
+      - name: q
+        in: query
+        schema:
+          type: string
+      - name: cursor
+        in: query
+        schema:
+          type: string
+      - name: record_ids[]
+        in: query
+        schema:
+          type: array
+          items:
+            $ref: '#/components/schemas/Ulid'
+      responses:
+        '200':
+          description: Batch data berisi id, name, description, active, version, dan next_cursor. Kode sumber dana lama tidak
+            menjadi field input atau pilihan baru.
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /api/v1/analisa-maintenance:
     get:
       tags:
@@ -4466,6 +4497,11 @@ paths:
       - Perencanaan aset
       operationId: createAsetPlan
       summary: Membuat header dan rincian perencanaan aset; spesifikasi adalah snapshot pada rincian transaksi
+      description: |
+        Pembuatan dapat memilih perusahaan dan unit pengusul di luar perusahaan aktif bila
+        keduanya termasuk hibah kebijakan data pengguna pada tenant yang sama. Ini jalur
+        pemilihan eksplisit perencanaan; daftar dan pembacaan biasa tetap mengikuti perusahaan aktif.
+        Tahun dipilih melalui planning_year_id milik perusahaan dokumen.
       parameters:
       - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
       requestBody:
@@ -4513,12 +4549,97 @@ paths:
                         type: boolean
         '403':
           $ref: '#/components/responses/Forbidden'
+  /api/modules/management-aset/v1/perencanaan-aset/planning-years:
+    get:
+      tags:
+      - Perencanaan aset
+      operationId: listAssetPlanningYears
+      summary: Pilihan master Tahun Rencana perusahaan yang diizinkan
+      description: |
+        Memerlukan salah satu izin read, create, atau update perencanaan. Perusahaan diperiksa
+        terhadap tenant dan kebijakan data. Pilihan baru hanya tahun aktif; record_ids[] dapat
+        memulihkan tahun yang tersimpan. Search dan cursor dibatasi server.
+      parameters:
+      - name: legal_entity_id
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      - name: q
+        in: query
+        schema:
+          type: string
+      - name: cursor
+        in: query
+        schema:
+          type: string
+      - name: record_ids[]
+        in: query
+        schema:
+          type: array
+          items:
+            $ref: '#/components/schemas/Ulid'
+      responses:
+        '200':
+          description: Batch data berisi id, legal_entity_id, year, active, version, dan next_cursor
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/modules/management-aset/v1/perencanaan-aset/organizations:
+    get:
+      tags:
+      - Perencanaan aset
+      operationId: listAssetPlanningOrganizations
+      summary: Pilihan perusahaan atau unit pengusul sesuai akses perencanaan
+      description: |
+        Memerlukan salah satu izin read, create, atau update perencanaan. kind legal_entities
+        memuat perusahaan yang dijangkau kebijakan data. kind operating_units mewajibkan
+        legal_entity_id dan membatasi unit pada hibah untuk perusahaan itu. record_ids[] tidak
+        memperluas hibah; data tenant lain tetap tidak terbaca. Hasil dimuat lewat cursor.
+      parameters:
+      - name: kind
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+          - legal_entities
+          - operating_units
+      - name: legal_entity_id
+        in: query
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      - name: q
+        in: query
+        schema:
+          type: string
+      - name: cursor
+        in: query
+        schema:
+          type: string
+      - name: record_ids[]
+        in: query
+        schema:
+          type: array
+          items:
+            $ref: '#/components/schemas/Ulid'
+      responses:
+        '200':
+          description: Batch data berisi id, nama, kode, display_label, dan next_cursor
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /api/modules/management-aset/v1/perencanaan-aset/{id}:
     get:
       tags:
       - Perencanaan aset
       operationId: showAsetPlan
       summary: Menampilkan satu rencana aset beserta rinciannya
+      description: |
+        Header membawa tanggal dokumen, planning_year_id, angka tahun kalender rencana
+        sebagai snapshot, dan penanggung jawab.
+        Rincian membawa needed_on, funding_source_id, funding_source_name, dan estimasi
+        yang boleh null. needed_on pada data lama boleh null sampai dokumen dilengkapi.
+        planning_type dan funding_source header lama dipertahankan sebagai data historis,
+        tidak menjadi input baseline baru.
       parameters:
       - $ref: '#/components/parameters/RecordId'
       responses:
@@ -4538,6 +4659,8 @@ paths:
       - Perencanaan aset
       operationId: updateAsetPlan
       summary: Mengubah rencana draf dengan version saat ini
+      description: Perusahaan dokumen tersimpan tidak dapat dipindahkan. Unit pengusul tetap harus berada dalam akses pengguna
+        pada perusahaan itu; pembacaan dan perubahan mengikuti perusahaan aktif.
       parameters:
       - $ref: '#/components/parameters/RecordId'
       - $ref: '#/components/parameters/IfMatch'
@@ -9787,7 +9910,13 @@ components:
       - satuan_id
       - quantity
       - requested_specification
+      - needed_on
+      - funding_source_id
       properties:
+        id:
+          allOf:
+          - $ref: '#/components/schemas/Ulid'
+          description: ID baris tersimpan saat mengubah dokumen; baris baru tidak mengirim ID.
         jenis_aset_id:
           $ref: '#/components/schemas/Ulid'
         satuan_id:
@@ -9804,14 +9933,25 @@ components:
         estimated_unit_price:
           type: number
           minimum: 0
+          nullable: true
+          description: Kosong berarti belum diestimasi; nol berarti estimasi memang nol.
+        needed_on:
+          type: string
+          format: date
+          description: Tanggal kebutuhan dalam tahun kalender planning_year; terpisah dari tanggal dokumen.
+        funding_source_id:
+          allOf:
+          - $ref: '#/components/schemas/Ulid'
+          description: Referensi sumber dana aktif milik Foundation pada tenant yang sama. Nama disimpan sebagai snapshot
+            baris.
     AsetPlanningWrite:
       type: object
       required:
       - legal_entity_id
       - planning_org_unit_id
       - planned_on
-      - planning_year
-      - planning_type
+      - planning_year_id
+      - responsible_user_id
       - details
       properties:
         kode:
@@ -9827,19 +9967,16 @@ components:
         planned_on:
           type: string
           format: date
-        planning_year:
-          type: integer
-          minimum: 2000
-          maximum: 2100
-        planning_type:
+          description: Tanggal dokumen; boleh berada sebelum tahun kebutuhan.
+        planning_year_id:
+          allOf:
+          - $ref: '#/components/schemas/Ulid'
+          description: ID master Tahun Rencana milik perusahaan dokumen. Angka planning_year pada jawaban berasal dari master
+            ini, bukan input bebas. Tahun nonaktif hanya boleh dipertahankan oleh dokumen yang sudah menunjuknya.
+        responsible_user_id:
           type: string
-          enum:
-          - regular
-          - additional
-        funding_source:
-          type: string
-          maxLength: 250
-          nullable: true
+          description: ID pengguna dari anggota aktif tenant, bukan ID keanggotaan. Akses perusahaan dan unit dokumen tetap
+            diperiksa terpisah.
         description:
           type: string
           maxLength: 2000

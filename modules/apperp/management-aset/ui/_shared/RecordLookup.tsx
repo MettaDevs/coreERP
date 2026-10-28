@@ -21,6 +21,13 @@ import type { MasterRecord } from '../master/masters';
 import { loadMatchingBatch } from './lookup-batches';
 
 const MasterForm = lazy(() => import('../master/MasterForm'));
+const UnitCatalogForm = lazy(() =>
+    import('@/pages/foundation/unit-of-measure/catalog-form').then(
+        (module) => ({
+            default: module.CatalogForm,
+        }),
+    ),
+);
 const VendorCreateCard = lazy(() =>
     import('@/pages/foundation/vendor/vendors').then((module) => ({
         default: module.VendorCreateCard,
@@ -49,6 +56,7 @@ export type RecordLookupProps<T extends { id: string }> = Omit<
     filterRecord?: (record: T) => boolean;
     filterKey?: string;
     allowCreate?: boolean;
+    onCreate?: () => void;
     onCreated?: (record: MasterRecord) => Promise<void>;
 };
 
@@ -90,6 +98,7 @@ export default function RecordLookup<T extends { id: string }>({
     filterRecord,
     filterKey = '',
     allowCreate = true,
+    onCreate,
     onCreated,
 }: RecordLookupProps<T>) {
     const page = usePage<{ permissions?: string[]; auth: Auth }>();
@@ -128,6 +137,12 @@ export default function RecordLookup<T extends { id: string }>({
         resource?.endsWith('/vendor') &&
         legalEntityId &&
         page.props.auth?.membership?.permissions.includes('core.vendor.update'),
+    );
+    const canCreateUnit = Boolean(
+        resource === 'reference-data/units-of-measure' &&
+        page.props.auth?.membership?.permissions.includes(
+            'core.reference-data.update',
+        ),
     );
     const canCreate = Boolean(
         config &&
@@ -347,9 +362,12 @@ export default function RecordLookup<T extends { id: string }>({
                 onCreate={
                     !disabled &&
                     allowCreate &&
-                    (canCreate || canCreateVendor) &&
+                    (canCreate ||
+                        canCreateVendor ||
+                        canCreateUnit ||
+                        onCreate) &&
                     !visiblePending
-                        ? () => setCreating(true)
+                        ? () => (onCreate ? onCreate() : setCreating(true))
                         : undefined
                 }
             />
@@ -388,6 +406,18 @@ export default function RecordLookup<T extends { id: string }>({
 
                             setCreating(false);
                             void chooseCreated(vendor.id);
+                        }}
+                    />
+                </Suspense>
+            )}
+            {creating && canCreateUnit && (
+                <Suspense fallback={<p role="status">Menyiapkan kartu…</p>}>
+                    <UnitCatalogForm
+                        draft={{ kind: 'units', record: null }}
+                        onClose={() => setCreating(false)}
+                        onSaved={(record) => {
+                            setCreating(false);
+                            void chooseCreated(record.id);
                         }}
                     />
                 </Suspense>

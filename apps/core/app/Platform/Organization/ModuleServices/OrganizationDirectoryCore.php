@@ -32,6 +32,10 @@ final class OrganizationDirectoryCore implements OrganizationDirectory
                 ->join('users', 'users.id', '=', 'memberships.user_id')
                 ->where('memberships.tenant_id', $tenantId)->where('memberships.status', 'active')
                 ->select(['users.id', 'users.name as kode', 'users.name as nama', 'users.name as display_label', 'users.email']);
+        } elseif ($kind === 'legal_entities') {
+            $query = DB::table('organizations')->join('legal_entities as company', 'company.organization_id', '=', 'organizations.id')
+                ->where('organizations.tenant_id', $tenantId)->where('organizations.classification', 'legal_entity')
+                ->select(['organizations.id', 'organizations.name as nama', 'company.company_code as kode', 'organizations.name as display_label']);
         } else {
             abort_unless($kind === 'operating_units', 422);
             $query = DB::table('organizations')->leftJoin('operating_units as unit', 'unit.organization_id', '=', 'organizations.id')

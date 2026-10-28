@@ -30,7 +30,13 @@ AsetPlanningDetailWrite:
   - satuan_id
   - quantity
   - requested_specification
+  - needed_on
+  - funding_source_id
   properties:
+    id:
+      allOf:
+      - $ref: '#/components/schemas/Ulid'
+      description: ID baris tersimpan saat mengubah dokumen; baris baru tidak mengirim ID.
     jenis_aset_id:
       $ref: '#/components/schemas/Ulid'
     satuan_id:
@@ -47,14 +53,24 @@ AsetPlanningDetailWrite:
     estimated_unit_price:
       type: number
       minimum: 0
+      nullable: true
+      description: Kosong berarti belum diestimasi; nol berarti estimasi memang nol.
+    needed_on:
+      type: string
+      format: date
+      description: Tanggal kebutuhan dalam tahun kalender planning_year; terpisah dari tanggal dokumen.
+    funding_source_id:
+      allOf:
+      - $ref: '#/components/schemas/Ulid'
+      description: Referensi sumber dana aktif milik Foundation pada tenant yang sama. Nama disimpan sebagai snapshot baris.
 AsetPlanningWrite:
   type: object
   required:
   - legal_entity_id
   - planning_org_unit_id
   - planned_on
-  - planning_year
-  - planning_type
+  - planning_year_id
+  - responsible_user_id
   - details
   properties:
     kode:
@@ -69,19 +85,14 @@ AsetPlanningWrite:
     planned_on:
       type: string
       format: date
-    planning_year:
-      type: integer
-      minimum: 2000
-      maximum: 2100
-    planning_type:
+      description: Tanggal dokumen; boleh berada sebelum tahun kebutuhan.
+    planning_year_id:
+      allOf:
+      - $ref: '#/components/schemas/Ulid'
+      description: ID master Tahun Rencana milik perusahaan dokumen. Angka planning_year pada jawaban berasal dari master ini, bukan input bebas. Tahun nonaktif hanya boleh dipertahankan oleh dokumen yang sudah menunjuknya.
+    responsible_user_id:
       type: string
-      enum:
-      - regular
-      - additional
-    funding_source:
-      type: string
-      maxLength: 250
-      nullable: true
+      description: ID pengguna dari anggota aktif tenant, bukan ID keanggotaan. Akses perusahaan dan unit dokumen tetap diperiksa terpisah.
     description:
       type: string
       maxLength: 2000
