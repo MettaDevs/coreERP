@@ -12,14 +12,21 @@ final class PlanningOrganizationScope
     public function choices(Request $request, string $kind, ?string $companyId = null): array
     {
         $policy = $this->policy($request);
-        $all = ($policy['all'] ?? false) === true;
-        $grants = collect($policy['scope_grants'] ?? []);
+        $all = $policy['all'];
         if ($kind === 'operating_units') {
             $this->require($request, (string) $companyId);
-            $ids = $grants->where('legal_entity_id', $companyId)->flatMap(fn ($grant) => $grant['operating_unit_ids'] ?? [])->unique()->values()->all();
-        } else {
-            $ids = $grants->pluck('legal_entity_id')->filter()->unique()->values()->all();
         }
+        $ids = [];
+        foreach ($policy['scope_grants'] as $grant) {
+            if ($kind === 'operating_units' && $grant['legal_entity_id'] === $companyId) {
+                foreach ($grant['operating_unit_ids'] as $unitId) {
+                    $ids[$unitId] = $unitId;
+                }
+            } elseif ($kind === 'legal_entities' && $grant['legal_entity_id'] !== null) {
+                $ids[$grant['legal_entity_id']] = $grant['legal_entity_id'];
+            }
+        }
+        $ids = array_values($ids);
         if (! $all && $ids === []) {
             return ['data' => collect(), 'next_cursor' => null];
         }
@@ -32,10 +39,14 @@ final class PlanningOrganizationScope
     public function require(Request $request, string $companyId, ?string $unitId = null): void
     {
         $policy = $this->policy($request);
-        $allowed = ($policy['all'] ?? false) === true || collect($policy['scope_grants'] ?? [])->contains(
-            fn ($grant) => ($grant['legal_entity_id'] ?? null) === $companyId
-                && ($unitId === null || in_array($unitId, $grant['operating_unit_ids'] ?? [], true)),
-        );
+        $allowed = $policy['all'];
+        foreach ($policy['scope_grants'] as $grant) {
+            if ($grant['legal_entity_id'] === $companyId
+                && ($unitId === null || in_array($unitId, $grant['operating_unit_ids'], true))) {
+                $allowed = true;
+                break;
+            }
+        }
         abort_unless($allowed, 403, 'Perusahaan atau unit pengusul berada di luar akses Anda.');
         $directory = app(OrganizationDirectory::class);
         $tenantId = (string) $request->attributes->get('coreerp.tenant_id');
