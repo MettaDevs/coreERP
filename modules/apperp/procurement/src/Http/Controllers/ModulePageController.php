@@ -88,4 +88,3 @@ final class ModulePageController
         return self::$menu = $menu;
     }
 }
-
