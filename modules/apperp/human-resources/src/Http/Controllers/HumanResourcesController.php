@@ -26,7 +26,7 @@ use Modules\Apperp\HumanResources\Services\HrOrganizationDirectory;
  * Sebelumnya setiap query di sini disusun dengan query builder mentah, dan penyaringan tenant
  * ditulis tangan sebagai `where('tenant_id', ...)` pada masing-masing. Selama tiap tenant punya
  * database sendiri, satu baris yang lupa ditulis tidak berakibat apa-apa. Di dalam satu
- * database bersama, ia memulangkan baris seluruh pelanggan â€” dan kegagalannya tidak pernah
+ * database bersama, ia memulangkan baris seluruh pelanggan — dan kegagalannya tidak pernah
  * terlihat sebagai kegagalan, hanya sebagai daftar yang isinya kebetulan banyak.
  *
  * Karena itu penyaringannya tidak lagi ditulis di sini sama sekali. Keempat modelnya memakai
@@ -332,15 +332,15 @@ final class HumanResourcesController extends Controller
         //
         // Mempertahankan pemanggilan HTTP-nya bukan pilihan yang lebih aman, meskipun terlihat
         // begitu. Setelan `services.coreerp` ikut hilang bersama kerangka app lama, jadi
-        // pemanggilan itu sekarang menembak alamat kosong dan **selalu** melempar â€” akibatnya
+        // pemanggilan itu sekarang menembak alamat kosong dan **selalu** melempar — akibatnya
         // setiap penugasan untuk pekerja yang akunnya tertaut akan dijawab 500, bukan tersimpan.
         // Yang tersisa dari mempertahankannya hanyalah penjaga batas yang merah selamanya.
         //
         // Akibat yang sungguhan ditanggung: penugasan tetap tersimpan, tetapi role otomatisnya
         // tidak lagi ikut diperbarui, dan admin tenant harus menugaskan rolenya sendiri. Ini
         // dicatat sebagai perubahan perilaku, bukan sebagai perbaikan. Yang mengembalikannya
-        // adalah sebuah antarmuka baru di Core â€” menerima id keanggotaan, id posisi, id unit
-        // kerja, id penugasan, dan status aktif â€” bukan menghidupkan kembali kliennya.
+        // adalah sebuah antarmuka baru di Core — menerima id keanggotaan, id posisi, id unit
+        // kerja, id penugasan, dan status aktif — bukan menghidupkan kembali kliennya.
 
         return response()->json(['data' => $assignment], 201);
     }
@@ -469,7 +469,7 @@ final class HumanResourcesController extends Controller
      *
      * Setiap lapisnya diperiksa bentuknya, bukan dipercaya. Isi kebijakan data datang dari
      * Core sebagai `mixed`, dan satu nilai yang bentuknya tidak seperti dugaan akan menjadi
-     * `whereIn` yang isinya bukan id â€” yang berarti bukan nol baris melainkan baris yang
+     * `whereIn` yang isinya bukan id — yang berarti bukan nol baris melainkan baris yang
      * salah. Yang tidak dikenali dilewati, bukan diteruskan.
      *
      * @return list<string>
@@ -505,8 +505,8 @@ final class HumanResourcesController extends Controller
      * Unit kerja yang boleh dilihat pengguna, atau `null` bila ia berhak atas semuanya.
      *
      * Memulangkan daftar, bukan menyaring query yang dioper masuk. Bedanya bukan gaya:
-     * penyaringan dipakai pada dua tempat yang bentuknya berbeda â€” langsung pada daftar posisi,
-     * dan dari dalam syarat relasi pada daftar penugasan â€” dan sebuah fungsi yang menerima
+     * penyaringan dipakai pada dua tempat yang bentuknya berbeda — langsung pada daftar posisi,
+     * dan dari dalam syarat relasi pada daftar penugasan — dan sebuah fungsi yang menerima
      * query harus bisa menerima kedua bentuk itu sekaligus. Sebagai daftar nilai, ia tidak
      * peduli pada bentuk query mana pun, dan aturannya tetap tinggal di satu tempat.
      *
