@@ -48,10 +48,10 @@ class PerencanaanAsetController extends Controller
         $query = PerencanaanAset::query();
         app(OrganizationScope::class)->query($query, $request, 'legal_entity_id', 'planning_org_unit_id');
         $query->select('aset_tr_perencanaan_aset.*')->selectSub(
-            DB::table(self::TABEL_BARIS.' as estimates')->selectRaw('COUNT(*)')
-                ->whereColumn('estimates.tenant_id', 'aset_tr_perencanaan_aset.tenant_id')
-                ->whereColumn('estimates.planning_id', 'aset_tr_perencanaan_aset.id')
-                ->whereNull('estimates.deleted_at')->where('estimates.estimate_pending', true)->where('estimates.estimated_unit_price', 0),
+            PerencanaanAsetDetail::query()->selectRaw('COUNT(*)')
+                ->whereColumn(self::TABEL_BARIS.'.tenant_id', 'aset_tr_perencanaan_aset.tenant_id')
+                ->whereColumn(self::TABEL_BARIS.'.planning_id', 'aset_tr_perencanaan_aset.id')
+                ->where('estimate_pending', true)->where('estimated_unit_price', 0),
             'unestimated_line_count',
         );
 
