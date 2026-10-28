@@ -1,24 +1,24 @@
-import { router, usePage } from "@inertiajs/react";
-import { ExternalLink } from "lucide-react";
-import { lazy, Suspense, useCallback, useState } from "react";
-import type { ComponentProps } from "react";
-import type { Auth } from "@/types";
-import { ActionButton } from "@apperp/ui/action-button";
-import { Alert, AlertDescription } from "@apperp/ui/alert";
-import { Button } from "@apperp/ui/button";
+import { router, usePage } from '@inertiajs/react';
+import { ExternalLink } from 'lucide-react';
+import { lazy, Suspense, useCallback, useState } from 'react';
+import type { ComponentProps } from 'react';
+import type { Auth } from '@/types';
+import { ActionButton } from '@apperp/ui/action-button';
+import { Alert, AlertDescription } from '@apperp/ui/alert';
+import { Button } from '@apperp/ui/button';
 import {
     Card,
     CardAction,
     CardContent,
     CardHeader,
     CardTitle,
-} from "@apperp/ui/card";
-import { DataTableText } from "@apperp/ui/data-table";
-import { InlineLookup } from "@apperp/ui/inline-lookup";
-import type { LookupLoader } from "@apperp/ui/inline-lookup";
+} from '@apperp/ui/card';
+import { DataTableText } from '@apperp/ui/data-table';
+import { InlineLookup } from '@apperp/ui/inline-lookup';
+import type { LookupLoader } from '@apperp/ui/inline-lookup';
 
 const VendorCreateCard = lazy(() =>
-    import("@/pages/foundation/vendor/vendors").then((module) => ({
+    import('@/pages/foundation/vendor/vendors').then((module) => ({
         default: module.VendorCreateCard,
     })),
 );
@@ -41,7 +41,7 @@ export type VendorPageProps = {
         org_unit_id: string | null;
         user_id: string;
     };
-    portalContainer?: ComponentProps<typeof InlineLookup>["portalContainer"];
+    portalContainer?: ComponentProps<typeof InlineLookup>['portalContainer'];
 };
 
 const formatVendorLabel = (vendor: VendorOption) =>
@@ -54,8 +54,8 @@ export default function VendorPage({
 }: VendorPageProps) {
     const { auth } = usePage<{ auth?: Auth }>().props;
     const corePermissions = auth?.membership?.permissions ?? [];
-    const canReadVendor = corePermissions.includes("core.vendor.read");
-    const canUpdateVendor = corePermissions.includes("core.vendor.update");
+    const canReadVendor = corePermissions.includes('core.vendor.read');
+    const canUpdateVendor = corePermissions.includes('core.vendor.update');
     const legalEntityId = context?.legal_entity_id ?? null;
     const canCreateVendor = Boolean(canUpdateVendor && legalEntityId);
 
@@ -93,25 +93,25 @@ export default function VendorPage({
                 legal_entity_id: legalEntityId,
             });
 
-            if (query.trim() !== "") {
-                params.set("q", query.trim());
+            if (query.trim() !== '') {
+                params.set('q', query.trim());
             }
 
             if (cursor) {
-                params.set("cursor", cursor);
+                params.set('cursor', cursor);
             }
 
             const response = await fetch(
                 `/api/v1/vendors/lookup?${params.toString()}`,
                 {
-                    credentials: "same-origin",
+                    credentials: 'same-origin',
                     signal,
-                    headers: { Accept: "application/json" },
+                    headers: { Accept: 'application/json' },
                 },
             );
 
             if (!response.ok) {
-                throw new Error("Daftar vendor belum dapat dimuat.");
+                throw new Error('Daftar vendor belum dapat dimuat.');
             }
 
             const payload = (await response.json()) as {
@@ -142,7 +142,7 @@ export default function VendorPage({
             return;
         }
 
-        router.visit("/settings/vendors");
+        router.visit('/settings/vendors');
     };
 
     return (
@@ -219,8 +219,8 @@ export default function VendorPage({
                                 }
                                 columns={[
                                     {
-                                        id: "number",
-                                        header: "Nomor vendor",
+                                        id: 'number',
+                                        header: 'Nomor vendor',
                                         width: 140,
                                         cell: (item) => (
                                             <DataTableText>
@@ -229,8 +229,8 @@ export default function VendorPage({
                                         ),
                                     },
                                     {
-                                        id: "name",
-                                        header: "Nama",
+                                        id: 'name',
+                                        header: 'Nama',
                                         width: 260,
                                         cell: (item) => (
                                             <DataTableText>
@@ -242,7 +242,7 @@ export default function VendorPage({
                                 getItemValue={(item) => item.id}
                                 getItemLabel={formatVendorLabel}
                                 getSearchText={(item) =>
-                                    `${item.number} ${item.name} ${item.tax_number ?? ""}`
+                                    `${item.number} ${item.name} ${item.tax_number ?? ''}`
                                 }
                                 onValueChange={(item) =>
                                     setSelectedState({
@@ -263,7 +263,7 @@ export default function VendorPage({
 
                             {selectedVendor && (
                                 <p className="text-muted-foreground text-sm">
-                                    Vendor terpilih:{" "}
+                                    Vendor terpilih:{' '}
                                     <span className="text-foreground font-medium">
                                         {formatVendorLabel(selectedVendor)}
                                     </span>
@@ -299,10 +299,10 @@ export default function VendorPage({
                         onCreated={(vendor) => {
                             if (
                                 vendor.legal_entity_id !== legalEntityId ||
-                                vendor.status !== "active"
+                                vendor.status !== 'active'
                             ) {
                                 throw new Error(
-                                    "Pilih vendor aktif untuk perusahaan ini.",
+                                    'Pilih vendor aktif untuk perusahaan ini.',
                                 );
                             }
 

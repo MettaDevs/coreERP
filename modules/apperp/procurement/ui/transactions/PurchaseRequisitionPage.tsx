@@ -1,4 +1,4 @@
-import { PlaceholderPage } from "../_shared/PlaceholderPage";
+import { PlaceholderPage } from '../_shared/PlaceholderPage';
 
 export default function PurchaseRequisitionPage() {
     return (
@@ -8,4 +8,3 @@ export default function PurchaseRequisitionPage() {
         />
     );
 }
-

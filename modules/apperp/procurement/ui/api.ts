@@ -1,5 +1,5 @@
-import { createSaveFeedback } from "@apperp/ui/form-feedback";
-import type { FormFeedback } from "@apperp/ui/form-feedback";
+import { createSaveFeedback } from '@apperp/ui/form-feedback';
+import type { FormFeedback } from '@apperp/ui/form-feedback';
 
 export type ApiValidationErrors = Record<string, string[]>;
 
@@ -11,12 +11,12 @@ export class ApiError extends Error {
         public readonly code: string | null = null,
     ) {
         super(message);
-        this.name = "ApiError";
+        this.name = 'ApiError';
     }
 }
 
 function normalizeValidationErrors(value: unknown): ApiValidationErrors {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
         return {};
     }
 
@@ -26,9 +26,9 @@ function normalizeValidationErrors(value: unknown): ApiValidationErrors {
                 const normalized = Array.isArray(messages)
                     ? messages.filter(
                           (message): message is string =>
-                              typeof message === "string",
+                              typeof message === 'string',
                       )
-                    : typeof messages === "string"
+                    : typeof messages === 'string'
                       ? [messages]
                       : [];
 
@@ -41,7 +41,7 @@ function normalizeValidationErrors(value: unknown): ApiValidationErrors {
 export function newIdempotencyKey(): string {
     const webCrypto = globalThis.crypto;
 
-    if (typeof webCrypto?.randomUUID === "function") {
+    if (typeof webCrypto?.randomUUID === 'function') {
         try {
             return webCrypto.randomUUID();
         } catch {
@@ -55,17 +55,17 @@ export function newIdempotencyKey(): string {
 /**
  * Awalan rute API procurement.
  */
-const API_PREFIX = "/api/modules/procurement/v1";
+const API_PREFIX = '/api/modules/procurement/v1';
 
-const SAFE_METHODS = ["GET", "HEAD", "OPTIONS"];
+const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
 
 function csrfToken(): string {
-    const prefix = "XSRF-TOKEN=";
+    const prefix = 'XSRF-TOKEN=';
     const cookie = document.cookie
-        .split("; ")
+        .split('; ')
         .find((part) => part.startsWith(prefix));
 
-    return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : "";
+    return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : '';
 }
 
 export function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -77,17 +77,17 @@ async function request<T>(
     path: string,
     init?: RequestInit,
 ): Promise<T> {
-    const method = (init?.method ?? "GET").toUpperCase();
+    const method = (init?.method ?? 'GET').toUpperCase();
     const isFormData = init?.body instanceof FormData;
 
     const response = await fetch(`${prefix}${path}`, {
         ...init,
-        credentials: "same-origin",
+        credentials: 'same-origin',
         headers: {
-            ...(isFormData ? {} : { "Content-Type": "application/json" }),
+            ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
             ...(SAFE_METHODS.includes(method)
                 ? {}
-                : { "X-XSRF-TOKEN": csrfToken() }),
+                : { 'X-XSRF-TOKEN': csrfToken() }),
             ...init?.headers,
         },
     });
@@ -106,17 +106,17 @@ async function request<T>(
             body?.errors ?? body?.error?.errors,
         );
         const message =
-            typeof body?.error?.message === "string"
+            typeof body?.error?.message === 'string'
                 ? body.error.message
-                : typeof body?.message === "string"
+                : typeof body?.message === 'string'
                   ? body.message
-                  : "Permintaan belum berhasil.";
+                  : 'Permintaan belum berhasil.';
 
         throw new ApiError(
             message,
             validationErrors,
             response.status,
-            typeof body?.error?.code === "string" ? body.error.code : null,
+            typeof body?.error?.code === 'string' ? body.error.code : null,
         );
     }
 
@@ -151,6 +151,6 @@ export function saveErrorFeedback(
         status: caught instanceof ApiError ? caught.status : undefined,
         code: caught instanceof ApiError ? caught.code : null,
         errors: caught instanceof ApiError ? caught.validationErrors : {},
-        details: `${operation}\n${caught instanceof ApiError ? `Status: ${caught.status}\nKode: ${caught.code ?? "-"}` : "Jenis gangguan belum diketahui."}`,
+        details: `${operation}\n${caught instanceof ApiError ? `Status: ${caught.status}\nKode: ${caught.code ?? '-'}` : 'Jenis gangguan belum diketahui.'}`,
     });
 }

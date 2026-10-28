@@ -1,10 +1,10 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@apperp/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
 import {
     Empty,
     EmptyDescription,
     EmptyHeader,
     EmptyTitle,
-} from "@apperp/ui/empty";
+} from '@apperp/ui/empty';
 
 export type PlaceholderPageProps = {
     title: string;

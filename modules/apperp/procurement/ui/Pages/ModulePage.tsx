@@ -1,7 +1,7 @@
-import { Suspense } from "react";
-import { Card, CardContent } from "@apperp/ui/card";
-import App from "../App";
-import type { ModulePageProps } from "../App";
+import { Suspense } from 'react';
+import { Card, CardContent } from '@apperp/ui/card';
+import App from '../App';
+import type { ModulePageProps } from '../App';
 
 /**
  * Titik masuk Inertia untuk seluruh layar modul Procurement.
@@ -27,4 +27,3 @@ export default function ModulePage(props: ModulePageProps) {
         </Suspense>
     );
 }
-

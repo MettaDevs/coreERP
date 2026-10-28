@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from "react";
-import type { RefObject } from "react";
+import { useEffect, useRef, useState } from 'react';
+import type { RefObject } from 'react';
 import {
     FormErrorSummary,
     focusFeedbackField,
     useFormValidation,
-} from "@apperp/ui/form-feedback";
-import type { FormFeedback } from "@apperp/ui/form-feedback";
-import { saveErrorFeedback } from "./api";
+} from '@apperp/ui/form-feedback';
+import type { FormFeedback } from '@apperp/ui/form-feedback';
+import { saveErrorFeedback } from './api';
 
 export function useSaveFeedback(
     providedScope?: RefObject<HTMLElement | null>,
@@ -37,7 +37,7 @@ export function useSaveFeedback(
             if (!focusFeedbackField(scopeRef.current, focusRequest.field)) {
                 focusFeedbackField(
                     scopeRef.current,
-                    focusRequest.field.split(".")[0],
+                    focusRequest.field.split('.')[0],
                 );
             }
         }
@@ -59,7 +59,7 @@ export function useSaveFeedback(
                         issue.field.startsWith(`${field}.`),
                 )
                 .map((issue) => issue.message)
-                .join(" ") || undefined,
+                .join(' ') || undefined,
         feedbackSummary: feedback ? (
             <FormErrorSummary
                 feedback={feedback}
