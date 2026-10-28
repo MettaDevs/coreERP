@@ -25,8 +25,8 @@ import {
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
 import { useConfirmation } from '@apperp/ui/use-confirmation';
-import type { ModulePageProps } from '../App';
 import { api, saveErrorMessage } from '../api';
+import type { ModulePageProps } from '../App';
 import { useRecordList } from '../use-record-list';
 import { useSaveFeedback } from '../use-save-feedback';
 import { VendorPrequalificationDetailDialog } from './prakualifikasi/VendorPrequalificationDetailDialog';
@@ -143,7 +143,13 @@ export default function VendorPrequalificationPage({
     }, [clearMutationFeedback, list]);
 
     const fetchDetail = useCallback(
-        async (id: string): Promise<VendorPrequalificationDetail | null> => {
+        async (
+            id: string,
+        ): Promise<
+            | { status: 'ok'; data: VendorPrequalificationDetail }
+            | { status: 'aborted' }
+            | { status: 'error'; message: string }
+        > => {
             detailAbortRef.current?.abort();
             const controller = new AbortController();
             detailAbortRef.current = controller;
@@ -160,22 +166,22 @@ export default function VendorPrequalificationPage({
                 });
 
                 if (controller.signal.aborted) {
-                    return null;
+                    return { status: 'aborted' };
                 }
 
-                return res.data;
+                return { status: 'ok', data: res.data };
             } catch (caught) {
                 if (controller.signal.aborted) {
-                    return null;
+                    return { status: 'aborted' };
                 }
 
-                setDetailError(
-                    saveErrorMessage(
-                        caught,
-                        'Rincian prakualifikasi vendor belum dapat dimuat.',
-                    ),
+                const message = saveErrorMessage(
+                    caught,
+                    'Rincian prakualifikasi vendor belum dapat dimuat.',
                 );
-                return null;
+                setDetailError(message);
+
+                return { status: 'error', message };
             } finally {
                 if (!controller.signal.aborted) {
                     setDetailLoading(false);
@@ -201,10 +207,10 @@ export default function VendorPrequalificationPage({
         setDetailRecord(null);
         setDetailDialogOpen(true);
 
-        const loaded = await fetchDetail(row.id);
+        const result = await fetchDetail(row.id);
 
-        if (loaded) {
-            setDetailRecord(loaded);
+        if (result.status === 'ok') {
+            setDetailRecord(result.data);
         }
     };
 
@@ -213,10 +219,10 @@ export default function VendorPrequalificationPage({
             return;
         }
 
-        const loaded = await fetchDetail(activeDetailId);
+        const result = await fetchDetail(activeDetailId);
 
-        if (loaded) {
-            setDetailRecord(loaded);
+        if (result.status === 'ok') {
+            setDetailRecord(result.data);
         }
     };
 
@@ -226,16 +232,14 @@ export default function VendorPrequalificationPage({
         }
 
         clearMutationFeedback();
-        const loaded = await fetchDetail(row.id);
+        const result = await fetchDetail(row.id);
 
-        if (loaded) {
-            setEditingRecord(loaded);
+        if (result.status === 'ok') {
+            setEditingRecord(result.data);
             setFormDialogOpen(true);
-        } else {
+        } else if (result.status === 'error') {
             reportMutationError(
-                new Error(
-                    'Rincian prakualifikasi vendor belum dapat dibuka untuk diubah.',
-                ),
+                new Error(result.message),
                 'Rincian prakualifikasi vendor belum dapat dibuka.',
             );
         }
@@ -251,67 +255,56 @@ export default function VendorPrequalificationPage({
         setFormDialogOpen(true);
     };
 
-    const handleArchive = useCallback(
-        async (target: {
-            id: string;
-            nomor_prakualifikasi: string;
-            nama_vendor: string;
-            version: number;
-        }) => {
-            if (!canArchive) {
-                return;
-            }
+    async function handleArchive(target: {
+        id: string;
+        nomor_prakualifikasi: string;
+        nama_vendor: string;
+        version: number;
+    }) {
+        if (!canArchive) {
+            return;
+        }
 
-            clearMutationFeedback();
+        clearMutationFeedback();
 
-            const confirmed = await confirmAction({
-                title: `Delete prakualifikasi ${target.nomor_prakualifikasi} (${target.nama_vendor})?`,
-                description:
-                    'Data prakualifikasi yang dihapus akan diarsipkan dan tidak lagi tampil pada daftar aktif.',
-                confirmLabel: 'Delete',
-                destructive: true,
+        const confirmed = await confirmAction({
+            title: `Delete prakualifikasi ${target.nomor_prakualifikasi} (${target.nama_vendor})?`,
+            description:
+                'Data prakualifikasi yang dihapus akan diarsipkan dan tidak lagi tampil pada daftar aktif.',
+            confirmLabel: 'Delete',
+            destructive: true,
+        });
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            await api(`/prakualifikasi/${encodeURIComponent(target.id)}`, {
+                method: 'DELETE',
+                body: JSON.stringify({ version: target.version }),
             });
 
-            if (!confirmed) {
-                return;
+            toast.success('Data prakualifikasi vendor berhasil dihapus.');
+
+            if (detailRecord?.id === target.id) {
+                setDetailDialogOpen(false);
+                setDetailRecord(null);
             }
 
-            try {
-                await api(`/prakualifikasi/${encodeURIComponent(target.id)}`, {
-                    method: 'DELETE',
-                    body: JSON.stringify({ version: target.version }),
-                });
-
-                toast.success('Data prakualifikasi vendor berhasil dihapus.');
-
-                if (detailRecord?.id === target.id) {
-                    setDetailDialogOpen(false);
-                    setDetailRecord(null);
-                }
-
-                if (editingRecord?.id === target.id) {
-                    setFormDialogOpen(false);
-                    setEditingRecord(null);
-                }
-
-                load();
-            } catch (caught) {
-                reportMutationError(
-                    caught,
-                    'Data prakualifikasi vendor belum dapat dihapus.',
-                );
+            if (editingRecord?.id === target.id) {
+                setFormDialogOpen(false);
+                setEditingRecord(null);
             }
-        },
-        [
-            canArchive,
-            clearMutationFeedback,
-            confirmAction,
-            detailRecord?.id,
-            editingRecord?.id,
-            load,
-            reportMutationError,
-        ],
-    );
+
+            load();
+        } catch (caught) {
+            reportMutationError(
+                caught,
+                'Data prakualifikasi vendor belum dapat dihapus.',
+            );
+        }
+    }
 
     const columns: DataTableColumn<VendorPrequalificationSummaryRow>[] =
         useMemo(
@@ -579,19 +572,22 @@ export default function VendorPrequalificationPage({
                 </CardContent>
             </Card>
 
-            <VendorPrequalificationFormDialog
-                open={formDialogOpen}
-                onClose={() => setFormDialogOpen(false)}
-                initialData={editingRecord}
-                legalEntityId={context?.legal_entity_id ?? null}
-                canCreateCoreVendor={canCreateCoreVendor}
-                onSaved={() => load()}
-                onDelete={
-                    canArchive && editingRecord
-                        ? () => void handleArchive(editingRecord)
-                        : undefined
-                }
-            />
+            {formDialogOpen && (
+                <VendorPrequalificationFormDialog
+                    key={editingRecord?.id ?? 'new'}
+                    open={formDialogOpen}
+                    onClose={() => setFormDialogOpen(false)}
+                    initialData={editingRecord}
+                    legalEntityId={context?.legal_entity_id ?? null}
+                    canCreateCoreVendor={canCreateCoreVendor}
+                    onSaved={() => load()}
+                    onDelete={
+                        canArchive && editingRecord
+                            ? () => void handleArchive(editingRecord)
+                            : undefined
+                    }
+                />
+            )}
 
             <VendorPrequalificationDetailDialog
                 open={detailDialogOpen}

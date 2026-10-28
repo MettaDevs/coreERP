@@ -10,6 +10,7 @@ import {
 } from 'react';
 import type { FormEvent } from 'react';
 import { toast } from 'sonner';
+import { useWorkDate } from '@/hooks/use-work-date';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
@@ -29,7 +30,6 @@ import { TableCell, TableRow } from '@apperp/ui/table';
 import { Textarea } from '@apperp/ui/textarea';
 import { useConfirmation } from '@apperp/ui/use-confirmation';
 import { useRecordTransition } from '@apperp/ui/use-record-transition';
-import { useWorkDate } from '@/hooks/use-work-date';
 import { ApiError, api, newIdempotencyKey, saveErrorMessage } from '../../api';
 import { useSaveFeedback } from '../../use-save-feedback';
 
@@ -344,21 +344,26 @@ export function VendorPrequalificationFormDialog({
         () => buildInitialFormState(initialData, workDate),
         [initialData, workDate],
     );
-    const [form, setForm] = useState<FormState>(baseline);
+    const [form, setForm] = useState<FormState>(() =>
+        buildInitialFormState(initialData, workDate),
+    );
     const [saving, setSaving] = useState(false);
     const [creatingVendor, setCreatingVendor] = useState(false);
 
-    const [numberPolicy, setNumberPolicy] = useState<{
+    const policyKey = open && !isEdit ? 'prakualifikasi' : null;
+    const [policyResult, setPolicyResult] = useState<{
+        key: string;
         allowManual: boolean;
         allowAutomatic: boolean;
-        loading: boolean;
         error: string | null;
-    }>({
-        allowManual: true,
-        allowAutomatic: true,
-        loading: !isEdit,
-        error: null,
-    });
+    } | null>(null);
+    const currentPolicy = policyResult?.key === policyKey ? policyResult : null;
+    const numberPolicy = {
+        allowManual: currentPolicy?.allowManual ?? true,
+        allowAutomatic: currentPolicy?.allowAutomatic ?? true,
+        loading: policyKey !== null && currentPolicy === null,
+        error: currentPolicy?.error ?? null,
+    };
 
     const {
         reportSaveError,
@@ -371,22 +376,11 @@ export function VendorPrequalificationFormDialog({
         useConfirmation();
 
     useEffect(() => {
-        if (!open) {
-            return;
-        }
-
-        setForm(buildInitialFormState(initialData, workDate));
-        clearSaveFeedback();
-        creationKey.current = newIdempotencyKey();
-    }, [open, initialData, workDate]);
-
-    useEffect(() => {
-        if (!open || isEdit) {
+        if (policyKey === null) {
             return;
         }
 
         let active = true;
-        setNumberPolicy((prev) => ({ ...prev, loading: true, error: null }));
 
         api<{ data: { allow_manual: boolean; allow_automatic: boolean } }>(
             '/prakualifikasi/number-policy',
@@ -396,10 +390,10 @@ export function VendorPrequalificationFormDialog({
                     return;
                 }
 
-                setNumberPolicy({
+                setPolicyResult({
+                    key: policyKey,
                     allowManual: res.data.allow_manual,
                     allowAutomatic: res.data.allow_automatic,
-                    loading: false,
                     error: null,
                 });
             })
@@ -408,10 +402,10 @@ export function VendorPrequalificationFormDialog({
                     return;
                 }
 
-                setNumberPolicy({
+                setPolicyResult({
+                    key: policyKey,
                     allowManual: false,
                     allowAutomatic: true,
-                    loading: false,
                     error: saveErrorMessage(
                         caught,
                         'memuat kebijakan penomoran prakualifikasi',
@@ -422,7 +416,7 @@ export function VendorPrequalificationFormDialog({
         return () => {
             active = false;
         };
-    }, [open, isEdit]);
+    }, [policyKey]);
 
     const loadVendors = useCallback(
         async ({
