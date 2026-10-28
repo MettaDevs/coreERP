@@ -3,31 +3,57 @@ info:
   title: Human Resources API
   version: 0.1.0
   description: |
-    Seluruh endpoint selain health memverifikasi signed Core context. Policy
+    Module berjalan di runtime Core dengan sesi dan konteks module tepercaya; bukan token layanan
+    atau signed context dari aplikasi terpisah. Seluruh endpoint selain health memakai policy dan izin Core. Policy
     `human-resources.workforce-responsibility` membatasi position dan penugasan
     menurut operating unit; pekerja tanpa position hanya terlihat bagi akses
     seluruh organisasi. Tautan akun memakai `core_membership_id` dari lookup
-    Core, bukan alamat email.
+    Core, bukan alamat email. Daftar pekerja, jabatan, posisi dan penugasan memakai batch cursor:
+    paling banyak 100 baris, default 40, dengan `data` dan `next_cursor`. Tidak ada total atau nomor halaman.
 paths:
-  /api/v1/health:
+  /api/modules/human-resources/v1/health:
     get:
       summary: Memeriksa kesiapan API
       responses: { '200': { description: API siap menerima request } }
-  /api/v1/core-members:
+  /api/modules/human-resources/v1/core-members:
     get:
       summary: Mencari anggota Core untuk ditautkan ke pekerja
       description: |
-        `q` mencari nama atau email (paling banyak 20 hasil). `email` mencocokkan email persis tanpa
+        `q` mencari nama atau email (default 20 baris, maksimum 100). `email` mencocokkan email persis tanpa
         membedakan huruf besar, untuk usulan tautan pekerja. Hanya anggota tenant aktif yang
         dipulangkan. Setiap anggota membawa `linked_worker_id`, pekerja yang sudah memegang akun itu.
       parameters:
         - { name: q, in: query, required: false, schema: { type: string, maxLength: 100 } }
         - { name: email, in: query, required: false, schema: { type: string, maxLength: 255 } }
-      responses: { '200': { description: Daftar anggota Core aktif } }
-  /api/v1/workers:
-    get: { summary: Menampilkan pekerja yang dapat diakses beserta nama akun yang tertaut (`account`), responses: { '200': { description: Daftar pekerja } } }
+        - { $ref: '#/components/parameters/Cursor' }
+        - { name: per_page, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200': { $ref: '#/components/responses/IncrementalList' }
+        '422': { description: Parameter daftar tidak valid }
+  /api/modules/human-resources/v1/operating-units:
+    get:
+      summary: Menampilkan batch unit kerja untuk pilihan posisi
+      parameters:
+        - { $ref: '#/components/parameters/Search' }
+        - { $ref: '#/components/parameters/Cursor' }
+        - { $ref: '#/components/parameters/BatchSize' }
+      responses:
+        '200': { $ref: '#/components/responses/IncrementalList' }
+        '422': { description: Parameter daftar tidak valid }
+  /api/modules/human-resources/v1/workers:
+    get:
+      summary: Menampilkan batch pekerja yang dapat diakses beserta nama akun tertaut (`account`)
+      parameters:
+        - { $ref: '#/components/parameters/Search' }
+        - { $ref: '#/components/parameters/Cursor' }
+        - { $ref: '#/components/parameters/BatchSize' }
+        - { $ref: '#/components/parameters/Direction' }
+        - { name: sort, in: query, schema: { type: string, enum: [id, personnel_number, name, email], default: name } }
+      responses:
+        '200': { $ref: '#/components/responses/IncrementalList' }
+        '422': { description: Parameter daftar tidak valid }
     post: { summary: Menambah pekerja, responses: { '201': { description: Pekerja dibuat }, '422': { description: Akun pengguna bukan milik tenant ini atau sudah tertaut ke pekerja lain } } }
-  /api/v1/workers/{worker}/core-membership:
+  /api/modules/human-resources/v1/workers/{worker}/core-membership:
     patch:
       summary: Menautkan atau melepas akun pengguna pekerja
       description: |
@@ -43,12 +69,59 @@ paths:
         '409': { description: Pekerja sudah diubah sejak form dibuka }
         '422': { description: Akun pengguna bukan milik tenant ini atau sudah tertaut ke pekerja lain }
         '428': { description: Versi baris tidak dikirim }
-  /api/v1/jobs:
-    get: { summary: Menampilkan jabatan, responses: { '200': { description: Daftar jabatan } } }
+  /api/modules/human-resources/v1/jobs:
+    get:
+      summary: Menampilkan batch jabatan
+      parameters:
+        - { $ref: '#/components/parameters/Search' }
+        - { $ref: '#/components/parameters/Cursor' }
+        - { $ref: '#/components/parameters/BatchSize' }
+        - { $ref: '#/components/parameters/Direction' }
+        - { name: sort, in: query, schema: { type: string, enum: [id, code, name], default: name } }
+      responses:
+        '200': { $ref: '#/components/responses/IncrementalList' }
+        '422': { description: Parameter daftar tidak valid }
     post: { summary: Menambah jabatan, responses: { '201': { description: Jabatan dibuat } } }
-  /api/v1/positions:
-    get: { summary: Menampilkan posisi, responses: { '200': { description: Daftar posisi } } }
+  /api/modules/human-resources/v1/positions:
+    get:
+      summary: Menampilkan batch posisi
+      parameters:
+        - { $ref: '#/components/parameters/Search' }
+        - { $ref: '#/components/parameters/Cursor' }
+        - { $ref: '#/components/parameters/BatchSize' }
+        - { $ref: '#/components/parameters/Direction' }
+        - { name: sort, in: query, schema: { type: string, enum: [id, code, name, valid_from], default: name } }
+      responses:
+        '200': { $ref: '#/components/responses/IncrementalList' }
+        '422': { description: Parameter daftar tidak valid }
     post: { summary: Menambah posisi, responses: { '201': { description: Posisi dibuat } } }
-  /api/v1/worker-position-assignments:
-    get: { summary: Menampilkan penugasan posisi, responses: { '200': { description: Daftar penugasan } } }
+  /api/modules/human-resources/v1/worker-position-assignments:
+    get:
+      summary: Menampilkan batch penugasan posisi
+      description: Urutan bawaan valid_from menurun; scope tetap mengikuti unit kerja posisi. Pencarian q tidak diterapkan pada daftar ini.
+      parameters:
+        - { $ref: '#/components/parameters/Cursor' }
+        - { $ref: '#/components/parameters/BatchSize' }
+        - { $ref: '#/components/parameters/Direction' }
+        - { name: sort, in: query, schema: { type: string, enum: [id, valid_from, valid_until], default: valid_from } }
+      responses:
+        '200': { $ref: '#/components/responses/IncrementalList' }
+        '422': { description: Parameter daftar tidak valid }
     post: { summary: Menugaskan pekerja ke posisi, responses: { '201': { description: Penugasan dibuat } } }
+components:
+  parameters:
+    Search: { name: q, in: query, schema: { type: string, maxLength: 200 } }
+    Cursor: { name: cursor, in: query, schema: { type: string, maxLength: 2000 } }
+    BatchSize: { name: per_page, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 40 } }
+    Direction: { name: direction, in: query, schema: { type: string, enum: [asc, desc] } }
+  responses:
+    IncrementalList:
+      description: Batch daftar; gunakan next_cursor untuk batch berikutnya sampai null
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data, next_cursor]
+            properties:
+              data: { type: array, items: { type: object } }
+              next_cursor: { type: [string, 'null'] }

@@ -9,7 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Platform\Environment\Support\CurrentWorkspace;
 use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\RowVersion;
-use App\Platform\Organization\Models\Organization;
+use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,15 +25,7 @@ class WorkingTimeTemplateController extends Controller
     {
         $membership = $this->currentMembership($request);
 
-        // Ambil entitas legal aktif dari sesi user (CurrentWorkspace) atau fallback organisasi pertama
         $workspaceLegalEntity = app(CurrentWorkspace::class)->legalEntity($request, $membership);
-        if (! $workspaceLegalEntity) {
-            $workspaceLegalEntity = Organization::query()
-                ->where('tenant_id', $membership->tenant_id)
-                ->where('classification', 'legal_entity')
-                ->where('status', 'active')
-                ->first();
-        }
 
         $selectedLegalEntityId = $workspaceLegalEntity?->id;
 
@@ -42,7 +34,7 @@ class WorkingTimeTemplateController extends Controller
             ->where('legal_entity_id', $selectedLegalEntityId)
             ->when(! $selectedLegalEntityId, fn ($query) => $query->whereRaw('1 = 0'));
 
-        if ($request->boolean('incremental')) {
+        if ($request->boolean('incremental') || $request->wantsJson() || $request->is('api/*')) {
             if ($request->filled('record_id')) {
                 $request->validate(['record_id' => ['required', 'ulid']]);
                 $template = (clone $query)->whereKey($request->string('record_id')->toString())->firstOrFail();
@@ -59,29 +51,14 @@ class WorkingTimeTemplateController extends Controller
             ));
         }
 
-        // Pemakai JSON lama tetap menerima bentuk semula; halaman memuat header per batch.
-        $templates = ($request->wantsJson() || $request->is('api/*'))
-            ? $query->with(['legalEntity.legalEntity', 'lines' => fn ($query) => $query->orderBy('day_of_week')->orderBy('from_time')])
-                ->orderBy('code')->get()->map(fn (WorkingTimeTemplate $template): array => $this->presentTemplate($template))
-            : collect();
-
         $currentLegalEntityData = $workspaceLegalEntity ? [
             'id' => $workspaceLegalEntity->id,
             'name' => $workspaceLegalEntity->name,
             'company_code' => $workspaceLegalEntity->legalEntity?->company_code,
         ] : null;
 
-        if ($request->wantsJson() || $request->is('api/*')) {
-            return response()->json([
-                'data' => [
-                    'templates' => $templates,
-                    'current_legal_entity' => $currentLegalEntityData,
-                ],
-            ]);
-        }
-
         return Inertia::render('foundation/working-calendar/working-time-templates', [
-            'templates' => $templates,
+            'templates' => collect(),
             'currentLegalEntity' => $currentLegalEntityData,
             'canManage' => $request->user()?->can('manage-reference-data') ?? false,
         ]);
@@ -121,37 +98,22 @@ class WorkingTimeTemplateController extends Controller
 
         $membership = $this->currentMembership($request);
 
-        $workspaceLegalEntity = app(CurrentWorkspace::class)->legalEntity($request, $membership);
-        if (! $workspaceLegalEntity) {
-            $workspaceLegalEntity = Organization::query()
-                ->where('tenant_id', $membership->tenant_id)
-                ->where('classification', 'legal_entity')
-                ->where('status', 'active')
-                ->first();
-        }
-
-        $legalEntityId = $request->input('legal_entity_id', $workspaceLegalEntity?->id);
-
-        abort_unless($legalEntityId, 422, 'Legal entity / perusahaan aktif tidak ditemukan pada sesi.');
+        $legalEntityId = $this->activeCompanyId($request, $membership);
 
         $validated = $request->validate([
             'code' => ['required', 'string', 'max:50'],
             'name' => ['required', 'string', 'max:150'],
             'legal_entity_id' => [
                 'nullable',
-                'string',
-                Rule::exists('organizations', 'id')
-                    ->where('tenant_id', $membership->tenant_id)
-                    ->where('classification', 'legal_entity'),
+                'ulid',
+                Rule::in([$legalEntityId]),
             ],
             'description' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $finalLegalEntityId = $validated['legal_entity_id'] ?? $legalEntityId;
-
         $template = WorkingTimeTemplate::create([
             'tenant_id' => $membership->tenant_id,
-            'legal_entity_id' => $finalLegalEntityId,
+            'legal_entity_id' => $legalEntityId,
             'code' => strtoupper(trim($validated['code'])),
             'name' => trim($validated['name']),
             'description' => $validated['description'] ?? null,
@@ -170,7 +132,7 @@ class WorkingTimeTemplateController extends Controller
         abort_unless($request->user()?->can('manage-reference-data'), 403);
 
         $membership = $this->currentMembership($request);
-        abort_unless($template->tenant_id === $membership->tenant_id, 404);
+        $this->assertActiveCompany($request, $membership, $template);
 
         $validated = $request->validate([
             'code' => ['required', 'string', 'max:50'],
@@ -217,7 +179,7 @@ class WorkingTimeTemplateController extends Controller
         abort_unless($request->user()?->can('manage-reference-data'), 403);
 
         $membership = $this->currentMembership($request);
-        abort_unless($template->tenant_id === $membership->tenant_id, 404);
+        $this->assertActiveCompany($request, $membership, $template);
 
         DB::transaction(function () use ($request, $template): void {
             RowVersion::claim($template, RowVersion::expected($request));
@@ -236,7 +198,7 @@ class WorkingTimeTemplateController extends Controller
         abort_unless($request->user()?->can('manage-reference-data'), 403);
 
         $membership = $this->currentMembership($request);
-        abort_unless($template->tenant_id === $membership->tenant_id, 404);
+        $this->assertActiveCompany($request, $membership, $template);
 
         $validated = $request->validate([
             'code' => ['required', 'string', 'max:50'],
@@ -282,7 +244,7 @@ class WorkingTimeTemplateController extends Controller
         abort_unless($request->user()?->can('manage-reference-data'), 403);
 
         $membership = $this->currentMembership($request);
-        abort_unless($template->tenant_id === $membership->tenant_id, 404);
+        $this->assertActiveCompany($request, $membership, $template);
 
         $validated = $request->validate([
             'lines' => ['present', 'array'],
@@ -310,6 +272,22 @@ class WorkingTimeTemplateController extends Controller
         }
 
         return back()->with('success', 'Baris jam kerja berhasil disimpan.');
+    }
+
+    private function activeCompanyId(Request $request, TenantMembership $membership): string
+    {
+        $company = app(CurrentWorkspace::class)->legalEntity($request, $membership);
+        if ($company === null) {
+            throw ValidationException::withMessages(['legal_entity_id' => 'Pilih perusahaan aktif sebelum menyimpan pola jam kerja.']);
+        }
+
+        return $company->id;
+    }
+
+    private function assertActiveCompany(Request $request, TenantMembership $membership, WorkingTimeTemplate $template): void
+    {
+        abort_unless($template->tenant_id === $membership->tenant_id
+            && $template->legal_entity_id === $this->activeCompanyId($request, $membership), 404);
     }
 
     /**

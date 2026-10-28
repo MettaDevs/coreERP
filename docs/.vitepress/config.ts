@@ -461,6 +461,7 @@ export default withMermaid({
                 { text: 'App management aset', link: '/todo/general/06-app-management-aset' },
                 { text: 'App procurement', link: '/todo/general/07-app-procurement' },
                 { text: 'Peta app', link: '/todo/general/08-peta-app' },
+                { text: 'Audit pola review', link: '/todo/general/09-audit-pola-review' },
                 { text: 'Sudah dikerjakan', link: '/todo/general/99-sudah-dikerjakan' },
               ],
             },

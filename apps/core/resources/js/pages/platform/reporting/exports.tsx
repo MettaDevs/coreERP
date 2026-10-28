@@ -19,9 +19,9 @@ import { Progress } from '@apperp/ui/progress';
 import { Head } from '@inertiajs/react';
 import { Download, Trash2 } from 'lucide-react';
 import { useEffect, useSyncExternalStore } from 'react';
-import { toast } from 'sonner';
 import Heading from '@/components/heading';
 import { useDateTimeFormat } from '@/hooks/use-date-time';
+import { useSaveFeedback } from '@/hooks/use-save-feedback';
 import {
     getExports,
     refreshExports,
@@ -46,24 +46,23 @@ type Props = { exports: ReportExport[] };
  * dibagikan dengan tray di header, jadi keduanya selalu menunjukkan hal yang sama.
  */
 export default function ReportExports({ exports: initial }: Props) {
+    const { scopeRef, summary, clear, report } = useSaveFeedback<HTMLElement>();
     const formatTime = useDateTimeFormat();
-    const live = useSyncExternalStore(subscribeExports, getExports, () => []);
-    const exports = live.length > 0 ? live : initial;
+    const live = useSyncExternalStore(subscribeExports, getExports, () => null);
+    const exports = live ?? initial;
 
     useEffect(() => {
         void refreshExports();
     }, []);
 
     const remove = async (item: ReportExport) => {
+        clear();
+
         try {
             await deleteExport(item.id);
             await refreshExports();
         } catch (caught) {
-            toast.error(
-                caught instanceof Error && caught.message
-                    ? caught.message
-                    : 'Ekspor belum dapat dihapus.',
-            );
+            report(caught, 'Ekspor belum dapat dihapus.');
         }
     };
 
@@ -145,15 +144,16 @@ export default function ReportExports({ exports: initial }: Props) {
                             type="button"
                             size="sm"
                             variant="outline"
-                            onClick={() =>
+                            onClick={() => {
+                                clear();
                                 void downloadExport(item).catch(
-                                    (caught: Error) =>
-                                        toast.error(
-                                            caught.message ||
-                                                'Berkas belum dapat diunduh.',
+                                    (caught: unknown) =>
+                                        report(
+                                            caught,
+                                            'Berkas belum dapat diunduh.',
                                         ),
-                                )
-                            }
+                                );
+                            }}
                         >
                             <Download />
                             Unduh
@@ -184,7 +184,10 @@ export default function ReportExports({ exports: initial }: Props) {
     return (
         <>
             <Head title="Ekspor laporan" />
-            <main className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 p-6">
+            <main
+                ref={scopeRef}
+                className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 p-6"
+            >
                 <Heading
                     title="Ekspor laporan"
                     description="Dokumen yang Anda cetak atau ekspor dari aplikasi mana pun, terbaru lebih dulu."
@@ -198,6 +201,7 @@ export default function ReportExports({ exports: initial }: Props) {
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="px-0">
+                        {summary}
                         {exports.length === 0 ? (
                             <Empty>
                                 <EmptyHeader>

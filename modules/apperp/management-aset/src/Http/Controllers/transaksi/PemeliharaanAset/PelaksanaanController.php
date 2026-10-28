@@ -572,7 +572,7 @@ class PelaksanaanController extends Controller
      */
     private function pilihanVariabel(?string $sumberId, string $nilai): mixed
     {
-        return MaintenanceChecklistVariableValue::query()
+        return MaintenanceChecklistVariableValue::withTrashed()
             ->join(self::TABEL_BARIS_TEMPLATE.' as baris', function ($join): void {
                 $join->on('baris.variable_id', '=', self::TABEL_NILAI.'.variable_id')
                     ->on('baris.tenant_id', '=', self::TABEL_NILAI.'.tenant_id');
@@ -588,7 +588,7 @@ class PelaksanaanController extends Controller
             ->orderBy('line_number')->toBase()->get();
 
         $sourceIds = $rows->pluck('sumber_id')->filter()->values();
-        $variables = MaintenanceChecklistTemplateLine::query()
+        $variables = MaintenanceChecklistTemplateLine::withTrashed()
             ->join(self::TABEL_NILAI.' as nilai', function ($join): void {
                 $join->on('nilai.variable_id', '=', self::TABEL_BARIS_TEMPLATE.'.variable_id')
                     ->on('nilai.tenant_id', '=', self::TABEL_BARIS_TEMPLATE.'.tenant_id');

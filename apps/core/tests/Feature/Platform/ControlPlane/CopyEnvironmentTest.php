@@ -225,8 +225,7 @@ class CopyEnvironmentTest extends TestCase
         $source = $this->realProduction();
         $seed = $this->seedSource($source);
 
-        $this->artisan('environment:copy', ['source' => $source->id, '--name' => 'Kotak Uji'])
-            ->assertExitCode(Command::SUCCESS);
+        $this->assertCopySucceeded($source);
 
         $sandbox = $this->lastSandbox();
         $databaseName = ProvisionEnvironment::databaseName($sandbox);
@@ -270,8 +269,7 @@ class CopyEnvironmentTest extends TestCase
         $source = $this->realProduction();
         $seed = $this->seedSource($source);
 
-        $this->artisan('environment:copy', ['source' => $source->id, '--name' => 'Kotak Uji'])
-            ->assertExitCode(Command::SUCCESS);
+        $this->assertCopySucceeded($source);
 
         $copy = $this->connectionTo((string) $this->lastSandbox()->database_name, 'test_copy');
 
@@ -319,8 +317,7 @@ class CopyEnvironmentTest extends TestCase
         $source = $this->realProduction();
         $seed = $this->seedSource($source);
 
-        $this->artisan('environment:copy', ['source' => $source->id, '--name' => 'Kotak Uji'])
-            ->assertExitCode(Command::SUCCESS);
+        $this->assertCopySucceeded($source);
 
         // 3a — antrean produksi masih utuh. Event yang belum terbit di sana memang belum terbit.
         $production = $this->connectionTo((string) $source->database_name, 'test_source');
@@ -356,8 +353,7 @@ class CopyEnvironmentTest extends TestCase
         $source = $this->realProduction();
         $this->seedSource($source);
 
-        $this->artisan('environment:copy', ['source' => $source->id, '--name' => 'Kotak Uji'])
-            ->assertExitCode(Command::SUCCESS);
+        $this->assertCopySucceeded($source);
 
         $this->activate($this->lastSandbox());
         $id = $this->controlPlaneOutbox();
@@ -381,8 +377,7 @@ class CopyEnvironmentTest extends TestCase
         $source = $this->realProduction();
         $this->seedSource($source);
 
-        $this->artisan('environment:copy', ['source' => $source->id, '--name' => 'Kotak Uji'])
-            ->assertExitCode(Command::SUCCESS);
+        $this->assertCopySucceeded($source);
 
         $sandbox = $this->lastSandbox();
         $databaseName = (string) $sandbox->database_name;
@@ -398,8 +393,7 @@ class CopyEnvironmentTest extends TestCase
             'lease_until' => now()->subHour(),
         ]);
 
-        $this->artisan('environment:copy', ['source' => $source->id, '--name' => 'Kotak Uji'])
-            ->assertExitCode(Command::SUCCESS);
+        $this->assertCopySucceeded($source);
 
         // Melanjutkan, bukan menggandakan: sandbox yang sama, database yang sama, dan tidak ada
         // database ketiga yang lahir.
@@ -422,6 +416,18 @@ class CopyEnvironmentTest extends TestCase
     }
 
     // ------------------------------------------------------------------ perkakas
+
+    private function assertCopySucceeded(Environment $source): void
+    {
+        $exitCode = $this->artisan('environment:copy', ['source' => $source->id, '--name' => 'Kotak Uji'])->run();
+        $operation = EnvironmentOperation::query()->where('operation', 'copy')->latest('id')->first();
+
+        $this->assertSame(Command::SUCCESS, $exitCode, sprintf(
+            'Copy gagal pada %s: %s',
+            $operation?->step ?? 'sebelum operasi tercatat',
+            $operation?->failure_message ?? 'Tidak ada pesan kegagalan yang tersimpan.',
+        ));
+    }
 
     /** Baris registry tanpa database sungguhan; cukup untuk penolakan yang berhenti sebelum bekerja. */
     private function environment(string $kind, string $slug, ?string $database): Environment

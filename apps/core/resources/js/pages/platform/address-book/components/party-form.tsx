@@ -1,6 +1,5 @@
 import { ActionButton } from '@apperp/ui/action-button';
 
-import { Checkbox } from '@apperp/ui/checkbox';
 import {
     CollapsibleSection,
     CollapsibleSectionGroup,
@@ -26,6 +25,7 @@ import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
 import { useEffect, useRef, useState } from 'react';
+import type { RefObject } from 'react';
 import { FormErrorHeader } from '@/components/form-error-header';
 import { apiJson, CoreApiError, errorText } from '@/lib/core-api';
 import {
@@ -42,6 +42,7 @@ import type {
 } from '../types';
 import { partyTypeLabel } from '../types';
 import { AddressBookHint } from './address-book-hint';
+import { AddressBookPicker } from './address-book-picker';
 
 type ProfileField = {
     key: keyof PartyProfile;
@@ -63,6 +64,7 @@ export const personProfileFields: ProfileField[] = [
 ];
 
 export function PartyForm({
+    portalContainer,
     party,
     metadata,
     onClose,
@@ -70,6 +72,7 @@ export function PartyForm({
     onBusyChange,
     onDirtyChange,
 }: {
+    portalContainer?: RefObject<HTMLElement | null>;
     party: PartyDetail | null;
     metadata: DirectoryMetadata;
     onClose: () => void;
@@ -494,46 +497,20 @@ export function PartyForm({
                         title="Buku alamat"
                         summary={`${bookIds.length} buku alamat`}
                     >
-                        <FieldSet className="gap-4">
+                        <FieldSet className="gap-4" disabled={busy}>
                             <FieldLegend
                                 variant="label"
                                 hint="Kelompok untuk memudahkan pencarian pihak. Pengelompokan ini tidak memberi izin akses."
                             >
                                 Keanggotaan buku alamat
                             </FieldLegend>
-                            {metadata.addressBooks.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
-                                    Belum ada buku alamat. Anda tetap dapat
-                                    menyimpan pihak tanpa kelompok.
-                                </p>
-                            ) : (
-                                metadata.addressBooks.map((book) => (
-                                    <Field
-                                        key={book.id}
-                                        orientation="horizontal"
-                                    >
-                                        <Checkbox
-                                            id={`book-${book.id}`}
-                                            checked={bookIds.includes(book.id)}
-                                            disabled={busy}
-                                            onCheckedChange={(checked) =>
-                                                setBookIds((ids) =>
-                                                    checked
-                                                        ? [...ids, book.id]
-                                                        : ids.filter(
-                                                              (id) =>
-                                                                  id !==
-                                                                  book.id,
-                                                          ),
-                                                )
-                                            }
-                                        />
-                                        <FieldLabel htmlFor={`book-${book.id}`}>
-                                            {book.name}
-                                        </FieldLabel>
-                                    </Field>
-                                ))
-                            )}
+                            <AddressBookPicker
+                                multiple
+                                value={bookIds}
+                                onValueChange={setBookIds}
+                                selectedBooks={party?.address_books}
+                                portalContainer={portalContainer}
+                            />
                         </FieldSet>
                     </CollapsibleSection>
                     <CollapsibleSection

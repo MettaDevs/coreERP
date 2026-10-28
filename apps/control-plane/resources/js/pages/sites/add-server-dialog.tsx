@@ -16,10 +16,14 @@ import {
     DialogTrigger,
     DialogToolbar,
 } from '@apperp/ui/dialog';
-import { NativeSelect } from '@apperp/ui/native-select';
+import { Select } from '@apperp/ui/select';
 import { useConfirmation } from '@apperp/ui/use-confirmation';
+import {
+    assertListBatch,
+    useIncrementalList,
+} from '@apperp/ui/use-incremental-list';
 import { Link, useForm } from '@inertiajs/react';
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
     ServerAddressField,
@@ -37,14 +41,78 @@ export type Candidate = { id: string; name: string; tenant: string };
  * tersimpan, operator dibawa ke halaman lingkungan itu, tempat perintah pasang dibuat.
  */
 export default function AddServerDialog({
-    candidates,
+    hasCandidates,
 }: {
-    candidates: Candidate[];
+    hasCandidates: boolean;
 }) {
     const { wrap: wrapLocalForm0Request, summary: localForm0RequestSummary } =
         useInertiaFeedback();
 
     const [open, setOpen] = useState(false);
+    const contentRef = useRef<HTMLDivElement>(null);
+    const [search, setSearch] = useState('');
+    const [selected, setSelected] = useState<Candidate | null>(null);
+    const loadItems = useCallback(
+        async ({
+            query,
+            cursor,
+            signal,
+        }: {
+            query: string;
+            cursor: string | null;
+            signal: AbortSignal;
+        }) => {
+            const params = new URLSearchParams({
+                lookup: 'candidates',
+                search: query,
+            });
+
+            if (cursor) {
+                params.set('cursor', cursor);
+            }
+
+            const response = await fetch(`/situs?${params}`, {
+                signal,
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+            });
+
+            if (!response.ok) {
+                throw new Error(
+                    'Pilihan lingkungan belum dapat dimuat. Periksa koneksi lalu coba lagi.',
+                );
+            }
+
+            const body: unknown = await response.json();
+
+            if (
+                !body ||
+                typeof body !== 'object' ||
+                !('data' in body) ||
+                !('next_cursor' in body)
+            ) {
+                throw new Error(
+                    'Jawaban pilihan lingkungan tidak lengkap. Muat ulang pilihan.',
+                );
+            }
+
+            const batch = { items: body.data, nextCursor: body.next_cursor };
+            assertListBatch<Candidate>(batch);
+
+            return batch;
+        },
+        [],
+    );
+    const list = useIncrementalList<Candidate>({
+        loadItems,
+        query: search,
+        active: open,
+        getKey: (item) => item.id,
+    });
+    const choices =
+        selected && !list.items.some((item) => item.id === selected.id)
+            ? [...list.items, selected]
+            : list.items;
     const { confirm, confirmation } = useConfirmation();
     const {
         data,
@@ -57,7 +125,7 @@ export default function AddServerDialog({
         reset,
         isDirty,
     } = useForm({
-        environment_id: candidates[0]?.id ?? '',
+        environment_id: '',
         server_address: '',
         update_window_start: '',
         update_window_end: '',
@@ -120,8 +188,8 @@ export default function AddServerDialog({
             <DialogTrigger asChild>
                 <ActionButton action="create" />
             </DialogTrigger>
-            <DialogContent>
-                {candidates.length === 0 ? (
+            <DialogContent ref={contentRef}>
+                {!hasCandidates ? (
                     <>
                         <DialogHeader>
                             <DialogTitle>Server klien baru</DialogTitle>
@@ -201,27 +269,33 @@ export default function AddServerDialog({
                             )}
 
                             <div className="space-y-2">
-                                <NativeSelect
-                                    id="environment_id"
+                                <Select
                                     label="Lingkungan produksi"
+                                    placeholder="Pilih lingkungan"
+                                    searchPlaceholder="Cari lingkungan atau tenant"
+                                    emptyMessage="Tidak ada lingkungan yang cocok."
                                     value={data.environment_id}
-                                    onChange={(e) =>
-                                        setData(
-                                            'environment_id',
-                                            e.target.value,
-                                        )
-                                    }
-                                >
-                                    {candidates.map((candidate) => (
-                                        <option
-                                            key={candidate.id}
-                                            value={candidate.id}
-                                        >
-                                            {candidate.tenant} —{' '}
-                                            {candidate.name}
-                                        </option>
-                                    ))}
-                                </NativeSelect>
+                                    onValueChange={(value) => {
+                                        setData('environment_id', value ?? '');
+                                        setSelected(
+                                            choices.find(
+                                                (item) => item.id === value,
+                                            ) ?? null,
+                                        );
+                                    }}
+                                    items={choices.map((item) => ({
+                                        value: item.id,
+                                        label: `${item.tenant} — ${item.name}`,
+                                    }))}
+                                    visibleValues={list.items.map(
+                                        (item) => item.id,
+                                    )}
+                                    knownValues={choices.map((item) => item.id)}
+                                    searchValue={search}
+                                    onSearchChange={setSearch}
+                                    incremental={list}
+                                    portalContainer={contentRef}
+                                />
                                 <p className="text-xs text-muted-foreground">
                                     Hanya produksi di server klien yang belum
                                     punya server. Nama server, app yang dibeli,

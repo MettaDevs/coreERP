@@ -57,12 +57,14 @@ import {
 import { RadioGroup, RadioGroupItem } from '@apperp/ui/radio-group';
 import { Select } from '@apperp/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@apperp/ui/tabs';
+import { useIncrementalList } from '@apperp/ui/use-incremental-list';
+import type { ListRequest } from '@apperp/ui/use-incremental-list';
 import { useRecordTransition } from '@apperp/ui/use-record-transition';
 import { Deferred, Head, router, useForm, usePage } from '@inertiajs/react';
 import { Trash2 } from 'lucide-react';
 import { Ban, Check, Copy, Pencil, Users } from 'lucide-react';
 import type { RefObject } from 'react';
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { FormErrorHeader } from '@/components/form-error-header';
 import Heading from '@/components/heading';
@@ -173,10 +175,12 @@ type Props = {
     tenant: { id: string; name: string };
     canManage: boolean;
     members: Member[];
+    membersNextCursor: string | null;
     roles: Role[];
     dataPolicies: DataPolicy[];
     organizations: Organization[];
     invitations: Invitation[];
+    invitationsNextCursor: string | null;
     newInvitationCodes: string[];
     /** Tenant ini memakai SSO bersama, sehingga undangan lewat email mungkin dibuat. */
     ssoAvailable: boolean;
@@ -192,6 +196,49 @@ type Props = {
     apps?: App[];
     hierarchies?: Hierarchy[];
 };
+
+async function accessBatch<T>(
+    kind: 'members' | 'invitations',
+    input: Partial<ListRequest> & { recordId?: string },
+) {
+    const params = new URLSearchParams({ list: kind });
+
+    if (input.query) {
+        params.set('q', input.query);
+    }
+
+    if (input.cursor) {
+        params.set('cursor', input.cursor);
+    }
+
+    if (input.sort) {
+        params.set('sort', input.sort.columnId);
+        params.set('direction', input.sort.direction);
+    }
+
+    if (input.recordId) {
+        params.set('record_id', input.recordId);
+    }
+
+    const response = await fetch(`/settings/access?${params}`, {
+        signal: input.signal,
+        headers: {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+    });
+
+    if (!response.ok) {
+        throw new Error('Daftar akses belum dapat dimuat. Coba lagi.');
+    }
+
+    const batch = (await response.json()) as {
+        data: T[];
+        next_cursor: string | null;
+    };
+
+    return { items: batch.data, nextCursor: batch.next_cursor };
+}
 
 const unrestrictedScope = (policyCode: string): PolicyScope => ({
     policy_code: policyCode,
@@ -981,6 +1028,7 @@ function ScopeDialog({
     organizations,
     hierarchies,
     onChange,
+    disabled = false,
 }: {
     code: CodeDraft;
     roles: Role[];
@@ -988,6 +1036,7 @@ function ScopeDialog({
     organizations: Organization[];
     hierarchies: Hierarchy[];
     onChange: (assignments: Assignment[]) => void;
+    disabled?: boolean;
 }) {
     const [open, setOpen] = useState(false);
     const contentRef = useRef<HTMLDivElement>(null);
@@ -1008,6 +1057,10 @@ function ScopeDialog({
         <PageDialog
             open={open}
             onOpenChange={(next) => {
+                if (disabled) {
+                    return;
+                }
+
                 if (!next) {
                     transition.request(() => setOpen(false));
 
@@ -1024,7 +1077,7 @@ function ScopeDialog({
             <PageDialogTrigger asChild>
                 <button
                     type="button"
-                    disabled={scopedRoles.length === 0}
+                    disabled={disabled || scopedRoles.length === 0}
                     className="w-full text-left text-sm underline-offset-2 hover:underline disabled:cursor-default disabled:text-muted-foreground disabled:no-underline"
                 >
                     {codeScopeSummary(roles, code.assignments)}
@@ -1040,7 +1093,12 @@ function ScopeDialog({
                 <PageDialogToolbar>
                     <DialogAction
                         type="button"
+                        disabled={disabled}
                         onClick={() => {
+                            if (disabled) {
+                                return;
+                            }
+
                             onChange(draft);
                             setOpen(false);
                         }}
@@ -1071,6 +1129,7 @@ function ScopeDialog({
                                         hierarchies={hierarchies}
                                         portalContainer={contentRef}
                                         onChange={(next) =>
+                                            !disabled &&
                                             setDraft((current) =>
                                                 current.map((item) =>
                                                     item.role_id === role.id
@@ -1103,6 +1162,53 @@ function ScopeDialog({
  * memperlihatkan daftar yang sama dengan tabel di halaman. Baris tersebut
  * terkunci: mencabut kode dilakukan dari tabel halaman, bukan dari sini.
  */
+function mergeIssuedRows(
+    current: CodeDraft[],
+    incoming: Invitation[],
+    pristine: Map<string, string>,
+    refreshedKey?: string,
+) {
+    const fingerprints = new Map(pristine);
+    const latest = new Map(
+        incoming.map((invitation) => {
+            const row = issuedDraft(invitation);
+
+            return [row.key, row];
+        }),
+    );
+    const rows = current.map((row) => {
+        const next = latest.get(row.key);
+        latest.delete(row.key);
+
+        if (
+            next?.issued &&
+            row.issued &&
+            next.issued.version < row.issued.version
+        ) {
+            return row;
+        }
+
+        if (
+            next &&
+            (row.key === refreshedKey ||
+                pristine.get(row.key) === codeFingerprint(row))
+        ) {
+            fingerprints.set(row.key, codeFingerprint(next));
+
+            return next;
+        }
+
+        return row;
+    });
+
+    for (const row of latest.values()) {
+        fingerprints.set(row.key, codeFingerprint(row));
+        rows.push(row);
+    }
+
+    return { rows, fingerprints };
+}
+
 function InviteForm({
     roles,
     dataPolicies,
@@ -1111,11 +1217,15 @@ function InviteForm({
     // yang membacanya berada di dalam dialog; ketika dialog itu dapat dibuka, ia sudah ada.
     hierarchies = [],
     invitations,
+    invitationList,
     ssoAvailable,
 }: Pick<
     Props,
     'roles' | 'dataPolicies' | 'organizations' | 'hierarchies' | 'invitations'
-> & { ssoAvailable: boolean }) {
+> & {
+    ssoAvailable: boolean;
+    invitationList: ReturnType<typeof useIncrementalList<Invitation>>;
+}) {
     const { wrap: wrapFormRequest, summary: formRequestSummary } =
         useInertiaFeedback();
 
@@ -1123,19 +1233,73 @@ function InviteForm({
     const [activeKey, setActiveKey] = useState<string | null>(null);
     const contentRef = useRef<HTMLDivElement>(null);
     const form = useForm({ codes: [blankCode()] });
-    const [issuedRows, setIssuedRows] = useState<CodeDraft[]>(() =>
-        invitations.map(issuedDraft),
-    );
+    const [issuedState, setIssuedState] = useState(() => ({
+        source: invitations,
+        rows: invitations.map(issuedDraft),
+        fingerprints: new Map(
+            invitations.map((invitation) => [
+                `issued-${invitation.id}`,
+                codeFingerprint(issuedDraft(invitation)),
+            ]),
+        ),
+    }));
+    const issuedRows = issuedState.rows;
+    const pristine = issuedState.fingerprints;
+    const setIssuedRows = (update: (rows: CodeDraft[]) => CodeDraft[]) =>
+        setIssuedState((current) => ({
+            ...current,
+            rows: update(current.rows),
+        }));
     const [saving, setSaving] = useState<string | null>(null);
+    const writeInFlight = useRef(false);
+    const [refreshError, setRefreshError] = useState('');
     const roleById = new Map(roles.map((role) => [role.id, role]));
-    const pristine = new Map(
-        invitations.map((invitation) => [
-            `issued-${invitation.id}`,
-            codeFingerprint(issuedDraft(invitation)),
-        ]),
-    );
+
+    if (issuedState.source !== invitations) {
+        setIssuedState((current) => ({
+            source: invitations,
+            ...mergeIssuedRows(current.rows, invitations, current.fingerprints),
+        }));
+    }
+
+    const refreshIssued = async (code: CodeDraft) => {
+        if (!code.issued) {
+            return;
+        }
+
+        setRefreshError('');
+
+        try {
+            const batch = await accessBatch<Invitation>('invitations', {
+                recordId: code.issued.id,
+            });
+
+            if (batch.items.length !== 1) {
+                throw new Error('Undangan belum dapat dimuat ulang.');
+            }
+
+            setIssuedState((current) => ({
+                ...current,
+                ...mergeIssuedRows(
+                    current.rows,
+                    batch.items,
+                    current.fingerprints,
+                    code.key,
+                ),
+            }));
+            invitationList.reload();
+        } catch {
+            setRefreshError(
+                'Perubahan sudah tersimpan, tetapi rincian terbaru belum dapat dimuat. Tutup lalu buka kembali undangan sebelum mengubahnya lagi.',
+            );
+        }
+    };
 
     const update = (key: string, change: Partial<CodeDraft>) => {
+        if (writeInFlight.current || form.processing) {
+            return;
+        }
+
         const apply = (code: CodeDraft) =>
             code.key === key ? { ...code, ...change } : code;
 
@@ -1186,10 +1350,11 @@ function InviteForm({
             ),
         );
     const save = (code: CodeDraft) => {
-        if (!code.issued) {
+        if (!code.issued || writeInFlight.current || form.processing) {
             return;
         }
 
+        writeInFlight.current = true;
         setSaving(code.key);
         router.patch(
             `/settings/access/invitations/${code.issued.id}`,
@@ -1203,17 +1368,14 @@ function InviteForm({
             },
             withInertiaErrors({
                 preserveScroll: true,
-                onSuccess: (page) => {
-                    // Props tersegar dipakai langsung; `invitations` pada
-                    // closure ini masih memuat nilai sebelum penyimpanan.
-                    setIssuedRows(
-                        (page.props.invitations as Invitation[]).map(
-                            issuedDraft,
-                        ),
-                    );
+                onSuccess: async () => {
+                    await refreshIssued(code);
                     toast('Perubahan kode undangan disimpan.');
                 },
-                onFinish: () => setSaving(null),
+                onFinish: () => {
+                    writeInFlight.current = false;
+                    setSaving(null);
+                },
                 onError: (errors) => reportIssuedErrors(code, errors),
             }),
         );
@@ -1226,25 +1388,25 @@ function InviteForm({
      * sedang mati meninggalkan baris yang sah dengan surat yang tidak pernah keluar.
      */
     const resend = (code: CodeDraft) => {
-        if (!code.issued) {
+        if (!code.issued || writeInFlight.current || form.processing) {
             return;
         }
 
+        writeInFlight.current = true;
         setSaving(code.key);
         router.post(
             `/settings/access/invitations/${code.issued.id}/kirim-ulang`,
             {},
             withInertiaErrors({
                 preserveScroll: true,
-                onSuccess: (page) => {
-                    setIssuedRows(
-                        (page.props.invitations as Invitation[]).map(
-                            issuedDraft,
-                        ),
-                    );
+                onSuccess: async () => {
+                    await refreshIssued(code);
                     toast('Penyedia SSO diminta mengirim ulang undangannya.');
                 },
-                onFinish: () => setSaving(null),
+                onFinish: () => {
+                    writeInFlight.current = false;
+                    setSaving(null);
+                },
                 onError: (errors) => reportIssuedErrors(code, errors),
             }),
         );
@@ -1286,6 +1448,9 @@ function InviteForm({
                                   error={rowError(code, 'sso_email')}
                               >
                                   <Input
+                                      disabled={
+                                          saving !== null || form.processing
+                                      }
                                       type="email"
                                       aria-invalid={
                                           !!rowError(code, 'sso_email')
@@ -1325,6 +1490,7 @@ function InviteForm({
                         error={rowError(code, 'label')}
                     >
                         <Input
+                            disabled={saving !== null || form.processing}
                             value={code.label}
                             aria-invalid={!!rowError(code, 'label')}
                             placeholder="mis. Onboarding staf gudang Agustus"
@@ -1392,7 +1558,7 @@ function InviteForm({
             // MultiSelect bekerja dengan daftar teks, jadi nama role dipetakan
             // balik ke id saat nilainya berubah.
             cell: (code) =>
-                locked(code) ? (
+                locked(code) || saving !== null || form.processing ? (
                     <span className="text-muted-foreground">
                         {rolesOf(code)
                             .map((role) => role.name)
@@ -1466,6 +1632,7 @@ function InviteForm({
                     </span>
                 ) : (
                     <ScopeDialog
+                        disabled={saving !== null || form.processing}
                         code={code}
                         roles={roles}
                         dataPolicies={dataPolicies}
@@ -1499,7 +1666,7 @@ function InviteForm({
                                 type="button"
                                 size="sm"
                                 variant="outline"
-                                disabled={saving === code.key}
+                                disabled={saving !== null}
                                 onClick={() => resend(code)}
                             >
                                 {code.issued.sso.notified_at
@@ -1518,7 +1685,7 @@ function InviteForm({
                     <ActionButton
                         action="save"
                         type="button"
-                        disabled={saving === code.key}
+                        disabled={saving !== null}
                         onClick={
                             code.issued.redeemed > 0
                                 ? undefined
@@ -1578,6 +1745,10 @@ function InviteForm({
             open={open}
             onOpenChange={(next) => {
                 if (!next) {
+                    if (writeInFlight.current) {
+                        return;
+                    }
+
                     transition.request(() => setOpen(false));
 
                     return;
@@ -1586,7 +1757,17 @@ function InviteForm({
                 setOpen(true);
                 // Selalu mulai dari keadaan server: baris baru dikosongkan dan
                 // suntingan baris terbit yang belum disimpan dibuang.
-                setIssuedRows(invitations.map(issuedDraft));
+                setIssuedState({
+                    source: invitations,
+                    rows: invitations.map(issuedDraft),
+                    fingerprints: new Map(
+                        invitations.map((invitation) => [
+                            `issued-${invitation.id}`,
+                            codeFingerprint(issuedDraft(invitation)),
+                        ]),
+                    ),
+                });
+                setRefreshError('');
                 form.setData('codes', next ? [blankCode()] : []);
             }}
         >
@@ -1604,6 +1785,13 @@ function InviteForm({
                     className="contents"
                     onSubmit={(event) => {
                         event.preventDefault();
+
+                        if (writeInFlight.current || form.processing) {
+                            return;
+                        }
+
+                        writeInFlight.current = true;
+                        setSaving('new');
                         // `key` hanya penanda baris di klien, tidak dikirim.
                         form.transform((data) => ({
                             codes: data.codes.map((code) => ({
@@ -1619,6 +1807,10 @@ function InviteForm({
                             '/settings/access/invitations',
                             wrapFormRequest({
                                 onSuccess: () => setOpen(false),
+                                onFinish: () => {
+                                    writeInFlight.current = false;
+                                    setSaving(null);
+                                },
                             }),
                         );
                     }}
@@ -1628,7 +1820,11 @@ function InviteForm({
                             action="save"
                             type="submit"
                             pending={form.processing}
-                            disabled={form.data.codes.length === 0}
+                            disabled={
+                                form.data.codes.length === 0 ||
+                                saving !== null ||
+                                form.processing
+                            }
                         />
                         <PageDialogClose asChild>
                             <ActionButton action="cancel" type="button" />
@@ -1636,7 +1832,15 @@ function InviteForm({
                     </PageDialogToolbar>
                     <>
                         {formRequestSummary}
-                        <FormErrorHeader errors={form.errors} />
+                        <FormErrorHeader
+                            errors={form.errors}
+                            message={refreshError}
+                            operation={
+                                refreshError
+                                    ? 'Perubahan sudah tersimpan'
+                                    : undefined
+                            }
+                        />
                     </>
 
                     <PageDialogBody className="space-y-4">
@@ -1655,22 +1859,36 @@ function InviteForm({
                         <DataTable
                             columns={columns}
                             data={[...issuedRows, ...form.data.codes]}
+                            incremental={invitationList}
                             getRowKey={(code) => code.key}
                             getRowLabel={() => 'kode undangan'}
                             activeRowKey={activeKey ?? undefined}
                             rowActivation="single-click"
                             onRowClick={(code) => setActiveKey(code.key)}
-                            actions={[
-                                { id: 'duplicate', label: 'Duplikat baris' },
-                                {
-                                    id: 'delete',
-                                    label: 'Delete',
-                                    icon: <Trash2 aria-hidden="true" />,
-                                    destructive: true,
-                                    separatorBefore: true,
-                                },
-                            ]}
+                            actions={
+                                saving !== null || form.processing
+                                    ? []
+                                    : [
+                                          {
+                                              id: 'duplicate',
+                                              label: 'Duplikat baris',
+                                          },
+                                          {
+                                              id: 'delete',
+                                              label: 'Delete',
+                                              icon: (
+                                                  <Trash2 aria-hidden="true" />
+                                              ),
+                                              destructive: true,
+                                              separatorBefore: true,
+                                          },
+                                      ]
+                            }
                             onRowAction={(action, code) => {
+                                if (writeInFlight.current || form.processing) {
+                                    return;
+                                }
+
                                 if (action === 'duplicate') {
                                     form.setData('codes', [
                                         ...form.data.codes,
@@ -1699,11 +1917,14 @@ function InviteForm({
                                     ),
                                 );
                             }}
-                            onAddRow={() =>
-                                form.setData('codes', [
-                                    ...form.data.codes,
-                                    blankCode(),
-                                ])
+                            onAddRow={
+                                saving !== null || form.processing
+                                    ? undefined
+                                    : () =>
+                                          form.setData('codes', [
+                                              ...form.data.codes,
+                                              blankCode(),
+                                          ])
                             }
                             addRowLabel="Tambah"
                             emptyMessage="Belum ada baris."
@@ -1997,6 +2218,8 @@ export default function Access({
     tenant,
     canManage,
     members,
+    membersNextCursor,
+    invitationsNextCursor,
     apps = [],
     roles,
     dataPolicies,
@@ -2014,6 +2237,46 @@ export default function Access({
     const queryString = url.includes('?') ? url.split('?')[1] : '';
     const section = new URLSearchParams(queryString).get('section');
     const activeSection = section === 'invitations' ? section : 'members';
+    const seededMembers = useRef<Member[] | null>(null);
+    const seededInvitations = useRef<Invitation[] | null>(null);
+    const loadMembers = useCallback(
+        (input: ListRequest) => {
+            const initial = seededMembers.current !== members;
+            seededMembers.current = members;
+
+            return initial && !input.cursor && !input.query && !input.sort
+                ? Promise.resolve({
+                      items: members,
+                      nextCursor: membersNextCursor,
+                  })
+                : accessBatch<Member>('members', input);
+        },
+        [members, membersNextCursor],
+    );
+    const loadInvitations = useCallback(
+        (input: ListRequest) => {
+            const initial = seededInvitations.current !== invitations;
+            seededInvitations.current = invitations;
+
+            return initial && !input.cursor && !input.query && !input.sort
+                ? Promise.resolve({
+                      items: invitations,
+                      nextCursor: invitationsNextCursor,
+                  })
+                : accessBatch<Invitation>('invitations', input);
+        },
+        [invitations, invitationsNextCursor],
+    );
+    const memberList = useIncrementalList({
+        loadItems: loadMembers,
+        getKey: (member) => member.id,
+        active: activeSection === 'members',
+    });
+    const invitationList = useIncrementalList({
+        loadItems: loadInvitations,
+        getKey: (invitation) => invitation.id,
+        active: activeSection === 'invitations',
+    });
     const [editingMember, setEditingMember] = useState<Member | null>(null);
     const [revokingInvitation, setRevokingInvitation] =
         useState<Invitation | null>(null);
@@ -2077,7 +2340,6 @@ export default function Access({
                                   Belum tertaut
                               </span>
                           ),
-                      sortValue: (member) => member.worker?.name ?? '',
                   } satisfies DataTableColumn<Member>,
               ]
             : []),
@@ -2178,7 +2440,8 @@ export default function Access({
                         <CardContent>
                             <DataTable
                                 columns={memberColumns}
-                                data={members}
+                                data={memberList.items}
+                                incremental={memberList}
                                 actions={
                                     canManage
                                         ? [
@@ -2243,7 +2506,8 @@ export default function Access({
                                             dataPolicies={dataPolicies}
                                             organizations={organizations}
                                             hierarchies={hierarchies}
-                                            invitations={invitations}
+                                            invitations={invitationList.items}
+                                            invitationList={invitationList}
                                             ssoAvailable={ssoAvailable}
                                         />
                                     </Deferred>
@@ -2251,10 +2515,13 @@ export default function Access({
                             )}
                         </CardHeader>
                         <CardContent>
-                            {invitations.length ? (
+                            {invitationList.items.length ||
+                            invitationList.loading ||
+                            invitationList.error ? (
                                 <DataTable
                                     columns={invitationColumns}
-                                    data={invitations}
+                                    data={invitationList.items}
+                                    incremental={invitationList}
                                     actions={
                                         canManage
                                             ? [

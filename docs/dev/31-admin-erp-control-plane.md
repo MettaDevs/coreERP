@@ -191,6 +191,12 @@ itu.
 - **Tampil di rincian server klien** (`/situs/{id}`), bagian "Feed posting finance", dengan peringatan di atas
   halaman bila perlu perhatian. Rincian dan tindak lanjutnya tetap di layar Pantau posting pada aplikasi server itu.
 
+## Daftar dimuat per batch
+
+Daftar pelanggan, lingkungan dan situs memakai batch cursor dari server dan lazy loading SDK pada UI. Search, filter serta cursor divalidasi sebelum query; picker pelanggan dan calon server memakai jalur terbatas yang sama. Label pilihan yang tersimpan tetap tersedia ketika pilihan itu berada di luar batch aktif. Menyimpan record baru menyegarkan daftar, sehingga hasil tidak berhenti pada merge lokal yang dapat merusak urutan/filter.
+
+Ringkasan armada situs tetap membutuhkan pembacaan seluruh situs. Server menghitungnya dalam chunk dengan fungsi status yang sama seperti rincian, lalu hanya menyimpan batch hasil yang diminta. Karena itu biaya ringkasan masih O(N), meskipun respons dan memori dibatasi. Penutupan lease operasi yang kedaluwarsa memakai update per batch dengan aturan pembersihan hash yang sama, bukan dua query tulis per baris situs.
+
 ## Layar dan rutenya
 
 Alamat rute berbahasa Indonesia, nama kelas dan method berbahasa Inggris. `/situs` tampil sebagai "Server

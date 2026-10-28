@@ -26,6 +26,7 @@ import { usePageDialogRecord } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
+import type { RefObject } from 'react';
 import { FormErrorHeader } from '@/components/form-error-header';
 import { apiJson, apiRequest, errorText } from '@/lib/core-api';
 import {
@@ -44,6 +45,7 @@ import {
 import { PartyRelationships } from './party-relationships';
 
 export function PartyCard({
+    portalContainer,
     partyId,
     metadata,
     onBack,
@@ -51,6 +53,7 @@ export function PartyCard({
     onDirtyChange,
     requestTransition,
 }: {
+    portalContainer?: RefObject<HTMLElement | null>;
     partyId: string;
     metadata: DirectoryMetadata;
     onBack: () => void;
@@ -178,6 +181,7 @@ export function PartyCard({
     if (editing) {
         return (
             <PartyForm
+                portalContainer={portalContainer}
                 party={party}
                 onBusyChange={onBusyChange}
                 onDirtyChange={onDirtyChange}
@@ -310,12 +314,7 @@ export function PartyCard({
                                         Buku alamat
                                     </dt>
                                     <dd>
-                                        {metadata.addressBooks
-                                            .filter((book) =>
-                                                party.address_book_ids.includes(
-                                                    book.id,
-                                                ),
-                                            )
+                                        {party.address_books
                                             .map((book) => book.name)
                                             .join(', ') || '—'}
                                     </dd>

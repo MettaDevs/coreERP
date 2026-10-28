@@ -27,11 +27,18 @@ final class OrganizationDirectoryCore implements OrganizationDirectory
 {
     public function lookup(string $tenantId, string $kind, array $input, ?array $allowedIds = null): array
     {
-        if ($kind === 'members') {
+        if (in_array($kind, ['members', 'memberships'], true)) {
             $query = DB::table('tenant_memberships as memberships')
                 ->join('users', 'users.id', '=', 'memberships.user_id')
                 ->where('memberships.tenant_id', $tenantId)->where('memberships.status', 'active')
-                ->select(['users.id', 'users.name as kode', 'users.name as nama', 'users.name as display_label', 'users.email']);
+                ->select([$kind === 'memberships' ? 'memberships.id' : 'users.id', 'users.name as kode', 'users.name as nama', 'users.name as display_label']);
+            if ($kind === 'memberships') {
+                $query->addSelect('users.email');
+                $filters = Request::create('/lookup', 'GET', $input)->validate(['email' => ['nullable', 'string', 'max:255']]);
+                if (($email = trim($filters['email'] ?? '')) !== '') {
+                    $query->whereRaw('LOWER(TRIM(users.email)) = ?', [mb_strtolower($email)]);
+                }
+            }
         } elseif ($kind === 'legal_entities') {
             $query = DB::table('organizations')->join('legal_entities as company', 'company.organization_id', '=', 'organizations.id')
                 ->where('organizations.tenant_id', $tenantId)->where('organizations.classification', 'legal_entity')
@@ -45,10 +52,15 @@ final class OrganizationDirectoryCore implements OrganizationDirectory
         }
 
         if ($allowedIds !== null) {
-            $query->whereIn($kind === 'members' ? 'users.id' : 'organizations.id', $allowedIds);
+            $identity = match ($kind) {
+                'members' => 'users.id',
+                'memberships' => 'memberships.id',
+                default => 'organizations.id',
+            };
+            $query->whereIn($identity, $allowedIds);
         }
 
-        return IncrementalList::query(Request::create('/lookup', 'GET', $input), $query, ['id' => 'id', 'kode' => 'kode', 'nama' => 'nama'], ['kode', 'nama'], 'nama');
+        return IncrementalList::query(Request::create('/lookup', 'GET', $input), $query, ['id' => 'id', 'kode' => 'kode', 'nama' => 'nama'], $kind === 'memberships' ? ['kode', 'nama', 'email'] : ['kode', 'nama'], 'nama');
     }
 
     public function __construct(private readonly BusinessUnitResolver $businessUnits) {}
@@ -115,6 +127,25 @@ final class OrganizationDirectoryCore implements OrganizationDirectory
             'nama' => (string) $row->name,
             'email' => (string) $row->email,
         ];
+    }
+
+    public function membersById(string $tenantId, array $membershipIds): array
+    {
+        if ($membershipIds === []) {
+            return [];
+        }
+
+        return DB::table('tenant_memberships as memberships')
+            ->join('users', 'users.id', '=', 'memberships.user_id')
+            ->where('memberships.tenant_id', $tenantId)->where('memberships.status', 'active')
+            ->whereIn('memberships.id', array_unique($membershipIds))
+            ->get(['memberships.id', 'memberships.user_id', 'users.name', 'users.email'])
+            ->mapWithKeys(static fn (object $row): array => [(string) $row->id => [
+                'id' => (string) $row->id,
+                'user_id' => (string) $row->user_id,
+                'nama' => (string) $row->name,
+                'email' => (string) $row->email,
+            ]])->all();
     }
 
     public function operatingUnits(string $tenantId): array
