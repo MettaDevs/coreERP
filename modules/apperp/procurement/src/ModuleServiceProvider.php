@@ -11,7 +11,6 @@ final class ModuleServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
-
         $this->app->booted(function (): void {
             Route::middleware(['web', 'auth'])
                 ->prefix('api/modules/procurement')

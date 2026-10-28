@@ -80,7 +80,14 @@ export default function App({
                 />
             );
         case 'prakualifikasi':
-            return <VendorPrequalificationPage />;
+            return (
+                <VendorPrequalificationPage
+                    view={view}
+                    segments={segments}
+                    permissions={permissions}
+                    context={context}
+                />
+            );
         case 'kualifikasi':
             return <VendorQualificationPage />;
         case 'harga-perkiraan':

@@ -78,6 +78,7 @@ security:
     - { code: procurement.dashboard.form, name: Layar dashboard pengadaan, type: form }
     - { code: procurement.vendor.form, name: Layar vendor/supplier, type: form }
     - { code: procurement.prakualifikasi.form, name: Layar prakualifikasi vendor, type: form }
+    - { code: procurement.prakualifikasi.api, name: API prakualifikasi vendor, type: api }
     - { code: procurement.kualifikasi.form, name: Layar kualifikasi vendor, type: form }
     - { code: procurement.harga-perkiraan.form, name: Layar harga perkiraan, type: form }
     - { code: procurement.kategori-pengadaan.form, name: Layar kategori pengadaan, type: form }
@@ -96,6 +97,9 @@ security:
     - { code: procurement.dashboard.read, name: Lihat dashboard pengadaan, entry_point: procurement.dashboard.form, access: read }
     - { code: procurement.vendor.read, name: Lihat vendor/supplier, entry_point: procurement.vendor.form, access: read }
     - { code: procurement.prakualifikasi.read, name: Lihat prakualifikasi, entry_point: procurement.prakualifikasi.form, access: read }
+    - { code: procurement.prakualifikasi.create, name: Tambah prakualifikasi, entry_point: procurement.prakualifikasi.api, access: create }
+    - { code: procurement.prakualifikasi.update, name: Ubah prakualifikasi, entry_point: procurement.prakualifikasi.api, access: update }
+    - { code: procurement.prakualifikasi.archive, name: Arsipkan prakualifikasi, entry_point: procurement.prakualifikasi.api, access: delete }
     - { code: procurement.kualifikasi.read, name: Lihat kualifikasi, entry_point: procurement.kualifikasi.form, access: read }
     - { code: procurement.harga-perkiraan.read, name: Lihat harga perkiraan, entry_point: procurement.harga-perkiraan.form, access: read }
     - { code: procurement.kategori-pengadaan.read, name: Lihat kategori pengadaan, entry_point: procurement.kategori-pengadaan.form, access: read }
@@ -123,6 +127,16 @@ security:
       name: Lihat prakualifikasi vendor
       permissions:
         - procurement.prakualifikasi.read
+    - code: procurement.prakualifikasi.maintain
+      name: Pelihara prakualifikasi vendor
+      permissions:
+        - procurement.prakualifikasi.read
+        - procurement.prakualifikasi.create
+        - procurement.prakualifikasi.update
+    - code: procurement.prakualifikasi.retire
+      name: Arsipkan prakualifikasi vendor
+      permissions:
+        - procurement.prakualifikasi.archive
     - code: procurement.kualifikasi.view
       name: Lihat kualifikasi vendor
       permissions:
@@ -189,6 +203,11 @@ security:
       name: Lihat prakualifikasi vendor
       privileges:
         - procurement.prakualifikasi.view
+    - code: procurement.prakualifikasi.manage
+      name: Kelola prakualifikasi vendor
+      privileges:
+        - procurement.prakualifikasi.maintain
+        - procurement.prakualifikasi.retire
     - code: procurement.kualifikasi.inquire
       name: Lihat kualifikasi vendor
       privileges:
@@ -241,3 +260,14 @@ security:
       name: Lihat laporan pengadaan
       privileges:
         - procurement.laporan-pengadaan.view
+
+number_sequences:
+  references:
+    - code: procurement.prakualifikasi
+      name: Nomor prakualifikasi vendor
+      default_prefix: PRKP
+      allowed_scopes:
+        - tenant
+      default_settings:
+        allow_automatic: true
+        allow_manual: true
