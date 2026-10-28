@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/** @property int $version */
 #[DataClassification(DataClass::CustomerContent)]
 final class FundingSource extends Model
 {

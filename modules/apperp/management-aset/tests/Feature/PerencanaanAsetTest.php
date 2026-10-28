@@ -373,6 +373,31 @@ class PerencanaanAsetTest extends TestCase
         $this->getJson('/api/modules/management-aset/v1/perencanaan-aset/organizations?kind=operating_units&legal_entity_id='.$otherCompany)->assertForbidden();
     }
 
+    public function test_organization_choices_page_through_more_than_one_hundred_granted_units(): void
+    {
+        $units = [];
+        $grants = [];
+        for ($index = 0; $index < 101; $index++) {
+            $unitId = (string) Str::ulid();
+            $this->pastikanOrganisasiAda($this->tenantId, $unitId, 'operating_unit');
+            $units[] = $unitId;
+            $grants[] = ['policy_code' => 'management-aset.asset-responsibility', 'legal_entity_id' => $this->legalEntityId, 'organization_id' => $unitId];
+        }
+        $this->sebagaiPenggunaBernama('planning-author', $this->tenantId, ['management-aset.perencanaan-aset.create'], $grants);
+        $seen = [];
+        $cursor = null;
+        do {
+            $query = http_build_query(['kind' => 'operating_units', 'legal_entity_id' => $this->legalEntityId, 'per_page' => 20, 'cursor' => $cursor]);
+            $response = $this->getJson('/api/modules/management-aset/v1/perencanaan-aset/organizations?'.$query)->assertOk();
+            $rows = $response->json('data');
+            $this->assertLessThanOrEqual(20, count($rows));
+            $seen = [...$seen, ...array_column($rows, 'id')];
+            $cursor = $response->json('next_cursor');
+        } while ($cursor !== null);
+        $this->assertCount(101, array_unique($seen));
+        $this->assertEqualsCanonicalizing($units, $seen);
+    }
+
     public function test_explicit_creation_in_another_allowed_company_does_not_change_normal_read_scope(): void
     {
         $otherCompany = (string) Str::ulid();

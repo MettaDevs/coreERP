@@ -30,6 +30,9 @@ use Illuminate\Support\Carbon;
  * @property string $unit
  * @property string $quantity
  * @property string $requested_specification
+ * @property ?string $funding_source_id
+ * @property ?string $funding_source_name
+ * @property ?Carbon $needed_on
  * @property string $estimated_unit_price
  * @property string $estimated_total_price
  * @property ?Carbon $created_at

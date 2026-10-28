@@ -21,7 +21,7 @@ final class PlanningYearController extends Controller
     {
         $workspace = app(CurrentWorkspace::class);
         $membership = $workspace->membership($request);
-        abort_unless($membership, 403);
+        abort_unless($membership !== null, 403);
         $companyId = $request->input('legal_entity_id') ?? $workspace->legalEntity($request, $membership)?->id;
         $this->scope($request, $companyId);
 

@@ -22,7 +22,7 @@ import { Head } from '@inertiajs/react';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { useSaveFeedback } from '@/hooks/use-save-feedback';
-import { apiJson, apiRequest, errorText } from '@/lib/core-api';
+import { apiJson, apiRequest } from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
 
 export type PlanningYearRecord = {
@@ -254,6 +254,7 @@ export default function PlanningYears({
         null,
     );
     const [deleting, setDeleting] = useState(false);
+    const listFeedback = useSaveFeedback('planning-year-list');
     const { confirm, confirmation } = useConfirmation();
     const loadItems = useCallback(
         async ({ query, cursor, sort, signal }: ListRequest) => {
@@ -299,6 +300,7 @@ export default function PlanningYears({
         }
 
         setDeleting(true);
+        listFeedback.clear();
 
         try {
             await apiRequest(`/api/v1/planning-years/${record.id}`, {
@@ -307,7 +309,7 @@ export default function PlanningYears({
             });
             list.reload();
         } catch (error) {
-            toast.error(errorText(error, 'Tahun rencana belum dapat dihapus.'));
+            listFeedback.report(error, 'Tahun rencana belum dapat dihapus.');
         } finally {
             setDeleting(false);
         }
@@ -319,7 +321,10 @@ export default function PlanningYears({
             {confirmation}
             <ListPageLayout
                 header={
-                    <RecordActionBar title="Tahun rencana">
+                    <RecordActionBar
+                        title="Tahun rencana"
+                        feedback={listFeedback.summary}
+                    >
                         {canManage && (
                             <ActionButton
                                 action="create"

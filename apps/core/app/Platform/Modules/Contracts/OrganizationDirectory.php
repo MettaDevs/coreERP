@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Platform\Modules\Contracts;
 
 use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Collection;
 
 /**
  * Membaca anggota tenant dan unit organisasinya.
@@ -17,9 +18,10 @@ interface OrganizationDirectory
 {
     /** Pilihan database dibatasi sebelum dikirim; kind `members`, `legal_entities`, atau `operating_units`.
      * @param  array<string, mixed>  $input
-     * @return array{data: mixed, next_cursor: ?string}
+     * @param  list<string>|null  $allowedIds  Filter izin tepercaya dari pemanggil, terpisah dari pilihan record HTTP.
+     * @return array{data: Collection<int, \stdClass>, next_cursor: ?string}
      */
-    public function lookup(string $tenantId, string $kind, array $input): array;
+    public function lookup(string $tenantId, string $kind, array $input, ?array $allowedIds = null): array;
 
     /** Nama direktori sebagai proyeksi query milik pemanggil, sesudah scope record diterapkan.
      * @param  array<string, string>  $units  Alias hasil => kolom id unit/perusahaan milik pemanggil.

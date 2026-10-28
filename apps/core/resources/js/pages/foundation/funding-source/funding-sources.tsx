@@ -23,7 +23,7 @@ import { Head } from '@inertiajs/react';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { useSaveFeedback } from '@/hooks/use-save-feedback';
-import { apiJson, apiRequest, errorText } from '@/lib/core-api';
+import { apiJson, apiRequest } from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
 
 export type FundingSourceRecord = {
@@ -276,6 +276,7 @@ export default function FundingSources({ canManage }: { canManage: boolean }) {
         null,
     );
     const [deleting, setDeleting] = useState(false);
+    const listFeedback = useSaveFeedback('funding-source-list');
     const { confirm, confirmation } = useConfirmation();
     const loadItems = useCallback(
         async ({ query, cursor, sort, signal }: ListRequest) => {
@@ -318,6 +319,7 @@ export default function FundingSources({ canManage }: { canManage: boolean }) {
         }
 
         setDeleting(true);
+        listFeedback.clear();
 
         try {
             await apiRequest(`/api/v1/funding-sources/${record.id}`, {
@@ -326,7 +328,7 @@ export default function FundingSources({ canManage }: { canManage: boolean }) {
             });
             list.reload();
         } catch (error) {
-            toast.error(errorText(error, 'Sumber dana belum dapat dihapus.'));
+            listFeedback.report(error, 'Sumber dana belum dapat dihapus.');
         } finally {
             setDeleting(false);
         }
@@ -338,7 +340,10 @@ export default function FundingSources({ canManage }: { canManage: boolean }) {
             {confirmation}
             <ListPageLayout
                 header={
-                    <RecordActionBar title="Sumber dana">
+                    <RecordActionBar
+                        title="Sumber dana"
+                        feedback={listFeedback.summary}
+                    >
                         {canManage && (
                             <ActionButton
                                 action="create"

@@ -91,6 +91,7 @@ type Plan = {
     status: string;
     version: number;
     total_estimated_value: string | number;
+    unestimated_line_count: number;
     details?: Detail[];
 };
 
@@ -123,6 +124,7 @@ const emptyPlan = (
     responsible_user_id: userId,
     description: '',
     total_estimated_value: 0,
+    unestimated_line_count: 1,
     details: [emptyDetail()],
 });
 
@@ -694,7 +696,16 @@ export default function PlanningPage({
             header: 'Total perkiraan',
             width: 180,
             align: 'right',
-            cell: (plan) => money(plan.total_estimated_value),
+            cell: (plan) => (
+                <span>
+                    {money(plan.total_estimated_value)}
+                    {plan.unestimated_line_count > 0 && (
+                        <span className="text-muted-foreground block text-xs">
+                            {plan.unestimated_line_count} baris belum diestimasi
+                        </span>
+                    )}
+                </span>
+            ),
         },
         {
             id: 'status',

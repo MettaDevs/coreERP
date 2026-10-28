@@ -361,12 +361,14 @@ class PerencanaanAsetController extends Controller
         PerencanaanAsetDetail::query()->where('planning_id', $planId)->whereNotIn('id', $retained)->delete();
     }
 
+    /** @param array<string, mixed> $detail */
     private function detailTotal(array $detail): ?string
     {
         return ($detail['estimated_unit_price'] ?? null) === null ? null
             : (string) BigDecimal::of((string) $detail['quantity'])->multipliedBy((string) $detail['estimated_unit_price'])->toScale(2, RoundingMode::HalfUp);
     }
 
+    /** @param list<array<string, mixed>> $details */
     private function validateFundingSources(string $tenantId, array $details, ?string $planId = null): void
     {
         $sources = app(FundingSourceDirectory::class)->resolve($tenantId, array_values(array_unique(array_column($details, 'funding_source_id'))));

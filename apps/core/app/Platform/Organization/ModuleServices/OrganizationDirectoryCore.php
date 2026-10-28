@@ -25,7 +25,7 @@ use Illuminate\Support\Facades\DB;
  */
 final class OrganizationDirectoryCore implements OrganizationDirectory
 {
-    public function lookup(string $tenantId, string $kind, array $input): array
+    public function lookup(string $tenantId, string $kind, array $input, ?array $allowedIds = null): array
     {
         if ($kind === 'members') {
             $query = DB::table('tenant_memberships as memberships')
@@ -42,6 +42,10 @@ final class OrganizationDirectoryCore implements OrganizationDirectory
                 ->where('organizations.tenant_id', $tenantId)->where('organizations.classification', 'operating_unit')
                 ->select(['organizations.id', 'organizations.name as nama', 'unit.number as kode'])
                 ->selectRaw("CASE WHEN unit.number IS NULL THEN organizations.name ELSE unit.number || ' — ' || organizations.name END AS display_label");
+        }
+
+        if ($allowedIds !== null) {
+            $query->whereIn($kind === 'members' ? 'users.id' : 'organizations.id', $allowedIds);
         }
 
         return IncrementalList::query(Request::create('/lookup', 'GET', $input), $query, ['id' => 'id', 'kode' => 'kode', 'nama' => 'nama'], ['kode', 'nama'], 'nama');
