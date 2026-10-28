@@ -15,11 +15,12 @@ use Illuminate\Support\Collection;
  */
 interface OrganizationDirectory
 {
-    /** Pilihan database dibatasi sebelum dikirim; kind `members` (id pengguna), `memberships` (id keanggotaan), atau `operating_units`.
+    /** Pilihan database dibatasi sebelum dikirim; kind `members` (id pengguna), `memberships` (id keanggotaan), `legal_entities`, atau `operating_units`.
      * @param  array<string, mixed>  $input
+     * @param  list<string>|null  $allowedIds  Filter izin tepercaya dari pemanggil, terpisah dari pilihan record HTTP.
      * @return array{data: Collection<int, \stdClass>, next_cursor: ?string}
      */
-    public function lookup(string $tenantId, string $kind, array $input): array;
+    public function lookup(string $tenantId, string $kind, array $input, ?array $allowedIds = null): array;
 
     /** Nama direktori sebagai proyeksi query milik pemanggil, sesudah scope record diterapkan.
      * @param  array<string, string>  $units  Alias hasil => kolom id unit/perusahaan milik pemanggil.

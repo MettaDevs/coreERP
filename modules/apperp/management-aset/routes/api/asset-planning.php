@@ -6,6 +6,8 @@ use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PerencanaanAset\Per
 Route::get('perencanaan-aset', [PerencanaanAsetController::class, 'index']);
 Route::post('perencanaan-aset', [PerencanaanAsetController::class, 'store']);
 Route::get('perencanaan-aset/number-policy', [PerencanaanAsetController::class, 'numberPolicy']);
+Route::get('perencanaan-aset/planning-years', [PerencanaanAsetController::class, 'planningYears']);
+Route::get('perencanaan-aset/organizations', [PerencanaanAsetController::class, 'organizations']);
 Route::get('perencanaan-aset/{id}', [PerencanaanAsetController::class, 'show']);
 Route::patch('perencanaan-aset/{id}', [PerencanaanAsetController::class, 'update']);
 Route::delete('perencanaan-aset/{id}', [PerencanaanAsetController::class, 'destroy']);

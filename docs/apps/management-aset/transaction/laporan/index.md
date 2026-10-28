@@ -67,7 +67,8 @@ Yang dibaca hanya yang memang ada di datanya:
 
 - **Diminta** = jumlah baris permintaan yang tidak dibatalkan (`cancelled`) dan tidak diarsipkan. Permintaan belum punya alur pengajuan maupun persetujuan, jadi draf ikut dihitung; begitu alurnya ada, aturan ini ditinjau ulang.
 - **Diterima** = jumlah baris penerimaan berstatus `selesai`, yaitu aset yang sudah lahir di register; penerimaan draf belum melahirkan apa pun. **Nilai diterima** = nilai per unit × jumlah, dibulatkan sekali per baris seperti jurnal perolehan (K-20), **tanpa PPN**. Fase ini hanya IDR (K-19), jadi totalnya dijumlah langsung.
-- **Nilai rencana** = perkiraan di baris rencana. Permintaan tidak memikul harga, jadi tidak ada nilai diminta.
+- **Nilai rencana** = perkiraan di baris rencana. Harga yang belum diestimasi tetap null, bukan nol; total hanya menjumlah estimasi yang sudah diketahui dan `jumlah_baris_belum_diestimasi` menampilkan jumlah rincian rencana yang belum lengkap. Permintaan tidak memikul harga, jadi tidak ada nilai diminta.
+- **Sumber dana** berasal dari snapshot `funding_source_name` pada setiap baris rencana. Header `funding_source` lama hanya menjadi fallback data warisan. **Tanggal kebutuhan** membaca `needed_on` baris; data lama yang belum dilengkapi tetap kosong dan tidak ditebak dari tanggal dokumen.
 - **Vendor** hanya ada di penerimaan; rencana dan permintaan tidak menyebut pemasok. Namanya dibaca dari vendor Core (K-06).
 - **Belum diminta** = rencana − diminta, dan **belum diterima** = diminta − diterima; keduanya tidak pernah negatif.
 - **Status** diturunkan dari angka itu: Belum diminta (belum ada permintaan yang berlaku), Belum diterima, Diterima sebagian, Diterima penuh. Filter status menyaring hasil turunan ini.

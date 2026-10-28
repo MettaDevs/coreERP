@@ -229,6 +229,8 @@ export default withMermaid({
             { text: 'Number sequence', link: '/dev/14-number-sequences' },
             { text: 'Kalender fiskal', link: '/dev/15-fiscal-calendars' },
             { text: 'Satuan ukur', link: '/dev/16-units-of-measure' },
+            { text: 'Sumber dana', link: '/dev/37-funding-sources' },
+            { text: 'Tahun rencana', link: '/dev/38-planning-years' },
             { text: 'Buku alamat', link: '/dev/24-global-address-book' },
           ],
         },

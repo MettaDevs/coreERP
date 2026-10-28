@@ -25,7 +25,7 @@ use Illuminate\Support\Facades\DB;
  */
 final class OrganizationDirectoryCore implements OrganizationDirectory
 {
-    public function lookup(string $tenantId, string $kind, array $input): array
+    public function lookup(string $tenantId, string $kind, array $input, ?array $allowedIds = null): array
     {
         if (in_array($kind, ['members', 'memberships'], true)) {
             $query = DB::table('tenant_memberships as memberships')
@@ -39,12 +39,25 @@ final class OrganizationDirectoryCore implements OrganizationDirectory
                     $query->whereRaw('LOWER(TRIM(users.email)) = ?', [mb_strtolower($email)]);
                 }
             }
+        } elseif ($kind === 'legal_entities') {
+            $query = DB::table('organizations')->join('legal_entities as company', 'company.organization_id', '=', 'organizations.id')
+                ->where('organizations.tenant_id', $tenantId)->where('organizations.classification', 'legal_entity')
+                ->select(['organizations.id', 'organizations.name as nama', 'company.company_code as kode', 'organizations.name as display_label']);
         } else {
             abort_unless($kind === 'operating_units', 422);
             $query = DB::table('organizations')->leftJoin('operating_units as unit', 'unit.organization_id', '=', 'organizations.id')
                 ->where('organizations.tenant_id', $tenantId)->where('organizations.classification', 'operating_unit')
                 ->select(['organizations.id', 'organizations.name as nama', 'unit.number as kode'])
                 ->selectRaw("CASE WHEN unit.number IS NULL THEN organizations.name ELSE unit.number || ' — ' || organizations.name END AS display_label");
+        }
+
+        if ($allowedIds !== null) {
+            $identity = match ($kind) {
+                'members' => 'users.id',
+                'memberships' => 'memberships.id',
+                default => 'organizations.id',
+            };
+            $query->whereIn($identity, $allowedIds);
         }
 
         return IncrementalList::query(Request::create('/lookup', 'GET', $input), $query, ['id' => 'id', 'kode' => 'kode', 'nama' => 'nama'], $kind === 'memberships' ? ['kode', 'nama', 'email'] : ['kode', 'nama'], 'nama');
