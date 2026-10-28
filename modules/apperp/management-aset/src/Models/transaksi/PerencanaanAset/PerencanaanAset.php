@@ -81,6 +81,8 @@ class PerencanaanAset extends Model
         'legal_entity_id' => 'Badan hukum dipilih lewat workspace, bukan filter laporan.',
         'planning_type' => 'Nilai warisan yang dipertahankan untuk riwayat.',
         'funding_source' => 'Teks sumber dana lama; sumber dana baru berada pada rincian.',
+        'planning_year_id' => 'Rujukan master tahun; laporan menyaring angka tahun pada planning_year.',
+        'unestimated_line_count' => 'Ringkasan tersimpan; laporan menghitung estimasi kosong dari rincian aktif.',
     ];
 
     protected $table = 'aset_tr_perencanaan_aset';

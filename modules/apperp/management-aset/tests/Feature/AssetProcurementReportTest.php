@@ -141,7 +141,7 @@ class AssetProcurementReportTest extends TestCase
         DB::table('aset_tr_perencanaan_aset_details')->where('tenant_id', $this->tenantId)
             ->where('nama_aset', 'Laptop')->update([
                 'funding_source_name' => 'Pembiayaan baris uji', 'needed_on' => '2026-09-01',
-                'estimated_unit_price' => null, 'estimated_total_price' => null,
+                'estimated_unit_price' => 0, 'estimated_total_price' => 0, 'estimate_pending' => true,
             ]);
 
         $report = $this->report();

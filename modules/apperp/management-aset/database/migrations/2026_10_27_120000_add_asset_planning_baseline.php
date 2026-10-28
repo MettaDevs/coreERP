@@ -6,6 +6,9 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * @kompatibel-mundur Kolom harga hanya dilonggarkan; nama dan tipe angka tetap. Migration lanjutan memulihkan default nol dan menandai estimasi kosong sebelum kode lama membaca data.
+ */
 return new class extends Migration
 {
     public function up(): void

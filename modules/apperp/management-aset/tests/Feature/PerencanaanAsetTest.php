@@ -277,7 +277,7 @@ class PerencanaanAsetTest extends TestCase
         $this->assertSame(0, $this->jumlahNomorTerbit());
     }
 
-    public function test_unknown_price_stays_null_and_funding_source_is_snapshotted_per_line(): void
+    public function test_unknown_price_is_returned_as_null_without_changing_legacy_numeric_storage(): void
     {
         $payload = $this->payload($this->jenis($this->tenantId));
         $payload['details'][0]['estimated_unit_price'] = null;
@@ -289,12 +289,34 @@ class PerencanaanAsetTest extends TestCase
         $this->assertDatabaseHas('aset_tr_perencanaan_aset_details', [
             'planning_id' => $plan['id'], 'funding_source_id' => $this->fundingSourceId,
             'funding_source_name' => DB::table('funding_sources')->where('id', $this->fundingSourceId)->value('name'),
-            'estimated_unit_price' => null, 'estimated_total_price' => null,
+            'estimated_unit_price' => 0, 'estimated_total_price' => 0, 'estimate_pending' => true,
         ]);
         $this->assertDatabaseHas('aset_tr_perencanaan_aset_details', [
             'planning_id' => $plan['id'], 'funding_source_id' => $otherSource,
-            'estimated_unit_price' => 0, 'estimated_total_price' => 0,
+            'estimated_unit_price' => 0, 'estimated_total_price' => 0, 'estimate_pending' => false,
         ]);
+        $lineIds = DB::table('aset_tr_perencanaan_aset_details')->where('planning_id', $plan['id'])->orderBy('id')->pluck('id')->all();
+        DB::table('aset_tr_perencanaan_aset_details')->where('planning_id', $plan['id'])->where('funding_source_id', $this->fundingSourceId)
+            ->update(['estimated_unit_price' => null, 'estimated_total_price' => null, 'estimate_pending' => false]);
+        $migration = require dirname(__DIR__, 2).'/database/migrations/2026_10_28_100000_preserve_legacy_planning_estimates.php';
+        $migration->up();
+        $migration->up();
+        $this->assertSame($lineIds, DB::table('aset_tr_perencanaan_aset_details')->where('planning_id', $plan['id'])->orderBy('id')->pluck('id')->all());
+        $this->assertDatabaseHas('aset_tr_perencanaan_aset_details', ['planning_id' => $plan['id'], 'funding_source_id' => $this->fundingSourceId,
+            'estimated_unit_price' => 0, 'estimated_total_price' => 0, 'estimate_pending' => true]);
+        $this->assertDatabaseHas('aset_tr_perencanaan_aset_details', ['planning_id' => $plan['id'], 'funding_source_id' => $otherSource,
+            'estimated_unit_price' => 0, 'estimated_total_price' => 0, 'estimate_pending' => false]);
+        $this->headers(['management-aset.perencanaan-aset.read'])
+            ->getJson('/api/modules/management-aset/v1/perencanaan-aset/'.$plan['id'])
+            ->assertOk()->assertJsonPath('data.details.0.estimated_unit_price', null)
+            ->assertJsonPath('data.details.0.estimated_total_price', null)
+            ->assertJsonPath('data.details.1.estimated_unit_price', '0.00');
+        DB::table('aset_tr_perencanaan_aset_details')->where('planning_id', $plan['id'])->where('funding_source_id', $this->fundingSourceId)
+            ->update(['estimated_unit_price' => 25, 'estimated_total_price' => 50]);
+        DB::table('aset_tr_perencanaan_aset')->where('id', $plan['id'])->update(['total_estimated_value' => 50]);
+        $this->getJson('/api/modules/management-aset/v1/perencanaan-aset/'.$plan['id'])->assertOk()
+            ->assertJsonPath('data.details.0.estimated_unit_price', '25.00')->assertJsonPath('data.unestimated_line_count', 0);
+        $this->getJson('/api/modules/management-aset/v1/perencanaan-aset')->assertOk()->assertJsonPath('data.0.unestimated_line_count', 0);
     }
 
     public function test_saved_line_can_retain_its_inactive_funding_source(): void

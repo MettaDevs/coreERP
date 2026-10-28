@@ -47,6 +47,13 @@ class PerencanaanAsetController extends Controller
 
         $query = PerencanaanAset::query();
         app(OrganizationScope::class)->query($query, $request, 'legal_entity_id', 'planning_org_unit_id');
+        $query->select('aset_tr_perencanaan_aset.*')->selectSub(
+            DB::table(self::TABEL_BARIS.' as estimates')->selectRaw('COUNT(*)')
+                ->whereColumn('estimates.tenant_id', 'aset_tr_perencanaan_aset.tenant_id')
+                ->whereColumn('estimates.planning_id', 'aset_tr_perencanaan_aset.id')
+                ->whereNull('estimates.deleted_at')->where('estimates.estimate_pending', true)->where('estimates.estimated_unit_price', 0),
+            'unestimated_line_count',
+        );
 
         return response()->json(IncrementalList::query($request, $query->toBase(), [
             'id' => 'id', 'kode' => 'kode', 'date' => 'planned_on', 'status' => 'status', 'planning_year' => 'planning_year',
@@ -108,6 +115,14 @@ class PerencanaanAsetController extends Controller
             ->get([
                 self::TABEL_BARIS.'.*', 'jenis.kode as jenis_aset_kode', 'jenis.nama as jenis_aset_nama',
             ]);
+        $plan->details->each(function (stdClass $line): void {
+            if ($line->estimate_pending && BigDecimal::of((string) $line->estimated_unit_price)->isZero()) {
+                $line->estimated_unit_price = null;
+                $line->estimated_total_price = null;
+            }
+        });
+
+        $plan->unestimated_line_count = $plan->details->filter(fn (stdClass $line) => $line->estimated_unit_price === null)->count();
 
         return response()->json(['data' => $plan], 200, ['ETag' => RowVersion::etag((int) $plan->version)]);
     }
@@ -352,8 +367,9 @@ class PerencanaanAsetController extends Controller
                 'needed_on' => $detail['needed_on'], 'funding_source_id' => $detail['funding_source_id'],
                 'funding_source_name' => $fundingName,
                 'quantity' => $detail['quantity'], 'requested_specification' => $detail['requested_specification'],
-                'estimated_unit_price' => $detail['estimated_unit_price'] ?? null,
-                'estimated_total_price' => $this->detailTotal($detail),
+                'estimated_unit_price' => $detail['estimated_unit_price'] ?? 0,
+                'estimated_total_price' => $this->detailTotal($detail) ?? '0.00',
+                'estimate_pending' => ($detail['estimated_unit_price'] ?? null) === null,
             ]);
             $line->save();
             $retained[] = $line->id;

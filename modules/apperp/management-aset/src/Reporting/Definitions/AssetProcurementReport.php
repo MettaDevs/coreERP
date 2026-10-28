@@ -229,7 +229,7 @@ final class AssetProcurementReport implements ReportDefinition
                     'spesifikasi' => $plan->requested_specification ?: '—',
                     'satuan' => $plan->unit ?: '—',
                     'jumlah_rencana' => self::quantity($plan->quantity),
-                    'nilai_rencana' => $plan->estimated_total_price === null ? null : (string) BigDecimal::of((string) $plan->estimated_total_price)->toScale(2),
+                    'nilai_rencana' => ($plan->estimate_pending && BigDecimal::of((string) $plan->estimated_unit_price)->isZero()) ? null : (string) BigDecimal::of((string) $plan->estimated_total_price)->toScale(2),
                 ],
                 'requests' => $requests,
                 'planned' => BigDecimal::of((string) $plan->quantity),
@@ -367,7 +367,7 @@ final class AssetProcurementReport implements ReportDefinition
 
         return $query->toBase()->get([
             "{$lines}.id", "{$lines}.line_number", "{$lines}.nama_aset", "{$lines}.unit", "{$lines}.quantity",
-            "{$lines}.requested_specification", "{$lines}.estimated_total_price", "{$lines}.needed_on", "{$lines}.funding_source_name",
+            "{$lines}.requested_specification", "{$lines}.estimated_unit_price", "{$lines}.estimated_total_price", "{$lines}.estimate_pending", "{$lines}.needed_on", "{$lines}.funding_source_name",
             'rencana.kode as rencana_kode', 'rencana.planned_on', 'rencana.planning_year', 'rencana.funding_source',
             'rencana.planning_org_unit_id',
         ]);

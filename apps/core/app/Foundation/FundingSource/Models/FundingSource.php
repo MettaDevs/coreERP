@@ -14,6 +14,8 @@ final class FundingSource extends Model
 {
     use HasUlids, SoftDeletes;
 
+    public const COLUMN_CLASSIFICATION = ['name' => DataClass::CustomerContent];
+
     protected $fillable = ['tenant_id', 'code', 'name', 'description', 'active', 'creation_key', 'creation_payload_hash'];
 
     protected $hidden = ['code', 'creation_key', 'creation_payload_hash'];

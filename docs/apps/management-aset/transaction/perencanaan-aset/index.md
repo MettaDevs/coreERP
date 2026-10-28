@@ -14,13 +14,15 @@ Pada pembuatan dokumen, perusahaan dan unit pengusul dapat dipilih dari organisa
 
 Setiap baris wajib menunjuk `funding_source_id` dari master **Sumber dana** Foundation pada tenant yang sama. Master dipelihara melalui **Nama**, **Deskripsi**, dan status aktif; kode lama tetap tersimpan tetapi tidak menjadi input baru atau kolom lookup. `funding_source_name` pada baris menyimpan nama saat dipilih agar dokumen lama tetap terbaca setelah master berganti nama. Baris tersimpan boleh mempertahankan sumber yang kemudian dinonaktifkan; baris baru atau pilihan pengganti wajib memakai sumber aktif. Sumber dana adalah informasi pembiayaan, bukan saldo, pagu, atau anggaran yang disahkan. Pembuatan dari lookup memakai form Foundation asli beserta izin pengelolaan data acuan.
 
-`estimated_unit_price` dan `estimated_total_price` boleh null. Null berarti **belum diestimasi**, sedangkan nol berarti estimasi memang nol. Total dokumen dan laporan hanya menjumlah nilai yang sudah diketahui dan menyertakan jumlah baris yang belum diestimasi.
+Pada API, `estimated_unit_price` dan `estimated_total_price` bernilai null ketika **belum diestimasi**, sedangkan nol berarti estimasi memang nol. Penyimpanan mempertahankan kolom angka lama dengan nilai nol dan memakai flag tambahan `estimate_pending` untuk membedakan keduanya. Dengan begitu image sebelumnya tetap dapat membaca angka tanpa gagal pada nilai null, walaupun UI lama belum mengenal status belum diestimasi. Total dokumen dan laporan hanya menjumlah nilai yang sudah diketahui dan menyertakan jumlah baris yang belum diestimasi. Migration lanjutan memindahkan null dari baseline lokal awal menjadi nol beserta flag tersebut tanpa mengganti ID atau nilai yang sudah diketahui.
 
 Pilihan Reguler/Tambahan tidak lagi menjadi input atau penentu proses. Kolom `planning_type` dan `funding_source` pada header lama tetap disimpan untuk riwayat. Migration memindahkan keterangan sumber dana lama ke master dan referensi per baris tanpa menghapus teks header asal. Tanggal kebutuhan lama dibiarkan null karena tanggal dokumen tidak membuktikan tanggal kebutuhan; petugas melengkapinya ketika mengubah dokumen. Rencana dan baris lama mempertahankan ID supaya permintaan pembelian tetap menunjuk kebutuhan asal.
 
 Migration `2026_10_27_150000_link_asset_planning_years` membuat atau memakai ulang master per pasangan tenant, perusahaan, dan angka tahun existing, lalu mengisi `planning_year_id`. Angka tahun lama, ID dokumen, dan ID rincian tidak diubah. Impor memakai kontrak `PlanningYearDirectory`, sehingga module tidak menulis tabel Foundation langsung.
 
 Baseline ini mengadaptasi pemisahan tanggal dan rincian dokumen pada Dynamics 365. Ia tidak membuat G/L Budget, kontrol pagu, atau workflow persetujuan baru.
+
+Migration Core untuk master bersama dijalankan sebelum migration module. Pada development yang memakai cache route, jalankan `php artisan route:clear` di container runtime setelah menambah endpoint. Hot Reload Vite memperbarui source UI, tetapi tidak memperbarui cache route Laravel. Pada rilis, cache route dibentuk ulang mengikuti prosedur penerapan rilis.
 
 ## Mengenali rencana dan membuat permintaan
 
