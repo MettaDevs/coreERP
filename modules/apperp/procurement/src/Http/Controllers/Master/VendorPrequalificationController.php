@@ -8,6 +8,7 @@ use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\NumberSequenceIssuer;
 use App\Platform\Modules\Contracts\RequestContext;
 use App\Platform\Modules\Contracts\RowVersion;
+use App\Platform\Modules\Contracts\TenantContext;
 use App\Platform\Modules\Contracts\VendorDirectory;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -60,10 +61,14 @@ final class VendorPrequalificationController extends Controller
     /**
      * Daftar prakualifikasi secara bertahap (cursor/incremental) tanpa memuat rincian child.
      */
-    public function index(Request $request, RequestContext $context, VendorDirectory $vendors): JsonResponse
-    {
-        $context->requirePermission('procurement.prakualifikasi.read');
-        $tenantId = $context->tenantId();
+    public function index(
+        Request $request,
+        RequestContext $context,
+        TenantContext $tenant,
+        VendorDirectory $vendors,
+    ): JsonResponse {
+        $this->requirePermission($context, 'procurement.prakualifikasi.read');
+        $tenantId = $tenant->tenantId();
 
         $filters = $request->validate([
             'status_kualifikasi' => ['nullable', 'string', Rule::in(self::QUALIFICATION_STATUSES)],
@@ -152,10 +157,13 @@ final class VendorPrequalificationController extends Controller
     /**
      * Kebijakan penomoran untuk form prakualifikasi.
      */
-    public function numberPolicy(RequestContext $context, NumberSequenceIssuer $numbers): JsonResponse
-    {
-        $context->requirePermission('procurement.prakualifikasi.read');
-        $tenantId = $context->tenantId();
+    public function numberPolicy(
+        RequestContext $context,
+        TenantContext $tenant,
+        NumberSequenceIssuer $numbers,
+    ): JsonResponse {
+        $this->requirePermission($context, 'procurement.prakualifikasi.read');
+        $tenantId = $tenant->tenantId();
 
         return response()->json([
             'data' => [
@@ -168,11 +176,15 @@ final class VendorPrequalificationController extends Controller
     /**
      * Lookup daftar vendor aktif milik perusahaan aktif dari Core VendorDirectory.
      */
-    public function lookupVendors(Request $request, RequestContext $context, VendorDirectory $vendors): JsonResponse
-    {
-        $context->requirePermission('procurement.prakualifikasi.read');
-        $tenantId = $context->tenantId();
-        $legalEntityId = $this->requireLegalEntityId($request);
+    public function lookupVendors(
+        Request $request,
+        RequestContext $context,
+        TenantContext $tenant,
+        VendorDirectory $vendors,
+    ): JsonResponse {
+        $this->requirePermission($context, 'procurement.prakualifikasi.read');
+        $tenantId = $tenant->tenantId();
+        $legalEntityId = $this->requireLegalEntityId($tenant);
 
         return response()->json($vendors->lookup($tenantId, $legalEntityId, $request->query()));
     }
@@ -180,10 +192,14 @@ final class VendorPrequalificationController extends Controller
     /**
      * Detail satu prakualifikasi beserta dokumen dan item untuk card detail/edit.
      */
-    public function show(RequestContext $context, VendorDirectory $vendors, string $id): JsonResponse
-    {
-        $context->requirePermission('procurement.prakualifikasi.read');
-        $tenantId = $context->tenantId();
+    public function show(
+        RequestContext $context,
+        TenantContext $tenant,
+        VendorDirectory $vendors,
+        string $id,
+    ): JsonResponse {
+        $this->requirePermission($context, 'procurement.prakualifikasi.read');
+        $tenantId = $tenant->tenantId();
 
         $record = VendorPrequalification::query()
             ->where('tenant_id', $tenantId)
@@ -205,12 +221,13 @@ final class VendorPrequalificationController extends Controller
     public function store(
         Request $request,
         RequestContext $context,
+        TenantContext $tenant,
         NumberSequenceIssuer $numbers,
         VendorDirectory $vendors,
     ): JsonResponse {
-        $context->requirePermission('procurement.prakualifikasi.create');
-        $tenantId = $context->tenantId();
-        $legalEntityId = $this->requireLegalEntityId($request);
+        $this->requirePermission($context, 'procurement.prakualifikasi.create');
+        $tenantId = $tenant->tenantId();
+        $legalEntityId = $this->requireLegalEntityId($tenant);
 
         $creationKey = (string) $request->header('Idempotency-Key');
         validator(
@@ -322,12 +339,13 @@ final class VendorPrequalificationController extends Controller
     public function update(
         Request $request,
         RequestContext $context,
+        TenantContext $tenant,
         VendorDirectory $vendors,
         string $id,
     ): JsonResponse {
-        $context->requirePermission('procurement.prakualifikasi.update');
-        $tenantId = $context->tenantId();
-        $legalEntityId = $this->requireLegalEntityId($request);
+        $this->requirePermission($context, 'procurement.prakualifikasi.update');
+        $tenantId = $tenant->tenantId();
+        $legalEntityId = $this->requireLegalEntityId($tenant);
         $expectedVersion = RowVersion::expected($request);
 
         $validated = $this->validatePayload($request);
@@ -400,10 +418,14 @@ final class VendorPrequalificationController extends Controller
     /**
      * Arsipkan (soft delete) data prakualifikasi dengan pengaman versi baris.
      */
-    public function destroy(Request $request, RequestContext $context, string $id): JsonResponse
-    {
-        $context->requirePermission('procurement.prakualifikasi.archive');
-        $tenantId = $context->tenantId();
+    public function destroy(
+        Request $request,
+        RequestContext $context,
+        TenantContext $tenant,
+        string $id,
+    ): JsonResponse {
+        $this->requirePermission($context, 'procurement.prakualifikasi.archive');
+        $tenantId = $tenant->tenantId();
         $expectedVersion = RowVersion::expected($request);
 
         return DB::transaction(function () use ($tenantId, $id, $expectedVersion): JsonResponse {
@@ -519,9 +541,23 @@ final class VendorPrequalificationController extends Controller
         return $vendor;
     }
 
-    private function requireLegalEntityId(Request $request): string
+    private function requirePermission(RequestContext $context, string $permission): void
     {
-        $legalEntityId = $this->trimmedOrNull($request->attributes->get('coreerp.legal_entity_id'));
+        if ($context->hasPermission($permission)) {
+            return;
+        }
+
+        abort(response()->json([
+            'error' => [
+                'code' => 'forbidden',
+                'message' => 'Hak '.$permission.' belum dimiliki pengguna pada tenant aktif.',
+            ],
+        ], 403));
+    }
+
+    private function requireLegalEntityId(TenantContext $tenant): string
+    {
+        $legalEntityId = $this->trimmedOrNull($tenant->legalEntityId());
 
         if ($legalEntityId === null) {
             throw ValidationException::withMessages([
@@ -588,7 +624,7 @@ final class VendorPrequalificationController extends Controller
         }
 
         $normalized = [];
-        foreach (array_values($documents) as $index => $doc) {
+        foreach ($documents as $index => $doc) {
             $normalized[] = [
                 'id' => $this->trimmedOrNull($doc['id'] ?? null),
                 'kategori' => (string) ($doc['kategori'] ?? 'wajib'),
@@ -609,7 +645,7 @@ final class VendorPrequalificationController extends Controller
     private function normalizeItemsPayload(array $items): array
     {
         $normalized = [];
-        foreach (array_values($items) as $index => $item) {
+        foreach ($items as $index => $item) {
             $normalized[] = [
                 'id' => $this->trimmedOrNull($item['id'] ?? null),
                 'urutan' => $index + 1,

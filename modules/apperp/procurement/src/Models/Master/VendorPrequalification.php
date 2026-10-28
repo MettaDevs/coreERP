@@ -6,6 +6,7 @@ namespace Modules\Apperp\Procurement\Models\Master;
 
 use App\Platform\Modules\Contracts\DataClass;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 use Modules\Apperp\Procurement\Models\MasterData;
 
 /**
@@ -14,7 +15,7 @@ use Modules\Apperp\Procurement\Models\MasterData;
  * @property ?string $creation_key
  * @property ?string $creation_payload_hash
  * @property string $nomor_prakualifikasi
- * @property string $tanggal_prakualifikasi
+ * @property Carbon|null $tanggal_prakualifikasi
  * @property string $vendor_id
  * @property string $kode_vendor
  * @property string $nama_vendor
