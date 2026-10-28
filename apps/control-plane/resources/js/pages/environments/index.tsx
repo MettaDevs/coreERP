@@ -1,7 +1,13 @@
 import { Card, CardHeader, CardTitle, CardContent } from '@apperp/ui/card';
 import { DataTable } from '@apperp/ui/data-table';
+import { Input } from '@apperp/ui/input';
+import {
+    assertListBatch,
+    useIncrementalList,
+} from '@apperp/ui/use-incremental-list';
 import { Head, Link } from '@inertiajs/react';
 import { Cloud, Server } from 'lucide-react';
+import { useCallback, useState } from 'react';
 import { InstallStateBadge, KindBadge, StatusBadge } from '@/components/badges';
 import Shell from '@/components/shell';
 import { progressDetail } from '@/lib/install-progress';
@@ -28,18 +34,77 @@ type Row = {
 };
 
 export default function Index({
-    environments,
-    tenant,
+    hasTenants,
     kinds,
 }: {
-    environments: Row[];
-    tenant: { id: string; name: string }[];
+    hasTenants: boolean;
     kinds: string[];
 }) {
+    const [search, setSearch] = useState('');
+    const loadItems = useCallback(
+        async ({
+            query,
+            cursor,
+            signal,
+        }: {
+            query: string;
+            cursor: string | null;
+            signal: AbortSignal;
+        }) => {
+            const params = new URLSearchParams({ search: query });
+
+            if (cursor) {
+                params.set('cursor', cursor);
+            }
+
+            const response = await fetch(`/lingkungan?${params}`, {
+                signal,
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+            });
+
+            if (!response.ok) {
+                throw new Error(
+                    'Daftar lingkungan belum dapat dimuat. Periksa koneksi lalu coba lagi.',
+                );
+            }
+
+            const body: unknown = await response.json();
+
+            if (
+                !body ||
+                typeof body !== 'object' ||
+                !('data' in body) ||
+                !('next_cursor' in body)
+            ) {
+                throw new Error(
+                    'Jawaban daftar lingkungan tidak lengkap. Muat ulang daftar.',
+                );
+            }
+
+            const batch = { items: body.data, nextCursor: body.next_cursor };
+            assertListBatch<Row>(batch);
+
+            return batch;
+        },
+        [],
+    );
+    const list = useIncrementalList<Row>({
+        loadItems,
+        query: search,
+        getKey: (row) => row.id,
+    });
+
     return (
         <Shell
             title="Lingkungan"
-            actions={<CreateDialog tenant={tenant} kinds={kinds} />}
+            actions={
+                <CreateDialog
+                    hasTenants={hasTenants}
+                    kinds={kinds}
+                    onCreated={list.reload}
+                />
+            }
         >
             <Head title="Lingkungan" />
 
@@ -47,7 +112,7 @@ export default function Index({
                 <CardHeader>
                     <CardTitle>Tempat kerja terdaftar</CardTitle>
                     <span className="text-xs text-muted-foreground">
-                        {environments.length} lingkungan
+                        {list.items.length} lingkungan dimuat
                     </span>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -55,7 +120,12 @@ export default function Index({
                         Buka nama lingkungan untuk melihat kesiapan, aplikasi
                         yang terpasang, dan riwayatnya.
                     </p>
-                    {tenant.length === 0 && (
+                    <Input
+                        label="Cari lingkungan atau tenant"
+                        value={search}
+                        onChange={(event) => setSearch(event.target.value)}
+                    />
+                    {!hasTenants && (
                         <Link
                             href="/tenant"
                             className="inline-flex text-sm text-primary underline underline-offset-4"
@@ -66,11 +136,12 @@ export default function Index({
                     <div className="h-[min(32rem,60vh)] min-h-40">
                         <DataTable
                             scrollMode="viewport"
-                            data={environments}
+                            data={list.items}
+                            incremental={list}
                             getRowKey={(row) => row.id}
                             showRowNumbers={false}
                             emptyMessage={
-                                tenant.length === 0
+                                !hasTenants
                                     ? 'Lingkungan memerlukan tenant. Daftarkan tenant melalui tautan di atas.'
                                     : 'Belum ada lingkungan. Pilih Baru untuk membuat tempat kerja produksi, demo, atau sandbox.'
                             }

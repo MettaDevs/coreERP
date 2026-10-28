@@ -12,6 +12,7 @@ use App\Platform\Attachments\Support\AttachmentContentMismatch;
 use App\Platform\Attachments\Support\CoreAttachmentStorage;
 use App\Platform\Identity\Models\User;
 use App\Platform\Modules\Contracts\AttachmentRecordType;
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\JsonResponse;
@@ -125,20 +126,28 @@ final class AttachmentController extends Controller
         $type = $this->recordType($request);
         $this->requireReadable($type, $tenantId, $recordId);
 
-        $attachments = DocumentAttachment::query()
+        $query = DocumentAttachment::query()
             ->where('tenant_id', $tenantId)
             ->where('record_type', $type->recordType())
             ->where('record_id', $recordId)
-            ->where('kind', 'document')
-            ->orderByRaw('line_number nulls first')
-            ->orderBy('created_at')
-            ->orderBy('id')
-            ->get();
+            ->where('kind', 'document');
+        $total = (clone $query)->count();
+        $batch = IncrementalList::query(
+            $request,
+            $query->select('document_attachments.*')->selectRaw('COALESCE(line_number, -1) AS attachment_order')->toBase(),
+            ['order' => 'attachment_order'],
+            ['file_name'],
+            'order',
+            numericColumns: ['attachment_order'],
+        );
+        $attachments = DocumentAttachment::hydrate($batch['data']->map(fn (object $row): array => (array) $row)->all());
         $names = $this->userNames($attachments);
 
         return response()->json([
             'data' => $attachments->map(fn (DocumentAttachment $attachment): array => $this->present($attachment, $names))->values(),
+            'next_cursor' => $batch['next_cursor'],
             'meta' => [
+                'total' => $total,
                 'can_change' => $type->canChange($tenantId, $recordId),
                 'max_kb' => $this->maxKb(),
                 'extensions' => $this->extensions(),

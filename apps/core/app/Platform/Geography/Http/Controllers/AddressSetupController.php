@@ -1255,71 +1255,9 @@ final class AddressSetupController extends Controller
     /** Administrative Divisions */
     public function getDivisions(Request $request): JsonResponse
     {
-        if ($request->has('section')) {
-            abort_unless($this->currentMembership($request)->hasCorePermission(CoreSecurityCatalog::REFERENCE_DATA_READ), 403);
+        abort_unless($this->currentMembership($request)->hasCorePermission(CoreSecurityCatalog::REFERENCE_DATA_READ), 403);
 
-            return response()->json(AddressSetupRecords::batch($request));
-        }
-        $countryId = $request->query('country_id');
-        $parentId = $request->query('parent_id');
-        $level = (int) $request->query('level', 1);
-        $search = $request->query('search');
-
-        $query = match ($level) {
-            1 => $countryId ? Province::where('country_code', $countryId) : Province::query(),
-            2 => $parentId ? Regency::where('province_id', $parentId) : ($countryId ? Regency::whereHas('province', fn ($q) => $q->where('country_code', $countryId)) : Regency::query()),
-            3 => $parentId ? District::where('regency_id', $parentId) : ($countryId ? District::whereHas('regency.province', fn ($q) => $q->where('country_code', $countryId)) : District::query()),
-            4 => $parentId ? Village::where('district_id', $parentId) : ($countryId ? Village::whereHas('district.regency.province', fn ($q) => $q->where('country_code', $countryId)) : Village::query()),
-            default => $countryId ? Province::where('country_code', $countryId) : Province::query(),
-        };
-
-        if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'ilike', "%{$search}%")
-                    ->orWhere('code', 'ilike', "%{$search}%")
-                    ->orWhere('display_code', 'ilike', "%{$search}%");
-            });
-        }
-
-        return response()->json($query->orderBy('code')->get());
-    }
-
-    /** Paginated Villages */
-    public function getVillagesPaginated(Request $request): JsonResponse
-    {
-        $districtId = $request->query('district_id');
-        $regencyId = $request->query('regency_id');
-        $provinceId = $request->query('province_id');
-        $country = $request->query('country');
-        $search = $request->query('search');
-        $page = (int) $request->query('page', 1);
-        $perPage = (int) $request->query('per_page', 50);
-        $sort = is_string($request->query('sort')) ? $request->query('sort') : 'code';
-        $direction = strtolower((string) $request->query('direction', 'asc')) === 'desc' ? 'desc' : 'asc';
-
-        $query = Village::with('district.regency.province');
-
-        if ($districtId) {
-            $query->where('district_id', $districtId);
-        } elseif ($regencyId) {
-            $query->whereHas('district', fn ($q) => $q->where('regency_id', $regencyId));
-        } elseif ($provinceId) {
-            $query->whereHas('district.regency', fn ($q) => $q->where('province_id', $provinceId));
-        } elseif ($country) {
-            $query->whereHas('district.regency.province', fn ($q) => $q->where('country_code', $country));
-        }
-
-        if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'ilike', "%{$search}%")
-                    ->orWhere('code', 'ilike', "%{$search}%")
-                    ->orWhere('display_code', 'ilike', "%{$search}%");
-            });
-        }
-
-        $paginated = $query->orderBy($sort, $direction)->paginate($perPage, ['*'], 'page', $page);
-
-        return response()->json($paginated);
+        return response()->json(AddressSetupRecords::batch($request));
     }
 
     /** External Codes */

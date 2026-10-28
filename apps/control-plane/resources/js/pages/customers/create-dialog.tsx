@@ -44,8 +44,10 @@ const formFields = [
  */
 export default function CreateDialog({
     app,
+    onCreated,
 }: {
     app: { id: string; name: string }[];
+    onCreated?: () => void;
 }) {
     const { wrap: wrapLocalForm0Request, summary: localForm0RequestSummary } =
         useInertiaFeedback();
@@ -124,6 +126,7 @@ export default function CreateDialog({
                 onSuccess: () => {
                     reset();
                     setOpen(false);
+                    onCreated?.();
                 },
             }),
         );

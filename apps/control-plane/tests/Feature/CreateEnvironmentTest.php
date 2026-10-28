@@ -101,6 +101,33 @@ final class CreateEnvironmentTest extends TestCase
         $this->assertDatabaseCount('environment_operations', 0);
     }
 
+    public function test_environment_list_is_bounded_and_searches_its_tenant(): void
+    {
+        $operator = $this->operator();
+        for ($index = 1; $index <= 55; $index++) {
+            Environment::query()->create([
+                'tenant_id' => $this->tenant('Batch tenant '.$index),
+                'kind' => 'production', 'name' => 'Environment '.$index,
+                'slug' => 'production', 'status' => 'provisioning',
+                'hosting' => 'provider', 'outbound_allowed' => true,
+            ]);
+        }
+
+        $first = $this->actingAs($operator)->getJson('/lingkungan')->assertOk()->assertJsonCount(50, 'data');
+        $cursor = $first->json('next_cursor');
+        $this->assertIsString($cursor);
+        $second = $this->getJson('/lingkungan?'.http_build_query(['cursor' => $cursor]))
+            ->assertOk()->assertJsonCount(5, 'data')->assertJsonPath('next_cursor', null);
+        $ids = [...array_column($first->json('data'), 'id'), ...array_column($second->json('data'), 'id')];
+        $this->assertCount(55, array_unique($ids));
+        $this->getJson('/lingkungan?search=Batch%20tenant%2055')->assertOk()->assertJsonCount(1, 'data');
+        $this->getJson('/lingkungan?cursor=invalid')->assertUnprocessable()->assertJsonValidationErrors('cursor');
+        $this->getJson('/lingkungan?'.http_build_query(['cursor' => base64_encode(json_encode(['unrelated' => 'value', '_pointsToNextItems' => true], JSON_THROW_ON_ERROR))]))
+            ->assertUnprocessable()->assertJsonValidationErrors('cursor');
+        $this->getJson('/lingkungan?search[]=invalid')->assertUnprocessable()->assertJsonValidationErrors('search');
+        $this->actingAs($this->ordinaryUser())->getJson('/lingkungan')->assertNotFound();
+    }
+
     public function test_non_operator_cannot_send_creation_command(): void
     {
         Http::fake();

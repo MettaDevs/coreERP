@@ -17,7 +17,13 @@ export type ApprovalRequest = {
     email_last_error: string | null;
 };
 
-export function ApprovalRequestCard({ item }: { item: ApprovalRequest }) {
+export function ApprovalRequestCard({
+    item,
+    onDecided,
+}: {
+    item: ApprovalRequest;
+    onDecided?: () => void;
+}) {
     const { wrap: wrapFormRequest, summary: formRequestSummary } =
         useInertiaFeedback();
 
@@ -28,6 +34,7 @@ export function ApprovalRequestCard({ item }: { item: ApprovalRequest }) {
             `/workflow-inbox/${item.id}/decision`,
             wrapFormRequest({
                 preserveScroll: true,
+                onSuccess: onDecided,
             }),
         );
     };

@@ -129,6 +129,70 @@ class WorkflowConfigurationTest extends TestCase
         return $id;
     }
 
+    public function test_inbox_batches_without_per_item_rule_queries_and_keeps_notification_target(): void
+    {
+        $ids = $this->insertInboxItems(45);
+        $this->actingAs($this->owner);
+        foreach ([1, 10, 25] as $size) {
+            DB::enableQueryLog();
+            DB::flushQueryLog();
+            $this->getJson('/workflow-inbox?per_page='.$size)->assertOk()->assertJsonCount($size, 'data');
+            $rules = collect(DB::getQueryLog())->filter(fn (array $query): bool => str_contains($query['query'], 'from "workflow_types"'));
+            $this->assertCount(1, $rules);
+            DB::disableQueryLog();
+        }
+        $first = $this->getJson('/workflow-inbox')->assertOk()->assertJsonCount(40, 'data');
+        $second = $this->getJson('/workflow-inbox?cursor='.urlencode($first->json('next_cursor')))
+            ->assertOk()->assertJsonCount(5, 'data')->assertJsonPath('next_cursor', null);
+        $this->assertCount(45, array_unique([...array_column($first->json('data'), 'id'), ...array_column($second->json('data'), 'id')]));
+        $this->get('/workflow-inbox?item='.$ids[44])->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('targetItem.id', $ids[44])->missing('items'));
+        $this->getJson('/workflow-inbox?per_page=100000')->assertUnprocessable()->assertJsonValidationErrors('per_page');
+        $this->getJson('/workflow-inbox?cursor=bad')->assertUnprocessable()->assertJsonValidationErrors('cursor');
+    }
+
+    public function test_inbox_fills_visible_batch_after_hidden_items_and_checks_each_submitter(): void
+    {
+        $ids = $this->insertInboxItems(45);
+        DB::table('workflow_types')->where('id', $this->workflowTypeId)->update(['decision_context_schema' => json_encode([
+            'x-approval-authority' => ['permission' => 'app-uji.entitas.read', 'disallow_submitter' => true],
+        ], JSON_THROW_ON_ERROR)]);
+        $membership = $this->owner->activeMembership();
+        DB::table('workflow_instances')->where('workflow_type_id', $this->workflowTypeId)->update(['initiator_membership_id' => $membership->id]);
+        $visibleInstance = DB::table('workflow_work_items')->where('id', $ids[44])->value('instance_id');
+        DB::table('workflow_instances')->where('id', $visibleInstance)->update(['initiator_membership_id' => null]);
+        $this->actingAs($this->owner)->getJson('/workflow-inbox?per_page=10')->assertOk()
+            ->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $ids[44])->assertJsonPath('next_cursor', null);
+        $this->get('/workflow-inbox?item='.$ids[0])->assertInertia(fn (Assert $page) => $page->where('targetItem', null));
+    }
+
+    /** @return list<string> */
+    private function insertInboxItems(int $count): array
+    {
+        $membership = $this->owner->activeMembership();
+        $configurationId = $this->insertListWorkflow($membership->tenant_id, 'Kotak masuk');
+        $versionId = DB::table('workflow_configuration_versions')->where('configuration_id', $configurationId)->value('id');
+        $ids = [];
+        foreach (range(1, $count) as $number) {
+            $instanceId = (string) Str::ulid();
+            $id = (string) Str::ulid();
+            $date = now()->subSeconds($number);
+            DB::table('workflow_instances')->insert([
+                'id' => $instanceId, 'tenant_id' => $membership->tenant_id, 'workflow_type_id' => $this->workflowTypeId,
+                'configuration_version_id' => $versionId, 'source_document_type' => 'fixture', 'source_document_id' => (string) Str::ulid(),
+                'idempotency_key' => 'inbox:'.$number, 'decision_context' => json_encode(['document_number' => 'DOC-'.$number], JSON_THROW_ON_ERROR),
+                'status' => 'pending', 'created_at' => $date, 'updated_at' => $date,
+            ]);
+            DB::table('workflow_work_items')->insert([
+                'id' => $id, 'tenant_id' => $membership->tenant_id, 'instance_id' => $instanceId, 'element_id' => (string) Str::ulid(),
+                'assigned_membership_id' => $membership->id, 'status' => 'pending', 'created_at' => $date, 'updated_at' => $date,
+            ]);
+            $ids[] = $id;
+        }
+
+        return $ids;
+    }
+
     public function test_admin_can_draft_and_activate_a_role_assigned_workflow(): void
     {
         $role = Role::create(['tenant_id' => $this->owner->activeMembership()->tenant_id, 'name' => 'Pemeriksa aset', 'is_active' => true]);

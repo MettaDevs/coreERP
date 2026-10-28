@@ -27,11 +27,18 @@ final class OrganizationDirectoryCore implements OrganizationDirectory
 {
     public function lookup(string $tenantId, string $kind, array $input): array
     {
-        if ($kind === 'members') {
+        if (in_array($kind, ['members', 'memberships'], true)) {
             $query = DB::table('tenant_memberships as memberships')
                 ->join('users', 'users.id', '=', 'memberships.user_id')
                 ->where('memberships.tenant_id', $tenantId)->where('memberships.status', 'active')
-                ->select(['users.id', 'users.name as kode', 'users.name as nama', 'users.name as display_label', 'users.email']);
+                ->select([$kind === 'memberships' ? 'memberships.id' : 'users.id', 'users.name as kode', 'users.name as nama', 'users.name as display_label']);
+            if ($kind === 'memberships') {
+                $query->addSelect('users.email');
+                $filters = Request::create('/lookup', 'GET', $input)->validate(['email' => ['nullable', 'string', 'max:255']]);
+                if (($email = trim($filters['email'] ?? '')) !== '') {
+                    $query->whereRaw('LOWER(TRIM(users.email)) = ?', [mb_strtolower($email)]);
+                }
+            }
         } else {
             abort_unless($kind === 'operating_units', 422);
             $query = DB::table('organizations')->leftJoin('operating_units as unit', 'unit.organization_id', '=', 'organizations.id')
@@ -40,7 +47,7 @@ final class OrganizationDirectoryCore implements OrganizationDirectory
                 ->selectRaw("CASE WHEN unit.number IS NULL THEN organizations.name ELSE unit.number || ' — ' || organizations.name END AS display_label");
         }
 
-        return IncrementalList::query(Request::create('/lookup', 'GET', $input), $query, ['id' => 'id', 'kode' => 'kode', 'nama' => 'nama'], ['kode', 'nama'], 'nama');
+        return IncrementalList::query(Request::create('/lookup', 'GET', $input), $query, ['id' => 'id', 'kode' => 'kode', 'nama' => 'nama'], $kind === 'memberships' ? ['kode', 'nama', 'email'] : ['kode', 'nama'], 'nama');
     }
 
     public function __construct(private readonly BusinessUnitResolver $businessUnits) {}
@@ -107,6 +114,25 @@ final class OrganizationDirectoryCore implements OrganizationDirectory
             'nama' => (string) $row->name,
             'email' => (string) $row->email,
         ];
+    }
+
+    public function membersById(string $tenantId, array $membershipIds): array
+    {
+        if ($membershipIds === []) {
+            return [];
+        }
+
+        return DB::table('tenant_memberships as memberships')
+            ->join('users', 'users.id', '=', 'memberships.user_id')
+            ->where('memberships.tenant_id', $tenantId)->where('memberships.status', 'active')
+            ->whereIn('memberships.id', array_unique($membershipIds))
+            ->get(['memberships.id', 'memberships.user_id', 'users.name', 'users.email'])
+            ->mapWithKeys(static fn (object $row): array => [(string) $row->id => [
+                'id' => (string) $row->id,
+                'user_id' => (string) $row->user_id,
+                'nama' => (string) $row->name,
+                'email' => (string) $row->email,
+            ]])->all();
     }
 
     public function operatingUnits(string $tenantId): array

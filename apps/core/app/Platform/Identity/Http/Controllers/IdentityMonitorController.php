@@ -16,10 +16,10 @@ class IdentityMonitorController extends Controller
     public function index(Request $request): Response
     {
         abort_unless($request->user()->can('monitor-identities'), 403);
-        $input = $request->validate(['sort' => ['nullable', Rule::in(['identity', 'last-login'])], 'direction' => ['nullable', Rule::in(['asc', 'desc'])]]);
+        $input = $request->validate(['search' => ['nullable', 'string', 'max:200'], 'sort' => ['nullable', Rule::in(['identity', 'last-login'])], 'direction' => ['nullable', Rule::in(['asc', 'desc'])]]);
         $sort = ['identity' => 'name', 'last-login' => 'last_login_at'][$input['sort'] ?? ''] ?? 'created_at';
         $direction = $input['direction'] ?? 'desc';
-        $search = trim((string) $request->query('search'));
+        $search = trim($input['search'] ?? '');
         // Akun aplikasi klien integrasi bukan identitas yang dapat masuk; ia tidak dipantau di sini.
         $identities = User::query()
             ->where('account_type', User::PERSON)
