@@ -203,6 +203,63 @@ class MaintenanceSetupTest extends TestCase
         ]);
     }
 
+    public function test_default_copy_replays_original_request_after_source_and_copy_edits(): void
+    {
+        $job = $this->postMaster('maintenance-job-types', ['nama' => 'Copy job'])->assertCreated()->json('data.id');
+        $source = $this->postMaster('maintenance-job-type-defaults', ['nama' => 'Source', 'maintenance_job_type_id' => $job])->assertCreated()->json('data.id');
+        $url = '/api/modules/management-aset/v1/maintenance-job-type-defaults/'.$source.'/copy';
+        $this->withHeader('Idempotency-Key', 'copy-replay');
+        $copy = $this->postJson($url, ['nama' => 'Copied default'])->assertCreated()->json('data.id');
+        DB::table('aset_m_maintenance_job_type_default')->where('id', $source)->update(['nama' => 'Changed source']);
+        DB::table('aset_m_maintenance_job_type_default')->where('id', $copy)->update(['nama' => 'Changed copy']);
+        $this->postJson($url, ['nama' => 'Copied default'])->assertOk()->assertHeader('Idempotent-Replayed', 'true')->assertJsonPath('data.id', $copy)->assertJsonPath('data.nama', 'Changed copy')->assertJsonMissingPath('data.creation_payload_hash');
+        $this->postJson($url, ['nama' => 'Different request'])->assertConflict();
+        $this->assertSame(1, DB::table('aset_m_maintenance_job_type_default')->where('creation_key', 'copy-replay')->count());
+        DB::table('aset_m_maintenance_job_type_default')->where('id', $copy)->update(['deleted_at' => now()]);
+        $this->postJson($url, ['nama' => 'Copied default'])->assertConflict();
+    }
+
+    public function test_checklist_children_keep_ids_archive_omissions_and_reject_foreign_ids(): void
+    {
+        foreach ([
+            ['maintenance-checklist-variables', 'aset_m_maintenance_checklist_variable', 'aset_m_maintenance_checklist_variable_value', 'variable_id', 'values', ['value' => 'Baik', 'result_code' => 'pass']],
+            ['maintenance-checklist-templates', 'aset_m_maintenance_checklist_template', 'aset_m_maintenance_checklist_template_line', 'template_id', 'lines', ['type' => 'text', 'nama' => 'Periksa']],
+        ] as [$resource, $parentTable, $table, $owner, $section, $fields]) {
+            $parent = $this->postMaster($resource, ['nama' => 'Retention fixture'])->assertCreated()->json('data.id');
+            $url = '/api/modules/management-aset/v1/'.$resource.'/'.$parent.'/'.$section;
+            $first = $this->putJson($url, ['version' => 1, $section => [
+                ['line_number' => 1, ...$fields], ['line_number' => 2, ...$fields],
+            ]])->assertOk()->assertJsonCount(2, 'data')->json();
+            [$a, $b] = $first['data'];
+            $swapped = $this->putJson($url, ['version' => $first['version'], $section => [
+                [...$a, 'line_number' => 2], [...$b, 'line_number' => 1],
+            ]])->assertOk()->json();
+            $this->assertSame([$b['id'], $a['id']], array_column($swapped['data'], 'id'));
+            $this->assertSame(2, DB::table($table)->where($owner, $parent)->count());
+            $latest = $this->putJson($url, ['version' => $swapped['version'], $section => [
+                [...$a, 'line_number' => 2], ['line_number' => 1, ...$fields],
+            ]])->assertOk()->assertJsonCount(2, 'data')->json();
+            $this->assertContains($a['id'], array_column($latest['data'], 'id'));
+            $this->assertNotContains($b['id'], array_column($latest['data'], 'id'));
+            $this->assertNotNull(DB::table($table)->where('id', $b['id'])->value('deleted_at'));
+            $this->assertSame(3, DB::table($table)->where($owner, $parent)->count());
+            $this->assertFalse(DB::table($table)->where($owner, $parent)->where('line_number', '<', 1)->exists());
+            $this->putJson($url, ['version' => $latest['version'], $section => [$b]])->assertUnprocessable()->assertJsonValidationErrors($section.'.0.id');
+
+            $other = $this->postMaster($resource, ['nama' => 'Other owner'])->assertCreated()->json('data.id');
+            $this->putJson('/api/modules/management-aset/v1/'.$resource.'/'.$other.'/'.$section, ['version' => 1, $section => [$a]])
+                ->assertUnprocessable()->assertJsonValidationErrors($section.'.0.id');
+            $foreignTenant = $this->buatTenantUji();
+            $foreignOwner = (string) Str::ulid();
+            $foreignId = (string) Str::ulid();
+            DB::table($parentTable)->insert(['id' => $foreignOwner, 'tenant_id' => $foreignTenant, 'creation_key' => $foreignOwner, 'kode' => $foreignOwner, 'nama' => 'Foreign owner', 'aktif' => true]);
+            DB::table($table)->insert(['id' => $foreignId, 'tenant_id' => $foreignTenant, $owner => $foreignOwner, 'line_number' => 1, ...$fields]);
+            $this->withContext($this->permissions($resource))->putJson($url, ['version' => $latest['version'], $section => [['id' => $foreignId, 'line_number' => 1, ...$fields]]])
+                ->assertUnprocessable()->assertJsonValidationErrors($section.'.0.id');
+            $this->putJson($url, ['version' => $latest['version'], $section => [['line_number' => 1.11, ...$fields]]])->assertUnprocessable();
+        }
+    }
+
     public function test_seed_maintenance_manual_idempotent_dan_tidak_menimpa_data_custom(): void
     {
         $this->semaiMaintenance();

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ControlPlane\Http\Controllers;
 
+use ControlPlane\Audit\OperatorAudit;
 use ControlPlane\Models\ExternalIdentity;
 use ControlPlane\Models\User;
 use ControlPlane\Sso\Ceremony;
@@ -11,6 +12,7 @@ use ControlPlane\Sso\IdentityProvider;
 use ControlPlane\Sso\SsoFailure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -77,12 +79,18 @@ class Account extends Controller
 
         $user = $this->confirmPassword($request);
 
-        $removed = ExternalIdentity::query()
-            ->where('user_id', $user->id)
-            ->where('issuer', $this->provider->issuer())
-            ->delete();
+        DB::transaction(function () use ($request, $user): void {
+            $identity = ExternalIdentity::query()
+                ->where('user_id', $user->id)
+                ->where('issuer', $this->provider->issuer())
+                ->lockForUpdate()
+                ->first();
 
-        Log::info('Konsol SSO: hubungan akun diputus.', ['user_id' => $user->id, 'baris' => $removed]);
+            if ($identity !== null) {
+                $identity->delete();
+                OperatorAudit::record($request, 'sso.unlink', 'external_identity', (string) $identity->id);
+            }
+        });
 
         return redirect('/akun')->with('message', 'Akun SSO diputus dari akun ini.');
     }

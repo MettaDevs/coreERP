@@ -173,3 +173,26 @@ membuka alamat tenant lain, dan halaman masuk yang tidak pernah mencetak teks da
 - [Identity dan access](09-identity-and-access.md) — kapan tenant memakai SSO, dan dua jenis undangan.
 - [admin.erp: konsol operator](31-admin-erp-control-plane.md) — siapa yang dianggap operator.
 - `apps/core/app/Platform/Identity/Support/Sso/` dan `apps/control-plane/app/Sso/` — kodenya.
+
+## Penguatan login konsol dan riwayat tautan
+
+Login password admin.erp mengikuti MFA yang sudah dikonfirmasi pada akun Core. Password yang benar
+membuat challenge sesi sementara selama lima menit, belum membuat sesi operator. Challenge meneruskan
+TOTP atau recovery code ke API internal Core. Verifikasi TOTP memakai provider Fortify Core, termasuk penolakan kode yang sudah dipakai; konsumsi recovery code dilakukan Core dengan row lock. Hak operator, kebijakan
+login password, dan kewajiban mengganti password diperiksa kembali saat challenge diselesaikan.
+Pemakaian akun darurat tetap dicatat setelah MFA berhasil.
+
+Key enkripsi Core dan konsol tetap terpisah (`CORE_APP_KEY` dan `CONSOLE_APP_KEY`). Secret MFA
+hanya didekripsi Core. Konsol tidak menyalin key Core; `POST /api/internal/v1/operators/{user}/verify-second-factor`
+mengembalikan hasil verifikasi dan identitas yang harus cocok dengan challenge. Core yang tidak
+tersedia tidak mengesahkan sesi baru. Jangan mengganti key konsol untuk mengatasi kesalahan MFA,
+karena key itu melindungi setelan terenkripsi milik konsol sendiri.
+
+Pemutusan tautan identitas mengisi `external_identities.deleted_at`. Indeks unik issuer/subjek dan
+user/issuer hanya berlaku untuk tautan aktif. Kedua aplikasi menyaring tautan terarsip melalui model;
+link/unlink dari konsol mencatat audit dalam transaksi yang sama dengan perubahan tautan.
+
+Kedua pemeriksa logout token mewajibkan `iat`, `exp`, serta `jti`, membatasi umur token menjadi 300
+detik, dan memakai klaim cache atomik untuk menolak replay. Hash issuer, client, dan `jti` menjadi
+kunci replay; token mentah tidak disimpan sebagai audit. Aturan klaim mengikuti
+[OpenID Back-Channel Logout bagian 2.4 dan 2.6](https://openid.net/specs/openid-connect-backchannel-1_0.html).

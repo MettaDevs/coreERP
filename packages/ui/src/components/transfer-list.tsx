@@ -31,8 +31,12 @@ function TransferListPane({
     incremental,
     searchValue,
     onSearchChange,
+    size,
+    reserveSearchSpace = false,
 }: {
     title: string;
+    size: 'default' | 'large';
+    reserveSearchSpace?: boolean;
     items: TransferListItem[];
     highlighted: string | null;
     onHighlight: (id: string) => void;
@@ -56,8 +60,11 @@ function TransferListPane({
                     onChange={(event) => onSearchChange(event.target.value)}
                 />
             )}
+            {!onSearchChange && reserveSearchSpace && (
+                <div aria-hidden="true" className="h-9 shrink-0" />
+            )}
             {/*
-        Tinggi mengikuti isi sampai batas atas, bukan tinggi tetap.
+        Ukuran bawaan mengikuti isi sampai batas atas; ukuran besar memakai tinggi layar.
 
         Panel ini hampir selalu dipasang di dalam permukaan yang sudah bergulir sendiri.
         Kotak bertinggi tetap membuat area gulir kedua yang menumpuk di dalam yang pertama,
@@ -67,7 +74,14 @@ function TransferListPane({
         melampaui batas, dan `overscroll-contain` menahan gulirnya agar tidak merembet ke
         permukaan induk begitu mentok.
       */}
-            <div className="max-h-56 min-h-24 overflow-y-auto overscroll-contain rounded-md border">
+            <div
+                className={cn(
+                    'overflow-y-auto overscroll-contain rounded-md border',
+                    size === 'large'
+                        ? 'h-[min(52dvh,36rem)] min-h-64'
+                        : 'max-h-56 min-h-24',
+                )}
+            >
                 {items.length === 0 ? (
                     <p className="text-muted-foreground p-3 text-sm">
                         {emptyLabel}
@@ -133,7 +147,12 @@ function TransferList({
     incremental,
     searchValue,
     onSearchChange,
+    size = 'default',
+    onActiveItemChange,
 }: {
+    size?: 'default' | 'large';
+    /** Pratinjau baris aktif terpisah dari pemindahan dan perubahan pilihan. */
+    onActiveItemChange?: (id: string) => void;
     remaining: TransferListItem[];
     selected: TransferListItem[];
     onChange: (next: {
@@ -209,13 +228,22 @@ function TransferList({
             className={cn('flex items-stretch gap-3', className)}
         >
             <TransferListPane
+                size={size}
                 incremental={incremental}
                 searchValue={searchValue}
                 onSearchChange={onSearchChange}
                 title={remainingTitle}
                 items={remaining}
                 highlighted={highlightedRemaining}
-                onHighlight={setHighlightedRemaining}
+                onHighlight={(id) => {
+                    setHighlightedRemaining(id);
+
+                    if (onActiveItemChange) {
+                        setHighlightedSelected(null);
+                    }
+
+                    onActiveItemChange?.(id);
+                }}
                 onActivate={moveToSelected}
                 disabled={disabled}
                 emptyLabel={remainingEmptyLabel}
@@ -273,10 +301,20 @@ function TransferList({
                 </Button>
             </div>
             <TransferListPane
+                size={size}
                 title={selectedTitle}
+                reserveSearchSpace={size === 'large' && Boolean(onSearchChange)}
                 items={selected}
                 highlighted={highlightedSelected}
-                onHighlight={setHighlightedSelected}
+                onHighlight={(id) => {
+                    setHighlightedSelected(id);
+
+                    if (onActiveItemChange) {
+                        setHighlightedRemaining(null);
+                    }
+
+                    onActiveItemChange?.(id);
+                }}
                 onActivate={moveToRemaining}
                 disabled={disabled}
                 emptyLabel={selectedEmptyLabel}

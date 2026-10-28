@@ -22,11 +22,12 @@ import {
 } from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
+import { useConfirmation } from '@apperp/ui/use-confirmation';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
-import { api, errorMessage } from '../api';
+import { ApiError, api, errorMessage } from '../api';
 import { useRecordQueryTarget } from '../transactions/_shared/use-record-query-target';
 import { useRecordList } from '../use-record-list';
-import GroupBookMatrix from './GroupBookMatrix';
+import { useSaveFeedback } from '../use-save-feedback';
 import MasterForm from './MasterForm';
 import type {
     MasterAction,
@@ -37,51 +38,10 @@ import type {
 } from './masters';
 import { parentSummaryOf, permission } from './masters';
 import MasterSelect from './MasterSelect';
-import TipeAtributNilai from './TipeAtributNilai';
 
 const optionLabel = (option: ParentSummary) =>
     `${option.kode} — ${option.nama}`;
 const allLabel = (label: string) => `Semua ${label.toLowerCase()}`;
-
-/**
- * Bagian yang disunting di dalam form pemiliknya, bukan sebagai menu tersendiri.
- *
- * Seluruhnya butuh id pemilik, jadi baru muncul setelah record tersimpan. Pilihan nilai
- * hanya relevan untuk atribut teks; ada atau tidaknya Values menentukan apakah form
- * aset memakai dropdown atau teks bebas.
- */
-function extraSectionFor(
-    resource: string,
-    record: MasterRecord,
-    canEdit: boolean,
-    onVersionChange: (version: number) => void,
-) {
-    // Rincian disimpan dengan mengklaim versi record pemiliknya, jadi versi itu satu dan
-    // dipegang bersama form: simpan rincian lalu simpan form tidak saling menolak.
-    if (resource === 'group-aset') {
-        return (
-            <GroupBookMatrix
-                groupId={record.id}
-                canEdit={canEdit}
-                version={record.version}
-                onVersionChange={onVersionChange}
-            />
-        );
-    }
-
-    if (resource === 'tipe-atribut' && record.data_type === 'string') {
-        return (
-            <TipeAtributNilai
-                tipeAtributId={record.id}
-                canEdit={canEdit}
-                version={record.version}
-                onVersionChange={onVersionChange}
-            />
-        );
-    }
-
-    return undefined;
-}
 
 export default function MasterPage({
     config,
@@ -90,6 +50,9 @@ export default function MasterPage({
     config: MasterConfig;
     permissions: Permission[];
 }) {
+    const { confirm: confirmAction, confirmation: actionConfirmation } =
+        useConfirmation();
+
     const parents = useMemo(() => config.parents ?? [], [config.parents]);
     const can = (action: MasterAction) =>
         permissions.includes(permission(config.resource, action));
@@ -103,6 +66,12 @@ export default function MasterPage({
     const [masterBusy, setMasterBusy] = useState(false);
     const [masterDirty, setMasterDirty] = useState(false);
     const [error, setError] = useState('');
+    const {
+        scopeRef: mutationScopeRef,
+        feedbackSummary: mutationFeedback,
+        reportSaveError: reportMutationError,
+        clearSaveFeedback: clearMutationFeedback,
+    } = useSaveFeedback(undefined, config.resource);
     const [picked, setPicked] = useState<string[]>([]);
 
     const query = useMemo(() => {
@@ -128,7 +97,7 @@ export default function MasterPage({
         `/${config.resource}?${query}`,
         search,
     );
-    const { items, setItems, loading } = list;
+    const { items, loading } = list;
     const load = () => {
         setError('');
         list.reload();
@@ -175,26 +144,17 @@ export default function MasterPage({
         [picked, items],
     );
 
-    async function toggle(item: MasterRecord) {
-        try {
-            await api(`/${config.resource}/${item.id}`, {
-                method: 'PATCH',
-                body: JSON.stringify({
-                    aktif: !item.aktif,
-                    version: item.version,
-                }),
-            });
-            load();
-        } catch (caught) {
-            setError(errorMessage(caught, 'Status belum dapat diubah.'));
-        }
-    }
-
     async function archive(item: MasterRecord) {
+        clearMutationFeedback();
+
         if (
-            !window.confirm(
-                `Delete ${item.nama}? Data ini tidak lagi tampil pada daftar pilihan.`,
-            )
+            !(await confirmAction({
+                title: `Delete ${item.nama}? Data ini tidak lagi tampil pada daftar pilihan.`,
+                description:
+                    'Data yang dihapus tidak lagi tampil pada daftar pilihan.',
+                confirmLabel: 'Delete',
+                destructive: true,
+            }))
         ) {
             return;
         }
@@ -209,53 +169,23 @@ export default function MasterPage({
             );
             load();
         } catch (caught) {
-            setError(errorMessage(caught, 'Data belum dapat diarsipkan.'));
+            reportMutationError(caught, 'Data belum dapat diarsipkan.');
         }
-    }
-
-    async function changeSelected(aktif: boolean) {
-        const selected = items.filter(
-            (item) => selectedIds.includes(item.id) && item.aktif !== aktif,
-        );
-
-        if (!selected.length) {
-            return;
-        }
-
-        const action = aktif ? 'Aktifkan' : 'Nonaktifkan';
-
-        if (!window.confirm(`${action} ${selected.length} data terpilih?`)) {
-            return;
-        }
-
-        const results = await Promise.allSettled(
-            selected.map((item) =>
-                api(`/${config.resource}/${item.id}`, {
-                    method: 'PATCH',
-                    body: JSON.stringify({ aktif, version: item.version }),
-                }),
-            ),
-        );
-        const failed = results.filter(
-            (result) => result.status === 'rejected',
-        ).length;
-        setPicked([]);
-
-        if (failed) {
-            setError(`${failed} data belum dapat diubah.`);
-        }
-
-        load();
     }
 
     async function archiveSelected() {
+        clearMutationFeedback();
         const selected = items.filter((item) => selectedIds.includes(item.id));
 
         if (
             !selected.length ||
-            !window.confirm(
-                `Delete ${selected.length} data terpilih? Data ini tidak lagi tampil pada daftar pilihan.`,
-            )
+            !(await confirmAction({
+                title: `Delete ${selected.length} data terpilih? Data ini tidak lagi tampil pada daftar pilihan.`,
+                description:
+                    'Data yang dihapus tidak lagi tampil pada daftar pilihan.',
+                confirmLabel: 'Delete',
+                destructive: true,
+            }))
         ) {
             return;
         }
@@ -274,22 +204,17 @@ export default function MasterPage({
         setPicked([]);
 
         if (failed) {
-            setError(`${failed} data belum dapat diarsipkan.`);
+            reportMutationError(
+                new ApiError(
+                    `${selected.length - failed} data berhasil dihapus. ${failed} data belum dapat dihapus. Periksa daftar sebelum mengulang.`,
+                    {},
+                    422,
+                ),
+                'Sebagian data belum dapat dihapus.',
+            );
         }
 
         load();
-    }
-
-    /** Versi baru sesudah rincian disimpan, untuk form yang terbuka dan baris daftarnya. */
-    function changeVersion(id: string, version: number) {
-        setEditing((current) =>
-            current?.id === id ? { ...current, version } : current,
-        );
-        setItems((current) =>
-            current.map((item) =>
-                item.id === id ? { ...item, version } : item,
-            ),
-        );
     }
 
     const typeLabel: Record<string, string> = {
@@ -386,10 +311,7 @@ export default function MasterPage({
     const rowActions: DataTableRowAction[] = [];
 
     if (can('update')) {
-        rowActions.push(
-            { id: 'edit', label: 'Ubah' },
-            { id: 'toggle', label: 'Ubah status' },
-        );
+        rowActions.push({ id: 'edit', label: 'Ubah' });
     }
 
     if (can('archive')) {
@@ -402,13 +324,16 @@ export default function MasterPage({
     }
 
     return (
-        <div className="h-full min-h-0 overflow-hidden">
+        <div ref={mutationScopeRef} className="h-full min-h-0 overflow-hidden">
+            {actionConfirmation}
+
             <Card
                 aria-labelledby="list-title"
                 className="flex h-full min-h-0 flex-col overflow-hidden rounded-none border-0 shadow-none"
             >
                 <CardHeader className="min-h-0 shrink-0 border-b">
                     <CardTitle id="list-title">{config.title}</CardTitle>
+                    {mutationFeedback}
                     {can('create') && (
                         <CardAction>
                             <ActionButton
@@ -501,15 +426,6 @@ export default function MasterPage({
                         <div className="bg-muted/40 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b px-5 py-2 text-sm">
                             <span>{selectedIds.length} data dipilih</span>
                             <div className="flex gap-2">
-                                {can('update') && (
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => changeSelected(false)}
-                                    >
-                                        Nonaktifkan
-                                    </Button>
-                                )}
                                 {can('archive') && (
                                     <ActionButton
                                         action="archive"
@@ -568,10 +484,6 @@ export default function MasterPage({
                                     setEditing(item);
                                 }
 
-                                if (action === 'toggle') {
-                                    toggle(item);
-                                }
-
                                 if (action === 'archive') {
                                     archive(item);
                                 }
@@ -608,39 +520,11 @@ export default function MasterPage({
                         setEditing(undefined);
                     }}
                     key={editing?.id ?? 'baru'}
-                    onSaved={(savedRecord, created) => {
-                        // Form hanya tetap terbuka bila ada rincian lanjutan yang
-                        // baru dapat diisi setelah record pemiliknya tersimpan.
-                        const keepOpen =
-                            created &&
-                            Boolean(
-                                extraSectionFor(
-                                    config.resource,
-                                    savedRecord,
-                                    can('update'),
-                                    (version) =>
-                                        changeVersion(savedRecord.id, version),
-                                ),
-                            );
-
-                        if (!keepOpen) {
-                            clearRecordTarget();
-                        }
-
-                        setEditing(keepOpen ? savedRecord : undefined);
+                    onSaved={() => {
+                        clearRecordTarget();
+                        setEditing(undefined);
                         void load();
                     }}
-                    extraSection={
-                        editing
-                            ? extraSectionFor(
-                                  config.resource,
-                                  editing,
-                                  can('update'),
-                                  (version) =>
-                                      changeVersion(editing.id, version),
-                              )
-                            : undefined
-                    }
                 />
             )}
         </div>

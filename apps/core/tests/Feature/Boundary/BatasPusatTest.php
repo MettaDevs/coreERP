@@ -6,7 +6,12 @@ namespace Tests\Feature\Boundary;
 
 use App\Platform\ControlPlane\Models\Client;
 use App\Platform\ControlPlane\Models\ConsoleSetting;
+use App\Platform\ControlPlane\Models\ManagedProductTenant;
 use App\Platform\ControlPlane\Models\OperatorAuditEvent;
+use App\Platform\ControlPlane\Models\ProductAuthAttempt;
+use App\Platform\ControlPlane\Models\ProductCustomer;
+use App\Platform\ControlPlane\Models\ProductCustomerSession;
+use App\Platform\ControlPlane\Models\ProductEmailChallenge;
 use App\Platform\ControlPlane\Models\Site;
 use App\Platform\ControlPlane\Models\SiteEnrollmentToken;
 use App\Platform\ControlPlane\Models\SiteOperation;
@@ -48,6 +53,11 @@ class BatasPusatTest extends TestCase
         return [
             [User::class, 'users'],
             [Client::class, 'clients'],
+            [ManagedProductTenant::class, 'managed_product_tenants'],
+            [ProductCustomer::class, 'product_customers'],
+            [ProductCustomerSession::class, 'product_customer_sessions'],
+            [ProductAuthAttempt::class, 'product_auth_attempts'],
+            [ProductEmailChallenge::class, 'product_email_challenges'],
             [Tenant::class, 'tenants'],
             [TenantMembership::class, 'tenant_memberships'],
             [ProviderAccess::class, 'provider_access'],

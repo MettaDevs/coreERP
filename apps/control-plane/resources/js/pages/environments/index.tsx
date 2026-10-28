@@ -1,14 +1,13 @@
-import { Button } from '@apperp/ui/button';
+import { Card, CardHeader, CardTitle, CardContent } from '@apperp/ui/card';
+import { DataTable } from '@apperp/ui/data-table';
+import { Input } from '@apperp/ui/input';
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
+    assertListBatch,
+    useIncrementalList,
+} from '@apperp/ui/use-incremental-list';
 import { Head, Link } from '@inertiajs/react';
 import { Cloud, Server } from 'lucide-react';
+import { useCallback, useState } from 'react';
 import { InstallStateBadge, KindBadge, StatusBadge } from '@/components/badges';
 import Shell from '@/components/shell';
 import { progressDetail } from '@/lib/install-progress';
@@ -35,144 +34,224 @@ type Row = {
 };
 
 export default function Index({
-    environments,
-    tenant,
+    hasTenants,
     kinds,
 }: {
-    environments: Row[];
-    tenant: { id: string; name: string }[];
+    hasTenants: boolean;
     kinds: string[];
 }) {
+    const [search, setSearch] = useState('');
+    const loadItems = useCallback(
+        async ({
+            query,
+            cursor,
+            signal,
+        }: {
+            query: string;
+            cursor: string | null;
+            signal: AbortSignal;
+        }) => {
+            const params = new URLSearchParams({ search: query });
+
+            if (cursor) {
+                params.set('cursor', cursor);
+            }
+
+            const response = await fetch(`/lingkungan?${params}`, {
+                signal,
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+            });
+
+            if (!response.ok) {
+                throw new Error(
+                    'Daftar lingkungan belum dapat dimuat. Periksa koneksi lalu coba lagi.',
+                );
+            }
+
+            const body: unknown = await response.json();
+
+            if (
+                !body ||
+                typeof body !== 'object' ||
+                !('data' in body) ||
+                !('next_cursor' in body)
+            ) {
+                throw new Error(
+                    'Jawaban daftar lingkungan tidak lengkap. Muat ulang daftar.',
+                );
+            }
+
+            const batch = { items: body.data, nextCursor: body.next_cursor };
+            assertListBatch<Row>(batch);
+
+            return batch;
+        },
+        [],
+    );
+    const list = useIncrementalList<Row>({
+        loadItems,
+        query: search,
+        getKey: (row) => row.id,
+    });
+
     return (
         <Shell
             title="Lingkungan"
-            description="Setiap tempat kerja yang dikenal sistem, beserta jenis dan tempat datanya berada."
-            actions={<CreateDialog tenant={tenant} kinds={kinds} />}
+            actions={
+                <CreateDialog
+                    hasTenants={hasTenants}
+                    kinds={kinds}
+                    onCreated={list.reload}
+                />
+            }
         >
             <Head title="Lingkungan" />
 
-            <div className="overflow-x-auto rounded-lg border bg-background">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Nama</TableHead>
-                            <TableHead>Tenant</TableHead>
-                            <TableHead>Jenis</TableHead>
-                            <TableHead>Berjalan di</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Alamat</TableHead>
-                            <TableHead>Berakhir</TableHead>
-                            <TableHead />
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {environments.length === 0 && (
-                            <TableRow>
-                                <TableCell
-                                    colSpan={8}
-                                    className="py-10 text-center text-sm text-muted-foreground"
-                                >
-                                    Belum ada lingkungan yang tercatat.
-                                </TableCell>
-                            </TableRow>
-                        )}
-                        {environments.map((row) => (
-                            <TableRow key={row.id}>
-                                <TableCell className="font-medium">
-                                    {row.name}
-                                    <span className="ms-2 text-xs text-muted-foreground">
-                                        {row.slug}
-                                    </span>
-                                </TableCell>
-                                <TableCell>{row.tenant}</TableCell>
-                                <TableCell>
-                                    <KindBadge kind={row.kind} />
-                                </TableCell>
-                                <TableCell>
-                                    {row.hosting === 'client_server' ? (
-                                        <span className="inline-flex items-start gap-1.5 text-sm">
-                                            <Server className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-                                            <span>
-                                                Server klien
-                                                {row.site?.serverAddress && (
-                                                    <span className="block font-mono text-xs text-muted-foreground">
-                                                        {row.site.serverAddress}
-                                                    </span>
-                                                )}
-                                            </span>
-                                        </span>
-                                    ) : (
-                                        <span className="inline-flex items-center gap-1.5 text-sm">
-                                            <Cloud className="size-3.5 shrink-0 text-muted-foreground" />
-                                            Server kita
-                                        </span>
-                                    )}
-                                </TableCell>
-                                {/*
-                                    Produksi di server klien tidak pernah disiapkan di sini, jadi status
-                                    registry-nya menetap "Sedang disiapkan" selamanya — kata yang benar
-                                    secara teknis dan salah bagi pembacanya. Yang ditampilkan untuknya
-                                    keadaan pemasangan, dihitung `InstallProgress`.
-                                */}
-                                <TableCell>
-                                    {row.serverClient ? (
-                                        <div className="space-y-1">
-                                            <InstallStateBadge
-                                                state={row.serverClient.state}
-                                            />
-                                            {progressDetail(
-                                                row.serverClient,
-                                            ) && (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Tempat kerja terdaftar</CardTitle>
+                    <span className="text-xs text-muted-foreground">
+                        {list.items.length} lingkungan dimuat
+                    </span>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                        Buka nama lingkungan untuk melihat kesiapan, aplikasi
+                        yang terpasang, dan riwayatnya.
+                    </p>
+                    <Input
+                        label="Cari lingkungan atau tenant"
+                        value={search}
+                        onChange={(event) => setSearch(event.target.value)}
+                    />
+                    {!hasTenants && (
+                        <Link
+                            href="/tenant"
+                            className="inline-flex text-sm text-primary underline underline-offset-4"
+                        >
+                            Daftarkan tenant terlebih dahulu
+                        </Link>
+                    )}
+                    <div className="h-[min(32rem,60vh)] min-h-40">
+                        <DataTable
+                            scrollMode="viewport"
+                            data={list.items}
+                            incremental={list}
+                            getRowKey={(row) => row.id}
+                            showRowNumbers={false}
+                            emptyMessage={
+                                !hasTenants
+                                    ? 'Lingkungan memerlukan tenant. Daftarkan tenant melalui tautan di atas.'
+                                    : 'Belum ada lingkungan. Pilih Baru untuk membuat tempat kerja produksi, demo, atau sandbox.'
+                            }
+                            columns={[
+                                {
+                                    id: 'name',
+                                    header: 'Lingkungan / tenant',
+                                    minWidth: 220,
+                                    cell: (row) => (
+                                        <div className="space-y-1 py-1">
+                                            <Link
+                                                href={`/lingkungan/${row.id}`}
+                                                className="font-medium text-primary underline-offset-4 hover:underline"
+                                            >
+                                                {row.name}
+                                            </Link>
+                                            <p className="text-xs text-muted-foreground">
+                                                {row.tenant}
+                                            </p>
+                                        </div>
+                                    ),
+                                },
+                                {
+                                    id: 'kind',
+                                    header: 'Jenis',
+                                    minWidth: 120,
+                                    cell: (row) => (
+                                        <KindBadge kind={row.kind} />
+                                    ),
+                                },
+                                {
+                                    id: 'status',
+                                    header: 'Kesiapan',
+                                    minWidth: 220,
+                                    cell: (row) =>
+                                        row.serverClient ? (
+                                            <div className="space-y-1">
+                                                <InstallStateBadge
+                                                    state={
+                                                        row.serverClient.state
+                                                    }
+                                                />
                                                 <p className="text-xs text-muted-foreground">
                                                     {progressDetail(
                                                         row.serverClient,
                                                     )}
                                                 </p>
+                                            </div>
+                                        ) : (
+                                            <StatusBadge status={row.status} />
+                                        ),
+                                },
+                                {
+                                    id: 'address',
+                                    header: 'Alamat akses',
+                                    minWidth: 220,
+                                    cell: (row) => (
+                                        <div className="space-y-1">
+                                            {row.url ? (
+                                                <a
+                                                    href={row.url}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="break-all text-primary underline-offset-4 hover:underline"
+                                                >
+                                                    {row.url.replace(
+                                                        'https://',
+                                                        '',
+                                                    )}
+                                                </a>
+                                            ) : (
+                                                <span className="text-muted-foreground">
+                                                    Belum tersedia
+                                                </span>
                                             )}
+                                            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                                {row.hosting ===
+                                                'client_server' ? (
+                                                    <>
+                                                        <Server
+                                                            className="size-3.5"
+                                                            aria-hidden="true"
+                                                        />
+                                                        Server klien
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Cloud
+                                                            className="size-3.5"
+                                                            aria-hidden="true"
+                                                        />
+                                                        Server kita
+                                                    </>
+                                                )}
+                                            </span>
                                         </div>
-                                    ) : (
-                                        <StatusBadge status={row.status} />
-                                    )}
-                                </TableCell>
-                                {/*
-                                    Alamat menggantikan nama database di kolom ini.
-
-                                    Keduanya sama-sama teknis, tetapi cuma satu yang perlu dikirim
-                                    ke pelanggan — dan nama database tetap terbaca di halaman
-                                    rincian bagi yang memang mencarinya. Produksi di server klien
-                                    memakai bentuk yang sama; record DNS-nya dibuat admin.erp.
-                                */}
-                                <TableCell className="max-w-[22rem] font-mono text-xs break-all">
-                                    {row.url ? (
-                                        <a
-                                            href={row.url}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="underline underline-offset-4"
-                                        >
-                                            {row.url.replace('https://', '')}
-                                        </a>
-                                    ) : (
-                                        <span className="text-muted-foreground">
-                                            {row.database}
-                                        </span>
-                                    )}
-                                </TableCell>
-                                <TableCell className="text-sm text-muted-foreground">
-                                    {row.expiresAt ?? 'Tidak berakhir'}
-                                </TableCell>
-                                <TableCell className="text-end">
-                                    <Button asChild size="sm" variant="ghost">
-                                        <Link href={`/lingkungan/${row.id}`}>
-                                            Rincian
-                                        </Link>
-                                    </Button>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </div>
+                                    ),
+                                },
+                                {
+                                    id: 'expires',
+                                    header: 'Berlaku sampai',
+                                    minWidth: 150,
+                                    cell: (row) =>
+                                        row.expiresAt ?? 'Tanpa batas waktu',
+                                },
+                            ]}
+                        />
+                    </div>
+                </CardContent>
+            </Card>
         </Shell>
     );
 }

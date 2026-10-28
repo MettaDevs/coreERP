@@ -15,6 +15,11 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
  * siapa pun. Tanpa `$fillable`, setiap percobaan `create()` atau `fill()` akan gagal seketika alih-
  * alih berhasil diam-diam.
  *
+ * @property string|null $two_factor_secret
+ * @property string|null $two_factor_recovery_codes
+ * @property string|null $two_factor_confirmed_at
+ * @property bool $must_change_password
+ * @property string $account_type
  * @property int $id
  * @property string $name
  * @property string $email
@@ -24,7 +29,12 @@ class User extends Authenticatable
     protected $table = 'users';
 
     /** @var list<string> */
-    protected $hidden = ['password', 'remember_token'];
+    protected $hidden = ['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'];
+
+    protected function casts(): array
+    {
+        return ['must_change_password' => 'boolean'];
+    }
 
     /** @return HasOne<ProviderAccess, $this> */
     public function providerAccess(): HasOne

@@ -116,6 +116,29 @@ class AddressHierarchyTest extends TestCase
             ->assertOk()->assertJsonCount(1, 'data');
     }
 
+    public function test_lookup_requires_a_known_section_and_bounded_batch(): void
+    {
+        $this->actingAs($this->user)->getJson('/settings/address-setup/divisions')
+            ->assertUnprocessable()->assertJsonValidationErrors('section');
+        $this->getJson('/settings/address-setup/divisions?section=unknown')
+            ->assertUnprocessable()->assertJsonValidationErrors('section');
+        $this->getJson('/settings/address-setup/divisions?section=provinces&per_page=100000')
+            ->assertUnprocessable()->assertJsonValidationErrors('per_page');
+        $this->getJson('/settings/address-setup/divisions?section=provinces&q[]=invalid')
+            ->assertUnprocessable()->assertJsonValidationErrors('q');
+        $this->getJson('/settings/address-setup/villages-paginated')->assertNotFound();
+    }
+
+    public function test_lookup_without_read_permission_cannot_use_legacy_parameters(): void
+    {
+        $reader = User::factory()->create();
+        TenantMembership::create(['tenant_id' => $this->tenant->id, 'user_id' => $reader->id, 'status' => 'active']);
+        $this->actingAs($reader)
+            ->withSession(['workspace_tenant_id' => $this->tenant->id])
+            ->getJson('/settings/address-setup/divisions?country_id=ID&level=1')
+            ->assertForbidden();
+    }
+
     public function test_tenant_cannot_create_a_shared_province(): void
     {
         $count = Province::query()->count();

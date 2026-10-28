@@ -178,6 +178,21 @@ final class VendorController extends Controller
         ]), 'next_cursor' => $companies->nextCursor()?->encode()]);
     }
 
+    public function createContext(Request $request): JsonResponse
+    {
+        $membership = $this->authorizedMembership($request, CoreSecurityCatalog::VENDOR_UPDATE);
+        $data = $request->validate(['legal_entity_id' => ['required', 'ulid']]);
+        $companies = array_values(array_filter($this->legalEntities($membership->tenant_id), static fn (array $company): bool => $company['id'] === $data['legal_entity_id']));
+        abort_if($companies === [], 404);
+
+        return response()->json(['data' => [
+            'legalEntities' => $companies,
+            'automaticNumbers' => $this->automaticNumberAllowed($membership->tenant_id),
+            'canReadAddressBook' => $membership->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_READ),
+            'canManageAddressBook' => $membership->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE),
+        ]]);
+    }
+
     public function store(Request $request, SaveVendor $saveVendor): JsonResponse
     {
         $membership = $this->authorizedMembership($request, CoreSecurityCatalog::VENDOR_UPDATE);

@@ -1,7 +1,8 @@
 import { Ban, Send } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@apperp/ui/button';
 import { Checkbox } from '@apperp/ui/checkbox';
+import { DatePicker } from '@apperp/ui/date-picker';
 import {
     Dialog,
     DialogContent,
@@ -10,10 +11,12 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@apperp/ui/dialog';
-import { Field, FieldLabel } from '@apperp/ui/field';
-import { Input } from '@apperp/ui/input';
+import { FieldLabel } from '@apperp/ui/field';
+import { FormControl } from '@apperp/ui/form-control';
+
 import { Textarea } from '@apperp/ui/textarea';
 import { ApiError, api, errorMessage } from '../../api';
+import { useSaveFeedback } from '../../use-save-feedback';
 import { PostingPreviewPanel } from './PostingPreviewPanel';
 import type { PostingPreview } from './PostingPreviewPanel';
 
@@ -56,6 +59,9 @@ export function CancellationAction({
     );
     const endpoint = `/${resource}/${documentId}`;
     const [open, setOpen] = useState(false);
+    const contentRef = useRef<HTMLDivElement>(null);
+    const { feedbackSummary, reportSaveError, clearSaveFeedback, fieldError } =
+        useSaveFeedback(contentRef, documentId);
     const [preview, setPreview] = useState<Preview | null>(null);
     const [reason, setReason] = useState('');
     const [newDate, setNewDate] = useState(false);
@@ -95,7 +101,22 @@ export function CancellationAction({
 
     const pending = preview?.cancellation?.status === 'pending';
     const submit = async () => {
-        if (!preview || busy || !reason.trim()) {
+        clearSaveFeedback();
+
+        if (!reason.trim()) {
+            reportSaveError(
+                new ApiError(
+                    'Isi alasan pembatalan.',
+                    { reason: ['Isi alasan pembatalan.'] },
+                    422,
+                ),
+                'Pembatalan belum dapat diproses.',
+            );
+
+            return;
+        }
+
+        if (!preview || busy) {
             return;
         }
 
@@ -122,12 +143,7 @@ export function CancellationAction({
             setOpen(false);
             onComplete();
         } catch (caught) {
-            setError(
-                cancellationError(
-                    caught,
-                    'Pembatalan belum dapat diproses. Periksa sambungan Anda, lalu coba lagi.',
-                ),
-            );
+            reportSaveError(caught, 'Pembatalan belum dapat diproses.');
         } finally {
             setBusy(false);
         }
@@ -177,7 +193,7 @@ export function CancellationAction({
                     }
                 }}
             >
-                <DialogContent className="sm:max-w-4xl">
+                <DialogContent ref={contentRef} className="sm:max-w-4xl">
                     <DialogHeader>
                         <DialogTitle>
                             {canCancel
@@ -190,6 +206,7 @@ export function CancellationAction({
                                 : 'Transaksi tetap berlaku sampai pengguna berwenang menyetujui pembatalannya. Permintaan tersedia di aplikasi dan pemberitahuan dikirim melalui email.'}
                         </DialogDescription>
                     </DialogHeader>
+                    {feedbackSummary}
                     <div className="max-h-[60vh] space-y-4 overflow-y-auto py-3 pr-1">
                         {error && (
                             <p
@@ -222,7 +239,10 @@ export function CancellationAction({
                                     {message}
                                 </p>
                             ))}
-                        <Field>
+                        <FormControl
+                            data-error-field="reason"
+                            error={fieldError('reason')}
+                        >
                             <Textarea
                                 label="Alasan pembatalan"
                                 required
@@ -233,9 +253,9 @@ export function CancellationAction({
                                 }
                                 readOnly={busy || pending}
                             />
-                        </Field>
+                        </FormControl>
                         {!pending && (
-                            <Field>
+                            <FormControl>
                                 <FieldLabel className="flex items-center gap-2">
                                     <Checkbox
                                         checked={newDate}
@@ -252,7 +272,7 @@ export function CancellationAction({
                                     />
                                     Gunakan tanggal pembukuan baru
                                 </FieldLabel>
-                            </Field>
+                            </FormControl>
                         )}
                         {pending ? (
                             <p className="text-muted-foreground text-sm">
@@ -260,16 +280,21 @@ export function CancellationAction({
                                 {preview?.posting_date}.
                             </p>
                         ) : newDate ? (
-                            <Input
-                                label="Tanggal pembukuan baru"
-                                required
-                                type="date"
-                                value={date}
-                                onChange={(event) =>
-                                    void changeDate(event.target.value)
-                                }
-                                disabled={busy}
-                            />
+                            <FormControl
+                                data-error-field="posting_date"
+                                error={fieldError('posting_date')}
+                            >
+                                <DatePicker
+                                    label="Tanggal pembukuan baru"
+                                    required
+
+                                    value={date}
+                                    onValueChange={(value) =>
+                                        void changeDate(value)
+                                    }
+                                    disabled={busy}
+                                />
+                            </FormControl>
                         ) : (
                             preview && (
                                 <p className="text-muted-foreground text-sm">
@@ -311,7 +336,6 @@ export function CancellationAction({
                             disabled={
                                 busy ||
                                 !preview ||
-                                !reason.trim() ||
                                 Object.keys(preview.blockers).length > 0 ||
                                 (pending && !canCancel) ||
                                 (newDate && !date)

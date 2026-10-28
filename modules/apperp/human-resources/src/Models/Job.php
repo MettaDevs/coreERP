@@ -40,7 +40,7 @@ class Job extends Model
 
     protected $table = 'hr_jobs';
 
-    protected $fillable = ['tenant_id', 'creation_key', 'code', 'name', 'description'];
+    protected $fillable = ['tenant_id', 'creation_key', 'creation_payload_hash', 'code', 'name', 'description'];
 
     /**
      * Alasannya sama dengan pada `Worker`: bentuk jawaban endpoint tidak boleh ikut berubah
@@ -48,5 +48,5 @@ class Job extends Model
      *
      * @var list<string>
      */
-    protected $hidden = ['deleted_at'];
+    protected $hidden = ['deleted_at', 'creation_payload_hash'];
 }

@@ -1,0 +1,37 @@
+post:
+  tags: [Pusat admin]
+  operationId: createEnvironment
+  summary: Mencatat lingkungan baru milik tenant
+  description: |
+    Core mencatat lingkungan berstatus provisioning, operasi pencatatan yang selesai, dan audit operator dalam satu transaksi.
+    Belum menyiapkan database. Satu lingkungan aktif per jenis per tenant; slug yang bentrok dicoba dengan akhiran angka.
+    Token menyatakan proses konsol. requested_by adalah operator yang diteruskan konsol tepercaya.
+  security:
+    - controlPlaneToken: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [tenant_id, kind, name, requested_by]
+          properties:
+            tenant_id: { type: string }
+            kind: { type: string, enum: [production, demo, sandbox] }
+            name: { type: string, maxLength: 100 }
+            requested_by: { type: integer, description: Id user operator yang ada di Core. }
+            expires_at: { type: [string, 'null'], format: date, description: Wajib untuk demo dan harus setelah hari ini. }
+            hosting: { type: [string, 'null'], enum: [provider, client_server, null], default: provider, description: Server klien hanya untuk produksi. }
+  responses:
+    '201':
+      description: Lingkungan tercatat dan belum disiapkan.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [environment_id, tenant_id]
+            properties:
+              environment_id: { type: string }
+              tenant_id: { type: string }
+    '401': { description: Token konsol tidak sah. }
+    '422': { description: Isian tidak sah atau tenant sudah memiliki lingkungan jenis ini. }

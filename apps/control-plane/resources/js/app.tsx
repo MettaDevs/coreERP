@@ -1,4 +1,5 @@
 import { installSentry } from '@/lib/sentry';
+import { TooltipProvider } from '@apperp/ui/tooltip';
 import { createInertiaApp } from '@inertiajs/react';
 import type { ComponentType } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -30,7 +31,11 @@ void createInertiaApp({
         return (await load()).default;
     },
     setup({ el, App, props }) {
-        createRoot(el).render(<App {...props} />);
+        createRoot(el).render(
+            <TooltipProvider>
+                <App {...props} />
+            </TooltipProvider>,
+        );
     },
-    progress: { color: '#2563eb' },
+    progress: { color: 'var(--primary)' },
 });

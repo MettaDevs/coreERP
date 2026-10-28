@@ -169,6 +169,38 @@ class AssetFinancialReportsTest extends TestCase
         $this->assertSame(0, $this->dataset('laporan-perolehan-aset', ['dari' => '2026-10-01', 'sampai' => '2026-12-31'])['fields']['jumlah_aset']);
     }
 
+    public function test_report_options_and_asset_field_filters_narrow_the_same_dataset(): void
+    {
+        $reports = [
+            'laporan-nilai-buku-aset' => ['dari' => '2026-09-01', 'sampai' => '2026-11-30'],
+            'laporan-penyusutan-aset' => ['periode' => '2026-11'],
+            'laporan-proyeksi-penyusutan-aset' => ['dari' => '2026-12', 'sampai' => '2027-01'],
+            'laporan-perolehan-aset' => ['dari' => '2026-09-01', 'sampai' => '2026-11-30'],
+        ];
+
+        foreach ($reports as $code => $options) {
+            $parameters = [...$options, 'buku_id' => $this->komersial, 'filters' => ['aset' => ['kode' => $this->kode('satu')]]];
+            $rows = $this->dataset($code, $parameters)['tables']['baris'];
+            $this->assertNotEmpty($rows, $code);
+            $this->assertSame([$this->kode('satu')], array_values(array_unique(array_column($rows, 'kode'))), $code);
+            $this->assertSame([], $this->dataset($code, [...$parameters, 'filters' => ['aset' => ['kode' => 'NO-SUCH-ASSET']]])['tables']['baris'], $code);
+            $this->assertSame([], $this->dataset($code, [...$parameters, 'buku_id' => (string) Str::ulid()])['tables']['baris'], $code);
+        }
+    }
+
+    public function test_acquisition_date_expression_is_not_restricted_by_an_unseen_default_period(): void
+    {
+        DB::table('aset_tr_aset')->where('tenant_id', $this->tenantId)->where('id', $this->aset['satu'])->update(['acquired_on' => '2025-09-01']);
+
+        $report = $this->dataset('laporan-perolehan-aset', ['filters' => ['aset' => ['acquired_on' => '01/09/2025..30/09/2025']]]);
+        $this->assertSame([$this->kode('satu')], array_column($report['tables']['baris'], 'kode'));
+        $this->assertNull($report['fields']['filter_dari']);
+        $this->assertNull($report['fields']['filter_sampai']);
+        $defaultRows = $this->dataset('laporan-perolehan-aset', [])['tables']['baris'];
+        $blankRows = $this->dataset('laporan-perolehan-aset', ['filters' => ['aset' => ['acquired_on' => '   ']]])['tables']['baris'];
+        $this->assertSame($defaultRows, $blankRows);
+    }
+
     public function test_depreciation_report_reads_the_accumulated_depreciation_moved_by_a_split(): void
     {
         $baris = $this->perKode($this->dataset('laporan-penyusutan-aset', ['periode' => '2026-11'])['tables']['baris']);

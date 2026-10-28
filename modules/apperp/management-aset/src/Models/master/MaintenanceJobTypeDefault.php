@@ -30,6 +30,8 @@ use Modules\Apperp\ManagementAset\Models\MasterData;
  */
 class MaintenanceJobTypeDefault extends MasterData
 {
+    protected $hidden = ['creation_payload_hash'];
+
     protected $table = 'aset_m_maintenance_job_type_default';
 
     protected $fillable = [

@@ -1,0 +1,45 @@
+post:
+  tags:
+  - Product registration
+  operationId: internal.productRegistration.emailChallenge
+  summary: Kirim tautan verifikasi email independen
+  security:
+  - productRegistrationGateway: []
+    productRegistrationSession: []
+  responses:
+    '200':
+      description: Permintaan berhasil.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+            - sent
+            - expires_at
+            properties:
+              sent:
+                type: boolean
+              expires_at:
+                type: string
+                format: date-time
+    '401':
+      description: Sesi atau kredensial bridge tidak berlaku.
+    '422':
+      description: Isian belum sesuai atau verifikasi belum selesai.
+    '429':
+      description: Batas permintaan tercapai.
+    '503':
+      description: Penyedia atau konfigurasi belum tersedia.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+          - email
+          properties:
+            email:
+              type: string
+              format: email
+              maxLength: 250

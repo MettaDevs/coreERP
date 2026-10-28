@@ -12,8 +12,8 @@ export default function AuthLayout({
 }) {
     return (
         <AuthLayoutTemplate title={title} description={description}>
-            {children}
             <FlashToasts />
+            {children}
         </AuthLayoutTemplate>
     );
 }

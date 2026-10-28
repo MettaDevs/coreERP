@@ -3,6 +3,7 @@
 namespace Modules\Apperp\ManagementAset\Http\Controllers;
 
 use App\Platform\Modules\Contracts\AddressDirectory;
+use App\Platform\Modules\Contracts\FundingSourceDirectory;
 use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\OrganizationDirectory;
 use App\Platform\Modules\Contracts\UnitOfMeasureDirectory;
@@ -54,6 +55,9 @@ final class ReferenceDataController extends Controller
      * boleh membuka salah satu layar itu memang sudah harus dapat melihat pilihannya.
      */
     private const DIREKTORI_READERS = [
+        'management-aset.perencanaan-aset.read',
+        'management-aset.perencanaan-aset.create',
+        'management-aset.perencanaan-aset.update',
         'management-aset.mutasi-aset.read',
         'management-aset.aset.read',
         'management-aset.pemeliharaan-aset.read',
@@ -75,9 +79,24 @@ final class ReferenceDataController extends Controller
     {
         $this->guardDirektori($request);
 
-        return response()->json(app(OrganizationDirectory::class)->lookup(
+        $batch = app(OrganizationDirectory::class)->lookup(
             (string) $request->attributes->get('coreerp.tenant_id'), 'members', $request->query(),
-        ));
+        );
+        $batch['data'] = collect($batch['data'])->map(function ($member) {
+            $member->id = (string) $member->id;
+
+            return $member;
+        });
+
+        return response()->json($batch);
+    }
+
+    public function fundingSources(Request $request): JsonResponse
+    {
+        $held = $request->attributes->get('coreerp.permissions', []);
+        abort_if(array_intersect(['management-aset.perencanaan-aset.read', 'management-aset.perencanaan-aset.create', 'management-aset.perencanaan-aset.update'], $held) === [], 403);
+
+        return response()->json(app(FundingSourceDirectory::class)->lookup((string) $request->attributes->get('coreerp.tenant_id'), $request->query()));
     }
 
     /**

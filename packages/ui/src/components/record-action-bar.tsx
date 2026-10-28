@@ -21,11 +21,14 @@ type RecordActionBarProps = React.ComponentProps<'div'> & {
     title?: React.ReactNode;
     /** Isi yang didorong ke ujung baris, misalnya lencana status record. */
     trailing?: React.ReactNode;
+    /** Ringkasan kegagalan milik form yang memakai bar ini. */
+    feedback?: React.ReactNode;
 };
 
 function RecordActionBar({
     title,
     trailing,
+    feedback,
     className,
     children,
     ...props
@@ -50,6 +53,9 @@ function RecordActionBar({
                 <div className="ms-auto flex flex-wrap items-center gap-2">
                     {trailing}
                 </div>
+            ) : null}
+            {feedback ? (
+                <div className="w-full basis-full py-2">{feedback}</div>
             ) : null}
         </div>
     );

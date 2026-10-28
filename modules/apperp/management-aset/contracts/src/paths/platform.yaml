@@ -127,3 +127,33 @@
         description: Daftar anggota dengan nama dan email
       '403':
         description: Pengguna tidak memegang satu pun izin layar yang memakai daftar ini
+/api/modules/management-aset/v1/reference-data/funding-sources:
+  get:
+    tags:
+    - Reference data
+    operationId: listAssetPlanningFundingSources
+    summary: Pilihan sumber dana Foundation untuk perencanaan aset
+    description: |
+      Memerlukan izin lihat perencanaan. Pencarian dan sort dijalankan server dengan
+      cursor bertahap. record_ids[] memuat pilihan tersimpan yang tidak aktif agar nama
+      dokumen lama tetap terbaca. Pembuatan memakai form dan izin Foundation asli.
+    parameters:
+    - name: q
+      in: query
+      schema:
+        type: string
+    - name: cursor
+      in: query
+      schema:
+        type: string
+    - name: record_ids[]
+      in: query
+      schema:
+        type: array
+        items:
+          $ref: '#/components/schemas/Ulid'
+    responses:
+      '200':
+        description: Batch data berisi id, name, description, active, version, dan next_cursor. Kode sumber dana lama tidak menjadi field input atau pilihan baru.
+      '403':
+        $ref: '#/components/responses/Forbidden'

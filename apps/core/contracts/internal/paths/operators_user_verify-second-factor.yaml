@@ -1,0 +1,43 @@
+post:
+  tags: [Pusat admin]
+  operationId: internal.operators.verifySecondFactor
+  summary: Periksa kode MFA operator memakai kunci enkripsi Core
+  description: |
+    Hanya untuk akun person dengan hak provider_admin, tanpa kewajiban mengganti password,
+    serta MFA yang telah dikonfirmasi. Kode pemulihan dikonsumsi sekali dalam transaksi
+    dengan kunci baris user. Rahasia MFA tidak pernah dikirim ke konsol. Maksimal lima
+    percobaan per user per menit, termasuk percobaan berhasil; batas grup 30/menit tetap berlaku.
+    Respons tidak memakai envelope data.
+  security:
+    - controlPlaneToken: []
+  parameters:
+    - name: user
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [code]
+          properties:
+            code: { type: string, minLength: 1, maxLength: 255 }
+  responses:
+    '200':
+      description: Kode benar dan akun masih diizinkan masuk.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [verified, user_id]
+            properties:
+              verified: { type: boolean, const: true }
+              user_id: { type: integer }
+    '401':
+      description: Token pusat admin tidak sah.
+    '422':
+      description: Kode salah, bentuk input salah, akun tidak ada atau tidak memenuhi syarat masuk.
+    '429':
+      description: Batas percobaan tercapai; Retry-After menyatakan detik sampai boleh mencoba lagi.

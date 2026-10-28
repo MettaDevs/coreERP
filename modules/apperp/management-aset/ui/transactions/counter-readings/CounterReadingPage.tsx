@@ -10,6 +10,7 @@ import type {
     DataTableColumn,
     DataTableRowAction,
 } from '@apperp/ui/data-table';
+import { DatePicker } from '@apperp/ui/date-picker';
 import {
     DialogClose,
     Dialog,
@@ -25,7 +26,9 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
-import { Field, FieldDescription } from '@apperp/ui/field';
+import { FieldError } from '@apperp/ui/field';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
+import { InlineLookup } from '@apperp/ui/inline-lookup';
 import { Input } from '@apperp/ui/input';
 import {
     PageDialog,
@@ -35,16 +38,12 @@ import {
     PageDialogBody,
 } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
-import { Select } from '@apperp/ui/select';
-import {
-    ApiError,
-    api,
-    errorMessage,
-    newIdempotencyKey,
-    toastSaveError,
-} from '../../api';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
+import { RecordLookup } from '../../_shared/RecordLookup';
+import { ApiError, api, errorMessage, newIdempotencyKey } from '../../api';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import { useRecordList } from '../../use-record-list';
+import { useSaveFeedback } from '../../use-save-feedback';
 import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
 
 type Reading = {
@@ -117,6 +116,17 @@ export default function CounterReadingPage({
     };
     permissions: string[];
 }) {
+    const {
+        scopeRef: pageFeedbackScopeRef,
+        feedbackSummary: pageFeedbackSummary,
+        reportSaveError: pageFeedbackReportSaveError,
+        clearSaveFeedback: pageFeedbackClearSaveFeedback,
+    } = useSaveFeedback();
+    const pageFeedback = {
+        reportSaveError: pageFeedbackReportSaveError,
+        clearSaveFeedback: pageFeedbackClearSaveFeedback,
+    };
+
     const canCreate = permissions.includes(
         'management-aset.pembacaan-counter.create',
     );
@@ -142,6 +152,15 @@ export default function CounterReadingPage({
     const [draftDirty, setDraftDirty] = useState(false);
     const [archiving, setArchiving] = useState<Reading | null>(null);
     const dialogRef = useRef<HTMLDivElement>(null);
+    const {
+        feedbackSummary: formFeedbackSummary,
+        reportSaveError: formFeedbackReportSaveError,
+        clearSaveFeedback: formFeedbackClearSaveFeedback,
+    } = useSaveFeedback(dialogRef, recording ? 'reading' : 'closed');
+    const formFeedback = {
+        reportSaveError: formFeedbackReportSaveError,
+        clearSaveFeedback: formFeedbackClearSaveFeedback,
+    };
 
     const list = useRecordList<Reading>('/pembacaan-counter', '', {
         aset_id: filterAset,
@@ -202,6 +221,8 @@ export default function CounterReadingPage({
     // Jam tidak diisi dari jam perangkat (standar module: jam peramban bisa salah zona); petugas
     // mengetik jam yang tertera saat ia membaca meter.
     function openRecord() {
+        formFeedback.clearSaveFeedback();
+
         setDraft({
             aset_id: filterAset,
             jenis_counter_id: filterCounter,
@@ -236,6 +257,7 @@ export default function CounterReadingPage({
                     keterangan: draft.keterangan || null,
                 }),
             });
+            formFeedback.clearSaveFeedback();
             toast.success('Pembacaan counter dicatat.');
             setRecording(false);
             refresh();
@@ -244,7 +266,10 @@ export default function CounterReadingPage({
                 setErrors(caught.validationErrors);
             }
 
-            toastSaveError(caught, 'Pembacaan counter belum dapat dicatat.');
+            formFeedback.reportSaveError(
+                caught,
+                'Pembacaan counter belum dapat dicatat.',
+            );
         } finally {
             setBusy(false);
         }
@@ -258,10 +283,14 @@ export default function CounterReadingPage({
                 method: 'DELETE',
                 body: JSON.stringify({ version: reading.version }),
             });
+            pageFeedback.clearSaveFeedback();
             toast.success('Pembacaan diarsipkan.');
             refresh();
         } catch (caught) {
-            toastSaveError(caught, 'Pembacaan belum dapat diarsipkan.');
+            pageFeedback.reportSaveError(
+                caught,
+                'Pembacaan belum dapat diarsipkan.',
+            );
         }
     }
 
@@ -346,19 +375,20 @@ export default function CounterReadingPage({
         scopeKey: 'new-reading',
         onDirtyChange: setDraftDirty,
     });
-    const closeReading = () => {
-        if (
-            !busy &&
-            (!draftDirty ||
-                window.confirm('Buang perubahan yang belum disimpan?'))
-        ) {
-            setRecording(false);
-        }
-    };
+    const {
+        request: requestReadingTransition,
+        confirmation: readingTransitionConfirmation,
+    } = useRecordTransition(draftDirty, busy);
+    const closeReading = () =>
+        requestReadingTransition(() => setRecording(false));
 
     return (
-        <div>
-            <RecordActionBar title="Pembacaan counter">
+        <div ref={pageFeedbackScopeRef}>
+            {readingTransitionConfirmation}
+            <RecordActionBar
+                feedback={pageFeedbackSummary}
+                title="Pembacaan counter"
+            >
                 {canCreate && (
                     <ActionButton
                         action="create"
@@ -370,36 +400,41 @@ export default function CounterReadingPage({
 
             <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
                 <div className="w-full sm:w-80">
-                    <Select
-                        {...assetSource.selectProps}
-                        label="Aset"
-                        items={[
-                            { value: '', label: 'Semua aset' },
-                            ...assetChoices,
-                        ]}
-                        value={filterAset || null}
-                        placeholder="Semua aset"
-                        searchPlaceholder="Cari kode atau nama aset"
-                        ariaLabel="Saring berdasarkan aset"
-                        onValueChange={(value) => {
-                            setFilterAset(value ?? '');
-                        }}
-                    />
+                    <FormControl>
+                        <RecordLookup
+                            source={assetSource}
+                            label="Aset"
+                            items={[
+                                { value: '', label: 'Semua aset' },
+                                ...assetChoices,
+                            ]}
+                            value={filterAset || null}
+                            placeholder="Semua aset"
+                            searchPlaceholder="Cari kode atau nama aset"
+                            ariaLabel="Saring berdasarkan aset"
+                            onValueChange={(value) => {
+                                setFilterAset(value ?? '');
+                            }}
+                        />
+                    </FormControl>
                 </div>
                 <div className="w-full sm:w-64">
-                    <Select
-                        label="Counter"
-                        items={[
-                            { value: '', label: 'Semua counter' },
-                            ...counterChoices,
-                        ]}
-                        value={filterCounter || null}
-                        placeholder="Semua counter"
-                        ariaLabel="Saring berdasarkan counter"
-                        onValueChange={(value) => {
-                            setFilterCounter(value ?? '');
-                        }}
-                    />
+                    <FormControl>
+                        <RecordLookup
+                            source={counterTypes}
+                            label="Counter"
+                            items={[
+                                { value: '', label: 'Semua counter' },
+                                ...counterChoices,
+                            ]}
+                            value={filterCounter || null}
+                            placeholder="Semua counter"
+                            ariaLabel="Saring berdasarkan counter"
+                            onValueChange={(value) => {
+                                setFilterCounter(value ?? '');
+                            }}
+                        />
+                    </FormControl>
                 </div>
                 {assetError && (
                     <p className="text-muted-foreground text-sm">
@@ -473,11 +508,12 @@ export default function CounterReadingPage({
                             <ActionButton action="cancel" type="button" />
                         </PageDialogClose>
                     </PageDialogToolbar>
+                    {formFeedbackSummary}
                     {draft && (
                         <PageDialogBody className="space-y-4">
-                            <Field>
-                                <Select
-                                    {...assetSource.selectProps}
+                            <FormControl data-error-field="aset_id">
+                                <RecordLookup
+                                    source={assetSource}
                                     label="Aset"
                                     required
                                     items={assetChoices}
@@ -495,82 +531,120 @@ export default function CounterReadingPage({
                                     }
                                 />
                                 {message('aset_id') && (
-                                    <FieldDescription>
+                                    <FieldError>
                                         {message('aset_id')}
-                                    </FieldDescription>
+                                    </FieldError>
                                 )}
-                            </Field>
-                            <Field>
-                                <Select
+                            </FormControl>
+                            <FormControl
+                                data-error-field="jenis_counter_id"
+                                hint={
+                                    chosenCounter?.terakhir
+                                        ? `Terakhir: ${plain(chosenCounter.terakhir.nilai)} ${chosenCounter.satuan ?? ''} pada ${showReadAt(chosenCounter.terakhir.dibaca_pada)}.`
+                                        : chosenCounter
+                                          ? 'Belum pernah dibaca.'
+                                          : undefined
+                                }
+                                error={
+                                    message('jenis_counter_id') ||
+                                    (draft.aset_id &&
+                                    assetCounters?.asetId === draft.aset_id &&
+                                    counters.length === 0
+                                        ? 'Belum ada counter yang berlaku untuk jenis aset ini. Atur di Jenis counter atau pada Jenis aset.'
+                                        : undefined)
+                                }
+                            >
+                                <InlineLookup
                                     label="Counter"
                                     required
-                                    items={counters.map((counter) => ({
-                                        value: counter.jenis_counter_id,
-                                        label: counter.satuan
+                                    items={counters}
+                                    columns={[
+                                        {
+                                            id: 'kode',
+                                            header: 'Kode',
+                                            cell: (counter) => counter.kode,
+                                            width: 120,
+                                        },
+                                        {
+                                            id: 'nama',
+                                            header: 'Nama',
+                                            cell: (counter) => counter.nama,
+                                        },
+                                        {
+                                            id: 'satuan',
+                                            header: 'Satuan',
+                                            cell: (counter) =>
+                                                counter.satuan ?? '—',
+                                            width: 100,
+                                        },
+                                    ]}
+                                    value={
+                                        counters.find(
+                                            (counter) =>
+                                                counter.jenis_counter_id ===
+                                                draft.jenis_counter_id,
+                                        ) ?? null
+                                    }
+                                    getItemValue={(counter) =>
+                                        counter.jenis_counter_id
+                                    }
+                                    getItemLabel={(counter) =>
+                                        counter.satuan
                                             ? `${counter.nama} (${counter.satuan})`
-                                            : counter.nama,
-                                    }))}
-                                    value={draft.jenis_counter_id || null}
+                                            : counter.nama
+                                    }
                                     placeholder={
                                         draft.aset_id
                                             ? 'Pilih counter'
                                             : 'Pilih aset lebih dahulu'
                                     }
-                                    ariaLabel="Counter"
                                     portalContainer={dialogRef}
                                     onValueChange={(value) =>
                                         setDraft({
                                             ...draft,
-                                            jenis_counter_id: value ?? '',
+                                            jenis_counter_id:
+                                                value.jenis_counter_id,
                                         })
                                     }
                                 />
-                                <FieldDescription>
-                                    {message('jenis_counter_id') ||
-                                        (draft.aset_id &&
-                                        assetCounters?.asetId ===
-                                            draft.aset_id &&
-                                        counters.length === 0
-                                            ? 'Belum ada counter yang berlaku untuk jenis aset ini. Atur di Jenis counter atau pada Jenis aset.'
-                                            : chosenCounter?.terakhir
-                                              ? `Terakhir: ${plain(chosenCounter.terakhir.nilai)} ${chosenCounter.satuan ?? ''} pada ${showReadAt(chosenCounter.terakhir.dibaca_pada)}.`
-                                              : chosenCounter
-                                                ? 'Belum pernah dibaca.'
-                                                : '')}
-                                </FieldDescription>
-                            </Field>
-                            <div className="grid grid-cols-2 gap-3">
-                                <Input
-                                    label="Tanggal baca"
-                                    type="date"
-                                    required
-                                    value={draft.tanggal}
-                                    onChange={(event) =>
-                                        setDraft({
-                                            ...draft,
-                                            tanggal: event.target.value,
-                                        })
-                                    }
-                                />
-                                <Input
-                                    label="Jam baca"
-                                    type="time"
-                                    required
-                                    value={draft.jam}
-                                    onChange={(event) =>
-                                        setDraft({
-                                            ...draft,
-                                            jam: event.target.value,
-                                        })
-                                    }
-                                />
-                            </div>
+                            </FormControl>
+                            <FormGrid>
+                                <FormControl data-error-field="tanggal">
+                                    <DatePicker
+                                        portalContainer={dialogRef}
+                                        label="Tanggal baca"
+
+                                        required
+                                        value={draft.tanggal}
+                                        onValueChange={(value) =>
+                                            setDraft({
+                                                ...draft,
+                                                tanggal: value,
+                                            })
+                                        }
+                                    />
+                                </FormControl>
+                                <FormControl data-error-field="jam">
+                                    <Input
+                                        label="Jam baca"
+                                        type="time"
+                                        required
+                                        value={draft.jam}
+                                        onChange={(event) =>
+                                            setDraft({
+                                                ...draft,
+                                                jam: event.target.value,
+                                            })
+                                        }
+                                    />
+                                </FormControl>
+                            </FormGrid>
                             {message('dibaca_pada') && (
                                 <p className="text-destructive text-sm">
                                     {message('dibaca_pada')}
                                 </p>
                             )}
-                            <Field>
+                            <FormControl data-error-field="nilai">
                                 <Input
                                     label="Angka meter"
                                     type="number"
@@ -586,11 +660,9 @@ export default function CounterReadingPage({
                                     }
                                 />
                                 {message('nilai') && (
-                                    <FieldDescription>
-                                        {message('nilai')}
-                                    </FieldDescription>
+                                    <FieldError>{message('nilai')}</FieldError>
                                 )}
-                            </Field>
+                            </FormControl>
                             <label className="flex items-start gap-2 text-sm">
                                 <Checkbox
                                     checked={draft.reset}
@@ -610,17 +682,19 @@ export default function CounterReadingPage({
                                     </span>
                                 </span>
                             </label>
-                            <Input
-                                label="Keterangan"
-                                maxLength={2000}
-                                value={draft.keterangan}
-                                onChange={(event) =>
-                                    setDraft({
-                                        ...draft,
-                                        keterangan: event.target.value,
-                                    })
-                                }
-                            />
+                            <FormControl data-error-field="keterangan">
+                                <Input
+                                    label="Keterangan"
+                                    maxLength={2000}
+                                    value={draft.keterangan}
+                                    onChange={(event) =>
+                                        setDraft({
+                                            ...draft,
+                                            keterangan: event.target.value,
+                                        })
+                                    }
+                                />
+                            </FormControl>
                         </PageDialogBody>
                     )}
                 </PageDialogContent>

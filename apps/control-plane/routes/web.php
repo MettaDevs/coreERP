@@ -13,6 +13,8 @@ use ControlPlane\Http\Controllers\Environments\Store as EnvironmentStore;
 use ControlPlane\Http\Controllers\Installer\InstallerFiles;
 use ControlPlane\Http\Controllers\Login;
 use ControlPlane\Http\Controllers\Logout;
+use ControlPlane\Http\Controllers\Products\ProductTenantActions;
+use ControlPlane\Http\Controllers\Products\ProductTenantScreens;
 use ControlPlane\Http\Controllers\Settings;
 use ControlPlane\Http\Controllers\SettingsLicense;
 use ControlPlane\Http\Controllers\Sites\SiteActions;
@@ -20,6 +22,7 @@ use ControlPlane\Http\Controllers\Sites\SiteScreens;
 use ControlPlane\Http\Controllers\Sites\SiteSettings;
 use ControlPlane\Http\Controllers\Sso\SsoBackchannelLogout;
 use ControlPlane\Http\Controllers\Sso\SsoLogin;
+use ControlPlane\Http\Controllers\TwoFactorLogin;
 use ControlPlane\Http\Controllers\Updates\Index as UpdateIndex;
 use ControlPlane\Http\Controllers\Updates\Upgrade as UpdateUpgrade;
 use Illuminate\Support\Facades\Route;
@@ -41,6 +44,8 @@ Route::middleware('throttle:60,1')->group(function (): void {
 });
 
 Route::middleware('guest')->group(function (): void {
+    Route::get('/login/verifikasi', [TwoFactorLogin::class, 'form']);
+    Route::post('/login/verifikasi', [TwoFactorLogin::class, 'submit'])->middleware('throttle:10,1');
     Route::get('/login', [Login::class, 'form'])->name('login');
     Route::post('/login', [Login::class, 'submit']);
     Route::get('/sso/masuk', [SsoLogin::class, 'start'])->middleware('throttle:30,1')->name('sso.start');
@@ -65,6 +70,10 @@ Route::post('/sso/backchannel-logout', SsoBackchannelLogout::class)->middleware(
  * menampilkan data yang sama dijaga gate.
  */
 Route::middleware(['auth', 'operator'])->group(function (): void {
+    Route::get('/produk/tenant', [ProductTenantScreens::class, 'index'])->name('product-tenants.index');
+    Route::post('/produk/tenant', [ProductTenantActions::class, 'store'])->name('product-tenants.store');
+    Route::get('/produk/tenant/{tenant}', [ProductTenantScreens::class, 'show'])->whereUuid('tenant')->name('product-tenants.show');
+    Route::post('/produk/tenant/{tenant}/ulang', [ProductTenantActions::class, 'retry'])->whereUuid('tenant')->name('product-tenants.retry');
     Route::get('/tenant', CustomerIndex::class)->name('customers.index');
     Route::post('/tenant', CustomerStore::class)->name('customers.store');
     // Alamat lama, sebelum layar ini berganti nama menjadi Tenant pada 14 September 2026. Penanda

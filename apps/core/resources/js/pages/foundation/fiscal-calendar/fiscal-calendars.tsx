@@ -1,9 +1,12 @@
 import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
+import { FieldError } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { NativeSelect } from '@apperp/ui/native-select';
 import { Head, useForm } from '@inertiajs/react';
 import { useState } from 'react';
+import { FormErrorHeader } from '@/components/form-error-header';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types/navigation';
 
@@ -46,33 +49,64 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 function CreateCalendar({ canManage }: { canManage: boolean }) {
+    const { wrap: wrapFormRequest, summary: formRequestSummary } =
+        useInertiaFeedback();
+
     const form = useForm({ code: '', name: '' });
 
     return (
         <form
+            noValidate
             className="flex flex-wrap items-end gap-2 rounded-md border p-3"
             onSubmit={(event) => {
                 event.preventDefault();
-                form.post('/settings/fiscal-calendars', {
-                    preserveScroll: true,
-                    onSuccess: () => form.reset(),
-                });
+                form.post(
+                    '/settings/fiscal-calendars',
+                    wrapFormRequest({
+                        preserveScroll: true,
+                        onSuccess: () => form.reset(),
+                    }),
+                );
             }}
         >
-            <Input
-                label="Kode"
-                placeholder="FY-JULI"
-                value={form.data.code}
-                disabled={!canManage}
-                onChange={(event) => form.setData('code', event.target.value)}
-            />
-            <Input
-                label="Nama"
-                placeholder="Tahun buku Juli-Juni"
-                value={form.data.name}
-                disabled={!canManage}
-                onChange={(event) => form.setData('name', event.target.value)}
-            />
+            <>
+                {formRequestSummary}
+                <FormErrorHeader errors={form.errors} />
+            </>
+            <div
+                className="flex min-w-0 flex-col gap-1"
+                data-error-field={'code'}
+            >
+                <Input
+                    label="Kode"
+                    placeholder="FY-JULI"
+                    value={form.data.code}
+                    disabled={!canManage}
+                    onChange={(event) =>
+                        form.setData('code', event.target.value)
+                    }
+                    data-error-field="code"
+                    aria-invalid={!!form.errors.code}
+                />
+                <FieldError>{form.errors.code}</FieldError>
+            </div>
+            <div
+                className="flex min-w-0 flex-col gap-1"
+                data-error-field={'name'}
+            >
+                <Input
+                    label="Nama"
+                    placeholder="Tahun buku Juli-Juni"
+                    value={form.data.name}
+                    disabled={!canManage}
+                    onChange={(event) =>
+                        form.setData('name', event.target.value)
+                    }
+                    data-error-field="name"
+                    aria-invalid={!!form.errors.name}
+                />
+                <FieldError>{form.errors.name}</FieldError>
+            </div>
             <ActionButton
                 action="save"
                 type="submit"
@@ -89,10 +123,14 @@ function AddYear({
     calendar: Calendar;
     canManage: boolean;
 }) {
+    const { wrap: wrapFormRequest, summary: formRequestSummary } =
+        useInertiaFeedback();
+
     const form = useForm({ name: '', starts_on: '', months: 12 });
 
     return (
         <form
+            noValidate
             className="flex flex-wrap items-end gap-2"
             onSubmit={(event) => {
                 event.preventDefault();
@@ -100,40 +138,74 @@ function AddYear({
                     ...data,
                     version: calendar.version,
                 }));
-                form.post(`/settings/fiscal-calendars/${calendar.id}/years`, {
-                    preserveScroll: true,
-                    onSuccess: () => form.reset(),
-                });
+                form.post(
+                    `/settings/fiscal-calendars/${calendar.id}/years`,
+                    wrapFormRequest({
+                        preserveScroll: true,
+                        onSuccess: () => form.reset(),
+                    }),
+                );
             }}
         >
-            <Input
-                label="Nama tahun"
-                placeholder="FY2027"
-                value={form.data.name}
-                disabled={!canManage}
-                onChange={(event) => form.setData('name', event.target.value)}
-            />
-            <Input
-                label="Mulai"
-                type="date"
-                value={form.data.starts_on}
-                disabled={!canManage}
-                onChange={(event) =>
-                    form.setData('starts_on', event.target.value)
-                }
-            />
-            <Input
-                label="Jumlah periode"
-                type="number"
-                min="1"
-                max="24"
-                className="w-32"
-                value={form.data.months}
-                disabled={!canManage}
-                onChange={(event) =>
-                    form.setData('months', Number(event.target.value))
-                }
-            />
+            <>
+                {formRequestSummary}
+                <FormErrorHeader errors={form.errors} />
+            </>
+
+            <div
+                className="flex min-w-0 flex-col gap-1"
+                data-error-field={'name'}
+            >
+                <Input
+                    label="Nama tahun"
+                    placeholder="FY2027"
+                    value={form.data.name}
+                    disabled={!canManage}
+                    onChange={(event) =>
+                        form.setData('name', event.target.value)
+                    }
+                    data-error-field="name"
+                    aria-invalid={!!form.errors.name}
+                />
+                <FieldError>{form.errors.name}</FieldError>
+            </div>
+            <div
+                className="flex min-w-0 flex-col gap-1"
+                data-error-field={'starts_on'}
+            >
+                <Input
+                    label="Mulai"
+                    type="date"
+                    value={form.data.starts_on}
+                    disabled={!canManage}
+                    onChange={(event) =>
+                        form.setData('starts_on', event.target.value)
+                    }
+                    data-error-field="starts_on"
+                    aria-invalid={!!form.errors.starts_on}
+                />
+                <FieldError>{form.errors.starts_on}</FieldError>
+            </div>
+            <div
+                className="flex min-w-0 flex-col gap-1"
+                data-error-field={'months'}
+            >
+                <Input
+                    label="Jumlah periode"
+                    type="number"
+                    min="1"
+                    max="24"
+                    className="w-32"
+                    value={form.data.months}
+                    disabled={!canManage}
+                    onChange={(event) =>
+                        form.setData('months', Number(event.target.value))
+                    }
+                    data-error-field="months"
+                    aria-invalid={!!form.errors.months}
+                />
+                <FieldError>{form.errors.months}</FieldError>
+            </div>
             <ActionButton
                 action="save"
                 type="submit"
@@ -164,11 +236,21 @@ function AssignEntity({
     entity: LegalEntity;
     canManage: boolean;
 }) {
+    const { wrap: wrapFormRequest, summary: formRequestSummary } =
+        useInertiaFeedback();
+
     const [selected, setSelected] = useState(entity.fiscal_calendar_id ?? '');
     const form = useForm({ legal_entity_id: entity.id });
 
     return (
         <div className="flex flex-wrap items-end gap-2 border-t py-2">
+            <>
+                {formRequestSummary}
+                <FormErrorHeader
+                    errors={form.errors}
+                    operation="Kalender belum ditetapkan"
+                />
+            </>
             <span className="min-w-48 text-sm">
                 {entity.name}
                 {entity.company_code ? ` (${entity.company_code})` : ''}
@@ -195,9 +277,12 @@ function AssignEntity({
                         ...data,
                         version: entity.version,
                     }));
-                    form.post(`/settings/fiscal-calendars/${selected}/assign`, {
-                        preserveScroll: true,
-                    });
+                    form.post(
+                        `/settings/fiscal-calendars/${selected}/assign`,
+                        wrapFormRequest({
+                            preserveScroll: true,
+                        }),
+                    );
                 }}
             >
                 Tetapkan

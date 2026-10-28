@@ -44,6 +44,8 @@ type DataTableColumn<T> = {
     filterActive?: boolean;
     headerActions?: { label: string; onSelect: () => void }[];
     cell: (row: T) => React.ReactNode;
+    /** Kontrol form menyediakan ruang bagi floating label tanpa pemotongan teks sel. */
+    content?: 'text' | 'control';
     sortValue?: (row: T) => SortValue;
     width?: number;
     minWidth?: number;
@@ -86,6 +88,8 @@ type DataTableProps<T> = {
     data: T[];
     getRowKey: (row: T) => React.Key;
     actions?: DataTableRowAction[];
+    /** Aksi mengikuti izin tiap record; actions tetap menentukan kolom yang tersedia. */
+    getRowActions?: (row: T) => DataTableRowAction[];
     getRowLabel?: (row: T) => string;
     onRowAction?: (actionId: string, row: T) => void;
     selection?: DataTableSelection;
@@ -173,6 +177,7 @@ function DataTable<T>({
     data,
     getRowKey,
     actions = [],
+    getRowActions,
     getRowLabel,
     onRowAction,
     selection,
@@ -371,47 +376,59 @@ function DataTable<T>({
         (selection ? 1 : 0) +
         (showRowNumbers ? 1 : 0) +
         (actions.length > 0 ? 1 : 0);
-    const actionsMenu = (row: T) => (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-6"
-                    aria-label={`Tindakan untuk ${getRowLabel?.(row) ?? 'baris'}`}
-                    /* Membuka menu bukan mengklik baris. Tanpa ini, tabel yang memakai
+    const actionsMenu = (row: T) => {
+        const rowActions = getRowActions?.(row) ?? actions;
+
+        if (!rowActions.length) {
+            return null;
+        }
+
+        return (
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-6"
+                        aria-label={`Tindakan untuk ${getRowLabel?.(row) ?? 'baris'}`}
+                        /* Membuka menu bukan mengklik baris. Tanpa ini, tabel yang memakai
              `onRowClick` ikut berpindah halaman begitu menunya dibuka, dan tindakan
              yang baru saja dipilih pengguna langsung ditimpa tujuan baris. */
-                    onClick={(event) => event.stopPropagation()}
-                >
-                    <Ellipsis />
-                </Button>
-            </DropdownMenuTrigger>
-            {/* Menu ini diportal, tetapi peristiwa React tetap merambat lewat pohon komponen,
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <Ellipsis />
+                    </Button>
+                </DropdownMenuTrigger>
+                {/* Menu ini diportal, tetapi peristiwa React tetap merambat lewat pohon komponen,
           bukan pohon DOM: tanpa penghenti di sini, memilih satu tindakan juga menghitung
           sebagai klik pada barisnya, dan tujuan baris menimpa tindakan yang dipilih. */}
-            <DropdownMenuContent
-                align="start"
-                onClick={(event) => event.stopPropagation()}
-                onDoubleClick={(event) => event.stopPropagation()}
-            >
-                {actions.map((action) => (
-                    <React.Fragment key={action.id}>
-                        {action.separatorBefore && <DropdownMenuSeparator />}
-                        <DropdownMenuItem
-                            variant={
-                                action.destructive ? 'destructive' : 'default'
-                            }
-                            onSelect={() => onRowAction?.(action.id, row)}
-                        >
-                            {action.icon}
-                            {action.label}
-                        </DropdownMenuItem>
-                    </React.Fragment>
-                ))}
-            </DropdownMenuContent>
-        </DropdownMenu>
-    );
+                <DropdownMenuContent
+                    align="start"
+                    onClick={(event) => event.stopPropagation()}
+                    onDoubleClick={(event) => event.stopPropagation()}
+                >
+                    {rowActions.map((action) => (
+                        <React.Fragment key={action.id}>
+                            {action.separatorBefore && (
+                                <DropdownMenuSeparator />
+                            )}
+                            <DropdownMenuItem
+                                variant={
+                                    action.destructive
+                                        ? 'destructive'
+                                        : 'default'
+                                }
+                                onSelect={() => onRowAction?.(action.id, row)}
+                            >
+                                {action.icon}
+                                {action.label}
+                            </DropdownMenuItem>
+                        </React.Fragment>
+                    ))}
+                </DropdownMenuContent>
+            </DropdownMenu>
+        );
+    };
 
     const activateRow = (
         event: React.MouseEvent<HTMLTableRowElement>,
@@ -522,7 +539,15 @@ function DataTable<T>({
                             column.align === 'right' && 'text-right',
                         )}
                     >
-                        <div className="min-w-0 truncate">
+                        <div
+                            data-cell-content={column.content ?? 'text'}
+                            className={cn(
+                                'min-w-0',
+                                column.content === 'control'
+                                    ? 'whitespace-normal py-2'
+                                    : 'truncate',
+                            )}
+                        >
                             <DataTableText>{column.cell(row)}</DataTableText>
                         </div>
                     </TableCell>

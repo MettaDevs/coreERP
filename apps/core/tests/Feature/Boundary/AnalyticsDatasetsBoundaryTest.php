@@ -36,11 +36,7 @@ class AnalyticsDatasetsBoundaryTest extends TestCase
         parent::setUp();
 
         // Tabel module produk sudah dibuat `Tests\TestCase`; tabel module contoh dibuat test-nya sendiri.
-        Artisan::call('migrate', [
-            '--path' => dirname(__DIR__, 2).'/Fixtures/modules/apperp/contoh-a/database/migrations',
-            '--realpath' => true,
-            '--force' => true,
-        ]);
+        Artisan::call('module:migrate', ['module' => 'contoh-a']);
     }
 
     public function test_every_registered_dataset_passes_the_validator(): void

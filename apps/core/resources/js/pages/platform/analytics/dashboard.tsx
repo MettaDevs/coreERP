@@ -32,6 +32,7 @@ import {
 import { WidgetBuilder } from '@/components/analytics/widget-builder';
 import { WidgetFrame } from '@/components/analytics/widget-frame';
 import { WidgetTitleDialog } from '@/components/analytics/widget-title-dialog';
+import { useSaveFeedback } from '@/hooks/use-save-feedback';
 import {
     archiveDashboard,
     archiveWidget,
@@ -43,7 +44,6 @@ import type {
     DashboardLayoutItem,
     DashboardWidget,
 } from '@/lib/analytics/types';
-import { toastSaveError } from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
 
 type Props = {
@@ -80,6 +80,12 @@ function reloadDashboard(onFinish?: () => void) {
 }
 
 function DashboardScreen({ dashboard, abilities }: Props) {
+    const {
+        report: saveReport,
+        clear: saveClear,
+        summary: saveSummary,
+        scopeRef: saveScopeRef,
+    } = useSaveFeedback<HTMLDivElement>(dashboard.id);
     const [draft, setDraft] = useState<DashboardLayoutItem[] | null>(null);
     const [savingLayout, setSavingLayout] = useState(false);
     const [editingDashboard, setEditingDashboard] = useState(false);
@@ -102,34 +108,40 @@ function DashboardScreen({ dashboard, abilities }: Props) {
 
         setSavingLayout(true);
 
+        saveClear();
+
         try {
             await updateDashboard(dashboard, { layout: draft });
             toast.success('Tata letak disimpan.');
             reloadDashboard(() => setDraft(null));
         } catch (caught) {
-            toastSaveError(caught, 'Tata letak belum disimpan.');
+            saveReport(caught, 'Tata letak belum disimpan.');
         } finally {
             setSavingLayout(false);
         }
     };
 
     const confirmArchiveDashboard = async () => {
+        saveClear();
+
         try {
             await archiveDashboard(dashboard);
             toast.success(`Dasbor "${dashboard.name}" diarsipkan.`);
             router.visit('/analytics');
         } catch (caught) {
-            toastSaveError(caught, 'Dasbor belum diarsipkan.');
+            saveReport(caught, 'Dasbor belum diarsipkan.');
         }
     };
 
     const confirmArchiveWidget = async (widget: DashboardWidget) => {
+        saveClear();
+
         try {
             await archiveWidget(widget);
             toast.success(`"${widget.title}" diarsipkan dari dasbor ini.`);
             reloadDashboard();
         } catch (caught) {
-            toastSaveError(caught, 'Bagian ini belum diarsipkan.');
+            saveReport(caught, 'Bagian ini belum diarsipkan.');
         } finally {
             setArchivingWidget(null);
         }
@@ -139,6 +151,8 @@ function DashboardScreen({ dashboard, abilities }: Props) {
         <>
             <Head title={dashboard.name} />
             <RecordActionBar
+                ref={saveScopeRef}
+                feedback={saveSummary}
                 title="Dasbor"
                 trailing={
                     dashboard.shared ? (
@@ -161,7 +175,10 @@ function DashboardScreen({ dashboard, abilities }: Props) {
                                 action="cancel"
                                 type="button"
                                 disabled={savingLayout}
-                                onClick={() => setDraft(null)}
+                                onClick={() => {
+                                    saveClear();
+                                    setDraft(null);
+                                }}
                             />
                         </>
                     ) : (

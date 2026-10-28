@@ -217,7 +217,6 @@ Route::middleware(['auth'])->group(function () {
     Route::get('settings/address-setup/lookup/top-down', [AddressSetupController::class, 'lookupTopDown'])->name('address-setup.lookup.top-down');
     Route::get('settings/address-setup/timezone/resolve', [AddressSetupController::class, 'resolveTimezone'])->name('address-setup.timezone.resolve');
     Route::get('settings/address-setup/divisions', [AddressSetupController::class, 'getDivisions'])->name('address-setup.divisions');
-    Route::get('settings/address-setup/villages-paginated', [AddressSetupController::class, 'getVillagesPaginated'])->name('address-setup.villages.paginated');
     // External Codes & Translations
     Route::get('settings/address-setup/external-codes', [AddressSetupController::class, 'getExternalCodes'])->name('address-setup.external-codes.index');
     Route::get('settings/address-setup/translations', [AddressSetupController::class, 'getTranslations'])->name('address-setup.translations.index');
@@ -384,6 +383,7 @@ Route::middleware(['auth'])->group(function () {
         Route::patch('parties/{party}', [GlobalAddressBookController::class, 'update'])->name('parties.update');
         Route::delete('parties/{party}', [GlobalAddressBookController::class, 'destroy'])->name('parties.destroy');
         Route::post('parties/{party}/restore', [GlobalAddressBookController::class, 'restore'])->withTrashed()->name('parties.restore');
+        Route::get('address-books', [GlobalAddressBookController::class, 'books'])->name('address-books.index');
         Route::post('address-books', [GlobalAddressBookController::class, 'storeBook'])->name('address-books.store');
         Route::patch('address-books/{addressBook}', [GlobalAddressBookController::class, 'updateBook'])->name('address-books.update');
         Route::delete('address-books/{addressBook}', [GlobalAddressBookController::class, 'destroyBook'])->name('address-books.destroy');
@@ -424,6 +424,7 @@ Route::middleware(['auth'])->group(function () {
         Route::post('integration-clients/{integrationClient}/test-push', [IntegrationClientController::class, 'testPush'])->middleware('throttle:10,1')->name('integration-clients.test-push');
         Route::get('vendors/party-options', [VendorController::class, 'partyOptions'])->name('vendors.party-options');
         Route::get('vendors/company-options', [VendorController::class, 'companyOptions'])->name('vendors.company-options');
+        Route::get('vendors/create-context', [VendorController::class, 'createContext'])->name('vendors.create-context');
         Route::get('vendors/lookup', [VendorController::class, 'lookup'])->name('vendors.lookup');
         Route::get('vendors/{vendor}/activity', [VendorController::class, 'activity'])->middleware('throttle:60,1')->name('vendors.activity');
         Route::post('vendors', [VendorController::class, 'store'])->middleware('throttle:60,1')->name('vendors.store');

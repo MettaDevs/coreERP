@@ -1,0 +1,51 @@
+type: object
+required:
+- id
+- product
+- profile
+- name
+- slug
+- status
+properties:
+  id:
+    type: string
+  product:
+    type: string
+  profile:
+    type: string
+  name:
+    type: string
+  slug:
+    type: string
+  owner_name:
+    type: string
+  owner_email:
+    type: string
+  created_at:
+    type: string
+  status:
+    type: string
+    enum:
+    - queued
+    - provisioning
+    - ready
+    - failed
+  public_url:
+    type:
+    - string
+    - 'null'
+    format: uri
+  failure_message:
+    type:
+    - string
+    - 'null'
+  expires_at:
+    type:
+    - string
+    - 'null'
+    format: date-time
+  credentials:
+    type: object
+    additionalProperties:
+      type: string
+    description: Hanya rincian operator, tidak pernah pada daftar atau audit.

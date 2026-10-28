@@ -63,6 +63,7 @@ function CollapsibleSection({
     value,
     title,
     summary,
+    keepMounted = false,
     className,
     children,
 }: {
@@ -75,10 +76,19 @@ function CollapsibleSection({
      * reads the same value twice.
      */
     summary?: React.ReactNode;
+    /** Preserve form drafts after the section has first been opened. */
+    keepMounted?: boolean;
     className?: string;
     children: React.ReactNode;
 }) {
     const isOpen = React.useContext(OpenSectionsContext).includes(value);
+    const [hasOpened, setHasOpened] = React.useState(isOpen);
+
+    if (isOpen && !hasOpened) {
+        setHasOpened(true);
+    }
+
+    const preserveContent = keepMounted && hasOpened;
     const activation = useRecordEditActivation();
 
     return (
@@ -116,7 +126,11 @@ function CollapsibleSection({
         was clipped for any field placed first inside a section. This padding is what gives
         it room; it is not decorative spacing.
       */}
-            <AccordionContent className="min-w-0 px-3 pb-3 pt-3">
+            <AccordionContent
+                className="min-w-0 px-3 pb-3 pt-3"
+                forceMount={preserveContent ? true : undefined}
+                hidden={preserveContent && !isOpen ? true : undefined}
+            >
                 {children}
             </AccordionContent>
         </AccordionItem>
