@@ -21,6 +21,7 @@ const required = new Set([
     'mergeIssuedRows',
 ]);
 const declarations = [];
+
 for (const statement of source.statements) {
     if (
         ts.isFunctionDeclaration(statement) &&
@@ -29,6 +30,7 @@ for (const statement of source.statements) {
         declarations.push(statement.getText(source));
         required.delete(statement.name.text);
     }
+
     if (ts.isVariableStatement(statement)) {
         for (const declaration of statement.declarationList.declarations) {
             if (required.has(declaration.name.getText(source))) {
@@ -38,11 +40,15 @@ for (const statement of source.statements) {
         }
     }
 }
+
 const callbacks = new Set(['update', 'save', 'resend', 'refreshIssued']);
 function visit(node) {
     if (ts.isFunctionDeclaration(node) && node.name?.text === 'InviteForm') {
         for (const statement of node.body.statements) {
-            if (!ts.isVariableStatement(statement)) continue;
+            if (!ts.isVariableStatement(statement)) {
+                continue;
+            }
+
             for (const declaration of statement.declarationList.declarations) {
                 if (callbacks.has(declaration.name.getText(source))) {
                     declarations.push(`const ${declaration.getText(source)};`);
@@ -51,6 +57,7 @@ function visit(node) {
             }
         }
     }
+
     ts.forEachChild(node, visit);
 }
 visit(source);

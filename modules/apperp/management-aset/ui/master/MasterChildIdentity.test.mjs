@@ -16,6 +16,7 @@ function actualCallbacks(file, names, context) {
         if (ts.isFunctionDeclaration(node) && names.includes(node.name?.text)) {
             declarations.set(node.name.text, node.getText(source));
         }
+
         if (
             ts.isVariableDeclaration(node) &&
             names.includes(node.name.getText(source))
@@ -25,6 +26,7 @@ function actualCallbacks(file, names, context) {
                 `const ${node.getText(source)};`,
             );
         }
+
         ts.forEachChild(node, visit);
     }
     visit(source);
@@ -39,6 +41,7 @@ function actualCallbacks(file, names, context) {
         }).outputText,
         context,
     );
+
     return context;
 }
 

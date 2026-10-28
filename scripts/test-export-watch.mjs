@@ -60,6 +60,7 @@ function visit(node) {
     ) {
         selector = node.initializer.getText(pageAst);
     }
+
     ts.forEachChild(node, visit);
 }
 visit(pageAst);
