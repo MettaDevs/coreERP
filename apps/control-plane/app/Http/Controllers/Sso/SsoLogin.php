@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ControlPlane\Http\Controllers\Sso;
 
+use ControlPlane\Audit\OperatorAudit;
 use ControlPlane\Http\Controllers\Controller;
 use ControlPlane\Models\ExternalIdentity;
 use ControlPlane\Models\User;
@@ -84,7 +85,7 @@ class SsoLogin extends Controller
             $subject = (string) $claims['sub'];
 
             return $connecting
-                ? $this->finishConnect($ceremony['user_id'], $subject, $claims)
+                ? $this->finishConnect($request, $ceremony['user_id'], $subject, $claims)
                 : $this->finishLogin($request, $subject);
         } catch (SsoFailure $e) {
             Log::info('Konsol SSO: upacara berhenti.', ['alasan' => $e->reason, 'hubungkan' => $connecting, 'detail' => $e->getMessage()]);
@@ -118,7 +119,7 @@ class SsoLogin extends Controller
     }
 
     /** @param  array<string, mixed>  $claims */
-    private function finishConnect(?int $userId, string $subject, array $claims): RedirectResponse
+    private function finishConnect(Request $request, ?int $userId, string $subject, array $claims): RedirectResponse
     {
         // Upacara "hubungkan" hanya boleh diselesaikan akun yang memulainya, di sesi yang sama.
         if ($userId === null || (int) Auth::id() !== $userId) {
@@ -137,12 +138,15 @@ class SsoLogin extends Controller
         try {
             // Savepoint: pelanggaran unik dari upacara yang berbalapan tidak membatalkan transaksi
             // yang lebih luar.
-            DB::transaction(fn () => ExternalIdentity::create([
-                'user_id' => $userId,
-                'issuer' => $this->provider->issuer(),
-                'subject' => $subject,
-                'email_at_link' => is_string($claims['email'] ?? null) ? $claims['email'] : null,
-            ]));
+            DB::transaction(function () use ($request, $userId, $subject, $claims): void {
+                $identity = ExternalIdentity::create([
+                    'user_id' => $userId,
+                    'issuer' => $this->provider->issuer(),
+                    'subject' => $subject,
+                    'email_at_link' => is_string($claims['email'] ?? null) ? $claims['email'] : null,
+                ]);
+                OperatorAudit::record($request, 'sso.link', 'external_identity', (string) $identity->id);
+            });
         } catch (UniqueConstraintViolationException) {
             throw new SsoFailure(SsoFailure::LINKED_ELSEWHERE, 'Hubungan yang sama lahir di upacara lain lebih dulu.');
         }

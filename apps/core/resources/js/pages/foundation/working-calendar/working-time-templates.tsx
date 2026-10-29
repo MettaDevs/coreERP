@@ -23,7 +23,7 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
-import { FieldHint, FieldLabel } from '@apperp/ui/field';
+import { FieldError, FieldHint, FieldLabel } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { Label } from '@apperp/ui/label';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
@@ -52,7 +52,8 @@ import type { ListLoader } from '@apperp/ui/use-incremental-list';
 import { Head } from '@inertiajs/react';
 import { Copy, Info, Search, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { apiJson, errorText } from '@/lib/core-api';
+import { FormErrorHeader } from '@/components/form-error-header';
+import { apiJson, CoreApiError, errorText } from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
 
 // Urutan hari standar Dynamics 365: Senin, Selasa, Rabu, Kamis, Jumat, Sabtu, Minggu
@@ -212,6 +213,18 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
     const [isLoadingDetail, setIsLoadingDetail] = useState(false);
     const [error, setError] = useState('');
     const [modalError, setModalError] = useState('');
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>(
+        {},
+    );
+    const [modalErrors, setModalErrors] = useState<Record<string, string[]>>(
+        {},
+    );
+    const [validationLinePositions, setValidationLinePositions] = useState<
+        number[]
+    >([]);
+    const templateScope = useRef<HTMLElement>(null);
+    const lineErrorKey = (line: WorkingTimeLine, field: string) =>
+        `lines.${validationLinePositions.indexOf(draftLines.indexOf(line))}.${field}`;
     const detailRequest = useRef<AbortController | null>(null);
     useEffect(() => () => detailRequest.current?.abort(), []);
 
@@ -224,6 +237,7 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
         setIsEditing(edit);
         setSelectedRowIndex(null);
         setError('');
+        setFieldErrors({});
     };
     const selectTemplate = async (id: string) => {
         detailRequest.current?.abort();
@@ -232,6 +246,7 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
         setActiveTemplate(null);
         setIsLoadingDetail(true);
         setError('');
+        setFieldErrors({});
 
         try {
             const result = await apiJson<{ data: WorkingTimeTemplate[] }>(
@@ -243,6 +258,11 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
                 openRecord(result.data[0]);
             }
         } catch (caught) {
+            if (caught instanceof CoreApiError) {
+                setFieldErrors(caught.errors);
+                setExpandedDays(DAYS.map((day) => String(day.index)));
+            }
+
             if (!controller.signal.aborted) {
                 setError(
                     errorText(
@@ -323,6 +343,7 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
     };
 
     const handleAddLine = (dayIndex: number) => {
+        setFieldErrors({});
         setIsEditing(true);
         const newLine: WorkingTimeLine = {
             day_of_week: dayIndex,
@@ -342,6 +363,7 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
     };
 
     const handleRemoveLine = (dayIndex: number) => {
+        setFieldErrors({});
         setIsEditing(true);
         const dayIndices = draftLines
             .map((l, i) => (l.day_of_week === dayIndex ? i : -1))
@@ -363,6 +385,7 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
     };
 
     const handleDeleteSpecificLine = (dayIndex: number, indexInDay: number) => {
+        setFieldErrors({});
         setIsEditing(true);
         const dayIndices = draftLines
             .map((l, i) => (l.day_of_week === dayIndex ? i : -1))
@@ -430,36 +453,39 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
 
         setIsSaving(true);
 
-        const sanitizedLines = draftLines
-            .filter(
-                (l) =>
-                    l.closed_for_pickup ||
-                    (l.from_time && l.from_time.trim()) ||
-                    (l.to_time && l.to_time.trim()) ||
-                    (l.hours && l.hours > 0),
-            )
-            .map((l) => {
-                const from = l.from_time ? formatTimeString(l.from_time) : null;
-                const to = l.to_time ? formatTimeString(l.to_time) : null;
-                const hrs = computeHours(from, to) || Number(l.hours) || 0;
+        const includedLines = draftLines.filter(
+            (l) =>
+                l.closed_for_pickup ||
+                (l.from_time && l.from_time.trim()) ||
+                (l.to_time && l.to_time.trim()) ||
+                (l.hours && l.hours > 0),
+        );
+        setValidationLinePositions(
+            includedLines.map((line) => draftLines.indexOf(line)),
+        );
+        const sanitizedLines = includedLines.map((l) => {
+            const from = l.from_time ? formatTimeString(l.from_time) : null;
+            const to = l.to_time ? formatTimeString(l.to_time) : null;
+            const hrs = computeHours(from, to) || Number(l.hours) || 0;
 
-                return {
-                    day_of_week: l.day_of_week,
-                    from_time: from || null,
-                    to_time: to || null,
-                    efficiency:
-                        l.efficiency === null ||
-                        l.efficiency === undefined ||
-                        String(l.efficiency).trim() === ''
-                            ? 100
-                            : Number(l.efficiency),
-                    property: l.property ? l.property.trim() : null,
-                    closed_for_pickup: Boolean(l.closed_for_pickup),
-                    hours: hrs,
-                };
-            });
+            return {
+                day_of_week: l.day_of_week,
+                from_time: from || null,
+                to_time: to || null,
+                efficiency:
+                    l.efficiency === null ||
+                    l.efficiency === undefined ||
+                    String(l.efficiency).trim() === ''
+                        ? 100
+                        : Number(l.efficiency),
+                property: l.property ? l.property.trim() : null,
+                closed_for_pickup: Boolean(l.closed_for_pickup),
+                hours: hrs,
+            };
+        });
 
         setError('');
+        setFieldErrors({});
 
         try {
             const result = await apiJson<{ data: WorkingTimeTemplate }>(
@@ -477,6 +503,11 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
             openRecord(result.data);
             list.reload();
         } catch (caught) {
+            if (caught instanceof CoreApiError) {
+                setFieldErrors(caught.errors);
+                setExpandedDays(DAYS.map((day) => String(day.index)));
+            }
+
             setError(
                 errorText(
                     caught,
@@ -489,6 +520,7 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
     };
 
     const handleExecuteCopyDay = () => {
+        setFieldErrors({});
         setIsEditing(true);
         const sourceLines = draftLines.filter(
             (l) => l.day_of_week === copyFromDay,
@@ -520,6 +552,7 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
 
         setIsCreating(true);
         setModalError('');
+        setModalErrors({});
 
         try {
             const result = await apiJson<{ data: WorkingTimeTemplate }>(
@@ -539,6 +572,10 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
             setNewCode('');
             setNewName('');
         } catch (caught) {
+            if (caught instanceof CoreApiError) {
+                setModalErrors(caught.errors);
+            }
+
             setModalError(
                 errorText(
                     caught,
@@ -556,6 +593,7 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
 
         setIsArchiving(true);
         setModalError('');
+        setModalErrors({});
 
         try {
             await apiJson(`${TEMPLATE_URL}/${activeTemplate.id}`, {
@@ -566,6 +604,10 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
             setIsArchiveOpen(false);
             list.reload();
         } catch (caught) {
+            if (caught instanceof CoreApiError) {
+                setModalErrors(caught.errors);
+            }
+
             setModalError(
                 errorText(
                     caught,
@@ -584,6 +626,7 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
         setCopyNewCode(`${activeTemplate.code}-SALIN`);
         setCopyNewName(`${activeTemplate.name} (Salinan)`);
         setModalError('');
+        setModalErrors({});
         setIsCopyTemplateOpen(true);
     };
     const handleExecuteCopyTemplate = async () => {
@@ -598,6 +641,7 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
 
         setIsCopying(true);
         setModalError('');
+        setModalErrors({});
 
         try {
             const result = await apiJson<{ data: WorkingTimeTemplate }>(
@@ -614,6 +658,10 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
             list.reload();
             setIsCopyTemplateOpen(false);
         } catch (caught) {
+            if (caught instanceof CoreApiError) {
+                setModalErrors(caught.errors);
+            }
+
             setModalError(
                 errorText(
                     caught,
@@ -631,7 +679,17 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
 
             <ListPageLayout
                 header={
-                    <RecordActionBar title="Pola jam kerja">
+                    <RecordActionBar
+                        title="Pola jam kerja"
+                        feedback={
+                            <FormErrorHeader
+                                message={error}
+                                errors={fieldErrors}
+                                scopeRef={templateScope}
+                                operation="Pola jam kerja belum disimpan"
+                            />
+                        }
+                    >
                         {isEditing ? (
                             <>
                                 <ActionButton
@@ -670,6 +728,7 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
                                         disabled={isLoadingDetail}
                                         onClick={() => {
                                             setModalError('');
+                                            setModalErrors({});
                                             setIsCreateOpen(true);
                                         }}
                                     />
@@ -682,6 +741,7 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
                                         disabled={!activeTemplate}
                                         onClick={() => {
                                             setModalError('');
+                                            setModalErrors({});
                                             setIsArchiveOpen(true);
                                         }}
                                     />
@@ -773,6 +833,7 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
                         className="flex h-full min-h-0 min-w-0 flex-col"
                     >
                         <main
+                            ref={templateScope}
                             className="min-h-0 min-w-0 flex-1 overflow-auto bg-background p-4 lg:p-6"
                             scroll-region=""
                         >
@@ -791,39 +852,69 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
                                 >
                                     {/* Form Fields: Standard Input Component */}
                                     <div className="grid w-full gap-4 sm:grid-cols-2">
-                                        <Input
-                                            label="Kode pola jam kerja"
-                                            required
-                                            maxLength={50}
-                                            value={
-                                                isEditing
-                                                    ? headerCode
-                                                    : activeTemplate.code
-                                            }
-                                            readOnly={!isEditing || !canManage}
-                                            onChange={(e) =>
-                                                setHeaderCode(
-                                                    e.target.value.toUpperCase(),
-                                                )
-                                            }
-                                            className="font-medium uppercase"
-                                        />
+                                        <div
+                                            className="flex min-w-0 flex-col gap-1"
+                                            data-error-field={'code'}
+                                        >
+                                            <Input
+                                                label="Kode pola jam kerja"
+                                                required
+                                                maxLength={50}
+                                                value={
+                                                    isEditing
+                                                        ? headerCode
+                                                        : activeTemplate.code
+                                                }
+                                                readOnly={
+                                                    !isEditing || !canManage
+                                                }
+                                                onChange={(e) =>
+                                                    setHeaderCode(
+                                                        e.target.value.toUpperCase(),
+                                                    )
+                                                }
+                                                className="font-medium uppercase"
+                                                data-error-field={'code'}
+                                                aria-invalid={Boolean(
+                                                    fieldErrors['code'],
+                                                )}
+                                            />
+                                            <FieldError>
+                                                {fieldErrors['code']?.join(' ')}
+                                            </FieldError>
+                                        </div>
 
-                                        <Input
-                                            label="Nama"
-                                            required
-                                            maxLength={150}
-                                            value={
-                                                isEditing
-                                                    ? headerName
-                                                    : activeTemplate.name
-                                            }
-                                            readOnly={!isEditing || !canManage}
-                                            onChange={(e) =>
-                                                setHeaderName(e.target.value)
-                                            }
-                                            className="font-medium"
-                                        />
+                                        <div
+                                            className="flex min-w-0 flex-col gap-1"
+                                            data-error-field={'name'}
+                                        >
+                                            <Input
+                                                label="Nama"
+                                                required
+                                                maxLength={150}
+                                                value={
+                                                    isEditing
+                                                        ? headerName
+                                                        : activeTemplate.name
+                                                }
+                                                readOnly={
+                                                    !isEditing || !canManage
+                                                }
+                                                onChange={(e) =>
+                                                    setHeaderName(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className="font-medium"
+                                                data-error-field={'name'}
+                                                aria-invalid={Boolean(
+                                                    fieldErrors['name'],
+                                                )}
+                                            />
+                                            <FieldError>
+                                                {fieldErrors['name']?.join(' ')}
+                                            </FieldError>
+                                        </div>
                                     </div>
 
                                     {/* Standard Collapsible Section Group */}
@@ -1028,259 +1119,379 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
                                                                                         {isEditing ? (
                                                                                             <>
                                                                                                 <TableCell>
-                                                                                                    <Input
-                                                                                                        aria-label={`Dari jam ${day.name}, baris ${idx + 1}`}
-                                                                                                        type="text"
-                                                                                                        inputMode="numeric"
-                                                                                                        maxLength={
-                                                                                                            5
-                                                                                                        }
-                                                                                                        value={
-                                                                                                            line.from_time
-                                                                                                                ? line.from_time.slice(
-                                                                                                                      0,
-                                                                                                                      5,
-                                                                                                                  )
-                                                                                                                : ''
-                                                                                                        }
-
-                                                                                                        onChange={(
-                                                                                                            e,
-                                                                                                        ) => {
-                                                                                                            let val =
-                                                                                                                e.target.value.replace(
-                                                                                                                    /[^0-9:]/g,
-                                                                                                                    '',
-                                                                                                                );
-
-                                                                                                            if (
-                                                                                                                val.length >
+                                                                                                    <div
+                                                                                                        className="flex min-w-0 flex-col gap-1"
+                                                                                                        data-error-field={lineErrorKey(
+                                                                                                            line,
+                                                                                                            'from_time',
+                                                                                                        )}
+                                                                                                    >
+                                                                                                        <Input
+                                                                                                            aria-label={`Dari jam ${day.name}, baris ${idx + 1}`}
+                                                                                                            type="text"
+                                                                                                            inputMode="numeric"
+                                                                                                            maxLength={
                                                                                                                 5
-                                                                                                            ) {
-                                                                                                                val =
-                                                                                                                    val.slice(
-                                                                                                                        0,
-                                                                                                                        5,
-                                                                                                                    );
+                                                                                                            }
+                                                                                                            value={
+                                                                                                                line.from_time
+                                                                                                                    ? line.from_time.slice(
+                                                                                                                          0,
+                                                                                                                          5,
+                                                                                                                      )
+                                                                                                                    : ''
                                                                                                             }
 
-                                                                                                            handleUpdateLine(
-                                                                                                                day.index,
-                                                                                                                idx,
-                                                                                                                'from_time',
-                                                                                                                val,
-                                                                                                            );
-                                                                                                        }}
-                                                                                                        onBlur={(
-                                                                                                            e,
-                                                                                                        ) => {
-                                                                                                            const formatted =
-                                                                                                                formatTimeString(
-                                                                                                                    e
-                                                                                                                        .target
-                                                                                                                        .value,
-                                                                                                                );
-                                                                                                            handleUpdateLine(
-                                                                                                                day.index,
-                                                                                                                idx,
-                                                                                                                'from_time',
-                                                                                                                formatted,
-                                                                                                            );
-
-                                                                                                            if (
-                                                                                                                formatted &&
-                                                                                                                line.to_time
-                                                                                                            ) {
-                                                                                                                const hrs =
-                                                                                                                    computeHours(
-                                                                                                                        formatted,
-                                                                                                                        line.to_time,
+                                                                                                            onChange={(
+                                                                                                                e,
+                                                                                                            ) => {
+                                                                                                                let val =
+                                                                                                                    e.target.value.replace(
+                                                                                                                        /[^0-9:]/g,
+                                                                                                                        '',
                                                                                                                     );
-                                                                                                                handleUpdateLine(
-                                                                                                                    day.index,
-                                                                                                                    idx,
-                                                                                                                    'hours',
-                                                                                                                    hrs,
-                                                                                                                );
-                                                                                                            }
-                                                                                                        }}
-                                                                                                        className="w-20"
-                                                                                                        placeholder="08:00"
-                                                                                                    />
-                                                                                                </TableCell>
-                                                                                                <TableCell>
-                                                                                                    <Input
-                                                                                                        aria-label={`Sampai jam ${day.name}, baris ${idx + 1}`}
-                                                                                                        type="text"
-                                                                                                        inputMode="numeric"
-                                                                                                        maxLength={
-                                                                                                            5
-                                                                                                        }
-                                                                                                        value={
-                                                                                                            line.to_time
-                                                                                                                ? line.to_time.slice(
-                                                                                                                      0,
-                                                                                                                      5,
-                                                                                                                  )
-                                                                                                                : ''
-                                                                                                        }
 
-                                                                                                        onChange={(
-                                                                                                            e,
-                                                                                                        ) => {
-                                                                                                            let val =
-                                                                                                                e.target.value.replace(
-                                                                                                                    /[^0-9:]/g,
-                                                                                                                    '',
-                                                                                                                );
-
-                                                                                                            if (
-                                                                                                                val.length >
-                                                                                                                5
-                                                                                                            ) {
-                                                                                                                val =
-                                                                                                                    val.slice(
-                                                                                                                        0,
-                                                                                                                        5,
-                                                                                                                    );
-                                                                                                            }
-
-                                                                                                            handleUpdateLine(
-                                                                                                                day.index,
-                                                                                                                idx,
-                                                                                                                'to_time',
-                                                                                                                val,
-                                                                                                            );
-                                                                                                        }}
-                                                                                                        onBlur={(
-                                                                                                            e,
-                                                                                                        ) => {
-                                                                                                            const formatted =
-                                                                                                                formatTimeString(
-                                                                                                                    e
-                                                                                                                        .target
-                                                                                                                        .value,
-                                                                                                                );
-                                                                                                            handleUpdateLine(
-                                                                                                                day.index,
-                                                                                                                idx,
-                                                                                                                'to_time',
-                                                                                                                formatted,
-                                                                                                            );
-
-                                                                                                            if (
-                                                                                                                line.from_time &&
-                                                                                                                formatted
-                                                                                                            ) {
-                                                                                                                const hrs =
-                                                                                                                    computeHours(
-                                                                                                                        line.from_time,
-                                                                                                                        formatted,
-                                                                                                                    );
-                                                                                                                handleUpdateLine(
-                                                                                                                    day.index,
-                                                                                                                    idx,
-                                                                                                                    'hours',
-                                                                                                                    hrs,
-                                                                                                                );
-                                                                                                            }
-                                                                                                        }}
-                                                                                                        className="w-20"
-                                                                                                        placeholder="17:00"
-                                                                                                    />
-                                                                                                </TableCell>
-                                                                                                <TableCell>
-                                                                                                    <Input
-                                                                                                        aria-label={`Efisiensi ${day.name}, baris ${idx + 1}`}
-                                                                                                        type="text"
-                                                                                                        inputMode="decimal"
-                                                                                                        value={
-                                                                                                            line.efficiency ??
-                                                                                                            ''
-                                                                                                        }
-
-                                                                                                        onChange={(
-                                                                                                            e,
-                                                                                                        ) => {
-                                                                                                            const val =
-                                                                                                                e.target.value.replace(
-                                                                                                                    /[^0-9.]/g,
-                                                                                                                    '',
-                                                                                                                );
-                                                                                                            handleUpdateLine(
-                                                                                                                day.index,
-                                                                                                                idx,
-                                                                                                                'efficiency',
-                                                                                                                val,
-                                                                                                            );
-                                                                                                        }}
-                                                                                                        onBlur={(
-                                                                                                            e,
-                                                                                                        ) => {
-                                                                                                            const val =
-                                                                                                                e.target.value.trim();
-
-                                                                                                            if (
-                                                                                                                !val ||
-                                                                                                                isNaN(
-                                                                                                                    parseFloat(
-                                                                                                                        val,
-                                                                                                                    ),
-                                                                                                                )
-                                                                                                            ) {
-                                                                                                                handleUpdateLine(
-                                                                                                                    day.index,
-                                                                                                                    idx,
-                                                                                                                    'efficiency',
-                                                                                                                    100,
-                                                                                                                );
-                                                                                                            } else {
-                                                                                                                const num =
-                                                                                                                    Math.min(
-                                                                                                                        100,
-                                                                                                                        Math.max(
+                                                                                                                if (
+                                                                                                                    val.length >
+                                                                                                                    5
+                                                                                                                ) {
+                                                                                                                    val =
+                                                                                                                        val.slice(
                                                                                                                             0,
-                                                                                                                            parseFloat(
-                                                                                                                                val,
-                                                                                                                            ),
-                                                                                                                        ),
+                                                                                                                            5,
+                                                                                                                        );
+                                                                                                                }
+
+                                                                                                                handleUpdateLine(
+                                                                                                                    day.index,
+                                                                                                                    idx,
+                                                                                                                    'from_time',
+                                                                                                                    val,
+                                                                                                                );
+                                                                                                            }}
+                                                                                                            onBlur={(
+                                                                                                                e,
+                                                                                                            ) => {
+                                                                                                                const formatted =
+                                                                                                                    formatTimeString(
+                                                                                                                        e
+                                                                                                                            .target
+                                                                                                                            .value,
+                                                                                                                    );
+                                                                                                                handleUpdateLine(
+                                                                                                                    day.index,
+                                                                                                                    idx,
+                                                                                                                    'from_time',
+                                                                                                                    formatted,
+                                                                                                                );
+
+                                                                                                                if (
+                                                                                                                    formatted &&
+                                                                                                                    line.to_time
+                                                                                                                ) {
+                                                                                                                    const hrs =
+                                                                                                                        computeHours(
+                                                                                                                            formatted,
+                                                                                                                            line.to_time,
+                                                                                                                        );
+                                                                                                                    handleUpdateLine(
+                                                                                                                        day.index,
+                                                                                                                        idx,
+                                                                                                                        'hours',
+                                                                                                                        hrs,
+                                                                                                                    );
+                                                                                                                }
+                                                                                                            }}
+                                                                                                            className="w-20"
+                                                                                                            placeholder="08:00"
+                                                                                                            data-error-field={lineErrorKey(
+                                                                                                                line,
+                                                                                                                'from_time',
+                                                                                                            )}
+                                                                                                            aria-invalid={Boolean(
+                                                                                                                fieldErrors[
+                                                                                                                    lineErrorKey(
+                                                                                                                        line,
+                                                                                                                        'from_time',
+                                                                                                                    )
+                                                                                                                ],
+                                                                                                            )}
+                                                                                                        />
+                                                                                                        <FieldError>
+                                                                                                            {fieldErrors[
+                                                                                                                lineErrorKey(
+                                                                                                                    line,
+                                                                                                                    'from_time',
+                                                                                                                )
+                                                                                                            ]?.join(
+                                                                                                                ' ',
+                                                                                                            )}
+                                                                                                        </FieldError>
+                                                                                                    </div>
+                                                                                                </TableCell>
+                                                                                                <TableCell>
+                                                                                                    <div
+                                                                                                        className="flex min-w-0 flex-col gap-1"
+                                                                                                        data-error-field={lineErrorKey(
+                                                                                                            line,
+                                                                                                            'to_time',
+                                                                                                        )}
+                                                                                                    >
+                                                                                                        <Input
+                                                                                                            aria-label={`Sampai jam ${day.name}, baris ${idx + 1}`}
+                                                                                                            type="text"
+                                                                                                            inputMode="numeric"
+                                                                                                            maxLength={
+                                                                                                                5
+                                                                                                            }
+                                                                                                            value={
+                                                                                                                line.to_time
+                                                                                                                    ? line.to_time.slice(
+                                                                                                                          0,
+                                                                                                                          5,
+                                                                                                                      )
+                                                                                                                    : ''
+                                                                                                            }
+
+                                                                                                            onChange={(
+                                                                                                                e,
+                                                                                                            ) => {
+                                                                                                                let val =
+                                                                                                                    e.target.value.replace(
+                                                                                                                        /[^0-9:]/g,
+                                                                                                                        '',
+                                                                                                                    );
+
+                                                                                                                if (
+                                                                                                                    val.length >
+                                                                                                                    5
+                                                                                                                ) {
+                                                                                                                    val =
+                                                                                                                        val.slice(
+                                                                                                                            0,
+                                                                                                                            5,
+                                                                                                                        );
+                                                                                                                }
+
+                                                                                                                handleUpdateLine(
+                                                                                                                    day.index,
+                                                                                                                    idx,
+                                                                                                                    'to_time',
+                                                                                                                    val,
+                                                                                                                );
+                                                                                                            }}
+                                                                                                            onBlur={(
+                                                                                                                e,
+                                                                                                            ) => {
+                                                                                                                const formatted =
+                                                                                                                    formatTimeString(
+                                                                                                                        e
+                                                                                                                            .target
+                                                                                                                            .value,
+                                                                                                                    );
+                                                                                                                handleUpdateLine(
+                                                                                                                    day.index,
+                                                                                                                    idx,
+                                                                                                                    'to_time',
+                                                                                                                    formatted,
+                                                                                                                );
+
+                                                                                                                if (
+                                                                                                                    line.from_time &&
+                                                                                                                    formatted
+                                                                                                                ) {
+                                                                                                                    const hrs =
+                                                                                                                        computeHours(
+                                                                                                                            line.from_time,
+                                                                                                                            formatted,
+                                                                                                                        );
+                                                                                                                    handleUpdateLine(
+                                                                                                                        day.index,
+                                                                                                                        idx,
+                                                                                                                        'hours',
+                                                                                                                        hrs,
+                                                                                                                    );
+                                                                                                                }
+                                                                                                            }}
+                                                                                                            className="w-20"
+                                                                                                            placeholder="17:00"
+                                                                                                            data-error-field={lineErrorKey(
+                                                                                                                line,
+                                                                                                                'to_time',
+                                                                                                            )}
+                                                                                                            aria-invalid={Boolean(
+                                                                                                                fieldErrors[
+                                                                                                                    lineErrorKey(
+                                                                                                                        line,
+                                                                                                                        'to_time',
+                                                                                                                    )
+                                                                                                                ],
+                                                                                                            )}
+                                                                                                        />
+                                                                                                        <FieldError>
+                                                                                                            {fieldErrors[
+                                                                                                                lineErrorKey(
+                                                                                                                    line,
+                                                                                                                    'to_time',
+                                                                                                                )
+                                                                                                            ]?.join(
+                                                                                                                ' ',
+                                                                                                            )}
+                                                                                                        </FieldError>
+                                                                                                    </div>
+                                                                                                </TableCell>
+                                                                                                <TableCell>
+                                                                                                    <div
+                                                                                                        className="flex min-w-0 flex-col gap-1"
+                                                                                                        data-error-field={lineErrorKey(
+                                                                                                            line,
+                                                                                                            'efficiency',
+                                                                                                        )}
+                                                                                                    >
+                                                                                                        <Input
+                                                                                                            aria-label={`Efisiensi ${day.name}, baris ${idx + 1}`}
+                                                                                                            type="text"
+                                                                                                            inputMode="decimal"
+                                                                                                            value={
+                                                                                                                line.efficiency ??
+                                                                                                                ''
+                                                                                                            }
+
+                                                                                                            onChange={(
+                                                                                                                e,
+                                                                                                            ) => {
+                                                                                                                const val =
+                                                                                                                    e.target.value.replace(
+                                                                                                                        /[^0-9.]/g,
+                                                                                                                        '',
                                                                                                                     );
                                                                                                                 handleUpdateLine(
                                                                                                                     day.index,
                                                                                                                     idx,
                                                                                                                     'efficiency',
-                                                                                                                    num,
+                                                                                                                    val,
                                                                                                                 );
-                                                                                                            }
-                                                                                                        }}
-                                                                                                        className="w-20"
-                                                                                                        placeholder="100"
-                                                                                                    />
+                                                                                                            }}
+                                                                                                            onBlur={(
+                                                                                                                e,
+                                                                                                            ) => {
+                                                                                                                const val =
+                                                                                                                    e.target.value.trim();
+
+                                                                                                                if (
+                                                                                                                    !val ||
+                                                                                                                    isNaN(
+                                                                                                                        parseFloat(
+                                                                                                                            val,
+                                                                                                                        ),
+                                                                                                                    )
+                                                                                                                ) {
+                                                                                                                    handleUpdateLine(
+                                                                                                                        day.index,
+                                                                                                                        idx,
+                                                                                                                        'efficiency',
+                                                                                                                        100,
+                                                                                                                    );
+                                                                                                                } else {
+                                                                                                                    const num =
+                                                                                                                        Math.min(
+                                                                                                                            100,
+                                                                                                                            Math.max(
+                                                                                                                                0,
+                                                                                                                                parseFloat(
+                                                                                                                                    val,
+                                                                                                                                ),
+                                                                                                                            ),
+                                                                                                                        );
+                                                                                                                    handleUpdateLine(
+                                                                                                                        day.index,
+                                                                                                                        idx,
+                                                                                                                        'efficiency',
+                                                                                                                        num,
+                                                                                                                    );
+                                                                                                                }
+                                                                                                            }}
+                                                                                                            className="w-20"
+                                                                                                            placeholder="100"
+                                                                                                            data-error-field={lineErrorKey(
+                                                                                                                line,
+                                                                                                                'efficiency',
+                                                                                                            )}
+                                                                                                            aria-invalid={Boolean(
+                                                                                                                fieldErrors[
+                                                                                                                    lineErrorKey(
+                                                                                                                        line,
+                                                                                                                        'efficiency',
+                                                                                                                    )
+                                                                                                                ],
+                                                                                                            )}
+                                                                                                        />
+                                                                                                        <FieldError>
+                                                                                                            {fieldErrors[
+                                                                                                                lineErrorKey(
+                                                                                                                    line,
+                                                                                                                    'efficiency',
+                                                                                                                )
+                                                                                                            ]?.join(
+                                                                                                                ' ',
+                                                                                                            )}
+                                                                                                        </FieldError>
+                                                                                                    </div>
                                                                                                 </TableCell>
                                                                                                 <TableCell>
-                                                                                                    <Input
-                                                                                                        aria-label={`Properti ${day.name}, baris ${idx + 1}`}
-                                                                                                        type="text"
-                                                                                                        value={
-                                                                                                            line.property ??
-                                                                                                            ''
-                                                                                                        }
+                                                                                                    <div
+                                                                                                        className="flex min-w-0 flex-col gap-1"
+                                                                                                        data-error-field={lineErrorKey(
+                                                                                                            line,
+                                                                                                            'property',
+                                                                                                        )}
+                                                                                                    >
+                                                                                                        <Input
+                                                                                                            aria-label={`Properti ${day.name}, baris ${idx + 1}`}
+                                                                                                            type="text"
+                                                                                                            value={
+                                                                                                                line.property ??
+                                                                                                                ''
+                                                                                                            }
 
-                                                                                                        onChange={(
-                                                                                                            e,
-                                                                                                        ) =>
-                                                                                                            handleUpdateLine(
-                                                                                                                day.index,
-                                                                                                                idx,
+                                                                                                            onChange={(
+                                                                                                                e,
+                                                                                                            ) =>
+                                                                                                                handleUpdateLine(
+                                                                                                                    day.index,
+                                                                                                                    idx,
+                                                                                                                    'property',
+                                                                                                                    e
+                                                                                                                        .target
+                                                                                                                        .value,
+                                                                                                                )
+                                                                                                            }
+                                                                                                            className="w-full min-w-28"
+                                                                                                            placeholder="Catatan / jenis pekerjaan"
+                                                                                                            data-error-field={lineErrorKey(
+                                                                                                                line,
                                                                                                                 'property',
-                                                                                                                e
-                                                                                                                    .target
-                                                                                                                    .value,
-                                                                                                            )
-                                                                                                        }
-                                                                                                        className="w-full min-w-28"
-                                                                                                        placeholder="Catatan / jenis pekerjaan"
-                                                                                                    />
+                                                                                                            )}
+                                                                                                            aria-invalid={Boolean(
+                                                                                                                fieldErrors[
+                                                                                                                    lineErrorKey(
+                                                                                                                        line,
+                                                                                                                        'property',
+                                                                                                                    )
+                                                                                                                ],
+                                                                                                            )}
+                                                                                                        />
+                                                                                                        <FieldError>
+                                                                                                            {fieldErrors[
+                                                                                                                lineErrorKey(
+                                                                                                                    line,
+                                                                                                                    'property',
+                                                                                                                )
+                                                                                                            ]?.join(
+                                                                                                                ' ',
+                                                                                                            )}
+                                                                                                        </FieldError>
+                                                                                                    </div>
                                                                                                 </TableCell>
                                                                                             </>
                                                                                         ) : (
@@ -1461,31 +1672,52 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
                             disabled={isCreating}
                         />
                     </PageDialogToolbar>
+                    <FormErrorHeader
+                        message={modalError}
+                        errors={modalErrors}
+                    />
+
                     <PageDialogBody className="space-y-4">
                         {modalError && (
                             <p role="alert" className="text-destructive">
                                 {modalError}
                             </p>
                         )}
-                        <Input
-                            label="Kode pola jam kerja"
-                            value={newCode}
-                            onChange={(event) =>
-                                setNewCode(event.target.value.toUpperCase())
-                            }
-                            maxLength={50}
-                            required
-                            autoFocus
-                            readOnly={isCreating}
-                        />
-                        <Input
-                            label="Nama"
-                            value={newName}
-                            onChange={(event) => setNewName(event.target.value)}
-                            maxLength={150}
-                            required
-                            readOnly={isCreating}
-                        />
+                        <div className="flex min-w-0 flex-col gap-1">
+                            <Input
+                                label="Kode pola jam kerja"
+                                value={newCode}
+                                onChange={(event) =>
+                                    setNewCode(event.target.value.toUpperCase())
+                                }
+                                maxLength={50}
+                                required
+                                autoFocus
+                                readOnly={isCreating}
+                                data-error-field={'code'}
+                                aria-invalid={Boolean(modalErrors['code'])}
+                            />
+                            <FieldError>
+                                {modalErrors['code']?.join(' ')}
+                            </FieldError>
+                        </div>
+                        <div className="flex min-w-0 flex-col gap-1">
+                            <Input
+                                label="Nama"
+                                value={newName}
+                                onChange={(event) =>
+                                    setNewName(event.target.value)
+                                }
+                                maxLength={150}
+                                required
+                                readOnly={isCreating}
+                                data-error-field={'name'}
+                                aria-invalid={Boolean(modalErrors['name'])}
+                            />
+                            <FieldError>
+                                {modalErrors['name']?.join(' ')}
+                            </FieldError>
+                        </div>
                     </PageDialogBody>
                 </PageDialogContent>
             </PageDialog>
@@ -1531,33 +1763,54 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
                             disabled={isCopying}
                         />
                     </PageDialogToolbar>
+                    <FormErrorHeader
+                        message={modalError}
+                        errors={modalErrors}
+                    />
+
                     <PageDialogBody className="space-y-4">
                         {modalError && (
                             <p role="alert" className="text-destructive">
                                 {modalError}
                             </p>
                         )}
-                        <Input
-                            label="Kode pola baru"
-                            value={copyNewCode}
-                            onChange={(event) =>
-                                setCopyNewCode(event.target.value.toUpperCase())
-                            }
-                            maxLength={50}
-                            required
-                            autoFocus
-                            readOnly={isCopying}
-                        />
-                        <Input
-                            label="Nama pola baru"
-                            value={copyNewName}
-                            onChange={(event) =>
-                                setCopyNewName(event.target.value)
-                            }
-                            maxLength={150}
-                            required
-                            readOnly={isCopying}
-                        />
+                        <div className="flex min-w-0 flex-col gap-1">
+                            <Input
+                                label="Kode pola baru"
+                                value={copyNewCode}
+                                onChange={(event) =>
+                                    setCopyNewCode(
+                                        event.target.value.toUpperCase(),
+                                    )
+                                }
+                                maxLength={50}
+                                required
+                                autoFocus
+                                readOnly={isCopying}
+                                data-error-field={'code'}
+                                aria-invalid={Boolean(modalErrors['code'])}
+                            />
+                            <FieldError>
+                                {modalErrors['code']?.join(' ')}
+                            </FieldError>
+                        </div>
+                        <div className="flex min-w-0 flex-col gap-1">
+                            <Input
+                                label="Nama pola baru"
+                                value={copyNewName}
+                                onChange={(event) =>
+                                    setCopyNewName(event.target.value)
+                                }
+                                maxLength={150}
+                                required
+                                readOnly={isCopying}
+                                data-error-field={'name'}
+                                aria-invalid={Boolean(modalErrors['name'])}
+                            />
+                            <FieldError>
+                                {modalErrors['name']?.join(' ')}
+                            </FieldError>
+                        </div>
                     </PageDialogBody>
                 </PageDialogContent>
             </PageDialog>
@@ -1674,6 +1927,11 @@ function WorkingTimeTemplatePage({ canManage, currentLegalEntity }: Props) {
                             Kalender yang sudah menggunakannya tetap tersimpan.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
+                    <FormErrorHeader
+                        message={modalError}
+                        errors={modalErrors}
+                    />
+
                     {modalError && (
                         <p role="alert" className="text-destructive">
                             {modalError}

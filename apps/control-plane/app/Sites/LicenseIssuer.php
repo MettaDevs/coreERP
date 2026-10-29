@@ -66,7 +66,7 @@ final class LicenseIssuer
     {
         return $this->issue($site, null, static function (array $detail) use ($agentIp, $site): void {
             OperatorAudit::recordBySystem($agentIp, 'site.license.renewed', 'site', $site->id, $detail);
-        });
+        }, automatic: true);
     }
 
     /** Kunci publik lisensi dalam PEM, untuk diantar ke agen saat pendaftaran. */
@@ -100,38 +100,43 @@ final class LicenseIssuer
      * @param  callable(array<string, mixed>): void  $audit
      * @return array{license: string, signature: string}
      */
-    private function issue(Site $site, ?string $validUntil, callable $audit): array
+    private function issue(Site $site, ?string $validUntil, callable $audit, bool $automatic = false): array
     {
         // Kunci diperiksa sebelum Core dipanggil. Konsol yang belum disetel tidak perlu membebani Core
         // setiap kali agen melapor, dan operator membaca sebab yang benar lebih dulu.
         $key = $this->privateKey();
         $apps = $this->entitlements->appsFor($site->tenant_id);
 
-        // Situs permanen tidak pernah diberi tanggal, bahkan ketika operator meminta satu. Tanggal yang
-        // diminta datang dari layar yang mungkin dibuka sebelum situs ini ditandai permanen, dan lisensi
-        // bertanggal yang lahir dari situ akan mengunci klinik yang justru dibebaskan dari tanggal.
-        // Dicor, karena model yang dibuat lalu tidak dimuat ulang belum memegang nilai bawaan kolomnya:
-        // atributnya null, dan null yang ditulis ke kolom NOT NULL menggagalkan penerbitan.
-        $perpetual = (bool) $site->license_perpetual;
-        $validUntil = $perpetual ? null : ($validUntil ?? $this->defaultValidUntil($site));
-        $issuedAt = CarbonImmutable::now('UTC');
+        return DB::transaction(function () use ($site, $apps, $validUntil, $key, $audit, $automatic): array {
+            $current = Site::query()->whereKey($site->id)->lockForUpdate()->firstOrFail();
+            if ($current->revoked() || ($automatic && $current->licenseRenewalSuspended())) {
+                throw new SiteRejected('license_issuance_stopped', 'Penerbitan lisensi dihentikan karena status server telah berubah.');
+            }
+            $site->setRawAttributes($current->getAttributes(), true);
+            // Situs permanen tidak pernah diberi tanggal, bahkan ketika operator meminta satu. Tanggal yang
+            // diminta datang dari layar yang mungkin dibuka sebelum situs ini ditandai permanen, dan lisensi
+            // bertanggal yang lahir dari situ akan mengunci klinik yang justru dibebaskan dari tanggal.
+            // Dicor, karena model yang dibuat lalu tidak dimuat ulang belum memegang nilai bawaan kolomnya:
+            // atributnya null, dan null yang ditulis ke kolom NOT NULL menggagalkan penerbitan.
+            $perpetual = (bool) $site->license_perpetual;
+            $validUntil = $perpetual ? null : ($validUntil ?? $this->defaultValidUntil($site));
+            $issuedAt = CarbonImmutable::now('UTC');
 
-        // Urutan kunci bagian dari kontrak: yang ditandatangani adalah byte ini, dan agen maupun Core
-        // tidak menyusunnya ulang.
-        $license = (string) json_encode([
-            'version' => 2,
-            'tenant_id' => $site->tenant_id,
-            'site_id' => $site->id,
-            'apps' => $apps,
-            'valid_until' => $validUntil,
-            'issued_at' => $issuedAt->format('Y-m-d\TH:i:s\Z'),
-        ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+            // Urutan kunci bagian dari kontrak: yang ditandatangani adalah byte ini, dan agen maupun Core
+            // tidak menyusunnya ulang.
+            $license = (string) json_encode([
+                'version' => 2,
+                'tenant_id' => $site->tenant_id,
+                'site_id' => $site->id,
+                'apps' => $apps,
+                'valid_until' => $validUntil,
+                'issued_at' => $issuedAt->format('Y-m-d\TH:i:s\Z'),
+            ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
 
-        if (! openssl_sign($license, $signature, $key, OPENSSL_ALGO_SHA256)) {
-            throw new SiteRejected('license_sign_failed', 'Lisensi gagal ditandatangani.');
-        }
+            if (! openssl_sign($license, $signature, $key, OPENSSL_ALGO_SHA256)) {
+                throw new SiteRejected('license_sign_failed', 'Lisensi gagal ditandatangani.');
+            }
 
-        DB::transaction(function () use ($site, $apps, $validUntil, $perpetual, $issuedAt, $audit): void {
             $site->forceFill([
                 'license_issued_at' => $issuedAt,
                 'license_valid_until' => $validUntil,
@@ -144,9 +149,9 @@ final class LicenseIssuer
                 'perpetual' => $perpetual,
                 'issued_at' => $issuedAt->toIso8601String(),
             ]);
-        });
 
-        return ['license' => $license, 'signature' => base64_encode($signature)];
+            return ['license' => $license, 'signature' => base64_encode($signature)];
+        });
     }
 
     private function privateKey(): OpenSSLAsymmetricKey

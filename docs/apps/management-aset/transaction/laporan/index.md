@@ -67,7 +67,8 @@ Yang dibaca hanya yang memang ada di datanya:
 
 - **Diminta** = jumlah baris permintaan yang tidak dibatalkan (`cancelled`) dan tidak diarsipkan. Permintaan belum punya alur pengajuan maupun persetujuan, jadi draf ikut dihitung; begitu alurnya ada, aturan ini ditinjau ulang.
 - **Diterima** = jumlah baris penerimaan berstatus `selesai`, yaitu aset yang sudah lahir di register; penerimaan draf belum melahirkan apa pun. **Nilai diterima** = nilai per unit × jumlah, dibulatkan sekali per baris seperti jurnal perolehan (K-20), **tanpa PPN**. Fase ini hanya IDR (K-19), jadi totalnya dijumlah langsung.
-- **Nilai rencana** = perkiraan di baris rencana. Permintaan tidak memikul harga, jadi tidak ada nilai diminta.
+- **Nilai rencana** = perkiraan di baris rencana. Harga yang belum diestimasi tetap null, bukan nol; total hanya menjumlah estimasi yang sudah diketahui dan `jumlah_baris_belum_diestimasi` menampilkan jumlah rincian rencana yang belum lengkap. Permintaan tidak memikul harga, jadi tidak ada nilai diminta.
+- **Sumber dana** berasal dari snapshot `funding_source_name` pada setiap baris rencana. Header `funding_source` lama hanya menjadi fallback data warisan. **Tanggal kebutuhan** membaca `needed_on` baris; data lama yang belum dilengkapi tetap kosong dan tidak ditebak dari tanggal dokumen.
 - **Vendor** hanya ada di penerimaan; rencana dan permintaan tidak menyebut pemasok. Namanya dibaca dari vendor Core (K-06).
 - **Belum diminta** = rencana − diminta, dan **belum diterima** = diminta − diterima; keduanya tidak pernah negatif.
 - **Status** diturunkan dari angka itu: Belum diminta (belum ada permintaan yang berlaku), Belum diterima, Diterima sebagian, Diterima penuh. Filter status menyaring hasil turunan ini.
@@ -186,6 +187,33 @@ Nama tampilan kolom ditulis di model tabelnya (`FIELD_CAPTIONS`, `FIELD_OPTIONS`
 
 **Satu laporan, satu berkas pembangun.** Pembangun ditemukan perintah dari foldernya, seperti rute di `routes/api/`, jadi dua orang yang mengerjakan dua laporan berbeda tidak menyunting berkas yang sama. Sebelumnya semua layout ditulis di satu kelas perintah, dan enam PR laporan aset pertama saling konflik di sana. Kop, kepala tabel, dan cara menyimpan dipakai bersama lewat `BuiltinLayoutBuilder`. Sebelum menulis apa pun, perintah mencocokkan pembangun dengan definisi laporan dan menolak keduanya bila tidak berpasangan: layout yang dinyatakan definisi tanpa pembangun tidak pernah dibangun, dan pembangun tanpa definisi menulis berkas yang tidak pernah dibaca.
 
+## Opsi dan filter per laporan
+
+`ui/laporan/_shared/reportFilterProfiles.ts` menyatakan Opsi, bagian filter yang ditampilkan, dan ikatan parameter ke kolom data item. `ReportFilterEngine` merender konfigurasi itu untuk semua halaman; halaman laporan tidak menyusun kontrol filternya sendiri. `dataItems()` tetap menyatakan tabel yang bisa difilter oleh penyedia dataset. Tabel perhitungan internal tidak otomatis menjadi bagian filter pada layar.
+
+Acuan pemisahan diambil dari source BC W1 `FixedAssets/Reports`: `FixedAssetBookValue01`, `FixedAssetBookValue02`, `FixedAssetAcquisitionList`, dan `FixedAssetProjectedValue`. Buku penyusutan dan periode perhitungan berada di Opsi; atribut register berada di Filter Aset. Ini pemetaan fungsi Opsi dan filter, bukan klaim seluruh laporan setara BC.
+
+| Laporan | Opsi | Bagian filter pada layar |
+| --- | --- | --- |
+| Nilai buku | Buku penyusutan dan rentang tanggal | Aset |
+| Penyusutan | Buku penyusutan dan bulan perhitungan | Aset |
+| Proyeksi penyusutan | Buku penyusutan dan rentang bulan proyeksi | Aset |
+| Perolehan | Buku penyusutan dan rentang tanggal perolehan | Aset |
+| Penjualan dan pemusnahan | Buku penilaian dan rentang tanggal dokumen | Dokumen dan Aset |
+| Rekonsiliasi | Tanggal saldo | Aset |
+| Monitoring | Tidak ada Opsi terpisah | Monitoring, Hasil pemeriksaan, dan Aset |
+| Pemeliharaan | Tidak ada Opsi terpisah | Work order, Baris pekerjaan, dan Aset |
+| Mutasi | Tidak ada Opsi terpisah | Mutasi, Baris mutasi, dan Aset |
+| Pengadaan | Periode, jenis aset, unit, dan status pemenuhan lintas tahap | Rencana pengadaan |
+
+Monitoring, work order, mutasi, pengadaan lintas tahap, dan rekonsiliasi bukan salinan laporan FA standar BC. Bagian filternya mengikuti sumber data lokal: kondisi monitoring berarti kondisi temuan; lokasi pekerjaan berarti lokasi pada baris work order; status pemenuhan pengadaan dihitung dari rencana, permintaan, dan penerimaan. Ketiganya tidak boleh diganti dengan atribut register atau status dokumen yang namanya mirip.
+
+Pada Daftar perolehan, pilihan buku menyaring aset yang memiliki buku itu melalui `EXISTS`, sehingga aset dengan beberapa buku tetap dicetak sekali. Tanpa pilihan buku, laporan tetap membaca seluruh register pada periode perolehan. Ini berbeda dari BC Acquisition List yang membuka buku bawaan pengaturan FA. Aset lokal wajib memiliki tanggal perolehan, sehingga pilihan BC untuk menyertakan aset yang belum diperoleh tidak ditampilkan. Opsi BC seperti pengelompokan total, laporan anggaran, dan panjang periode proyeksi belum ditawarkan oleh laporan lokal; jangan menambahkan kontrol sebelum perhitungan dan hasil ekspornya tersedia.
+
+`reportFilterState.ts` memastikan satu kolom hanya mempunyai satu syarat aktif. Nama parameter yang berbeda, seperti `org_unit_id` terhadap `responsible_org_unit_id`, dinyatakan lewat ikatan `field`. Kolom yang sudah mempunyai kontrol tidak ditawarkan ulang oleh pemilih filter. Jika preset lama mengisi kontrol tetap sekaligus filter kolom yang sama, filter kolom menggantikan kontrol tetap. Ekspresi kode aset tetap tersedia; pemilih satu aset dari preset lama tampil hanya selama pilihannya masih aktif.
+
+Filter buku lama yang berisi satu pilihan dipindahkan ke Opsi buku. Filter tersimpan pada bagian internal yang tidak lagi ditampilkan dibersihkan saat dimuat dan pengguna diberi pemberitahuan; filter itu tidak boleh terus menyaring data secara tersembunyi. State yang sudah dinormalisasi dipakai bersama oleh pratinjau, cetak, opsi terakhir, dan preset. Pemeriksaan perilakunya ada di `ui/laporan/_shared/reportFilterState.test.mjs`; penerapan opsi buku dan filter aset pada dataset diuji di `tests/Feature/AssetFinancialReportsTest.php`.
+
 ## Yang datang dari Core dan Shell
 
 - Halaman **Layout laporan** dan **Ekspor laporan** di Control Plane, dialog cetak, tray Ekspor di header, dan lonceng notifikasi.
@@ -227,7 +255,7 @@ Tombol **Cetak** ada di halaman rincian work order dan **Ekspor daftar** di daft
 1. Tulis kelas yang mengimplementasikan `ReportDefinition` di `src/Reporting/Definitions/`. Dataset memakai `OrganizationScope` seperti endpoint detailnya.
 2. Tulis pembangun layout bawaannya sebagai satu kelas baru di `src/Reporting/Layouts/Builtin/` (turunan `BuiltinLayoutBuilder`), jalankan `php artisan management-aset:build-builtin-layouts`, commit berkasnya. Tidak ada daftar yang perlu disunting.
 3. Daftarkan di `ModuleServiceProvider` pada `ReportRegistry`. Tidak ada blok manifest; jalankan ulang `app:register-manifest management-aset` supaya laporannya masuk katalog cetak.
-4. Tambahkan tombol cetak pada halaman record-nya dengan `requestPrint()`.
+4. Tambahkan tombol cetak pada halaman record-nya dengan `requestPrint()`. Untuk halaman pratinjau, nyatakan Opsi dan bagian filternya di `ui/laporan/_shared/reportFilterProfiles.ts`, lalu gunakan `useReportData` dan `ReportFilterEngine`. Ikatan kolom yang berbeda dari nama parameter ditulis lewat `field` dan, bila berbeda bagian, `dataItem`; jangan membuat engine atau kontrol filter baru di halaman.
 5. Tambahkan test di `PenyediaLaporanTest` untuk placeholder utama dan penolakan di luar scope, lalu perbarui halaman ini.
 
 `PenyediaLaporan` tidak berubah: ia generik dan menerima kode baru apa adanya.

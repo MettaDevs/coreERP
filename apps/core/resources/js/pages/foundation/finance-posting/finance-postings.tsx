@@ -66,6 +66,8 @@ import type {
 import Heading from '@/components/heading';
 import { RecordListScroll } from '@/components/record-list-scroll';
 import { useDateTimeFormat } from '@/hooks/use-date-time';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
+import { useSaveFeedback } from '@/hooks/use-save-feedback';
 import { apiJson, CoreApiError, errorText } from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
 
@@ -348,12 +350,6 @@ function toQuery(filters: Filters): Record<string, string> {
     return query;
 }
 
-function actionError(caught: unknown, fallback: string): string {
-    return caught instanceof CoreApiError && caught.status === 403
-        ? 'Anda tidak punya izin untuk menindaklanjuti posting.'
-        : errorText(caught, fallback);
-}
-
 function currentTime(): number {
     return Date.now();
 }
@@ -443,6 +439,7 @@ function PostingFilters({
     return (
         <div className="space-y-2">
             <form
+                noValidate
                 className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end"
                 onSubmit={(event) => {
                     event.preventDefault();
@@ -1277,6 +1274,12 @@ function MarkManualDialog({
 }) {
     const formatDateTime = useDateTimeFormat();
     const [reason, setReason] = useState('');
+    const {
+        report: reportSaveError,
+        clear: clearSaveError,
+        summary: saveSummary,
+        scopeRef: saveScopeRef,
+    } = useSaveFeedback<HTMLDivElement>(posting.id);
     const [errors, setErrors] = useState<Record<string, string[]>>({});
     const [saving, setSaving] = useState(false);
     const deliveries =
@@ -1297,6 +1300,7 @@ function MarkManualDialog({
         }
 
         setSaving(true);
+        clearSaveError();
         setErrors({});
 
         try {
@@ -1319,7 +1323,7 @@ function MarkManualDialog({
                 }
             }
 
-            toast.error(actionError(caught, 'Posting belum ditandai manual.'));
+            reportSaveError(caught, 'Posting belum ditandai manual.');
         } finally {
             setSaving(false);
         }
@@ -1327,7 +1331,7 @@ function MarkManualDialog({
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
-            <DialogContent size="compact">
+            <DialogContent ref={saveScopeRef} size="compact">
                 <DialogHeader>
                     <DialogTitle>Tandai posting manual</DialogTitle>
                     <DialogDescription>
@@ -1337,6 +1341,7 @@ function MarkManualDialog({
                         tidak dapat dibatalkan.
                     </DialogDescription>
                 </DialogHeader>
+                {saveSummary}
                 <DialogBody className="space-y-4">
                     {reached ? (
                         <Alert variant="destructive">
@@ -1361,7 +1366,10 @@ function MarkManualDialog({
                                   : 'Posting ini belum pernah sampai ke aplikasi finance. Setelah ditandai manual, posting ini tidak akan disajikan kepadanya.'}
                         </p>
                     )}
-                    <Field data-invalid={Boolean(errors.reason)}>
+                    <Field
+                        data-error-field="reason"
+                        data-invalid={Boolean(errors.reason)}
+                    >
                         <Textarea
                             label="Alasan"
                             required
@@ -1403,6 +1411,14 @@ export default function FinancePostings({
     counts,
     postings,
 }: Props) {
+    const { wrapRouter: wrapFilterRequest, summary: filterSummary } =
+        useInertiaFeedback('Saringan belum dapat dipakai');
+    const {
+        report: reportActionError,
+        clear: clearActionError,
+        summary: actionSummary,
+        scopeRef: actionScopeRef,
+    } = useSaveFeedback<HTMLElement>();
     const now = useNow();
     // Tidak ada baris terpilih saat halaman dibuka; rincian muncul setelah pengguna memilih.
     const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -1461,16 +1477,16 @@ export default function FinancePostings({
 
     const applyFilters = (next: Filters) => {
         setSelectedId(null);
-        router.get(PAGE_URL, toQuery(next), {
-            preserveState: true,
-            reset: ['postings'],
-            preserveScroll: true,
-            replace: true,
-            onError: (errors) =>
-                toast.error(
-                    Object.values(errors)[0] ?? 'Saringan belum dapat dipakai.',
-                ),
-        });
+        router.get(
+            PAGE_URL,
+            toQuery(next),
+            wrapFilterRequest({
+                preserveState: true,
+                reset: ['postings'],
+                preserveScroll: true,
+                replace: true,
+            }),
+        );
     };
 
     const refresh = (updated?: Posting) => {
@@ -1487,6 +1503,7 @@ export default function FinancePostings({
     };
 
     const revalidate = async (posting: Posting) => {
+        clearActionError();
         setSelectedId(posting.id);
         setBusyId(posting.id);
 
@@ -1513,7 +1530,7 @@ export default function FinancePostings({
                 refresh();
             }
 
-            toast.error(actionError(caught, 'Validasi ulang belum berhasil.'));
+            reportActionError(caught, 'Validasi ulang belum berhasil.');
         } finally {
             setBusyId(null);
         }
@@ -1527,7 +1544,10 @@ export default function FinancePostings({
     return (
         <>
             <Head title="Pantau posting" />
-            <main className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 p-6">
+            <main
+                ref={actionScopeRef}
+                className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 p-6"
+            >
                 <Heading
                     title="Pantau posting"
                     description="Posting jurnal yang diterbitkan app untuk aplikasi finance: statusnya, masalahnya, dan tindak lanjutnya."
@@ -1535,6 +1555,8 @@ export default function FinancePostings({
                 <Card>
                     <CardHeader>
                         <CardTitle>Daftar posting</CardTitle>
+                        {actionSummary}
+                        {filterSummary}
                         <CardDescription>
                             Posting tertahan diperbaiki di CoreERP lalu
                             divalidasi ulang. Posting yang ditolak dibukukan di

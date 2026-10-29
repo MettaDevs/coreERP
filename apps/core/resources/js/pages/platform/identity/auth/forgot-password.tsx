@@ -3,11 +3,16 @@ import { FieldError } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { Spinner } from '@apperp/ui/spinner';
 import { Form, Head } from '@inertiajs/react';
+import { FormErrorHeader } from '@/components/form-error-header';
 import TextLink from '@/components/text-link';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import { login } from '@/routes';
 import { email } from '@/routes/password';
 
 export default function ForgotPassword({ status }: { status?: string }) {
+    const { wrap: wrapFormResponse1, summary: formResponse1Summary } =
+        useInertiaFeedback();
+
     return (
         <>
             <Head title="Lupa kata sandi" />
@@ -19,10 +24,22 @@ export default function ForgotPassword({ status }: { status?: string }) {
             )}
 
             <div className="space-y-6">
-                <Form {...email.form()}>
+                <Form
+                    noValidate
+                    {...email.form()}
+                    options={wrapFormResponse1({})}
+                >
                     {({ processing, errors }) => (
                         <>
-                            <div className="grid gap-2">
+                            <>
+                                {formResponse1Summary}
+                                <FormErrorHeader errors={errors} />
+                            </>
+
+                            <div
+                                className="grid gap-2"
+                                data-error-field={'email'}
+                            >
                                 <Input
                                     id="email"
                                     label="Email"

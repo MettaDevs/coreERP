@@ -1,0 +1,25 @@
+get:
+  tags:
+  - Pusat admin
+  operationId: internal.productTenants.show
+  summary: Rincian tenant dan kredensial untuk operator
+  security:
+  - controlPlaneToken: []
+  responses:
+    '200':
+      description: Permintaan diterima.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ManagedProductTenant'
+    '401':
+      description: Token pusat admin salah.
+    '404':
+      description: Tenant atau operator tidak ditemukan.
+  parameters:
+  - name: id
+    in: path
+    required: true
+    schema:
+      type: string
+      format: uuid

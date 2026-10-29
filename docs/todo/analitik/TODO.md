@@ -184,7 +184,7 @@ Dari `apps/core` di worktree area, kecuali disebut lain.
 | Kontrak (area 15–17) | `python contracts/bundle.py`, lalu `python contracts/check-contract-coverage.py` |
 | Salinan skill | `python .github/scripts/check-skill-copies.py` (dari akar repo) |
 | Dokumentasi | `npm run docs:build` (dari `docs/`) |
-| Runtime lokal setelah mengubah layar | `D:\Kerja\erp-dev\start.ps1 -Build`, lalu buka layar lewat rail di `http://localhost:8000` |
+| Runtime lokal setelah mengubah layar | Dengan HotReload aktif, source diperbarui otomatis tanpa rebuild atau reload manual. Jika user/developer melaporkan layar stale, periksa Vite/mount lalu lakukan fallback yang diperlukan. |
 
 Catatan lingkungan yang sudah memakan waktu sesi lain:
 

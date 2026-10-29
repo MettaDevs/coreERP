@@ -8,21 +8,24 @@ import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
 import { PageDialog, PageDialogContent } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
 import type { InfiniteScrollRef } from '@inertiajs/core';
 import { Head, router } from '@inertiajs/react';
 import { useRef, useState } from 'react';
+import { FormErrorHeader } from '@/components/form-error-header';
 import { RecordListScroll } from '@/components/record-list-scroll';
-import { useRecordTransition } from '@/hooks/use-record-transition';
 import { apiJson, errorText } from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
 import { AddressBookHint } from './components/address-book-hint';
 import { AddressBookManager } from './components/address-book-manager';
+import { AddressBookPicker } from './components/address-book-picker';
 import { PartyCard } from './components/party-card';
 import { PartyForm } from './components/party-form';
-import type { DirectoryMetadata, Party } from './types';
+import type { AddressBook, DirectoryMetadata, Party } from './types';
 import { partyTypeLabel } from './types';
 
 type Props = DirectoryMetadata & {
+    selectedAddressBook: AddressBook | null;
     parties: {
         data: Party[];
         total: number;
@@ -44,7 +47,11 @@ type Props = DirectoryMetadata & {
 };
 
 export default function GlobalAddressBook(props: Props) {
-    const { parties, filters, canManage, partyTypes, addressBooks } = props;
+    const { parties, filters, canManage, partyTypes, selectedAddressBook } =
+        props;
+    const partyContentRef = useRef<HTMLDivElement>(null);
+    const createContentRef = useRef<HTMLDivElement>(null);
+    const [bookRevision, setBookRevision] = useState(0);
     const [creating, setCreating] = useState(false);
     const [createKey, setCreateKey] = useState(0);
     const [partyDirty, setPartyDirty] = useState(false);
@@ -183,7 +190,14 @@ export default function GlobalAddressBook(props: Props) {
             <Head title="Buku alamat global" />
             <ListPageLayout
                 header={
-                    <RecordActionBar>
+                    <RecordActionBar
+                        feedback={
+                            <FormErrorHeader
+                                message={error}
+                                operation="Tindakan pada pihak belum berhasil"
+                            />
+                        }
+                    >
                         <div className="flex items-center gap-2">
                             <h1 className="text-sm font-semibold">
                                 Buku alamat global
@@ -226,6 +240,7 @@ export default function GlobalAddressBook(props: Props) {
                 filters={
                     <div className="space-y-2 px-4 pb-4">
                         <form
+                            noValidate
                             onSubmit={(event) => {
                                 event.preventDefault();
                                 applyFilter('q', query);
@@ -314,28 +329,18 @@ export default function GlobalAddressBook(props: Props) {
                                 </NativeSelect>
                             </div>
                             <div className="w-full sm:w-44">
-                                <NativeSelect
-                                    label="Buku alamat"
+                                <AddressBookPicker
+                                    key={bookRevision}
                                     value={filters.address_book ?? ''}
-                                    onChange={(event) =>
-                                        applyFilter(
-                                            'address_book',
-                                            event.target.value,
-                                        )
+                                    selectedBooks={
+                                        selectedAddressBook
+                                            ? [selectedAddressBook]
+                                            : []
                                     }
-                                >
-                                    <NativeSelectOption value="">
-                                        Semua buku alamat
-                                    </NativeSelectOption>
-                                    {addressBooks.map((book) => (
-                                        <NativeSelectOption
-                                            key={book.id}
-                                            value={book.id}
-                                        >
-                                            {book.name}
-                                        </NativeSelectOption>
-                                    ))}
-                                </NativeSelect>
+                                    onValueChange={(value) =>
+                                        applyFilter('address_book', value)
+                                    }
+                                />
                             </div>
                             <div className="w-full sm:w-44">
                                 <NativeSelect
@@ -498,6 +503,7 @@ export default function GlobalAddressBook(props: Props) {
                     }}
                 >
                     <PageDialogContent
+                        ref={createContentRef}
                         aria-describedby={undefined}
                         onEscapeKeyDown={(event) => {
                             if (partySaving) {
@@ -509,6 +515,7 @@ export default function GlobalAddressBook(props: Props) {
                         onNew={canManage ? startNew : undefined}
                     >
                         <PartyForm
+                            portalContainer={createContentRef}
                             key={createKey}
                             onDirtyChange={setPartyDirty}
                             metadata={props}
@@ -535,6 +542,7 @@ export default function GlobalAddressBook(props: Props) {
                     }}
                 >
                     <PageDialogContent
+                        ref={partyContentRef}
                         aria-describedby={undefined}
                         onEscapeKeyDown={(event) => {
                             if (partySaving) {
@@ -547,6 +555,7 @@ export default function GlobalAddressBook(props: Props) {
                         navigation={navigation}
                     >
                         <PartyCard
+                            portalContainer={partyContentRef}
                             key={filters.party}
                             partyId={filters.party}
                             metadata={props}
@@ -562,8 +571,10 @@ export default function GlobalAddressBook(props: Props) {
             {transition.confirmation}
             {booksOpen && (
                 <AddressBookManager
-                    metadata={props}
-                    onClose={() => setBooksOpen(false)}
+                    onClose={() => {
+                        setBooksOpen(false);
+                        setBookRevision((current) => current + 1);
+                    }}
                 />
             )}
         </>

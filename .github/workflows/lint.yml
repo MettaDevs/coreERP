@@ -77,6 +77,9 @@ jobs:
       - name: Copy Environment File
         run: cp .env.example .env
 
+      - name: Check Browser Dialogs
+        run: node ../../scripts/check-browser-dialogs.mjs --self-test && node ../../scripts/check-browser-dialogs.mjs
+
       - name: Generate Application Key
         run: php artisan key:generate
 
@@ -98,8 +101,14 @@ jobs:
       - name: Lint Frontend
         run: npm run lint:check
 
+      - name: Check Form Error Feedback
+        run: node ../../packages/ui/scripts/form-feedback.test.mjs && node ../../scripts/test-inertia-feedback.mjs
+
       - name: Check Asset Service Life
         run: node --test ../../modules/apperp/management-aset/ui/master/serviceLife.test.mjs
+
+      - name: Check Report Filters
+        run: node --test ../../modules/apperp/management-aset/ui/laporan/_shared/reportFilterState.test.mjs
 
       - name: Check Page Dialog Stack
         run: node --test ../../packages/ui/scripts/page-dialog-stack.test.mjs

@@ -69,6 +69,15 @@ final class MaintenanceSetupLinkController extends Controller
         return response()->json($this->asetTypeTransfer($jobTypeId, 'job_type_id', MaintenanceJobType::class));
     }
 
+    /** @param array<string, mixed> $payload */
+    public function lockJenisAsetJobTypes(Request $request, string $jenisAsetId, array $payload): void
+    {
+        $this->permission($request, 'jenis-aset', 'update');
+        $data = validator($payload, $this->jobTypeIdsRules($this->tenant($request)))->validate();
+        $current = MaintenanceJobTypeJenisAset::query()->where('jenis_aset_id', $jenisAsetId)->pluck('job_type_id')->all();
+        $this->lockJobTypes([...$current, ...$data['jenis_aset_ids']]);
+    }
+
     public function jenisAsetAsetTypes(Request $request, string $jenisAsetId): JsonResponse
     {
         $this->jenisAset($jenisAsetId);
@@ -138,21 +147,31 @@ final class MaintenanceSetupLinkController extends Controller
         $this->permission($request, 'maintenance-checklist-variables', 'update');
         $data = validator($payload, [
             'values' => ['present', 'array', 'max:100'],
-            'values.*.line_number' => ['required', 'numeric', 'min:1', 'distinct'],
+            'values.*.id' => ['sometimes', 'required', 'ulid', 'distinct'],
+            'values.*.line_number' => ['required', 'numeric', 'decimal:0,1', 'min:1', 'max:9999999.9', 'distinct'],
             'values.*.value' => ['required', 'string', 'max:255'],
             'values.*.result_code' => ['required', Rule::in(['pass', 'fail', 'none'])],
         ])->validate();
         $expected = ($expectedVersion ?? RowVersion::expected($request));
         DB::transaction(function () use ($variableId, $data, $expected): void {
             RowVersion::claim(MaintenanceChecklistVariable::query()->findOrFail($variableId), $expected);
-            MaintenanceChecklistVariableValue::query()->where('variable_id', $variableId)->delete();
+            $current = MaintenanceChecklistVariableValue::query()->where('variable_id', $variableId)->lockForUpdate()->get()->keyBy('id');
+            $kept = array_column($data['values'], 'id');
+            foreach ($data['values'] as $index => $value) {
+                if (isset($value['id']) && ! $current->has($value['id'])) {
+                    throw ValidationException::withMessages(['values.'.$index.'.id' => 'Baris ini bukan pilihan aktif milik variabel yang sedang diubah.']);
+                }
+            }
+            MaintenanceChecklistVariableValue::query()->where('variable_id', $variableId)->whereNotIn('id', $kept)->delete();
+            // Nomor sementara hanya ada di transaksi ini, agar dua ID dapat bertukar urutan tanpa menabrak indeks aktif.
+            foreach ($kept as $index => $id) {
+                $current->get($id)->update(['line_number' => -($index + 1)]);
+            }
             foreach ($data['values'] as $value) {
-                MaintenanceChecklistVariableValue::query()->create([
-                    'variable_id' => $variableId,
-                    'line_number' => $value['line_number'],
-                    'value' => trim($value['value']),
-                    'result_code' => $value['result_code'],
-                ]);
+                $row = isset($value['id']) ? $current->get($value['id']) : new MaintenanceChecklistVariableValue(['variable_id' => $variableId]);
+                $row->fill([
+                    'line_number' => $value['line_number'], 'value' => trim($value['value']), 'result_code' => $value['result_code'],
+                ])->save();
             }
         });
 
@@ -182,7 +201,8 @@ final class MaintenanceSetupLinkController extends Controller
         $this->permission($request, 'maintenance-checklist-templates', 'update');
         $data = validator($payload, [
             'lines' => ['present', 'array', 'max:100'],
-            'lines.*.line_number' => ['required', 'numeric', 'min:1', 'distinct'],
+            'lines.*.id' => ['sometimes', 'required', 'ulid', 'distinct'],
+            'lines.*.line_number' => ['required', 'numeric', 'decimal:0,1', 'min:1', 'max:9999999.9', 'distinct'],
             'lines.*.type' => ['required', Rule::in(['header', 'text', 'measurement', 'variable', 'template'])],
             'lines.*.nama' => ['required', 'string', 'max:255'],
             'lines.*.instruksi' => ['sometimes', 'nullable', 'string', 'max:2000'],
@@ -190,8 +210,8 @@ final class MaintenanceSetupLinkController extends Controller
             'lines.*.unit_id' => ['sometimes', 'nullable', 'ulid'],
             'lines.*.min_value' => ['sometimes', 'nullable', 'numeric'],
             'lines.*.max_value' => ['sometimes', 'nullable', 'numeric'],
-            'lines.*.variable_id' => ['sometimes', 'nullable', 'ulid', Rule::exists('aset_m_maintenance_checklist_variable', 'id')->where('tenant_id', $tenant)],
-            'lines.*.nested_template_id' => ['sometimes', 'nullable', 'ulid', Rule::exists('aset_m_maintenance_checklist_template', 'id')->where('tenant_id', $tenant)],
+            'lines.*.variable_id' => ['sometimes', 'nullable', 'ulid', Rule::exists('aset_m_maintenance_checklist_variable', 'id')->where('tenant_id', $tenant)->whereNull('deleted_at')],
+            'lines.*.nested_template_id' => ['sometimes', 'nullable', 'ulid', Rule::exists('aset_m_maintenance_checklist_template', 'id')->where('tenant_id', $tenant)->whereNull('deleted_at')],
         ], [
             'lines.*.nama.required' => 'Nama baris wajib diisi.',
         ])->validate();
@@ -200,7 +220,18 @@ final class MaintenanceSetupLinkController extends Controller
 
         DB::transaction(function () use ($templateId, $data, $unitCodes, $expected): void {
             RowVersion::claim(MaintenanceChecklistTemplate::query()->findOrFail($templateId), $expected);
-            MaintenanceChecklistTemplateLine::query()->where('template_id', $templateId)->delete();
+            $current = MaintenanceChecklistTemplateLine::query()->where('template_id', $templateId)->lockForUpdate()->get()->keyBy('id');
+            $kept = array_column($data['lines'], 'id');
+            foreach ($data['lines'] as $index => $line) {
+                if (isset($line['id']) && ! $current->has($line['id'])) {
+                    throw ValidationException::withMessages(['lines.'.$index.'.id' => 'Baris ini bukan bagian aktif dari template yang sedang diubah.']);
+                }
+            }
+            MaintenanceChecklistTemplateLine::query()->where('template_id', $templateId)->whereNotIn('id', $kept)->delete();
+            // Nomor sementara hanya ada di transaksi ini, agar dua ID dapat bertukar urutan tanpa menabrak indeks aktif.
+            foreach ($kept as $index => $id) {
+                $current->get($id)->update(['line_number' => -($index + 1)]);
+            }
             foreach ($data['lines'] as $line) {
                 $min = $line['min_value'] ?? null;
                 $max = $line['max_value'] ?? null;
@@ -216,8 +247,8 @@ final class MaintenanceSetupLinkController extends Controller
                 if ($line['type'] === 'template' && empty($line['nested_template_id'])) {
                     throw ValidationException::withMessages(['lines' => 'Baris template harus memilih template checklist.']);
                 }
-                MaintenanceChecklistTemplateLine::query()->create([
-                    'template_id' => $templateId,
+                $row = isset($line['id']) ? $current->get($line['id']) : new MaintenanceChecklistTemplateLine(['template_id' => $templateId]);
+                $row->fill([
                     'line_number' => $line['line_number'], 'type' => $line['type'], 'variable_id' => $line['variable_id'] ?? null,
                     'nested_template_id' => $line['nested_template_id'] ?? null,
                     'unit_id' => $line['type'] === 'measurement' ? ($line['unit_id'] ?? null) : null,
@@ -229,7 +260,7 @@ final class MaintenanceSetupLinkController extends Controller
                     // Baris judul hanya memberi struktur dan tidak pernah diisi teknisi,
                     // jadi ia tidak boleh dapat ditandai wajib dan menahan penyelesaian.
                     'wajib' => $line['type'] === 'header' ? false : filter_var($line['wajib'] ?? false, FILTER_VALIDATE_BOOL),
-                ]);
+                ])->save();
             }
         });
 

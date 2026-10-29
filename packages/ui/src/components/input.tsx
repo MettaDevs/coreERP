@@ -5,6 +5,8 @@ import { useRecordEditActivation } from './record-edit-boundary';
 
 type InputProps = React.ComponentProps<'input'> & {
     label?: string;
+    /** Petunjuk format pada field berlabel muncul hanya saat fokus agar tidak menimpa label. */
+    focusedPlaceholder?: string;
     /** Field hasil perhitungan/identitas yang selalu baca saja dapat menolak pemicu edit. */
     editActivation?: boolean;
 };
@@ -15,6 +17,7 @@ function Input({
     id,
     label,
     placeholder,
+    focusedPlaceholder,
     required,
     editActivation = true,
     onClick,
@@ -36,13 +39,16 @@ function Input({
             type={type}
             data-slot="input"
             required={required}
-            placeholder={label ? ' ' : placeholder}
+            placeholder={label ? (focusedPlaceholder ?? ' ') : placeholder}
             className={cn(
                 'shadow-xs selection:bg-primary selection:text-primary-foreground file:text-foreground dark:border-input dark:bg-input/30 dark:text-foreground h-9 w-full min-w-0 rounded-md border border-[#d9dfe7] bg-white px-3 py-1 text-base text-[#1f2937] outline-none transition-[color,box-shadow] file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-[#8a94a6] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
                 'focus-visible:border-[#0284c7] focus-visible:ring-2 focus-visible:ring-[#0284c7]/15',
                 'focus:border-[#0284c7] focus:ring-2 focus:ring-[#0284c7]/15',
                 'aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40',
                 label && 'peer',
+                label &&
+                    focusedPlaceholder &&
+                    'placeholder:text-transparent focus:placeholder:text-[#8a94a6]',
                 className,
             )}
             {...props}

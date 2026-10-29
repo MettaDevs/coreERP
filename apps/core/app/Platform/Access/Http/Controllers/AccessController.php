@@ -9,11 +9,13 @@ use App\Platform\Access\Models\RoleAssignment;
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Access\Support\TenantProducts;
 use App\Platform\Identity\Support\Sso\TenantSso;
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\LinkedWorkerResolvers;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Organization\Models\OrganizationHierarchy;
 use App\Platform\Tenant\Models\InvitationCode;
 use App\Platform\Tenant\Models\TenantMembership;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -22,62 +24,30 @@ use Inertia\Response;
 
 class AccessController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(Request $request): Response|JsonResponse
     {
         $membership = $this->currentMembership($request);
         $tenantId = $membership->tenant_id;
         $entitledAppIds = TenantProducts::appIds($tenantId);
         $mayManage = $membership->hasCorePermission(CoreSecurityCatalog::ACCESS_UPDATE);
-        $members = TenantMembership::query()
-            ->where('tenant_id', $tenantId)
-            ->with(['user:id,name,email,last_login_at', 'roleAssignments.role:id,name', 'roleAssignments.dataPolicyScopes.policy'])
-            ->orderBy('created_at')
-            ->get();
-        // Pekerja yang tertaut dibaca dari module pemilik data pekerja lewat kontrak, bukan dari tabelnya
-        // (TODO analisa gap BC 9.2). Satu pertanyaan untuk seluruh anggota, tidak per baris.
-        $linkedWorkers = app(LinkedWorkerResolvers::class);
-        $workersAvailable = $linkedWorkers->availableFor($tenantId);
-        $workers = $workersAvailable
-            ? $linkedWorkers->forMemberships($tenantId, array_values($members->pluck('id')->map(fn (mixed $id): string => (string) $id)->all()))
-            : [];
+        $workersAvailable = app(LinkedWorkerResolvers::class)->availableFor($tenantId);
+        if ($request->expectsJson() && $request->has('list')) {
+            $input = $request->validate(['list' => ['required', 'in:members,invitations']]);
+
+            return response()->json($input['list'] === 'members'
+                ? $this->members($request, $tenantId, $mayManage, $workersAvailable)
+                : $this->invitations($request, $tenantId, $mayManage));
+        }
+        $initial = Request::create('/settings/access', 'GET');
+        $members = $this->members($initial, $tenantId, $mayManage, $workersAvailable);
+        $invitations = $this->invitations($initial, $tenantId, $mayManage);
 
         return Inertia::render('platform/access/access', [
             'canManage' => $mayManage,
             'tenant' => $membership->tenant->only(['id', 'name']),
             'workersAvailable' => $workersAvailable,
-            'members' => $members
-                ->map(function (TenantMembership $member) use ($mayManage, $workers): array {
-                    $assignments = $member->roleAssignments->where('status', 'active');
-
-                    return [
-                        'id' => $member->id,
-                        'version' => $member->version,
-                        'name' => $member->user->name,
-                        'email' => $member->user->email,
-                        'status' => $member->status,
-                        'last_login_at' => $member->user->last_login_at,
-                        'worker' => $workers[(string) $member->id] ?? null,
-                        'roles' => $assignments->map(fn (RoleAssignment $assignment) => $assignment->role->name)->values(),
-                        'role_ids' => $assignments->pluck('role_id')->values(),
-                        'assignments' => $assignments->map(fn (RoleAssignment $assignment) => [
-                            'role_id' => $assignment->role_id,
-                            'role_name' => $assignment->role->name,
-                            'source' => $assignment->source,
-                            'policy_scopes' => $assignment->dataPolicyScopes->map(fn ($scope) => [
-                                'policy_code' => $scope->policy_code,
-                                'policy_name' => $scope->policy?->name,
-                                'legal_entity_id' => $scope->legal_entity_id,
-                                'organization_id' => $scope->organization_id,
-                                'hierarchy_id' => $scope->hierarchy_id,
-                                'include_descendants' => $scope->include_descendants,
-                                'unrestricted' => $scope->legal_entity_id === null && $scope->organization_id === null,
-                                'valid_from' => $scope->valid_from?->toDateTimeString(),
-                                'valid_until' => $scope->valid_until?->toDateTimeString(),
-                            ])->values(),
-                        ])->values(),
-                        'can_edit_access' => $mayManage,
-                    ];
-                }),
+            'members' => $members['data'],
+            'membersNextCursor' => $members['next_cursor'],
             /*
              * Katalog izin dikirim **ditunda**, dan kolomnya dipilih satu per satu.
              *
@@ -117,12 +87,64 @@ class AccessController extends Controller
              * data di dalam dialog. Ditunda, bukan dihapus — yang membukanya tetap mendapatkannya.
              */
             'hierarchies' => Inertia::defer(fn (): array => $this->hierarchies($tenantId)),
-            'invitations' => $this->invitations($tenantId, $mayManage),
+            'invitations' => $invitations['data'],
+            'invitationsNextCursor' => $invitations['next_cursor'],
             'newInvitationCodes' => $request->session()->pull('new_invitation_codes', []),
             // Kolom "Diundang" hanya berarti bila tenant ini memang memakai SSO; tanpa itu, yang
             // muncul adalah kotak email yang setiap isinya pasti ditolak.
             'ssoAvailable' => app(TenantSso::class)->availableFor($tenantId),
         ]);
+    }
+
+    /** @return array{data: array<int, array<string, mixed>>, next_cursor: ?string} */
+    private function members(Request $request, string $tenantId, bool $mayManage, bool $workersAvailable): array
+    {
+        $query = TenantMembership::query()->where('tenant_memberships.tenant_id', $tenantId)
+            ->join('users', 'users.id', '=', 'tenant_memberships.user_id')
+            ->select('tenant_memberships.*')->addSelect('users.name as member_name', 'users.email as member_email');
+        $batch = IncrementalList::query($request, $query->toBase(), [
+            'id' => 'id', 'identity' => 'member_name', 'name' => 'member_name', 'email' => 'member_email', 'status' => 'status', 'created_at' => 'created_at',
+        ], ['member_name', 'member_email'], 'created_at');
+        $members = TenantMembership::hydrate($batch['data']->map(fn ($row): array => (array) $row)->all());
+        $members->load(['user:id,name,email,last_login_at', 'roleAssignments' => fn ($query) => $query->where('status', 'active'), 'roleAssignments.role:id,name', 'roleAssignments.dataPolicyScopes.policy']);
+        $workers = $workersAvailable
+            ? app(LinkedWorkerResolvers::class)->forMemberships($tenantId, array_values($members->pluck('id')->map(strval(...))->all()))
+            : [];
+        $batch['data'] = $members
+            ->map(function (TenantMembership $member) use ($mayManage, $workers): array {
+                $assignments = $member->roleAssignments->where('status', 'active');
+
+                return [
+                    'id' => $member->id,
+                    'version' => $member->version,
+                    'name' => $member->user->name,
+                    'email' => $member->user->email,
+                    'status' => $member->status,
+                    'last_login_at' => $member->user->last_login_at,
+                    'worker' => $workers[(string) $member->id] ?? null,
+                    'roles' => $assignments->map(fn (RoleAssignment $assignment) => $assignment->role->name)->values(),
+                    'role_ids' => $assignments->pluck('role_id')->values(),
+                    'assignments' => $assignments->map(fn (RoleAssignment $assignment) => [
+                        'role_id' => $assignment->role_id,
+                        'role_name' => $assignment->role->name,
+                        'source' => $assignment->source,
+                        'policy_scopes' => $assignment->dataPolicyScopes->map(fn ($scope) => [
+                            'policy_code' => $scope->policy_code,
+                            'policy_name' => $scope->policy?->name,
+                            'legal_entity_id' => $scope->legal_entity_id,
+                            'organization_id' => $scope->organization_id,
+                            'hierarchy_id' => $scope->hierarchy_id,
+                            'include_descendants' => $scope->include_descendants,
+                            'unrestricted' => $scope->legal_entity_id === null && $scope->organization_id === null,
+                            'valid_from' => $scope->valid_from?->toDateTimeString(),
+                            'valid_until' => $scope->valid_until?->toDateTimeString(),
+                        ])->values(),
+                    ])->values(),
+                    'can_edit_access' => $mayManage,
+                ];
+            })->values()->all();
+
+        return $batch;
     }
 
     /**
@@ -246,13 +268,19 @@ class AccessController extends Controller
      * undangan yang sudah ada dengan kolom yang sama seperti baris baru —
      * tanggung jawab dan batas datanya terbaca, bukan sekadar nama role.
      *
-     * @return list<array<string, mixed>>
+     * @return array{data: array<int, array<string, mixed>>, next_cursor: ?string}
      */
-    private function invitations(string $tenantId, bool $canManage): array
+    private function invitations(Request $request, string $tenantId, bool $canManage): array
     {
+        $batch = IncrementalList::query($request, InvitationCode::query()->where('tenant_id', $tenantId)->toBase(), [
+            'id' => 'id', 'label' => 'label', 'created_at' => 'created_at', 'expires_at' => 'expires_at',
+        ], ['label'], 'created_at', defaultDirection: 'desc');
+        $invitations = InvitationCode::hydrate($batch['data']->map(fn ($row): array => (array) $row)->all());
+        $invitations->load('roles:id,name');
+        $ids = $invitations->pluck('id')->all();
         $scopes = DB::table('invitation_data_policy_scopes as scope')
             ->join('invitation_codes as invitation', 'invitation.id', '=', 'scope.invitation_id')
-            ->where('invitation.tenant_id', $tenantId)
+            ->where('invitation.tenant_id', $tenantId)->whereIn('scope.invitation_id', $ids)
             ->get([
                 'scope.invitation_id', 'scope.role_id', 'scope.policy_code',
                 'scope.legal_entity_id', 'scope.organization_id',
@@ -265,18 +293,12 @@ class AccessController extends Controller
         $redeemed = DB::table('role_assignments')
             ->join('tenant_memberships as membership', 'membership.id', '=', 'role_assignments.membership_id')
             ->where('membership.tenant_id', $tenantId)
-            ->whereNotNull('role_assignments.source_reference')
-            ->select('role_assignments.source_reference', 'role_assignments.membership_id')
-            ->distinct()
-            ->get()
-            ->groupBy('source_reference')
-            ->map(fn (Collection $rows): int => $rows->pluck('membership_id')->unique()->count());
+            ->whereIn('role_assignments.source_reference', array_map(fn (string $id): string => 'invitation:'.$id, $ids))
+            ->groupBy('role_assignments.source_reference')
+            ->select('role_assignments.source_reference')->selectRaw('count(distinct role_assignments.membership_id) as redeemed_count')
+            ->pluck('redeemed_count', 'source_reference');
 
-        return array_values(InvitationCode::query()
-            ->where('tenant_id', $tenantId)
-            ->with(['roles:id,name'])
-            ->latest()
-            ->get()
+        $batch['data'] = $invitations
             ->map(function (InvitationCode $invitation) use ($scopes, $redeemed, $canManage): array {
                 $byRole = $scopes->get($invitation->id, collect())->groupBy('role_id');
 
@@ -312,7 +334,9 @@ class AccessController extends Controller
                         'redeemed_at' => $invitation->sso_redeemed_at,
                     ] : null,
                 ];
-            })->all());
+            })->all();
+
+        return $batch;
     }
 
     /**

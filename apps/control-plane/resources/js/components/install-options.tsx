@@ -1,4 +1,5 @@
 import { Checkbox } from '@apperp/ui/checkbox';
+import { FormControl } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 
 export type InstallOptionValues = {
@@ -26,10 +27,10 @@ export default function InstallOptionsFields({
     disabled: boolean;
 }) {
     return (
-        <div className="space-y-3 rounded-md border border-dashed p-4">
+        <div className="space-y-5 rounded-md border bg-muted/20 p-4">
             <p className="text-sm font-medium">Pilihan pemasangan</p>
 
-            <label className="flex items-start gap-3">
+            <label className="flex cursor-pointer items-start gap-3">
                 <Checkbox
                     checked={value.kunci_lisensi}
                     onCheckedChange={(checked) =>
@@ -48,7 +49,7 @@ export default function InstallOptionsFields({
                 </span>
             </label>
 
-            <label className="flex items-start gap-3">
+            <label className="flex cursor-pointer items-start gap-3">
                 <Checkbox
                     checked={value.proxy_luar}
                     onCheckedChange={(checked) =>
@@ -67,7 +68,11 @@ export default function InstallOptionsFields({
                 </span>
             </label>
 
-            <div className="max-w-xs">
+            <FormControl
+                className="max-w-sm"
+                error={portError}
+                hint="Kosongkan untuk memakai port 8000. Pilih port lain bila 8000 sudah digunakan di server klien."
+            >
                 <Input
                     label="Port aplikasi"
                     inputMode="numeric"
@@ -78,14 +83,7 @@ export default function InstallOptionsFields({
                         onChange({ ...value, app_port: e.target.value })
                     }
                 />
-                <p className="mt-1 text-xs text-muted-foreground">
-                    Kosongkan untuk 8000. Isi hanya bila port itu sudah dipakai
-                    di server klien.
-                </p>
-                {portError && (
-                    <p className="mt-1 text-xs text-destructive">{portError}</p>
-                )}
-            </div>
+            </FormControl>
         </div>
     );
 }

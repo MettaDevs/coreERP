@@ -1,4 +1,307 @@
-# App Procurement terhadap D365 Procurement and sourcing
+# App Procurement
+
+Procurement mengelola hubungan pemasok dengan proses pengadaan: pengajuan katalog,
+permintaan dan balasan penawaran, evaluasi, keputusan pembelian, dan dokumen pesanan.
+Identitas Vendor dan Item bersama tetap mengikuti pemilik master di Core/Foundation.
+
+## Arahan pemilik produk, 27 Oktober 2026
+
+Pemilik produk akan mengerjakan sendiri fitur Vendor memasukkan barang, katalog pemasok,
+sinkronisasi, dan perbandingan penawaran. Bagian ini menjadi catatan pengetahuan dan
+rancangan teknis untuk pekerjaan tersebut. Fitur itu **tidak ditugaskan kepada anak magang**
+melalui review fondasi Procurement yang sedang berjalan.
+
+Tujuannya adalah Vendor mengisi atau memperbarui barang serta penawarannya, kemudian buyer
+membandingkan pilihan yang setara dan menetapkan pembelian di CoreERP tanpa memindahkan
+data ke Excel. Ini arahan produk, bukan pernyataan bahwa fitur sudah tersedia.
+
+Pilihan material yang belum diputuskan ditandai sebagai **usulan** atau **terbuka**.
+Jangan menjadikan contoh nama resource, status, scope, atau format nomor pada catatan ini
+sebagai keputusan manifest/migration yang sudah disetujui.
+
+### Keputusan master bersama Metode Pembayaran, PR #349
+
+Keputusan pemilik produk, 27 Oktober 2026: **Metode Pembayaran dipindahkan ke
+Core/Foundation**, bukan dipertahankan sebagai master milik Procurement. Jika client
+tidak membeli Procurement, modul lain yang memerlukan metode pembayaran tetap harus
+mendapatkannya. Menu Procurement menjadi pintu ke master bersama yang sama, dengan hak
+akses dan scope yang tetap diperiksa.
+
+Ini juga menjadi decision gate untuk fitur lain: master atau kemampuan bersama yang
+benar-benar dibutuhkan modul lain tidak boleh memaksa pembelian/pemasangan modul pertama.
+Langsung tentukan pemilik Core sesuai aturan; business master di Foundation dan engine
+netral di Platform. Integrasi opsional atas fakta proses modul asal tetap dibedakan dari
+prasyarat bersama. Penerimaan kategori datar sementara pada PR #347 bukan pengecualian
+umum untuk master lintas modul.
+
+Tahap awal metode pembayaran boleh tetap sederhana. Pemindahan tidak berarti seluruh
+payment engine, ekspor bank atau akun penyeimbang BC harus dibuat sekaligus. Buktikan
+master/halaman/API tetap tersedia ketika Procurement tidak dipasang atau dinonaktifkan,
+serta consumer membaca lewat kontrak Core. Scope perusahaan dan konfigurasi keuangan
+tetap keputusan terpisah dari kepemilikan code.
+
+### TODO hierarchy kategori, ditunda dari PR #347
+
+Keputusan pemilik produk, 27 Oktober 2026: **PR #347 boleh mempertahankan master kategori
+datar untuk sementara**. Hierarchy kategori dicatat sebagai pekerjaan lanjutan di sini,
+bukan tuntutan perubahan konsep pada review PR tersebut. Temuan teknis keamanan, data,
+validasi dan UI tetap perlu diperbaiki.
+
+- [ ] Tentukan apakah resource yang dibangun adalah hierarchy kategori procurement
+  khusus proses pembelian atau kategori Item bersama. Kategori Item umum mengikuti
+  Foundation; lokasi menu Procurement tidak menentukan pemilik data.
+- [ ] Rancang parent dan nama node yang dapat dikelola pengguna, identitas kategori yang
+  stabil, penolakan self-parent/cycle, reparent, urutan tampilan serta aturan archive
+  kategori yang masih mempunyai child atau dipakai dokumen.
+- [ ] Putuskan apakah node induk hanya pengelompokan atau juga dapat dipilih pada transaksi.
+  Jangan mengasumsikan leaf-only atau mengadopsi tipe akun COA tanpa keputusan bisnis.
+- [ ] Pisahkan definisi hierarchy dari policy akses perusahaan/unit serta hubungan
+  kategori dengan produk dan Vendor. Kebutuhan scope dan riwayat perubahan belum ditetapkan.
+- [ ] Susun migrasi dari kategori datar setelah desain disepakati, dengan mempertahankan
+  ID/referensi dan perilaku data yang sudah tersimpan.
+
+Acuan F&O adalah [Procurement category hierarchy](https://learn.microsoft.com/en-us/dynamics365/supply-chain/procurement/tasks/set-up-procurement-category-hierarchy),
+[procurement catalogs](https://learn.microsoft.com/en-us/dynamics365/supply-chain/procurement/procurement-catalogs),
+dan [category policies](https://learn.microsoft.com/en-us/dynamics365/supply-chain/procurement/tasks/set-up-policies-procurement-category-hierarchies).
+BC [Item Category](https://learn.microsoft.com/en-us/dynamics365/business-central/inventory-how-categorize-items)
+mempunyai Parent Category dan atribut warisan. Source lokal
+`Inventory/Item/ItemCategory.Table.al` serta `ItemCategories.Page.al` di bawah
+`D:/Kerja/BCApps/src/Layers/W1/BaseApp/`, commit
+`777e102e90a078b7256bf94b065ba50089abafa9`, menunjukkan tree, validasi cycle, dan perubahan
+atribut saat parent berubah. Node induk dapat tampil tebal seperti header, tetapi tidak
+memiliki semantik COA Posting/Heading/Total yang sama.
+
+### Bukti implementasi yang sudah diperiksa
+
+| Sumber | Keadaan pada pemeriksaan |
+| --- | --- |
+| Checkout CoreERP saat penelitian | Procurement masih berupa template module di `modules/apperp/procurement/` |
+| [PR #343](https://github.com/MettaDevs/coreERP/pull/343), head `25d6cb1971a4c907fa6e4c81353005d1280b3578` | Fondasi navigasi, permission baca, dan placeholder |
+| [PR #344](https://github.com/MettaDevs/coreERP/pull/344), head `d1bf02a71c27d97403edcdb9dcc5428cd0fe32de` | Form internal Prakualifikasi, induk/rincian, dan API CRUD |
+| [PR #345](https://github.com/MettaDevs/coreERP/pull/345), head `5b113172e250c2c0011f6666306a65727d31dc0c` | Daftar baca Kualifikasi sebagai filter Prakualifikasi berstatus `Lolos` |
+
+Pada head PR #345, `ui/transactions/PermintaanPenawaranPage.tsx` dan
+`ui/transactions/PesananPembelianPage.tsx` masih placeholder. Item pada rincian
+Prakualifikasi belum mempunyai model harga, masa berlaku, currency, minimum pembelian,
+atau balasan RFQ. Daftar barang pada berkas kelulusan Vendor belum merupakan katalog
+pemasok yang bisa dipakai untuk membandingkan penawaran.
+
+### Konsep yang harus dipisahkan
+
+| Konsep | Fakta yang dimiliki |
+| --- | --- |
+| Identitas Vendor | Siapa pemasoknya, identitas party, alamat/kontak, dan hubungan dengan perusahaan pembeli |
+| Kualifikasi Vendor | Apakah pemasok memenuhi persyaratan proses/kategori/periode yang disepakati |
+| Katalog pemasok | Barang yang ditawarkan, SKU milik pemasok, spesifikasi, varian, dan kemasan |
+| Pemetaan Item | Hubungan SKU pemasok dengan Item internal yang sama |
+| Price list | Harga dan syarat yang berlaku pada periode, quantity, unit, dan currency tertentu |
+| RFQ dan balasan | Permintaan pembelian tertentu beserta penawaran masing-masing Vendor |
+| Perbandingan dan award | Penilaian penawaran yang setara dan keputusan buyer memilih pemenang |
+| PO | Komitmen pembelian dengan harga, quantity, dan syarat yang sudah ditetapkan |
+
+Vendor yang lolos tidak otomatis memenangkan pembelian. Produk yang dikirim Vendor tidak
+otomatis menjadi Item internal yang disetujui. Perubahan price list tidak otomatis mengubah
+penawaran yang sudah diterima atau PO yang sudah dikonfirmasi.
+
+### Padanan F&O dan batas penerapannya
+
+| Kebutuhan | Bukti Microsoft Learn | Penerapan ke CoreERP |
+| --- | --- | --- |
+| Vendor mengajukan pendaftaran | [Vendor onboarding](https://learn.microsoft.com/en-us/dynamics365/supply-chain/procurement/vendor-onboarding) menjelaskan prospective request, peninjauan, undangan pengguna, registration wizard, dan penerimaan Vendor | Adaptasi alur; pendaftaran pemasok tidak langsung memberi hak ke seluruh data perusahaan |
+| Vendor berinteraksi sendiri | [Vendor collaboration](https://learn.microsoft.com/en-us/dynamics365/supply-chain/procurement/set-up-maintain-vendor-collaboration) membatasi informasi yang tersedia untuk pengguna eksternal dan mendukung respons RFQ/PO | Portal dan principal eksternal perlu dibatasi ke Vendor yang terikat padanya |
+| Memasukkan katalog pemasok | [Import vendor catalogs](https://learn.microsoft.com/en-us/dynamics365/supply-chain/procurement/vendor-catalogs-import) menerima CMR/XML, peninjauan produk, dan penerbitan produk yang disetujui | Alur penerimaan katalog mempunyai padanan langsung; form portal dan API sinkronisasi adalah adaptasi CoreERP, bukan klaim fitur native yang identik |
+| Membandingkan penawaran | [Enter and compare RFQ bids](https://learn.microsoft.com/en-us/dynamics365/supply-chain/procurement/tasks/enter-compare-rfq-bids-award-contracts) memuat balasan Vendor, quantity, harga bersih, pengiriman, dan scoring | Acuan utama matriks penawaran dan keputusan buyer |
+| Memilih pemasok per baris | [RFQ overview](https://learn.microsoft.com/en-us/dynamics365/supply-chain/procurement/request-quotations) mendukung penerimaan sebagian baris dari Vendor berbeda | Usulan pilihan per barang atau paket; kebijakan final masih perlu ditetapkan |
+| Katalog tetap di sistem Vendor | [PunchOut](https://learn.microsoft.com/en-us/dynamics365/supply-chain/procurement/set-up-external-catalog-for-punchout) membuka situs Vendor lalu mengembalikan keranjang melalui cXML | Jalur integrasi opsional; tidak menggantikan matriks perbandingan terpusat secara otomatis |
+
+### Pengetahuan dari source BC lokal
+
+Source yang diperiksa berada di `D:/Kerja/BCApps`, commit
+`777e102e90a078b7256bf94b065ba50089abafa9`. Ini bukti source lokal, bukan versi runtime
+BC yang dipakai di suatu pemasangan.
+
+| Source di bawah `src/Layers/W1/BaseApp/` | Perilaku yang dibuktikan |
+| --- | --- |
+| `Inventory/Item/Catalog/ItemVendor.Table.al`, field `Item No.`, `Vendor No.`, `Vendor Item No.` | Satu Item internal mempunyai hubungan dengan Vendor dan kode barang Vendor. Kode pemasok bukan identitas Item internal |
+| `Inventory/Item/Catalog/NonstockItem.Table.al` | Barang katalog menyimpan data pemasok, unit, published cost, dan negotiated cost sebelum menjadi Item biasa |
+| `Inventory/Item/Catalog/CatalogItemManagement.Codeunit.al`, `NonstockAutoItem` | Konversi membuat Item internal serta hubungan Item Vendor/Item Reference. Ini membuktikan konversi, bukan approval workflow tertentu |
+| `Purchases/Pricing/PurchaseLinePrice.Codeunit.al`, `AddVendorSources` | Sumber harga memuat `All Vendors` serta Vendor yang sudah dipilih pada purchase header. `All Vendors` bukan loop seluruh pemasok |
+| `Pricing/Calculation/PriceCalculationV16.Codeunit.al`, `IsBetterPrice` | Memilih harga berlaku yang lebih baik setelah line discount. Ini bukan bukti mesin competitive bidding lintas Vendor |
+| `Purchases/Document/PurchQuotetoOrder.Codeunit.al` | Quote untuk Vendor terpilih dipindahkan menjadi order beserta barisnya |
+
+[Harga pembelian BC](https://learn.microsoft.com/en-us/dynamics365/business-central/purchasing-how-record-purchase-price-discount-payment-agreements)
+menjelaskan kondisi Vendor, Item, minimum quantity, unit, dan tanggal.
+[Purchase quote BC](https://learn.microsoft.com/en-us/dynamics365/business-central/purchasing-how-request-quotes)
+menjelaskan konversi penawaran yang diterima menjadi PO. Gunakan BC untuk pola master,
+katalog, harga, dan card; gunakan RFQ F&O sebagai pembanding alur competitive sourcing.
+Penelitian ini tidak membuktikan bahwa seluruh ekosistem BC tidak mempunyai portal atau
+addon perbandingan pemasok.
+
+## Usulan alur kerja untuk pengembangan pemilik produk
+
+1. Vendor diundang atau mengajukan pendaftaran. Organisasi meninjau identitas dan aksesnya.
+2. Vendor mengirim katalog, SKU, spesifikasi, kemasan, harga, dan syarat melalui portal atau integrasi.
+3. Data masuk sebagai submission. Validasi menolak baris tidak sah dan menjelaskan masalah per baris.
+4. Buyer memetakan SKU Vendor ke Item internal. Item baru mengikuti proses pembuatan master yang disepakati.
+5. Versi katalog/harga yang sudah diterima tersedia untuk kebutuhan pembelian.
+6. Untuk kebutuhan tertentu, buyer memakai harga katalog yang masih berlaku atau mengirim RFQ kepada beberapa Vendor.
+7. Vendor mengirim balasan RFQ. Sistem menyandingkan penawaran yang setara.
+8. Buyer memilih pemenang dan menyimpan alasan keputusan, lalu membuat PO.
+9. Penerimaan dan pemeriksaan invoice memakai PO serta fakta penerimaan yang sebenarnya.
+
+RFQ tidak harus dipaksakan untuk setiap pembelian dari harga yang sudah disepakati.
+Kapan pembelian langsung boleh dilakukan dan kapan RFQ wajib adalah keputusan kebijakan
+pengadaan yang masih terbuka.
+
+### Data yang perlu dikenali
+
+Nama berikut adalah konsep resource/field payload untuk mendiskusikan rancangan. Nama tabel,
+kolom, endpoint, serta migration final belum ditetapkan.
+
+| Konsep resource | Data dan aturan yang perlu dimodelkan |
+| --- | --- |
+| `SupplierRegistration` | Principal/kontak eksternal, identitas yang diajukan, organisasi penerima, dan hasil peninjauan |
+| `CatalogSubmission` | Vendor, sumber, versi kiriman, waktu diterima, checksum payload, dan hasil validasi per baris |
+| `SupplierCatalogLine` | SKU/varian Vendor, spesifikasi, kemasan, unit, referensi Item internal bila sudah dipetakan, dan asal data |
+| `SupplierPrice` | Currency, harga, quantity break, minimum pembelian, masa berlaku, biaya/discount yang diketahui, dan versi penawaran |
+| `RfqCase` / `RfqReply` | Kebutuhan dan revisinya, Vendor yang diundang, batas waktu, balasan per baris, serta syarat yang dijawab |
+| `BidComparison` / `AwardDecision` | Dasar pembandingan, versi penawaran, hasil normalisasi, pemenang, alasan dan pelaku keputusan |
+| `PurchaseOrder` | Vendor/perusahaan yang bertanggung jawab, Item, quantity, harga dan syarat yang disepakati, serta referensi keputusan |
+
+Satu baris matriks membandingkan Item atau kebutuhan yang benar-benar setara. Samakan
+varian/spesifikasi, isi kemasan, unit, quantity, currency, discount, ongkir, dasar pajak,
+masa berlaku, minimum pembelian, dan lead time. Jangan membandingkan harga per kotak
+langsung dengan harga per buah. Harga termurah per baris juga belum tentu menghasilkan
+total paket termurah setelah ongkir dan minimum pembelian.
+
+Matriks dapat menunjukkan harga terendah yang memenuhi syarat. Pilihan apakah ranking
+hanya berdasarkan harga, total biaya, atau kriteria berbobot tetap keputusan produk.
+Sistem belum diberi mandat untuk menetapkan pemenang atau membuat komitmen pembelian otomatis.
+
+### Ownership, scope, dan akses
+
+- Vendor/party dan Item bersama mengikuti [master bersama](/dev/02-module-standard#master-bersama-dan-modul-yang-berdiri-sendiri).
+  Procurement menyimpan fakta proses dan referensi master. Jangan membuat direktori Vendor/Item tandingan.
+- Gunakan card Core yang sama. Contoh Aset `ui/_shared/RecordLookup.tsx` membuka
+  `VendorCreateCard` milik Core. Entry point Detail/Ubah harus benar-benar tersedia;
+  jangan menganggap export card create sudah melayani semua mode.
+- Usulan record komersial mempertahankan perusahaan pembeli yang bertanggung jawab.
+  Putuskan scope per resource, bukan satu keputusan tenant/company untuk seluruh module.
+- Identitas Vendor dapat berhubungan dengan beberapa perusahaan. Hubungan tersebut tidak
+  otomatis memberi principal Vendor akses ke seluruh perusahaan atau seluruh tenant.
+- Principal eksternal hanya boleh mengirim/membaca data Vendor yang terikat padanya.
+  `vendor_id` dari browser bukan bukti ownership. Penawaran pesaing tidak menjadi data portal Vendor.
+- Setiap list, lookup, detail, download, write, replay, ekspor dan job menerapkan tenant,
+  konteks perusahaan tepercaya, permission serta policy resource yang disepakati.
+  Perusahaan aktif tidak menggantikan izin. Child mengikuti batas induknya.
+
+Rujukan teknisnya [identity dan access](/dev/09-identity-and-access),
+[scope query](/dev/08-query-scopes-and-schema), dan keputusan resource pada
+`.agents/skills/module-discovery/SKILL.md` serta `.agents/skills/coreerp-architecture/SKILL.md`.
+
+### Sinkronisasi dan penyimpanan
+
+Portal dan API integrasi dapat memanggil action validasi/submission yang sama. Jangan
+membuat salinan aturan harga atau pemetaan barang untuk setiap transport. Integrasi ke
+ERP Vendor baru diperlukan bila sumber dan kebutuhan sinkronisasinya sudah diketahui.
+
+- Simpan identitas sumber dan versi kiriman. Kunci pencocokan SKU memasukkan semua dimensi
+  yang membedakan barang/kemasan/varian; jangan memakai nama barang sebagai key.
+- Retry kiriman yang sama tidak membuat katalog/baris kedua. Kiriman berbeda dengan key
+  yang sudah dipakai harus menjadi konflik yang jelas, bukan update diam-diam.
+- Proses batch melalui staging, validasi, dan penerapan yang batas transaksinya jelas.
+  Bedakan ditolak seluruhnya, diterapkan sebagian, dan hasil yang belum diketahui.
+- Bedakan perubahan sebagian dengan penggantian seluruh katalog. SKU yang tidak ada pada
+  kiriman sebagian tidak boleh dianggap dihapus. Baris yang dinonaktifkan tetap mengikuti soft delete/retensi.
+- Tampilkan status/error per baris, asal dan waktu sinkronisasi, serta versi terakhir yang diterima.
+  Jangan mengganti error integrasi dengan data contoh atau respons sukses palsu.
+- Versi katalog baru tidak menimpa balasan RFQ yang diterima atau harga PO terkonfirmasi.
+  Perubahan komitmen mengikuti revisi dokumen, bukan efek samping sinkronisasi.
+- Gunakan issuer nomor Core setelah reference disepakati. Simpan dokumen dan penerbitan nomor
+  dalam transaksi yang sesuai; jangan memakai `COUNT + 1` atau `MAX + 1`.
+- Gunakan versi record dan idempotency pada batas write. Pertahankan identitas rincian,
+  soft delete dan indeks unik aktif dengan namespace yang sesuai scope resource.
+
+Untuk komunikasi di dalam runtime, panggil kontrak Core dalam proses. REST/event untuk
+sistem Vendor di luar runtime mengikuti [API dan integration](/dev/04-api-and-integration).
+Contract menggambarkan implementasi sebenarnya dan tidak menyatakan endpoint/event yang
+belum dibuat. Penomoran mengikuti [number sequences](/dev/14-number-sequences).
+
+### Pencegahan N+1 dan kualitas kode
+
+Aturan ini menjadi kriteria implementasi dan review, bukan klaim bahwa pengujian sudah lulus.
+
+**DataTable memakai lazy loading/incremental saat scroll, tanpa navigasi nomor halaman.**
+Server tetap mengirim batch terbatas beserta `next_cursor`; search, filter dan sort tetap
+di server. Lazy loading UI ini berbeda dari lazy loading relasi Eloquent per record yang
+bisa menyebabkan N+1. Jangan mengunduh seluruh data lalu menyebutnya lazy loading karena
+browser hanya menggambar sebagian baris.
+
+- Bandingkan jumlah query endpoint dengan batch kecil dan lebih besar sambil menserialisasi
+  respons sebenarnya. Query relasi per record adalah kandidat N+1; ukur sebelum menyimpulkan.
+  `with()` pada source belum membuktikan seluruh serializer/callback bebas lazy loading.
+- Query daftar hanya mengambil field dan ringkasan yang dipakai daftar. Muat rincian dokumen/item
+  ketika card dibuka melalui endpoint detail yang memakai scope dan permission yang sama.
+  Eager loading seluruh child menghindari N+1, tetapi tetap bisa membuat payload besar.
+- Gunakan pembacaan master banyak ID sekaligus, misalnya `VendorDirectory::findMany`,
+  untuk satu batch. Jangan memanggil `find` Vendor/Item per baris matriks atau daftar.
+- Hindari query atau request terpisah untuk setiap sel harga. Ambil penawaran satu kebutuhan
+  secara batch dengan dimensi dan scope yang eksplisit. Pemetaan SKU/harga harus dapat diindeks.
+- Catat query write secara terpisah. INSERT per rincian bukan otomatis N+1 read, tetapi
+  dapat membatasi batch besar. Pilih bulk write hanya jika validasi, tenant, audit, versi,
+  soft delete dan identitas rincian tetap benar; jangan melewati aturan model demi jumlah query.
+- Gunakan daftar/cursor incremental SDK, ukuran batch terbatas, search/sort di server, dan
+  AbortSignal/guard generasi. Jangan mengunduh seluruh katalog atau menambah nomor halaman.
+- Pisahkan state data server, draft form, dan feedback operasi. Jangan menyimpan salinan
+  state turunan yang bisa berbeda, atau membiarkan data Vendor sebelumnya menempel pada Vendor baru.
+- Gunakan kontrak payload/serializer yang jelas. Jangan mengirim relasi sama sebagai dua
+  field sekaligus hanya untuk mempertahankan alias lama yang seluruh caller-nya dapat dimigrasikan.
+- Gunakan cell/action API DataTable SDK. Jangan memberi data terkelola ke DataTable sambil
+  mengganti body dengan renderer manual yang melewati sorting, pilihan record, atau batching.
+  `renderRows` memang disediakan SDK; penggunaannya sendiri bukan bukti pelanggaran.
+- Validasi baris rincian yang sudah diisi sebagian. Jangan membuang baris dengan kode,
+  quantity, unit atau catatan hanya karena nama masih kosong lalu menyatakan simpan berhasil.
+  Hanya baris placeholder yang seluruhnya belum disentuh yang boleh diabaikan.
+- Pertahankan ID dan kategori rincian yang sudah tersimpan. Nama/label yang dapat disunting
+  bukan identitas record dan tidak dipakai untuk menebak ulang kategori saat membuka edit.
+- Pecah action/query/presentasi ketika tanggung jawabnya berbeda. Panjang file saja bukan
+  bukti kualitas buruk. Hindari wrapper satu pemanggil, registry generik dan compatibility layer spekulatif.
+- Header form dan field memakai feedback yang sama. Error tetap terlihat, draft tidak hilang,
+  dan halaman membedakan loading, empty, gagal, serta tidak berizin.
+
+Contoh yang sudah ada berada pada `modules/apperp/management-aset/ui/use-record-list.ts`,
+`ui/master/MasterPage.tsx`, `ui/master/MasterForm.tsx`, dan
+`src/Http/Controllers/MasterDataController.php`. Gunakan perilakunya sebagai pola; jangan
+mengimpor implementasi Aset lintas module. Aturan rinci ada di
+[data daftar bertahap](/dev/02-module-standard#data-daftar-dimuat-bertahap),
+[feedback error](/dev/28-pelaporan-kesalahan#kegagalan-yang-terlihat-oleh-pengguna), dan
+[penghapusan lunak](/dev/02-module-standard#penghapusan-lunak).
+
+### Keputusan yang masih terbuka dan bukti selesai
+
+| Keputusan | Yang harus ditetapkan sebelum implementation final |
+| --- | --- |
+| Portal dan pendaftaran | Undangan, pendaftaran mandiri, atau keduanya; siapa menerima Vendor dan mengikat principal eksternal |
+| Berbagi katalog | Katalog milik satu organisasi pembeli atau jaringan pemasok lintas client; jangan membuka data lintas tenant tanpa keputusan eksplisit |
+| Scope resource | Tenant/perusahaan/organisasi per resource, field pemilik, grant dan jalur lintas perusahaan |
+| Persetujuan | Perubahan yang memerlukan review dan yang boleh diterima otomatis setelah validasi; actor dan pemisahan tugas bila diperlukan |
+| Penawaran dan pemenang | Harga katalog atau RFQ, per barang atau paket, normalisasi biaya dan alasan override |
+| Sinkronisasi | Portal, upload, API push/pull atau PunchOut; sumber, versi, penggantian penuh/sebagian, dan pemulihan kegagalan |
+| Penomoran dan contract | Dokumen yang membutuhkan reference nomor, scope, format, kebijakan manual, serta permukaan eksternal yang benar-benar diterbitkan |
+
+Mulai dari alur Vendor mengirim katalog, buyer memetakan barang, membandingkan penawaran,
+lalu membuat PO. Pengujian harus meliputi isolasi Vendor/tenant/perusahaan, akses langsung
+ke API/detail/download, replay, konflik versi, kegagalan sebagian, validitas harga/unit,
+query count dan pertumbuhan payload. Pengujian query lokal tidak membuktikan kapasitas.
+Gate module lengkap tetap mengikuti [load dan concurrency testing](/dev/20-load-and-concurrency-testing)
+serta skill arsitektur, dengan database asli dan pemeriksaan kebenaran SQL.
+
+## Arsip audit terdahulu
+
+Bagian berikut dipertahankan sebagai catatan temuan lama. Klaim keadaan source, jumlah
+temuan, pemisahan app/database, service token, dan pembagian pemiliknya adalah snapshot
+historis. Bagian itu **bukan desain teknis kanonik untuk implementasi baru**. Jika berbeda,
+ikuti arahan di atas dan [standar module](/dev/02-module-standard).
 
 > Dihasilkan dari audit 7 dimensi terhadap Dynamics 365 F&O. Setiap temuan sudah
 > melewati satu putaran verifikasi lawan yang membuka file aslinya; temuan yang

@@ -129,7 +129,7 @@ class SsoApiClient
         return $this->setting('api_client_secret') ?: $this->setting('client_secret');
     }
 
-    private function setting(string $key): string
+    protected function setting(string $key): string
     {
         $value = config('coreerp.sso.'.$key);
 

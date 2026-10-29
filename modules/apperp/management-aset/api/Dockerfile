@@ -11,7 +11,7 @@ WORKDIR /app
 COPY api/composer.json api/composer.lock ./
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
 
-FROM php:8.4-apache
+FROM php:8.4.27-apache-trixie
 RUN apt-get update && apt-get install -y --no-install-recommends libicu-dev libpq-dev libzip-dev unzip \
     && docker-php-ext-install bcmath intl pdo_pgsql pgsql zip \
     && a2enmod rewrite \

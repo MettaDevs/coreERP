@@ -25,6 +25,7 @@ use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Services\AssetNumberSequenceIssuer;
 use Modules\Apperp\ManagementAset\Services\InsuredValues;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
+use Modules\Apperp\ManagementAset\Support\CreationPayload;
 use Modules\Apperp\ManagementAset\Support\OrganizationScope;
 use Modules\Apperp\ManagementAset\Support\StatusAset;
 use stdClass;
@@ -112,16 +113,23 @@ class InsurancePolicyController extends Controller
 
     public function store(Request $request, AssetNumberSequenceIssuer $numbers): JsonResponse
     {
+        return DB::transaction(fn (): JsonResponse => $this->storeRecord($request, $numbers));
+    }
+
+    private function storeRecord(Request $request, AssetNumberSequenceIssuer $numbers): JsonResponse
+    {
         $this->guard($request, 'create');
         $key = $this->creationKey($request);
         $tenant = $this->tenant($request);
+        $data = $this->validated($request);
+        $header = ['legal_entity_id' => $data['legal_entity_id'], ...$this->values($data)];
+        $creationHash = CreationPayload::hash(['header' => (new InsurancePolicy)->forceFill($header)->only(array_keys($header)), 'coverage_operations' => $data['coverage_operations'] ?? []]);
         if ($existing = InsurancePolicy::withTrashed()->where('creation_key', $key)->first()) {
             app(OrganizationScope::class)->require($request, $existing->legal_entity_id, null);
 
-            return response()->json(['data' => ['id' => $existing->id, 'kode' => $existing->kode]], 200, ['Idempotent-Replayed' => 'true']);
+            return $this->replayPolicy($request, $existing, $creationHash);
         }
 
-        $data = $this->validated($request);
         app(OrganizationScope::class)->require($request, $data['legal_entity_id'], null);
         $this->validateVendor($tenant, $data);
 
@@ -133,14 +141,15 @@ class InsurancePolicyController extends Controller
 
         $id = (string) Str::ulid();
         try {
-            (new InsurancePolicy)->forceFill([
+            DB::transaction(fn () => (new InsurancePolicy)->forceFill([
                 'id' => $id,
                 'tenant_id' => $tenant,
                 'creation_key' => $key,
+                'creation_payload_hash' => $creationHash,
                 'kode' => $kode,
                 'legal_entity_id' => $data['legal_entity_id'],
                 ...$this->values($data),
-            ])->save();
+            ])->save());
         } catch (QueryException $exception) {
             $existing = InsurancePolicy::withTrashed()->where('creation_key', $key)->first();
             if ($existing === null) {
@@ -149,10 +158,22 @@ class InsurancePolicyController extends Controller
 
             app(OrganizationScope::class)->require($request, $existing->legal_entity_id, null);
 
-            return response()->json(['data' => ['id' => $existing->id, 'kode' => $existing->kode]], 200, ['Idempotent-Replayed' => 'true']);
+            return $this->replayPolicy($request, $existing, $creationHash);
         }
 
+        $this->saveCoverageOperations($request, $id, $data['coverage_operations'] ?? []);
+
         return $this->document($request, $id, 201, ['Location' => $request->url().'/'.$id]);
+    }
+
+    private function replayPolicy(Request $request, InsurancePolicy $policy, string $creationHash): JsonResponse
+    {
+        $storedHash = $policy->getAttribute('creation_payload_hash');
+        if ($storedHash === null || ! hash_equals((string) $storedHash, $creationHash)) {
+            return response()->json(['error' => ['code' => 'idempotency_conflict', 'message' => 'Kunci permintaan sudah dipakai untuk data yang berbeda.']], 409);
+        }
+
+        return $this->document($request, (string) $policy->id, 200, ['Idempotent-Replayed' => 'true']);
     }
 
     /**
@@ -171,8 +192,10 @@ class InsurancePolicyController extends Controller
         }
         $this->validateVendor($this->tenant($request), $data);
 
-        DB::transaction(function () use ($id, $data, $version): void {
+        DB::transaction(function () use ($request, $id, $data, $version): void {
             RowVersion::claim(InsurancePolicy::query()->whereKey($id), $version);
+            InsurancePolicy::query()->whereKey($id)->update([...$this->values($data), 'updated_at' => now()]);
+            $this->saveCoverageOperations($request, $id, $data['coverage_operations'] ?? []);
             $outside = InsuranceCoverage::query()->where('polis_asuransi_id', $id)
                 ->where(fn ($query) => $query->where('berlaku_mulai', '<', $data['berlaku_mulai'])
                     ->when(($data['berlaku_sampai'] ?? null) !== null, fn ($query) => $query
@@ -182,7 +205,6 @@ class InsurancePolicyController extends Controller
             if ($outside) {
                 throw ValidationException::withMessages(['berlaku_mulai' => 'Masa berlaku ini tidak lagi mencakup seluruh pertanggungan aset pada polis. Akhiri atau arsipkan pertanggungan yang berada di luarnya lebih dulu.']);
             }
-            InsurancePolicy::query()->whereKey($id)->update([...$this->values($data), 'updated_at' => now()]);
         });
 
         return $this->document($request, $id);
@@ -215,20 +237,36 @@ class InsurancePolicyController extends Controller
     public function addCoverage(Request $request, string $id): JsonResponse
     {
         $this->guard($request, 'update');
-        $key = $this->creationKey($request);
-        if ($this->coverageRecorded($key)) {
-            return $this->document($request, $id, 200, ['Idempotent-Replayed' => 'true']);
-        }
 
+        return $this->addCoveragePayload($request, $id, $request->all(), null, $this->creationKey($request));
+    }
+
+    /** @param array<string, mixed> $input */
+    public function addCoveragePayload(Request $request, string $id, array $input, ?int $expected, string $key): JsonResponse
+    {
+        $this->guard($request, 'update');
         $policy = $this->find($request, $id);
-        $data = $request->validate([
+        $data = validator($input, [
             'aset_id' => ['required', 'ulid'],
             'nilai_pertanggungan' => ['required', 'numeric', 'gt:0', 'max:9999999999999999'],
             'berlaku_mulai' => ['required', 'date_format:Y-m-d'],
             'berlaku_sampai' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:berlaku_mulai'],
             'keterangan' => ['nullable', 'string', 'max:2000'],
-        ]);
-        $version = RowVersion::expected($request);
+        ])->validate();
+        if ($existing = InsuranceCoverage::withTrashed()->where('creation_key', $key)->first()) {
+            $same = $existing->polis_asuransi_id === $id
+                && $existing->aset_id === $data['aset_id']
+                && (float) $existing->nilai_pertanggungan === (float) $data['nilai_pertanggungan']
+                && $existing->berlaku_mulai->toDateString() === $data['berlaku_mulai']
+                && $existing->berlaku_sampai?->toDateString() === ($data['berlaku_sampai'] ?? null)
+                && $existing->keterangan === $this->text($data['keterangan'] ?? null);
+            if (! $same) {
+                throw ValidationException::withMessages(['creation_key' => 'Kunci baris sudah dipakai untuk pertanggungan yang berbeda.']);
+            }
+
+            return $this->document($request, $id, 200, ['Idempotent-Replayed' => 'true']);
+        }
+        $version = $expected ?? RowVersion::expected($request);
         abort_if($policy->diblokir, 422, 'Polis ini diblokir, sehingga tidak dapat menanggung aset baru.');
         $this->requireCoverableAsset($request, $policy, $data['aset_id']);
         $this->requireWithinPolicy($policy, $data['berlaku_mulai'], $data['berlaku_sampai'] ?? null);
@@ -263,11 +301,17 @@ class InsurancePolicyController extends Controller
     /** Mengakhiri pertanggungan pada tanggal tertentu, misalnya karena aset dijual atau dipindah polis. */
     public function endCoverage(Request $request, string $id, string $coverageId): JsonResponse
     {
+        return $this->endCoveragePayload($request, $id, $coverageId, $request->all(), null);
+    }
+
+    /** @param array<string, mixed> $input */
+    public function endCoveragePayload(Request $request, string $id, string $coverageId, array $input, ?int $expected): JsonResponse
+    {
         $this->guard($request, 'update');
         $this->find($request, $id);
         $coverage = $this->coverage($request, $id, $coverageId);
-        $date = $request->validate(['berlaku_sampai' => ['required', 'date_format:Y-m-d']])['berlaku_sampai'];
-        $version = RowVersion::expected($request);
+        $date = validator($input, ['berlaku_sampai' => ['required', 'date_format:Y-m-d']])->validate()['berlaku_sampai'];
+        $version = $expected ?? RowVersion::expected($request);
         if ($date < $coverage->berlaku_mulai->toDateString()) {
             throw ValidationException::withMessages(['berlaku_sampai' => 'Tanggal akhir tidak boleh sebelum pertanggungan mulai berlaku. Arsipkan pertanggungan bila ia memang salah dicatat.']);
         }
@@ -289,15 +333,21 @@ class InsurancePolicyController extends Controller
      */
     public function replaceCoverage(Request $request, string $id, string $coverageId): JsonResponse
     {
+        return $this->replaceCoveragePayload($request, $id, $coverageId, $request->all(), null);
+    }
+
+    /** @param array<string, mixed> $input */
+    public function replaceCoveragePayload(Request $request, string $id, string $coverageId, array $input, ?int $expected): JsonResponse
+    {
         $this->guard($request, 'update');
         $policy = $this->find($request, $id);
         $coverage = $this->coverage($request, $id, $coverageId);
-        $data = $request->validate([
+        $data = validator($input, [
             'nilai_pertanggungan' => ['required', 'numeric', 'gt:0', 'max:9999999999999999'],
             'berlaku_mulai' => ['required', 'date_format:Y-m-d'],
             'keterangan' => ['nullable', 'string', 'max:2000'],
-        ]);
-        $version = RowVersion::expected($request);
+        ])->validate();
+        $version = $expected ?? RowVersion::expected($request);
         abort_if($policy->diblokir, 422, 'Polis ini diblokir, sehingga nilai pertanggungannya tidak dapat diganti.');
         $start = $data['berlaku_mulai'];
         $end = $coverage->berlaku_sampai?->toDateString();
@@ -329,10 +379,16 @@ class InsurancePolicyController extends Controller
     /** Pertanggungan yang salah dicatat diarsipkan; yang benar tetapi berhenti diakhiri. */
     public function archiveCoverage(Request $request, string $id, string $coverageId): JsonResponse
     {
+        return $this->archiveCoveragePayload($request, $id, $coverageId, $request->all(), null);
+    }
+
+    /** @param array<string, mixed> $input */
+    public function archiveCoveragePayload(Request $request, string $id, string $coverageId, array $input, ?int $expected): JsonResponse
+    {
         $this->guard($request, 'update');
         $this->find($request, $id);
         $this->coverage($request, $id, $coverageId);
-        $version = RowVersion::expected($request);
+        $version = $expected ?? RowVersion::expected($request);
 
         DB::transaction(function () use ($id, $coverageId, $version): void {
             RowVersion::claim(InsurancePolicy::query()->whereKey($id), $version);
@@ -342,12 +398,43 @@ class InsurancePolicyController extends Controller
         return $this->document($request, $id);
     }
 
+    /** @param list<array<string, mixed>> $operations */
+    private function saveCoverageOperations(Request $request, string $id, array $operations): void
+    {
+        validator(['coverage_operations' => $operations], ['coverage_operations.*.creation_key' => ['sometimes', 'string', 'distinct']])->validate();
+        foreach ($operations as $index => $operation) {
+            try {
+                validator($operation, [
+                    'kind' => ['required', Rule::in(['add', 'end', 'replace', 'archive'])],
+                    'coverage_id' => ['required_unless:kind,add', 'ulid'],
+                    'creation_key' => ['required_if:kind,add', 'string', 'max:'.self::MAX_CREATION_KEY, 'regex:/^[A-Za-z0-9._:-]+$/'],
+                ])->validate();
+                $version = (int) $this->find($request, $id)->version;
+                match ($operation['kind']) {
+                    'add' => $this->addCoveragePayload($request, $id, $operation, $version, $operation['creation_key']),
+                    'end' => $this->endCoveragePayload($request, $id, $operation['coverage_id'], $operation, $version),
+                    'replace' => $this->replaceCoveragePayload($request, $id, $operation['coverage_id'], $operation, $version),
+                    'archive' => $this->archiveCoveragePayload($request, $id, $operation['coverage_id'], $operation, $version),
+                    default => throw ValidationException::withMessages(['kind' => 'Pilih tindakan pertanggungan yang tersedia.']),
+                };
+            } catch (ValidationException $failure) {
+                $errors = [];
+                foreach ($failure->errors() as $field => $messages) {
+                    $errors['coverage_operations.'.$index.'.'.$field] = $messages;
+                }
+                throw ValidationException::withMessages($errors);
+            }
+        }
+    }
+
     /** @return array<string, mixed> */
     private function validated(Request $request): array
     {
         $tenant = $this->tenant($request);
 
         return $request->validate([
+            'coverage_operations' => ['sometimes', 'array', 'list', 'max:100'],
+            'coverage_operations.*' => ['array'],
             'legal_entity_id' => ['required', 'ulid'],
             'nama' => ['required', 'string', 'max:150'],
             'nomor_polis' => ['required', 'string', 'max:60'],

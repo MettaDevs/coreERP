@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 # Image rilis CoreERP untuk server klien on-prem dikelola: satu image per rilis, berisi Core dan
 # seluruh module, ditarik dari Harbor lewat digest. Rancangannya di docs/todo/registry-harbor (IMG-01).
 #
@@ -84,8 +85,34 @@ RUN npm run build
 # Ekstensi yang dipasang di sini ditambah yang sudah dikompilasi ke dalam PHP resmi (curl, mbstring, xml,
 # sqlite3, readline, sodium) sama dengan yang dulu datang dari paket Debian; `uji-image.sh` menagihnya.
 # `pcntl` dipakai `octane:frankenphp` untuk meneruskan SIGTERM ke server saat container dihentikan.
-FROM dunglas/frankenphp:1.12.7-php8.4-trixie AS php
-RUN install-php-extensions bcmath gd intl pdo_pgsql pgsql redis zip pcntl opcache opentelemetry-1.2.1
+# PHP ZTS dan libphp berasal dari image resmi 8.4.27. Image FrankenPHP 1.12.7 hanya menyediakan
+# binari server, pemasang ekstensi, dan libwatcher; pustaka PHP 8.4.26-nya tidak ikut disalin.
+# FrankenPHP memuat libphp saat berjalan, dan kompatibilitas ABI patch 8.4 sudah diperiksa.
+FROM dunglas/frankenphp:1.12.7-php8.4-trixie@sha256:035fcb2fab91aacf77d70ee555d51b9bb084d057b16cf8a644bf1f93e28d4e3e AS frankenphp-assets
+FROM php:8.4.27-zts-trixie@sha256:1687b8117a59cc4ae1f73ff2f039f799e574c4b558c9e1148da1a72dc46169ca AS php
+COPY --from=frankenphp-assets /usr/local/bin/frankenphp /usr/local/bin/frankenphp
+COPY --from=frankenphp-assets /usr/local/bin/install-php-extensions /usr/local/bin/install-php-extensions
+COPY --from=frankenphp-assets /usr/local/lib/libwatcher-c.so* /usr/local/lib/
+RUN ldconfig
+RUN install-php-extensions bcmath gd intl pdo_pgsql pgsql zip pcntl opcache opentelemetry-1.2.1
+ADD --checksum=sha256:79ecabd899e50a6efa56d9fc28a987a25d78deecc32fdd0fa9840b1b3d83740e https://codeload.github.com/phpredis/phpredis/tar.gz/df4fab2de7fc327c54c94a13af2b9542e4fbd720 /tmp/phpredis-6.3.0.tar.gz
+ADD --checksum=sha256:8e425b5bf7a569543e29cb4a16a913445d80c4efe83b371760ca798ca9b819ed https://codeload.github.com/nemequ/liblzf/tar.gz/fb25820c3c0aeafd127956ae6c115063b47e459a /tmp/liblzf.tar.gz
+RUN set -eu; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends $PHPIZE_DEPS liblz4-1 liblz4-dev libzstd1 libzstd-dev; \
+    apt-mark manual liblz4-1 libzstd1; \
+    mkdir -p /tmp/phpredis /tmp/liblzf; \
+    tar -xzf /tmp/phpredis-6.3.0.tar.gz -C /tmp/phpredis --strip-components=1; \
+    tar -xzf /tmp/liblzf.tar.gz -C /tmp/liblzf --strip-components=1; \
+    cp -a /tmp/liblzf/. /tmp/phpredis/liblzf/; \
+    cd /tmp/phpredis; \
+    phpize; \
+    ./configure --with-php-config=/usr/local/bin/php-config --enable-redis-lzf --enable-redis-zstd --enable-redis-lz4 --with-liblz4; \
+    make -j"$(nproc)"; \
+    make install; \
+    docker-php-ext-enable redis; \
+    apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false $PHPIZE_DEPS liblz4-dev libzstd-dev; \
+    rm -rf /var/lib/apt/lists/* /tmp/phpredis /tmp/liblzf /tmp/phpredis-6.3.0.tar.gz /tmp/liblzf.tar.gz
 # Paket Debian pemilik setiap pustaka yang dibutuhkan binari, libphp, dan ekstensi. Pustaka di /usr/local
 # bukan milik paket mana pun; ia disalin langsung ke tahap akhir.
 #

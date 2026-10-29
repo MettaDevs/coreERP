@@ -1,5 +1,6 @@
 import { useEffect, useEffectEvent, useState } from 'react';
 import type { RefObject } from 'react';
+import { FormGrid } from '@apperp/ui/form-control';
 import { api, errorMessage } from '../../api';
 import DynamicField from '../../master/DynamicField';
 import { payloadValue, valueFrom } from '../../master/fields';
@@ -77,7 +78,7 @@ export default function ReceiptAttributes({
     );
 
     return (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <FormGrid>
             {error && (
                 <p role="alert" className="text-destructive text-sm">
                     {error}
@@ -112,6 +113,6 @@ export default function ReceiptAttributes({
                     />
                 );
             })}
-        </div>
+        </FormGrid>
     );
 }

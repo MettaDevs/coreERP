@@ -6,18 +6,21 @@ import type {
     DataTableColumn,
     DataTableRowAction,
 } from '@apperp/ui/data-table';
+import { DatePicker } from '@apperp/ui/date-picker';
 import {
     Empty,
     EmptyDescription,
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
+import { FormControl } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { PageDialog, PageDialogContent } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
 import { useRecordList } from '../../use-record-list';
 import type { RecordCardState } from '../_shared/record-card';
 import type { Context } from './monitoring';
@@ -47,31 +50,33 @@ export default function MonitoringListPage({
     const [card, setCard] = useState<RecordCardState>(null);
     const [cardBusy, setCardBusy] = useState(false);
     const [cardDirty, setCardDirty] = useState(false);
-    const discardChanges = () =>
-        !cardDirty || window.confirm('Buang perubahan yang belum disimpan?');
+    const {
+        request: requestChangesTransition,
+        confirmation: changesTransitionConfirmation,
+    } = useRecordTransition(cardDirty, cardBusy);
     const openNewCard = () => {
-        if (!cardBusy && discardChanges()) {
+        requestChangesTransition(() => {
             setCardDirty(false);
             setCard({ mode: 'create' });
-        }
+        });
     };
     const closeCard = () => {
-        if (!cardBusy && discardChanges()) {
+        requestChangesTransition(() => {
             setCard(null);
             setCardDirty(false);
             list.reload();
-        }
+        });
     };
     const cardRef = useRef<HTMLDivElement>(null);
     const openView = (id: string) => {
-        if (!cardBusy && discardChanges()) {
+        requestChangesTransition(() => {
             setCard({ mode: 'view', id });
-        }
+        });
     };
     const openEdit = (id: string) => {
-        if (!cardBusy && discardChanges()) {
+        requestChangesTransition(() => {
             setCard({ mode: 'edit', id });
-        }
+        });
     };
     const [status, setStatus] = useState('');
     const [dari, setDari] = useState('');
@@ -195,6 +200,7 @@ export default function MonitoringListPage({
 
     return (
         <>
+            {changesTransitionConfirmation}
             <ListPageLayout
                 header={
                     <RecordActionBar title="Monitoring aset">
@@ -203,9 +209,9 @@ export default function MonitoringListPage({
                                 action="create"
                                 type="button"
                                 onClick={() => {
-                                    if (!cardBusy && discardChanges()) {
+                                    requestChangesTransition(() => {
                                         setCard({ mode: 'create' });
-                                    }
+                                    });
                                 }}
                             />
                         )}
@@ -214,57 +220,62 @@ export default function MonitoringListPage({
                 filters={
                     <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
                         <div className="w-full sm:w-72">
-                            <Input
-                                label="Cari"
-                                type="search"
-                                placeholder="Nomor bukti, lokasi, atau orang"
-                                value={search}
-                                onChange={(event) =>
-                                    setSearch(event.target.value)
-                                }
-                            />
+                            <FormControl>
+                                <Input
+                                    label="Cari"
+                                    type="search"
+                                    placeholder="Nomor bukti, lokasi, atau orang"
+                                    value={search}
+                                    onChange={(event) =>
+                                        setSearch(event.target.value)
+                                    }
+                                />
+                            </FormControl>
                         </div>
                         <div className="w-full sm:w-44">
-                            <Input
-                                label="Dari tanggal"
-                                type="date"
-                                value={dari}
-                                onChange={(event) =>
-                                    setDari(event.target.value)
-                                }
-                            />
+                            <FormControl>
+                                <DatePicker
+                                    label="Dari tanggal"
+
+                                    value={dari}
+                                    onValueChange={(value) => setDari(value)}
+                                />
+                            </FormControl>
                         </div>
                         <div className="w-full sm:w-44">
-                            <Input
-                                label="Sampai tanggal"
-                                type="date"
-                                value={sampai}
-                                onChange={(event) =>
-                                    setSampai(event.target.value)
-                                }
-                            />
+                            <FormControl>
+                                <DatePicker
+                                    label="Sampai tanggal"
+
+                                    value={sampai}
+                                    onValueChange={(value) => setSampai(value)}
+                                />
+                            </FormControl>
                         </div>
                         <div className="w-full sm:w-48">
-                            <Select
-                                label="Status"
-                                items={PILIHAN_STATUS.map(
-                                    (pilihan) => pilihan.label,
-                                )}
-                                value={
-                                    PILIHAN_STATUS.find(
-                                        (pilihan) => pilihan.value === status,
-                                    )?.label ?? null
-                                }
-                                ariaLabel="Saring berdasarkan status"
-                                onValueChange={(value) =>
-                                    setStatus(
+                            <FormControl>
+                                <Select
+                                    label="Status"
+                                    items={PILIHAN_STATUS.map(
+                                        (pilihan) => pilihan.label,
+                                    )}
+                                    value={
                                         PILIHAN_STATUS.find(
                                             (pilihan) =>
-                                                pilihan.label === value,
-                                        )?.value ?? '',
-                                    )
-                                }
-                            />
+                                                pilihan.value === status,
+                                        )?.label ?? null
+                                    }
+                                    ariaLabel="Saring berdasarkan status"
+                                    onValueChange={(value) =>
+                                        setStatus(
+                                            PILIHAN_STATUS.find(
+                                                (pilihan) =>
+                                                    pilihan.label === value,
+                                            )?.value ?? '',
+                                        )
+                                    }
+                                />
+                            </FormControl>
                         </div>
                     </div>
                 }

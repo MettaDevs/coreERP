@@ -21,10 +21,10 @@ import {
 export function KindBadge({ kind }: { kind: string }) {
     const classes =
         kind === 'production'
-            ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200'
+            ? 'border-destructive/30 bg-destructive/10 text-destructive   '
             : kind === 'sandbox'
-              ? 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-200'
-              : 'border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200';
+              ? 'border-primary/30 bg-primary/10 text-primary   '
+              : 'border-border bg-muted text-muted-foreground   ';
 
     return (
         <Badge variant="outline" className={classes}>
@@ -36,10 +36,10 @@ export function KindBadge({ kind }: { kind: string }) {
 export function StatusBadge({ status }: { status: string }) {
     const classes =
         status === 'active'
-            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200'
+            ? 'border-success/30 bg-success/10 text-success   '
             : status === 'degraded' || status === 'suspended'
-              ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200'
-              : 'border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300';
+              ? 'border-warning/30 bg-warning/10 text-warning   '
+              : 'border-border bg-muted text-muted-foreground   ';
 
     return (
         <Badge variant="outline" className={classes}>
@@ -59,10 +59,10 @@ export function StatusBadge({ status }: { status: string }) {
 export function ModuleStatusBadge({ status }: { status: string }) {
     const classes =
         status === 'installed'
-            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200'
+            ? 'border-success/30 bg-success/10 text-success   '
             : status === 'disabled'
-              ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200'
-              : 'border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300';
+              ? 'border-warning/30 bg-warning/10 text-warning   '
+              : 'border-border bg-muted text-muted-foreground   ';
 
     return (
         <Badge variant="outline" className={classes}>
@@ -82,12 +82,12 @@ export function ModuleStatusBadge({ status }: { status: string }) {
 export function FleetStateBadge({ state }: { state: string }) {
     const classes =
         state === 'current'
-            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200'
+            ? 'border-success/30 bg-success/10 text-success   '
             : state === 'behind'
-              ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200'
+              ? 'border-warning/30 bg-warning/10 text-warning   '
               : state === 'failed'
-                ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200'
-                : 'border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300';
+                ? 'border-destructive/30 bg-destructive/10 text-destructive   '
+                : 'border-border bg-muted text-muted-foreground   ';
 
     return (
         <Badge variant="outline" className={classes}>
@@ -112,17 +112,17 @@ export function FleetStateBadge({ state }: { state: string }) {
 export function InstallStateBadge({ state }: { state: string }) {
     const classes =
         state === 'ready'
-            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200'
+            ? 'border-success/30 bg-success/10 text-success   '
             : state === 'failed' || state === 'stale'
-              ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200'
+              ? 'border-destructive/30 bg-destructive/10 text-destructive   '
               : [
                       'awaiting_command',
                       'awaiting_release',
                       'connected',
                       'installing',
                   ].includes(state)
-                ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200'
-                : 'border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300';
+                ? 'border-warning/30 bg-warning/10 text-warning   '
+                : 'border-border bg-muted text-muted-foreground   ';
 
     return (
         <Badge variant="outline" className={classes}>
@@ -142,12 +142,12 @@ export function InstallStateBadge({ state }: { state: string }) {
 export function FinanceFeedBadge({ state }: { state: string }) {
     const classes =
         state === 'healthy'
-            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200'
+            ? 'border-success/30 bg-success/10 text-success   '
             : state === 'attention'
-              ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200'
+              ? 'border-destructive/30 bg-destructive/10 text-destructive   '
               : state === 'unreadable'
-                ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200'
-                : 'border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300';
+                ? 'border-warning/30 bg-warning/10 text-warning   '
+                : 'border-border bg-muted text-muted-foreground   ';
 
     return (
         <Badge variant="outline" className={classes}>
@@ -159,12 +159,12 @@ export function FinanceFeedBadge({ state }: { state: string }) {
 export function SiteStateBadge({ state }: { state: string }) {
     const classes =
         state === 'enrolled'
-            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200'
+            ? 'border-success/30 bg-success/10 text-success   '
             : state === 'stale'
-              ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200'
+              ? 'border-destructive/30 bg-destructive/10 text-destructive   '
               : state === 'not_enrolled'
-                ? 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200'
-                : 'border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300';
+                ? 'border-warning/30 bg-warning/10 text-warning   '
+                : 'border-border bg-muted text-muted-foreground   ';
 
     return (
         <Badge variant="outline" className={classes}>

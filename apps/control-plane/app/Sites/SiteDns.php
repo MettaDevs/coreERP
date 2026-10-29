@@ -9,6 +9,7 @@ use ControlPlane\Dns\CloudflareClient;
 use ControlPlane\Dns\DnsUnavailable;
 use ControlPlane\Models\Site;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Record DNS yang membawa alamat aplikasi server klien ke mesinnya.
@@ -150,19 +151,21 @@ final class SiteDns
             ? $keep['id']
             : $this->cloudflare->put($zone['id'], $keep['id'] ?? null, $name, $type, $target, $comment);
 
-        $site->forceFill([
-            'dns_record_id' => $id,
-            'dns_name' => $name,
-            'dns_target' => $target,
-            'dns_synced_at' => now(),
-        ])->save();
+        DB::transaction(function () use ($request, $site, $id, $name, $target, $before, $type): void {
+            $site->forceFill([
+                'dns_record_id' => $id,
+                'dns_name' => $name,
+                'dns_target' => $target,
+                'dns_synced_at' => now(),
+            ])->save();
 
-        if ($before !== ['name' => $name, 'target' => $target]) {
-            OperatorAudit::record($request, 'site.dns.written', 'site', $site->id, [
-                'before' => $before,
-                'after' => ['name' => $name, 'type' => $type, 'target' => $target],
-            ]);
-        }
+            if ($before !== ['name' => $name, 'target' => $target]) {
+                OperatorAudit::record($request, 'site.dns.written', 'site', $site->id, [
+                    'before' => $before,
+                    'after' => ['name' => $name, 'type' => $type, 'target' => $target],
+                ]);
+            }
+        });
     }
 
     /**
@@ -181,13 +184,15 @@ final class SiteDns
 
         $removed = ['name' => $site->dns_name, 'target' => $site->dns_target];
 
-        $site->forceFill([
-            'dns_record_id' => null,
-            'dns_name' => null,
-            'dns_target' => null,
-            'dns_synced_at' => null,
-        ])->save();
+        DB::transaction(function () use ($request, $site, $removed): void {
+            $site->forceFill([
+                'dns_record_id' => null,
+                'dns_name' => null,
+                'dns_target' => null,
+                'dns_synced_at' => null,
+            ])->save();
 
-        OperatorAudit::record($request, 'site.dns.deleted', 'site', $site->id, $removed);
+            OperatorAudit::record($request, 'site.dns.deleted', 'site', $site->id, $removed);
+        });
     }
 }

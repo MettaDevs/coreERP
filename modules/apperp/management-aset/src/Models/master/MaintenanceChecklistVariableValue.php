@@ -7,6 +7,7 @@ use App\Platform\Modules\Contracts\DataClass;
 use App\Platform\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
@@ -14,7 +15,7 @@ use Illuminate\Support\Carbon;
  *
  * `line_number` desimal mengikuti baris template: urutan boleh disisipi tanpa menomori ulang.
  * Ia di-cast `decimal:1`, jadi Eloquent memulangkannya sebagai string dan bukan float.
- * Tabelnya tanpa soft delete, jadi tanpa `deleted_at`.
+ * Pilihan yang dilepas diarsipkan agar hasil checklist lama tetap dapat dikenali.
  *
  * @property string $id
  * @property string $tenant_id
@@ -30,6 +31,9 @@ class MaintenanceChecklistVariableValue extends Model
 {
     use BelongsToTenant;
     use HasUlids;
+    use SoftDeletes;
+
+    protected $hidden = ['deleted_at'];
 
     protected $table = 'aset_m_maintenance_checklist_variable_value';
 

@@ -1,0 +1,3 @@
+type: http
+scheme: bearer
+description: Token khusus bridge landing. Tidak menerima token operator control plane.

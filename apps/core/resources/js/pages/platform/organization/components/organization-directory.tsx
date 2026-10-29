@@ -38,6 +38,8 @@ import { Head, useForm, usePage } from '@inertiajs/react';
 import { Image, Mail, MapPin, Receipt } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import type { RefObject } from 'react';
+import { FormErrorHeader } from '@/components/form-error-header';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import { apiJson } from '@/lib/core-api';
 
 import {
@@ -129,6 +131,9 @@ function CreateOrganizationDialog({
     operatingUnitTypes: Props['operatingUnitTypes'];
     onCreated: (organization: Organization) => void;
 }) {
+    const { wrap: wrapFormRequest, summary: formRequestSummary } =
+        useInertiaFeedback();
+
     const [open, setOpen] = useState(false);
     const draftDetails = usePartyDraftDetails(open);
     const contentRef = useRef<HTMLDivElement>(null);
@@ -190,6 +195,7 @@ function CreateOrganizationDialog({
                 busy={form.processing}
             >
                 <form
+                    noValidate
                     className="flex min-h-0 flex-1 flex-col"
                     onSubmit={(event) => {
                         event.preventDefault();
@@ -201,23 +207,26 @@ function CreateOrganizationDialog({
                                 ? { party_details: draftDetails.payload }
                                 : {}),
                         }));
-                        form.post('/settings/organization/organizations', {
-                            onSuccess: (page) => {
-                                const created = page.props
-                                    .savedOrganization as Organization | null;
+                        form.post(
+                            '/settings/organization/organizations',
+                            wrapFormRequest({
+                                onSuccess: (page) => {
+                                    const created = page.props
+                                        .savedOrganization as Organization | null;
 
-                                if (created) {
-                                    onCreated(created);
-                                }
+                                    if (created) {
+                                        onCreated(created);
+                                    }
 
-                                form.reset();
-                                draftDetails.onChange({
-                                    locations: [],
-                                    contacts: [],
-                                });
-                                setOpen(false);
-                            },
-                        });
+                                    form.reset();
+                                    draftDetails.onChange({
+                                        locations: [],
+                                        contacts: [],
+                                    });
+                                    setOpen(false);
+                                },
+                            }),
+                        );
                     }}
                 >
                     <PageDialogToolbar>
@@ -233,6 +242,11 @@ function CreateOrganizationDialog({
                             disabled={form.processing}
                         />
                     </PageDialogToolbar>
+                    <>
+                        {formRequestSummary}
+                        <FormErrorHeader errors={form.errors} />
+                    </>
+
                     <div
                         data-page-dialog-body=""
                         className="min-h-0 flex-1 overflow-y-auto px-6 py-4"
@@ -246,7 +260,10 @@ function CreateOrganizationDialog({
                                 .join(' ')}
                         </FieldError>
                         <FieldGroup>
-                            <Field data-invalid={Boolean(form.errors.name)}>
+                            <Field
+                                data-invalid={Boolean(form.errors.name)}
+                                data-error-field={'name'}
+                            >
                                 <Input
                                     label="Nama Organisasi"
                                     required
@@ -269,6 +286,7 @@ function CreateOrganizationDialog({
                                         data-invalid={Boolean(
                                             form.errors.company_code,
                                         )}
+                                        data-error-field={'company_code'}
                                     >
                                         <Input
                                             label="Kode Perusahaan"
@@ -296,6 +314,7 @@ function CreateOrganizationDialog({
                                         data-invalid={Boolean(
                                             form.errors.country_code,
                                         )}
+                                        data-error-field={'country_code'}
                                     >
                                         <Input
                                             label="Kode Negara (ISO)"
@@ -332,6 +351,7 @@ function CreateOrganizationDialog({
                                         data-invalid={Boolean(
                                             form.errors.operating_unit_type,
                                         )}
+                                        data-error-field={'operating_unit_type'}
                                     >
                                         <Select
                                             label="Tipe operating unit"
@@ -365,6 +385,9 @@ function CreateOrganizationDialog({
                                         data-invalid={Boolean(
                                             form.errors.operating_unit_number,
                                         )}
+                                        data-error-field={
+                                            'operating_unit_number'
+                                        }
                                     >
                                         <Input
                                             label="Kode unit"
@@ -516,6 +539,9 @@ function OrganizationDetailPage({
     onUpdated: (organization: Organization) => void;
     operatingUnitTypes: Props['operatingUnitTypes'];
 }) {
+    const { wrap: wrapFormRequest, summary: formRequestSummary } =
+        useInertiaFeedback();
+
     const legalEntity = organization.classification === 'legal_entity';
     const [editing, setEditing] = useState(initialEditing);
     const [printRevision, setPrintRevision] = useState(0);
@@ -656,6 +682,7 @@ function OrganizationDetailPage({
             {/* Content Accordion */}
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-6">
                 <form
+                    noValidate
                     id={`organization-form-${organization.id}`}
                     onSubmit={(event) => {
                         event.preventDefault();
@@ -674,7 +701,7 @@ function OrganizationDetailPage({
                         }));
                         form.patch(
                             `/settings/organization/organizations/${organization.id}`,
-                            {
+                            wrapFormRequest({
                                 onSuccess: (page) => {
                                     setEditing(false);
                                     form.setData('print_identity', null);
@@ -688,10 +715,15 @@ function OrganizationDetailPage({
                                         onUpdated(saved);
                                     }
                                 },
-                            },
+                            }),
                         );
                     }}
                 >
+                    <>
+                        {formRequestSummary}
+                        <FormErrorHeader errors={form.errors} />
+                    </>
+
                     <FieldError>
                         {Object.entries(form.errors)
                             .filter(
@@ -716,7 +748,10 @@ function OrganizationDetailPage({
                             }
                         >
                             <FieldGroup className="grid gap-4 py-2 md:grid-cols-2">
-                                <Field data-invalid={Boolean(form.errors.name)}>
+                                <Field
+                                    data-invalid={Boolean(form.errors.name)}
+                                    data-error-field={'name'}
+                                >
                                     <Input
                                         label="Nama Organisasi"
                                         required
@@ -738,6 +773,7 @@ function OrganizationDetailPage({
                                             data-invalid={Boolean(
                                                 form.errors.company_code,
                                             )}
+                                            data-error-field={'company_code'}
                                         >
                                             <Input
                                                 label="Kode Perusahaan"
@@ -762,6 +798,7 @@ function OrganizationDetailPage({
                                             data-invalid={Boolean(
                                                 form.errors.country_code,
                                             )}
+                                            data-error-field={'country_code'}
                                         >
                                             <Input
                                                 label="Kode Negara (ISO)"
@@ -798,6 +835,9 @@ function OrganizationDetailPage({
                                             data-invalid={Boolean(
                                                 form.errors.operating_unit_type,
                                             )}
+                                            data-error-field={
+                                                'operating_unit_type'
+                                            }
                                         >
                                             {editing ? (
                                                 <Select

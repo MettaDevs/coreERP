@@ -1,0 +1,44 @@
+type: object
+required:
+- id
+- product
+- profile
+- name
+- slug
+- status
+- public_url
+- expires_at
+- failure_message
+properties:
+  id:
+    type: string
+    format: uuid
+  product:
+    type: string
+  profile:
+    type: string
+  name:
+    type: string
+  slug:
+    type: string
+  status:
+    type: string
+    enum:
+    - queued
+    - provisioning
+    - ready
+    - failed
+  public_url:
+    type:
+    - string
+    - 'null'
+    format: uri
+  expires_at:
+    type:
+    - string
+    - 'null'
+    format: date-time
+  failure_message:
+    type:
+    - string
+    - 'null'

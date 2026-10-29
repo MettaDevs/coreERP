@@ -8,6 +8,7 @@ import { Button } from '@apperp/ui/button';
 import { Checkbox } from '@apperp/ui/checkbox';
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
+import { DateTimePicker } from '@apperp/ui/date-time-picker';
 
 import {
     Empty,
@@ -15,7 +16,8 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
-import { Field, FieldDescription } from '@apperp/ui/field';
+import { FieldError } from '@apperp/ui/field';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import {
     PageDialog,
@@ -25,12 +27,14 @@ import {
     PageDialogBody,
 } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
-import { Select } from '@apperp/ui/select';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
 import { zonedInput } from '../../_shared/format';
-import { ApiError, api, newIdempotencyKey, toastSaveError } from '../../api';
+import { RecordLookup } from '../../_shared/RecordLookup';
+import { ApiError, api, newIdempotencyKey } from '../../api';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import { useRecordList } from '../../use-record-list';
+import { useSaveFeedback } from '../../use-save-feedback';
 import { RecordCardHeader, recordQueryUrl } from '../_shared/record-card';
 import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
 import { useRecordQueryTarget } from '../_shared/use-record-query-target';
@@ -58,6 +62,17 @@ export default function DowntimePage({
 }: {
     permissions: string[];
 }) {
+    const {
+        scopeRef: pageFeedbackScopeRef,
+        feedbackSummary: pageFeedbackSummary,
+        reportSaveError: pageFeedbackReportSaveError,
+        clearSaveFeedback: pageFeedbackClearSaveFeedback,
+    } = useSaveFeedback();
+    const pageFeedback = {
+        reportSaveError: pageFeedbackReportSaveError,
+        clearSaveFeedback: pageFeedbackClearSaveFeedback,
+    };
+
     const can = (action: string) =>
         permissions.includes(`management-aset.downtime-aset.${action}`);
     const { clock } = usePage().props;
@@ -79,6 +94,16 @@ export default function DowntimePage({
     const [busy, setBusy] = useState(false);
     const [draftDirty, setDraftDirty] = useState(false);
     const dialogRef = useRef<HTMLDivElement>(null);
+    const {
+        feedbackSummary: formFeedbackSummary,
+        reportSaveError: formFeedbackReportSaveError,
+        clearSaveFeedback: formFeedbackClearSaveFeedback,
+    } = useSaveFeedback(dialogRef, draft ? 'editing' : 'closed');
+    const formFeedback = {
+        reportSaveError: formFeedbackReportSaveError,
+        clearSaveFeedback: formFeedbackClearSaveFeedback,
+    };
+
     const message = (field: string) => errors[field]?.[0];
 
     const list = useRecordList<Downtime>('/downtime-aset', '', {
@@ -113,6 +138,7 @@ export default function DowntimePage({
                       headers: { 'Idempotency-Key': newIdempotencyKey() },
                       body: JSON.stringify({ ...body, aset_id: draft.aset_id }),
                   }));
+            formFeedback.clearSaveFeedback();
             toast.success('Downtime disimpan.');
             clearRecordTarget();
             setDraft(null);
@@ -122,7 +148,10 @@ export default function DowntimePage({
                 setErrors(caught.validationErrors);
             }
 
-            toastSaveError(caught, 'Downtime belum dapat disimpan.');
+            formFeedback.reportSaveError(
+                caught,
+                'Downtime belum dapat disimpan.',
+            );
         } finally {
             setBusy(false);
         }
@@ -136,12 +165,16 @@ export default function DowntimePage({
                 method: 'DELETE',
                 body: JSON.stringify({ version: row.version }),
             });
+            pageFeedback.clearSaveFeedback();
             toast.success('Downtime diarsipkan.');
             clearRecordTarget();
             setDraft((current) => (current?.id === row.id ? null : current));
             setReload((current) => current + 1);
         } catch (caught) {
-            toastSaveError(caught, 'Downtime belum dapat diarsipkan.');
+            (draft?.id === row.id
+                ? formFeedback
+                : pageFeedback
+            ).reportSaveError(caught, 'Downtime belum dapat diarsipkan.');
         } finally {
             setBusy(false);
         }
@@ -212,6 +245,8 @@ export default function DowntimePage({
     ];
 
     const openEdit = (row: Downtime) => {
+        formFeedback.clearSaveFeedback();
+
         setOpenedDowntime(row);
         setErrors({});
         setDraft({
@@ -240,10 +275,12 @@ export default function DowntimePage({
             }
         },
     });
-    const discardDraft = () =>
-        !draftDirty || window.confirm('Buang perubahan yang belum disimpan?');
+    const {
+        request: requestDraftTransition,
+        confirmation: draftTransitionConfirmation,
+    } = useRecordTransition(draftDirty, busy);
     const newDowntime = () => {
-        if (!busy && discardDraft()) {
+        requestDraftTransition(() => {
             clearRecordTarget();
             (() => {
                 setErrors({});
@@ -257,13 +294,13 @@ export default function DowntimePage({
                     keterangan: '',
                 });
             })();
-        }
+        });
     };
     const closeDowntime = () => {
-        if (!busy && discardDraft()) {
+        requestDraftTransition(() => {
             clearRecordTarget();
             setDraft(null);
-        }
+        });
     };
     useRecordCardDirty({
         value: draft,
@@ -290,8 +327,12 @@ export default function DowntimePage({
     });
 
     return (
-        <div>
-            <RecordActionBar title="Downtime aset">
+        <div ref={pageFeedbackScopeRef}>
+            {draftTransitionConfirmation}
+            <RecordActionBar
+                feedback={pageFeedbackSummary}
+                title="Downtime aset"
+            >
                 {can('create') && (
                     <Button type="button" onClick={newDowntime}>
                         Catat downtime
@@ -301,19 +342,23 @@ export default function DowntimePage({
 
             <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
                 <div className="w-full sm:w-80">
-                    <Select
-                        {...assetSource.selectProps}
-                        label="Aset"
-                        items={[
-                            { value: '', label: 'Semua aset' },
-                            ...assetChoices,
-                        ]}
-                        value={filterAset || null}
-                        placeholder="Semua aset"
-                        searchPlaceholder="Cari kode atau nama aset"
-                        ariaLabel="Saring berdasarkan aset"
-                        onValueChange={(value) => setFilterAset(value ?? '')}
-                    />
+                    <FormControl>
+                        <RecordLookup
+                            source={assetSource}
+                            label="Aset"
+                            items={[
+                                { value: '', label: 'Semua aset' },
+                                ...assetChoices,
+                            ]}
+                            value={filterAset || null}
+                            placeholder="Semua aset"
+                            searchPlaceholder="Cari kode atau nama aset"
+                            ariaLabel="Saring berdasarkan aset"
+                            onValueChange={(value) =>
+                                setFilterAset(value ?? '')
+                            }
+                        />
+                    </FormControl>
                 </div>
                 <label className="flex items-center gap-2 text-sm">
                     <Checkbox
@@ -437,12 +482,13 @@ export default function DowntimePage({
                             </PageDialogClose>
                         </PageDialogToolbar>
                     )}
+                    {formFeedbackSummary}
                     {draft && (
                         <PageDialogBody className="space-y-4">
-                            <Field>
+                            <FormControl data-error-field="aset_id">
                                 {editable ? (
-                                    <Select
-                                        {...assetSource.selectProps}
+                                    <RecordLookup
+                                        source={assetSource}
                                         label="Aset"
                                         required
                                         items={assetChoices}
@@ -481,52 +527,68 @@ export default function DowntimePage({
                                     />
                                 )}
                                 {message('aset_id') && (
-                                    <FieldDescription>
+                                    <FieldError>
                                         {message('aset_id')}
-                                    </FieldDescription>
+                                    </FieldError>
                                 )}
-                            </Field>
-                            <div className="grid grid-cols-2 gap-3">
-                                <Input
-                                    readOnly={!editable}
-                                    label="Mulai berhenti"
-                                    type="datetime-local"
-                                    required
-                                    value={draft.mulai}
-                                    onChange={(event) =>
-                                        setDraft({
-                                            ...draft,
-                                            mulai: event.target.value,
-                                        })
-                                    }
-                                />
-                                <Field>
-                                    <Input
+                            </FormControl>
+                            <FormGrid>
+                                <FormControl data-error-field="mulai">
+                                    <DateTimePicker
+                                        portalContainer={dialogRef}
                                         readOnly={!editable}
-                                        label="Kembali beroperasi"
-                                        type="datetime-local"
-                                        value={draft.selesai}
-                                        onChange={(event) =>
+                                        label="Mulai berhenti"
+
+                                        required
+                                        value={draft.mulai}
+                                        onValueChange={(value) =>
                                             setDraft({
                                                 ...draft,
-                                                selesai: event.target.value,
+                                                mulai: value,
                                             })
                                         }
                                     />
-                                    <FieldDescription>
-                                        Kosongkan bila aset masih berhenti.
-                                    </FieldDescription>
-                                </Field>
-                            </div>
+                                </FormControl>
+                                <FormControl
+                                    data-error-field="selesai"
+                                    hint={
+                                        <>Kosongkan bila aset masih berhenti.</>
+                                    }
+                                >
+                                    <DateTimePicker
+                                        portalContainer={dialogRef}
+                                        readOnly={!editable}
+                                        label="Kembali beroperasi"
+
+                                        value={draft.selesai}
+                                        onValueChange={(value) =>
+                                            setDraft({
+                                                ...draft,
+                                                selesai: value,
+                                            })
+                                        }
+                                    />
+                                </FormControl>
+                            </FormGrid>
                             {(message('mulai') ?? message('selesai')) && (
                                 <p className="text-destructive text-sm">
                                     {message('mulai') ?? message('selesai')}
                                 </p>
                             )}
-                            <Field>
+                            <FormControl
+                                data-error-field="alasan_downtime_id"
+                                hint={
+                                    <>
+                                        Downtime tanpa alasan tetap mengurangi
+                                        ketersediaan aset pada KPI. Pilih alasan
+                                        yang tidak dihitung KPI untuk henti
+                                        terencana.
+                                    </>
+                                }
+                            >
                                 {editable ? (
-                                    <Select
-                                        {...reasons.selectProps}
+                                    <RecordLookup
+                                        source={reasons}
                                         label="Alasan"
                                         items={reasons.options.map(
                                             (option) => ({
@@ -562,25 +624,21 @@ export default function DowntimePage({
                                         }
                                     />
                                 )}
-                                <FieldDescription>
-                                    Downtime tanpa alasan tetap mengurangi
-                                    ketersediaan aset pada KPI. Pilih alasan
-                                    yang tidak dihitung KPI untuk henti
-                                    terencana.
-                                </FieldDescription>
-                            </Field>
-                            <Input
-                                readOnly={!editable}
-                                label="Keterangan"
-                                maxLength={2000}
-                                value={draft.keterangan}
-                                onChange={(event) =>
-                                    setDraft({
-                                        ...draft,
-                                        keterangan: event.target.value,
-                                    })
-                                }
-                            />
+                            </FormControl>
+                            <FormControl data-error-field="keterangan">
+                                <Input
+                                    readOnly={!editable}
+                                    label="Keterangan"
+                                    maxLength={2000}
+                                    value={draft.keterangan}
+                                    onChange={(event) =>
+                                        setDraft({
+                                            ...draft,
+                                            keterangan: event.target.value,
+                                        })
+                                    }
+                                />
+                            </FormControl>
                         </PageDialogBody>
                     )}
                 </PageDialogContent>

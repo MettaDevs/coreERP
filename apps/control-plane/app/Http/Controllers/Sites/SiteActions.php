@@ -110,11 +110,12 @@ final class SiteActions extends Controller
     {
         $row = $this->site($site);
 
-        if ($row->revoked()) {
-            return redirect('/situs/'.$row->id);
-        }
-
         DB::transaction(function () use ($request, $row): void {
+            $row->refresh();
+            $locked = Site::query()->whereKey($row->id)->lockForUpdate()->firstOrFail();
+            if ($locked->revoked()) {
+                return;
+            }
             $row->forceFill(['revoked_at' => now()])->save();
 
             $cancelled = SiteOperation::query()

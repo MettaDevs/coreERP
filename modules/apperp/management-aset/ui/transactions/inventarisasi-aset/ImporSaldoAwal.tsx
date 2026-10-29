@@ -1,17 +1,11 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@apperp/ui/button';
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
-import {
-    Field,
-    FieldDescription,
-    FieldError,
-    FieldGroup,
-    FieldLabel,
-} from '@apperp/ui/field';
+import { FieldError, FieldLabel } from '@apperp/ui/field';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
-import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
 import {
     Sheet,
     SheetContent,
@@ -20,9 +14,11 @@ import {
     SheetHeader,
     SheetTitle,
 } from '@apperp/ui/sheet';
+import { RecordLookup } from '../../_shared/RecordLookup';
 
-import { api, errorMessage, newIdempotencyKey } from '../../api';
+import { api, ApiError, newIdempotencyKey } from '../../api';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
+import { useSaveFeedback } from '../../use-save-feedback';
 import type { Context, LaporanImpor } from './penerimaan';
 import { tanggalTampil } from './penerimaan';
 
@@ -54,6 +50,9 @@ export function ImporSaldoAwal({
     onClose: () => void;
     onApplied: () => void;
 }) {
+    const contentRef = useRef<HTMLDivElement>(null);
+    const { feedbackSummary, reportSaveError, clearSaveFeedback, fieldError } =
+        useSaveFeedback(contentRef);
     const unitKerja = useMasterOptions('reference-data/unit-kerja');
     const [unit, setUnit] = useState(context.org_unit_id ?? '');
     const [penerima, setPenerima] = useState('');
@@ -70,7 +69,30 @@ export function ImporSaldoAwal({
         laporan.receipts.length > 0;
 
     const kirim = async (apply: boolean) => {
+        clearSaveFeedback();
+
         if (!file || !context.legal_entity_id || !unit) {
+            const errors: Record<string, string[]> = {};
+
+            if (!file) {
+                errors.file = ['Pilih berkas CSV yang akan diperiksa.'];
+            }
+
+            if (!unit) {
+                errors.responsible_org_unit_id = ['Pilih unit pengguna aset.'];
+            }
+
+            reportSaveError(
+                new ApiError(
+                    !context.legal_entity_id
+                        ? 'Pilih perusahaan aktif terlebih dahulu pada header aplikasi.'
+                        : 'Lengkapi isian impor.',
+                    errors,
+                    422,
+                ),
+                'Impor belum dapat dilanjutkan.',
+            );
+
             return;
         }
 
@@ -106,7 +128,12 @@ export function ImporSaldoAwal({
                 onClose();
             }
         } catch (caught) {
-            setGalat(errorMessage(caught, 'Berkas belum dapat diperiksa.'));
+            reportSaveError(
+                caught,
+                apply
+                    ? 'Draf saldo awal belum dapat dibuat.'
+                    : 'Berkas belum dapat diperiksa.',
+            );
         } finally {
             setSibuk(false);
         }
@@ -121,6 +148,7 @@ export function ImporSaldoAwal({
     return (
         <Sheet open onOpenChange={(open) => !open && onClose()}>
             <SheetContent
+                ref={contentRef}
                 side="right"
                 className="w-full gap-0 p-0 sm:max-w-2xl"
             >
@@ -133,6 +161,7 @@ export function ImporSaldoAwal({
                         awal.
                     </SheetDescription>
                 </SheetHeader>
+                {feedbackSummary}
                 <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-5">
                     {!context.legal_entity_id ? (
                         <p className="text-destructive text-sm">
@@ -140,57 +169,85 @@ export function ImporSaldoAwal({
                             CoreERP.
                         </p>
                     ) : (
-                        <FieldGroup>
-                            <Field>
-                                <NativeSelect
+                        <FormGrid columns={1}>
+                            <FormControl
+                                data-error-field="responsible_org_unit_id"
+                                error={fieldError('responsible_org_unit_id')}
+                                hint={
+                                    <>
+                                        Unit yang menanggung seluruh aset dari
+                                        berkas ini. Impor per unit bila asetnya
+                                        tersebar.
+                                    </>
+                                }
+                            >
+                                <RecordLookup
+                                    source={unitKerja}
                                     label="Unit pengguna"
                                     required
-                                    value={unit}
-                                    onChange={(event) => {
-                                        setUnit(event.target.value);
+                                    items={[
+                                        ...unitKerja.options.map((record) => ({
+                                            value: record.id,
+                                            label: optionLabel(record),
+                                        })),
+                                    ]}
+                                    value={unit || null}
+                                    placeholder="Pilih unit"
+                                    portalContainer={contentRef}
+                                    onValueChange={(value) => {
+                                        setUnit(value ?? '');
                                         setLaporan(null);
                                     }}
-                                >
-                                    <NativeSelectOption value="">
-                                        Pilih unit
-                                    </NativeSelectOption>
-                                    {unitKerja.options.map((pilihan) => (
-                                        <NativeSelectOption
-                                            key={pilihan.id}
-                                            value={pilihan.id}
-                                        >
-                                            {optionLabel(pilihan)}
-                                        </NativeSelectOption>
-                                    ))}
-                                </NativeSelect>
-                                <FieldDescription>
-                                    Unit yang menanggung seluruh aset dari
-                                    berkas ini. Impor per unit bila asetnya
-                                    tersebar.
-                                </FieldDescription>
-                            </Field>
-                            <Field>
-                                <NativeSelect
+                                />
+                            </FormControl>
+                            <FormControl
+                                data-error-field="receiving_org_unit_id"
+                                error={fieldError('receiving_org_unit_id')}
+                            >
+                                <RecordLookup
+                                    source={unitKerja}
                                     label="Unit penerima"
-                                    value={penerima}
-                                    onChange={(event) =>
-                                        setPenerima(event.target.value)
-                                    }
-                                >
-                                    <NativeSelectOption value="">
-                                        Tanpa unit penerima
-                                    </NativeSelectOption>
-                                    {unitKerja.options.map((pilihan) => (
-                                        <NativeSelectOption
-                                            key={pilihan.id}
-                                            value={pilihan.id}
+                                    items={[
+                                        {
+                                            value: '',
+                                            label: 'Tanpa unit penerima',
+                                        },
+                                        ...unitKerja.options.map((record) => ({
+                                            value: record.id,
+                                            label: optionLabel(record),
+                                        })),
+                                    ]}
+                                    value={penerima || null}
+                                    placeholder="Tanpa unit penerima"
+                                    portalContainer={contentRef}
+                                    onValueChange={(value) => {
+                                        setPenerima(value ?? '');
+                                    }}
+                                />
+                            </FormControl>
+                            <FormControl
+                                data-invalid={Boolean(fieldError('file'))}
+                                data-error-field="file"
+                                error={fieldError('file')}
+                                hint={
+                                    <>
+                                        Pemisah koma atau titik koma, paling
+                                        besar 2 MB. Akumulasi buku selain buku
+                                        yang di-post ditulis di kolom{' '}
+                                        <code>
+                                            akumulasi_per_unit:KODE BUKU
+                                        </code>{' '}
+                                        dan{' '}
+                                        <code>periode_berjalan:KODE BUKU</code>.{' '}
+                                        <a
+                                            className="text-primary underline-offset-4 hover:underline"
+                                            href={TEMPLAT}
                                         >
-                                            {optionLabel(pilihan)}
-                                        </NativeSelectOption>
-                                    ))}
-                                </NativeSelect>
-                            </Field>
-                            <Field data-invalid={Boolean(galat)}>
+                                            Unduh templat
+                                        </a>
+                                    </>
+                                }
+                            >
                                 <FieldLabel htmlFor="berkas-saldo-awal">
                                     Berkas CSV
                                 </FieldLabel>
@@ -202,22 +259,10 @@ export function ImporSaldoAwal({
                                         ganti(event.target.files?.[0] ?? null)
                                     }
                                 />
-                                <FieldDescription>
-                                    Pemisah koma atau titik koma, paling besar 2
-                                    MB. Akumulasi buku selain buku yang di-post
-                                    ditulis di kolom{' '}
-                                    <code>akumulasi_per_unit:KODE BUKU</code>{' '}
-                                    dan <code>periode_berjalan:KODE BUKU</code>.{' '}
-                                    <a
-                                        className="text-primary underline-offset-4 hover:underline"
-                                        href={TEMPLAT}
-                                    >
-                                        Unduh templat
-                                    </a>
-                                </FieldDescription>
+
                                 <FieldError>{galat}</FieldError>
-                            </Field>
-                        </FieldGroup>
+                            </FormControl>
+                        </FormGrid>
                     )}
 
                     {laporan && laporan.rejected.length > 0 && (
@@ -382,7 +427,7 @@ export function ImporSaldoAwal({
                     <Button
                         type="button"
                         variant="outline"
-                        disabled={!file || !unit || sibuk}
+                        disabled={sibuk}
                         onClick={() => kirim(false)}
                     >
                         {sibuk && !bersih ? 'Memeriksa…' : 'Periksa berkas'}

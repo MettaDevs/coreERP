@@ -21,3 +21,5 @@ Route::post('pemeliharaan-aset/{id}/jobs/{jobId}/checklist/dari-template', [Pela
 Route::get('pemeliharaan-aset/{id}', [PemeliharaanAsetController::class, 'show']);
 Route::patch('pemeliharaan-aset/{id}', [PemeliharaanAsetController::class, 'update']);
 Route::delete('pemeliharaan-aset/{id}', [PemeliharaanAsetController::class, 'destroy']);
+
+Route::put('pemeliharaan-aset/{id}/execution', [PelaksanaanController::class, 'saveExecutionBatch']);

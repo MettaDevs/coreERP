@@ -60,7 +60,7 @@ class Upgrade extends Controller
     {
         if ($queued === 0) {
             return $environmentId === null
-                ? 'Tidak ada lingkungan yang perlu diperbarui — seluruh armada sudah memakai skema yang berlaku.'
+                ? 'Tidak ada pembaruan baru yang diantrekan. Lingkungan mungkin sudah mutakhir, menunggu pekerja, atau sedang dikerjakan.'
                 : 'Lingkungan itu tidak perlu diperbarui, atau keadaannya belum mengizinkannya.';
         }
 

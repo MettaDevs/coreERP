@@ -18,6 +18,8 @@ import {
 import { Head, Link, router } from '@inertiajs/react';
 import { AlertCircle, ArrowLeft, Play } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { FormErrorHeader } from '@/components/form-error-header';
+import { withInertiaErrors } from '@/hooks/use-inertia-feedback';
 import { useToday } from '@/hooks/use-work-date';
 import type { BreadcrumbItem } from '@/types/navigation';
 
@@ -222,7 +224,7 @@ export default function ComposeWorkingTimesPage({
                 to_date: toDate,
                 version: selectedCalendar?.version,
             },
-            {
+            withInertiaErrors({
                 preserveScroll: true,
                 onError: (err) => {
                     setErrors(err);
@@ -230,7 +232,7 @@ export default function ComposeWorkingTimesPage({
                 onFinish: () => {
                     setIsSubmitting(false);
                 },
-            },
+            }),
         );
     };
 
@@ -289,6 +291,7 @@ export default function ComposeWorkingTimesPage({
 
                         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
                             <form
+                                noValidate
                                 onSubmit={handleSubmit}
                                 className="space-y-6 rounded-lg border border-border bg-card p-6 lg:col-span-7"
                             >
@@ -316,6 +319,7 @@ export default function ComposeWorkingTimesPage({
                                         }
                                     />
                                 </RecordActionBar>
+                                <FormErrorHeader errors={errors} />
 
                                 <h2 className="border-b border-border pb-3 text-sm font-semibold text-foreground">
                                     Susun jadwal
@@ -336,6 +340,7 @@ export default function ComposeWorkingTimesPage({
                                         data-invalid={Boolean(
                                             errors.calendar_id,
                                         )}
+                                        data-error-field={'calendar_id'}
                                     >
                                         <NativeSelect
                                             label="Kalender kerja sasaran"
@@ -378,6 +383,7 @@ export default function ComposeWorkingTimesPage({
                                         data-invalid={Boolean(
                                             errors.template_id,
                                         )}
+                                        data-error-field={'template_id'}
                                     >
                                         <NativeSelect
                                             label="Pola jam kerja acuan"
@@ -439,6 +445,7 @@ export default function ComposeWorkingTimesPage({
                                             data-invalid={Boolean(
                                                 errors.from_date,
                                             )}
+                                            data-error-field={'from_date'}
                                         >
                                             <Input
                                                 label="Dari tanggal"
@@ -460,6 +467,7 @@ export default function ComposeWorkingTimesPage({
                                             data-invalid={Boolean(
                                                 errors.to_date,
                                             )}
+                                            data-error-field={'to_date'}
                                         >
                                             <Input
                                                 label="Sampai tanggal"

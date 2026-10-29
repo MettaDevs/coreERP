@@ -22,7 +22,10 @@ import {
 } from '@apperp/ui/collapsible-section';
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
-import { Field, FieldDescription } from '@apperp/ui/field';
+import { DatePicker } from '@apperp/ui/date-picker';
+import { FieldError } from '@apperp/ui/field';
+
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { usePageDialogRecord } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
@@ -30,16 +33,12 @@ import { Select } from '@apperp/ui/select';
 import { TableCell, TableRow } from '@apperp/ui/table';
 import { Textarea } from '@apperp/ui/textarea';
 import EditShield from '../../_shared/EditShield';
-import {
-    ApiError,
-    api,
-    errorMessage,
-    newIdempotencyKey,
-    toastSaveError,
-} from '../../api';
+import { RecordLookup } from '../../_shared/RecordLookup';
+import { ApiError, api, errorMessage, newIdempotencyKey } from '../../api';
 import AssetConditionSelect from '../../master/AssetConditionSelect';
-import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
+import { useMasterOptions } from '../../master/useMasterOptions';
 import { useRecordOptions } from '../../use-record-list';
+import { useSaveFeedback } from '../../use-save-feedback';
 import { RecordCardHeader } from '../_shared/record-card';
 import type { RecordCardControls } from '../_shared/record-card';
 import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
@@ -106,6 +105,20 @@ export default function MonitoringDetailPage({
     monitoringId?: string;
     mode: Mode;
 }) {
+    const [feedbackSections, setFeedbackSections] = useState<string[]>([
+        'general',
+        'lines',
+    ]);
+
+    const {
+        scopeRef: feedbackScopeRef,
+        feedbackSummary,
+        reportSaveError,
+        clearSaveFeedback,
+    } = useSaveFeedback(undefined, monitoringId, () =>
+        setFeedbackSections(['general', 'lines', 'notes']),
+    );
+
     const embedded = usePageDialogRecord(undefined);
 
     const can = izin(permissions);
@@ -208,18 +221,10 @@ export default function MonitoringDetailPage({
         }));
     }
 
-    function pilihDari(
-        options: { id: string }[],
-        id: string | null | undefined,
-    ) {
-        const dipilih = options.find((option) => option.id === id);
-
-        return dipilih ? optionLabel(dipilih as never) : null;
-    }
-
     async function simpan() {
         if (!context.legal_entity_id) {
-            toast.error(
+            reportSaveError(
+                null,
                 'Pilih perusahaan aktif terlebih dahulu pada header CoreERP.',
             );
 
@@ -256,6 +261,7 @@ export default function MonitoringDetailPage({
                         body: JSON.stringify(payload),
                     },
                 );
+                clearSaveFeedback();
                 toast.success(
                     `Monitoring ${hasil.data.kode} disimpan sebagai draf.`,
                 );
@@ -274,6 +280,7 @@ export default function MonitoringDetailPage({
                     }),
                 },
             );
+            clearSaveFeedback();
             toast.success('Perubahan monitoring disimpan.');
             saveCompleted(String(monitoringId));
         } catch (caught) {
@@ -281,7 +288,7 @@ export default function MonitoringDetailPage({
                 setGalat(caught.validationErrors);
             }
 
-            toastSaveError(caught, 'Monitoring belum dapat disimpan.');
+            reportSaveError(caught, 'Monitoring belum dapat disimpan.');
         } finally {
             setMenyimpan(false);
         }
@@ -301,13 +308,14 @@ export default function MonitoringDetailPage({
             setTersimpan(hasil.data);
             setRecord(keForm(hasil.data));
             const jumlah = hasil.meta?.ditambahkan ?? 0;
+            clearSaveFeedback();
             toast.success(
                 jumlah > 0
                     ? `${jumlah} aset di lokasi ini ditambahkan ke daftar periksa.`
                     : 'Semua aset di lokasi ini sudah ada di daftar periksa.',
             );
         } catch (caught) {
-            toastSaveError(caught, 'Daftar aset belum dapat diisi.');
+            reportSaveError(caught, 'Daftar aset belum dapat diisi.');
         } finally {
             setMenyimpan(false);
         }
@@ -328,6 +336,7 @@ export default function MonitoringDetailPage({
             );
             setTersimpan(hasil.data);
             setRecord(keForm(hasil.data));
+            clearSaveFeedback();
             toast.success('Monitoring diselesaikan. Hasilnya sudah dikunci.');
             card?.onSaved?.(String(monitoringId));
         } catch (caught) {
@@ -335,7 +344,7 @@ export default function MonitoringDetailPage({
                 setGalat(caught.validationErrors);
             }
 
-            toastSaveError(caught, 'Monitoring belum dapat diselesaikan.');
+            reportSaveError(caught, 'Monitoring belum dapat diselesaikan.');
         } finally {
             setMenyimpan(false);
         }
@@ -351,10 +360,11 @@ export default function MonitoringDetailPage({
                 method: 'DELETE',
                 body: JSON.stringify({ version: tersimpan?.version }),
             });
+            clearSaveFeedback();
             toast.success('Draf monitoring diarsipkan.');
             deleteCompleted();
         } catch (caught) {
-            toastSaveError(caught, 'Monitoring belum dapat diarsipkan.');
+            reportSaveError(caught, 'Monitoring belum dapat diarsipkan.');
         } finally {
             setMenyimpan(false);
         }
@@ -388,7 +398,10 @@ export default function MonitoringDetailPage({
     const ubah = () => monitoringId && editRecord(monitoringId);
 
     return (
-        <div className="flex h-full min-h-0 flex-col overflow-hidden">
+        <div
+            ref={feedbackScopeRef}
+            className="flex h-full min-h-0 flex-col overflow-hidden"
+        >
             <RecordCardHeader
                 recordTitle={tersimpan?.kode ?? 'Baru'}
                 editing={!readOnly}
@@ -407,6 +420,7 @@ export default function MonitoringDetailPage({
                 }
             />
             <RecordActionBar
+                feedback={feedbackSummary}
                 title={embedded ? undefined : judul}
                 trailing={
                     tersimpan ? (
@@ -479,7 +493,8 @@ export default function MonitoringDetailPage({
             >
                 <div className="space-y-5 p-5">
                     <CollapsibleSectionGroup
-                        defaultValue={['general', 'lines']}
+                        value={feedbackSections}
+                        onValueChange={setFeedbackSections}
                     >
                         <CollapsibleSection
                             value="general"
@@ -487,45 +502,62 @@ export default function MonitoringDetailPage({
                             summary={tanggalTampil(record.tanggal)}
                         >
                             <div className="space-y-4">
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    <Field>
-                                        <Input
+                                <FormGrid>
+                                    <FormControl data-error-field="tanggal">
+                                        <DatePicker
                                             label="Tanggal monitoring"
-                                            type="date"
+
                                             required
                                             readOnly={readOnly}
                                             value={record.tanggal ?? ''}
-                                            onChange={(event) =>
+                                            onValueChange={(value) =>
                                                 setRecord({
                                                     ...record,
-                                                    tanggal: event.target.value,
+                                                    tanggal: value,
                                                 })
                                             }
                                         />
                                         {pesan('tanggal') && (
-                                            <FieldDescription>
+                                            <FieldError>
                                                 {pesan('tanggal')}
-                                            </FieldDescription>
+                                            </FieldError>
                                         )}
-                                    </Field>
+                                    </FormControl>
 
-                                    <Field>
+                                    <FormControl
+                                        data-error-field="lokasi_aset_id"
+                                        error={
+                                            pesan('lokasi_aset_id') ||
+                                            lokasi.error
+                                        }
+                                        hint={
+                                            readOnly &&
+                                            tersimpan?.lokasi_aset_nama
+                                                ? tersimpan.lokasi_aset_nama
+                                                : 'Satu monitoring memeriksa satu lokasi.'
+                                        }
+                                    >
                                         <EditShield
                                             active={readOnly && !selesai}
                                             label="lokasi aset"
                                             onActivate={ubah}
                                         >
-                                            <Select
-                                                {...lokasi.selectProps}
+                                            <RecordLookup
+                                                source={lokasi}
                                                 label="Lokasi aset"
                                                 required
                                                 items={lokasi.options.map(
-                                                    optionLabel,
+                                                    (record) => ({
+                                                        value: record.id,
+                                                        label: lokasi.getLabel(
+                                                            record,
+                                                        ),
+                                                    }),
                                                 )}
-                                                value={pilihDari(
-                                                    lokasi.options,
-                                                    record.lokasi_aset_id,
-                                                )}
+                                                value={
+                                                    record.lokasi_aset_id ||
+                                                    null
+                                                }
                                                 placeholder="Pilih lokasi yang diperiksa"
                                                 searchPlaceholder="Cari lokasi aset"
                                                 emptyMessage="Lokasi aset tidak ditemukan."
@@ -535,42 +567,43 @@ export default function MonitoringDetailPage({
                                                     setRecord({
                                                         ...record,
                                                         lokasi_aset_id:
-                                                            lokasi.options.find(
-                                                                (option) =>
-                                                                    optionLabel(
-                                                                        option,
-                                                                    ) === item,
-                                                            )?.id ?? '',
+                                                            item ?? '',
                                                     })
                                                 }
                                             />
                                         </EditShield>
-                                        <FieldDescription>
-                                            {pesan('lokasi_aset_id') ||
-                                                lokasi.error ||
-                                                (readOnly &&
-                                                tersimpan?.lokasi_aset_nama
-                                                    ? tersimpan.lokasi_aset_nama
-                                                    : 'Satu monitoring memeriksa satu lokasi.')}
-                                        </FieldDescription>
-                                    </Field>
+                                    </FormControl>
 
-                                    <Field>
+                                    <FormControl
+                                        data-error-field="responsible_org_unit_id"
+                                        error={
+                                            pesan('responsible_org_unit_id') ||
+                                            unitKerja.error
+                                        }
+                                        hint={
+                                            'Bila diisi, Isi otomatis hanya mengambil aset milik unit ini.'
+                                        }
+                                    >
                                         <EditShield
                                             active={readOnly && !selesai}
                                             label="unit organisasi"
                                             onActivate={ubah}
                                         >
-                                            <Select
-                                                {...unitKerja.selectProps}
+                                            <RecordLookup
+                                                source={unitKerja}
                                                 label="Unit organisasi"
                                                 items={unitKerja.options.map(
-                                                    optionLabel,
+                                                    (record) => ({
+                                                        value: record.id,
+                                                        label: unitKerja.getLabel(
+                                                            record,
+                                                        ),
+                                                    }),
                                                 )}
-                                                value={pilihDari(
-                                                    unitKerja.options,
-                                                    record.responsible_org_unit_id,
-                                                )}
+                                                value={
+                                                    record.responsible_org_unit_id ||
+                                                    null
+                                                }
                                                 placeholder="Semua unit"
                                                 searchPlaceholder="Cari unit kerja"
                                                 emptyMessage="Unit kerja tidak ditemukan."
@@ -580,39 +613,40 @@ export default function MonitoringDetailPage({
                                                     setRecord({
                                                         ...record,
                                                         responsible_org_unit_id:
-                                                            unitKerja.options.find(
-                                                                (option) =>
-                                                                    optionLabel(
-                                                                        option,
-                                                                    ) === item,
-                                                            )?.id ?? '',
+                                                            item ?? '',
                                                     })
                                                 }
                                             />
                                         </EditShield>
-                                        <FieldDescription>
-                                            {pesan('responsible_org_unit_id') ||
-                                                unitKerja.error ||
-                                                'Bila diisi, Isi otomatis hanya mengambil aset milik unit ini.'}
-                                        </FieldDescription>
-                                    </Field>
+                                    </FormControl>
 
-                                    <Field>
+                                    <FormControl
+                                        data-error-field="penanggung_jawab_user_id"
+                                        error={anggota.error}
+                                        hint={
+                                            'Bila diisi, Isi otomatis hanya mengambil aset yang dipegang orang ini.'
+                                        }
+                                    >
                                         <EditShield
                                             active={readOnly && !selesai}
                                             label="penanggung jawab"
                                             onActivate={ubah}
                                         >
-                                            <Select
-                                                {...anggota.selectProps}
+                                            <RecordLookup
+                                                source={anggota}
                                                 label="Penanggung jawab"
                                                 items={anggota.options.map(
-                                                    optionLabel,
+                                                    (record) => ({
+                                                        value: record.id,
+                                                        label: anggota.getLabel(
+                                                            record,
+                                                        ),
+                                                    }),
                                                 )}
-                                                value={pilihDari(
-                                                    anggota.options,
-                                                    record.penanggung_jawab_user_id,
-                                                )}
+                                                value={
+                                                    record.penanggung_jawab_user_id ||
+                                                    null
+                                                }
                                                 placeholder="Semua orang"
                                                 searchPlaceholder="Cari nama"
                                                 emptyMessage="Orang tidak ditemukan."
@@ -622,22 +656,13 @@ export default function MonitoringDetailPage({
                                                     setRecord({
                                                         ...record,
                                                         penanggung_jawab_user_id:
-                                                            anggota.options.find(
-                                                                (option) =>
-                                                                    optionLabel(
-                                                                        option,
-                                                                    ) === item,
-                                                            )?.id ?? '',
+                                                            item ?? '',
                                                     })
                                                 }
                                             />
                                         </EditShield>
-                                        <FieldDescription>
-                                            {anggota.error ||
-                                                'Bila diisi, Isi otomatis hanya mengambil aset yang dipegang orang ini.'}
-                                        </FieldDescription>
-                                    </Field>
-                                </div>
+                                    </FormControl>
+                                </FormGrid>
                             </div>
                         </CollapsibleSection>
                         <CollapsibleSection
@@ -902,7 +927,7 @@ export default function MonitoringDetailPage({
                             }
                         >
                             <div className="space-y-4">
-                                <Field>
+                                <FormControl data-error-field="keterangan">
                                     <Textarea
                                         label="Keterangan"
                                         rows={2}
@@ -915,7 +940,7 @@ export default function MonitoringDetailPage({
                                             })
                                         }
                                     />
-                                </Field>
+                                </FormControl>
                             </div>
                         </CollapsibleSection>
                     </CollapsibleSectionGroup>
@@ -1026,37 +1051,27 @@ function MonitoringRow({
             <TableCell>{baris.line_number ?? index + 1}</TableCell>
             <TableCell>
                 {baru && !readOnly ? (
-                    <Select
-                        {...assetSource.selectProps}
-                        items={aset.map((item) =>
-                            item.nama
-                                ? `${item.kode} · ${item.nama}`
-                                : item.kode,
-                        )}
-                        value={
-                            dipilih
-                                ? dipilih.nama
-                                    ? `${dipilih.kode} · ${dipilih.nama}`
-                                    : dipilih.kode
-                                : null
-                        }
-                        placeholder="Pilih aset"
-                        searchPlaceholder="Cari kode atau nama aset"
-                        emptyMessage="Aset tidak ditemukan."
-                        ariaLabel={`Aset baris ${index + 1}`}
-                        portalContainer={panelRef}
-                        onValueChange={(item) =>
-                            onChange({
-                                aset_id:
-                                    aset.find(
-                                        (calon) =>
-                                            (calon.nama
-                                                ? `${calon.kode} · ${calon.nama}`
-                                                : calon.kode) === item,
-                                    )?.id ?? '',
-                            })
-                        }
-                    />
+                    <FormControl>
+                        <RecordLookup
+                            label="Pilih aset"
+                            source={assetSource}
+                            items={aset.map((record) => ({
+                                value: record.id,
+                                label: assetSource.getLabel(record),
+                            }))}
+                            value={dipilih?.id ?? null}
+                            placeholder="Pilih aset"
+                            searchPlaceholder="Cari kode atau nama aset"
+                            emptyMessage="Aset tidak ditemukan."
+                            ariaLabel={`Aset baris ${index + 1}`}
+                            portalContainer={panelRef}
+                            onValueChange={(item) =>
+                                onChange({
+                                    aset_id: item ?? '',
+                                })
+                            }
+                        />
+                    </FormControl>
                 ) : (
                     <div>
                         <span className="font-medium">
@@ -1104,23 +1119,25 @@ function MonitoringRow({
                         'Tidak ada'
                     )
                 ) : (
-                    <Select
-                        items={PRESENCE}
-                        value={presenceValue(baris.ada)}
-                        placeholder="Belum diperiksa"
-                        ariaLabel={`Keberadaan aset baris ${index + 1}`}
-                        portalContainer={panelRef}
-                        onValueChange={(value) =>
-                            onChange({
-                                ada:
-                                    value === 'ada'
-                                        ? true
-                                        : value === 'tidak'
-                                          ? false
-                                          : null,
-                            })
-                        }
-                    />
+                    <FormControl>
+                        <Select
+                            items={PRESENCE}
+                            value={presenceValue(baris.ada)}
+                            placeholder="Belum diperiksa"
+                            ariaLabel={`Keberadaan aset baris ${index + 1}`}
+                            portalContainer={panelRef}
+                            onValueChange={(value) =>
+                                onChange({
+                                    ada:
+                                        value === 'ada'
+                                            ? true
+                                            : value === 'tidak'
+                                              ? false
+                                              : null,
+                                })
+                            }
+                        />
+                    </FormControl>
                 )}
             </TableCell>
             <TableCell>
@@ -1151,13 +1168,15 @@ function MonitoringRow({
                 {readOnly ? (
                     baris.keterangan || '—'
                 ) : (
-                    <Input
-                        aria-label={`Keterangan baris ${index + 1}`}
-                        value={baris.keterangan ?? ''}
-                        onChange={(event) =>
-                            onChange({ keterangan: event.target.value })
-                        }
-                    />
+                    <FormControl>
+                        <Input
+                            aria-label={`Keterangan baris ${index + 1}`}
+                            value={baris.keterangan ?? ''}
+                            onChange={(event) =>
+                                onChange({ keterangan: event.target.value })
+                            }
+                        />
+                    </FormControl>
                 )}
             </TableCell>
             <TableCell className="text-right">

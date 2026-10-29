@@ -1,16 +1,25 @@
+import { usePage } from '@inertiajs/react';
 import { TriangleAlert } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useState } from 'react';
 import type { RefObject } from 'react';
 import { PostingCheck } from '@/components/finance/posting-check';
-import { Field, FieldDescription } from '@apperp/ui/field';
+import type { Auth } from '@/types';
+import { FormControl } from '@apperp/ui/form-control';
+import { InlineLookup } from '@apperp/ui/inline-lookup';
+import type { LookupLoader } from '@apperp/ui/inline-lookup';
 import { Input } from '@apperp/ui/input';
-import { Select } from '@apperp/ui/select';
-import { api } from '../../api';
+import { useRecordList } from '../../use-record-list';
 import type {
     PratinjauPosting,
     StatusPosting,
     VendorRingkas,
 } from './penerimaan';
+
+const VendorCreateCard = lazy(() =>
+    import('@/pages/foundation/vendor/vendors').then((module) => ({
+        default: module.VendorCreateCard,
+    })),
+);
 
 /**
  * Vendor dan jurnal perolehan pada dokumen penerimaan (feed posting finance, TODO 9.3).
@@ -21,10 +30,14 @@ import type {
  * supaya yang dilihat di sini persis yang akan terbit.
  */
 
-const TANPA_VENDOR = '__tanpa_vendor__';
-
+const NO_VENDOR: VendorRingkas = {
+    id: '',
+    number: '',
+    name: 'Tanpa vendor',
+    status: '',
+};
 const labelVendor = (vendor: VendorRingkas) =>
-    `${vendor.number} — ${vendor.name}`;
+    vendor.id ? vendor.number + ' — ' + vendor.name : vendor.name;
 
 export function VendorPicker({
     legalEntityId,
@@ -37,126 +50,135 @@ export function VendorPicker({
 }: {
     legalEntityId: string | null;
     value: string;
-    /** Vendor yang tersimpan di dokumen, supaya namanya tampil sebelum pencarian apa pun. */
     saved: VendorRingkas | null;
     readOnly: boolean;
     error?: string;
     portal: RefObject<HTMLDivElement | null>;
     onChange: (vendorId: string) => void;
 }) {
-    const [hasil, setHasil] = useState<VendorRingkas[]>([]);
-    const [dikenal, setDikenal] = useState<Record<string, VendorRingkas>>({});
-    const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    // Pilihan awal, sebelum pengguna mengetik apa pun.
-    useEffect(() => {
-        if (readOnly || !legalEntityId) {
-            return;
-        }
-
-        let dilepas = false;
-
-        const muat = async () => {
-            try {
-                const response = await api<{ data: VendorRingkas[] }>(
-                    `/penerimaan-aset/vendor?legal_entity_id=${encodeURIComponent(legalEntityId)}`,
-                );
-
-                if (!dilepas) {
-                    setHasil(response.data);
-                }
-            } catch {
-                // Pemilih tetap dapat dipakai lewat pencarian.
+    const { auth } = usePage<{ auth: Auth }>().props;
+    const [creating, setCreating] = useState(false);
+    const canCreate =
+        auth.membership?.permissions.includes('core.vendor.update') ?? false;
+    const [selected, setSelected] = useState<{
+        scope: string | null;
+        item: VendorRingkas;
+    } | null>(null);
+    const source = useRecordList<VendorRingkas>(
+        '/penerimaan-aset/vendor',
+        '',
+        { legal_entity_id: legalEntityId ?? '' },
+        false,
+    );
+    const fetchItems = source.loadItems;
+    const loadItems = useCallback<LookupLoader<VendorRingkas>>(
+        async (request) => {
+            if (!legalEntityId) {
+                return { items: [], nextCursor: null };
             }
-        };
 
-        void muat();
+            const batch = await fetchItems({ ...request, sort: null });
 
-        return () => {
-            dilepas = true;
-        };
-    }, [readOnly, legalEntityId]);
-
-    const kenali = (vendors: VendorRingkas[]) => {
-        setHasil(vendors);
-        setDikenal((sebelumnya) => ({
-            ...sebelumnya,
-            ...Object.fromEntries(vendors.map((vendor) => [vendor.id, vendor])),
-        }));
-    };
-
-    // Satu permintaan setelah pengguna berhenti mengetik, bukan satu per huruf.
-    const cariNanti = (query: string) => {
-        if (!legalEntityId) {
-            return;
-        }
-
-        if (timer.current) {
-            clearTimeout(timer.current);
-        }
-
-        timer.current = setTimeout(() => {
-            api<{ data: VendorRingkas[] }>(
-                `/penerimaan-aset/vendor?legal_entity_id=${encodeURIComponent(legalEntityId)}&q=${encodeURIComponent(query)}`,
-            )
-                .then((response) => kenali(response.data))
-                .catch(() => setHasil([]));
-        }, 250);
-    };
-
-    const sekarang =
-        (value && (dikenal[value] ?? hasil.find((v) => v.id === value))) ||
-        (saved && saved.id === value ? saved : null);
-
-    const items = useMemo(() => {
-        const vendors = new Map(hasil.map((vendor) => [vendor.id, vendor]));
-
-        if (sekarang) {
-            vendors.set(sekarang.id, sekarang);
-        }
-
-        return [
-            { value: TANPA_VENDOR, label: 'Tanpa vendor' },
-            ...[...vendors.values()].map((vendor) => ({
-                value: vendor.id,
-                label: labelVendor(vendor),
-            })),
-        ];
-    }, [hasil, sekarang]);
-
-    if (readOnly) {
-        return (
-            <Field>
-                <Input
-                    label="Vendor"
-                    readOnly
-                    value={sekarang ? labelVendor(sekarang) : 'Tanpa vendor'}
-                />
-            </Field>
-        );
-    }
+            return {
+                ...batch,
+                items:
+                    !request.cursor && !request.query
+                        ? [NO_VENDOR, ...batch.items]
+                        : batch.items,
+            };
+        },
+        [legalEntityId, fetchItems],
+    );
+    const current = !value
+        ? NO_VENDOR
+        : selected?.scope === legalEntityId && selected.item.id === value
+          ? selected.item
+          : saved?.id === value
+            ? saved
+            : null;
 
     return (
-        <Field data-invalid={Boolean(error)}>
-            <Select
-                label="Vendor"
-                items={items}
-                value={value || TANPA_VENDOR}
-                placeholder="Pilih vendor"
-                searchPlaceholder="Cari nomor atau nama vendor"
-                emptyMessage="Vendor tidak ditemukan."
-                ariaLabel="Vendor"
-                portalContainer={portal}
-                onSearchChange={cariNanti}
-                onValueChange={(next) =>
-                    onChange(next === null || next === TANPA_VENDOR ? '' : next)
-                }
-            />
-            <FieldDescription>
-                {error ??
-                    'Vendor asetnya. Wajib untuk pembelian, kecuali perusahaan ini mencatat perolehan lewat akun perantara.'}
-            </FieldDescription>
-        </Field>
+        <>
+            <FormControl
+                error={error}
+                hint="Vendor asetnya. Wajib untuk pembelian, kecuali perusahaan ini mencatat perolehan lewat akun perantara."
+            >
+                {readOnly ? (
+                    <Input
+                        label="Vendor"
+                        readOnly
+                        value={current ? labelVendor(current) : ''}
+                    />
+                ) : (
+                    <InlineLookup<VendorRingkas>
+                        label="Vendor"
+                        value={current}
+                        loadItems={loadItems}
+                        columns={[
+                            {
+                                id: 'number',
+                                header: 'Nomor',
+                                width: 112,
+                                cell: (item) => item.number,
+                            },
+                            {
+                                id: 'name',
+                                header: 'Nama',
+                                width: 240,
+                                cell: (item) => item.name,
+                            },
+                        ]}
+                        getItemValue={(item) => item.id}
+                        getItemLabel={labelVendor}
+                        getSearchText={(item) => item.number + ' ' + item.name}
+                        onValueChange={(item) => {
+                            setSelected({ scope: legalEntityId, item });
+                            onChange(item.id);
+                        }}
+                        disabled={!legalEntityId}
+                        portalContainer={portal}
+                        showDetails={false}
+                        onCreate={
+                            canCreate && legalEntityId
+                                ? () => setCreating(true)
+                                : undefined
+                        }
+                        emptyMessage="Vendor tidak ditemukan."
+                    />
+                )}
+            </FormControl>
+            {creating && legalEntityId && canCreate && (
+                <Suspense fallback={<p role="status">Membuka form vendor…</p>}>
+                    <VendorCreateCard
+                        key={legalEntityId}
+                        legalEntityId={legalEntityId}
+                        onClose={() => setCreating(false)}
+                        onCreated={(vendor) => {
+                            if (
+                                vendor.legal_entity_id !== legalEntityId ||
+                                vendor.status !== 'active'
+                            ) {
+                                throw new Error(
+                                    'Pilih akun vendor aktif untuk perusahaan penerimaan ini.',
+                                );
+                            }
+
+                            setSelected({
+                                scope: legalEntityId,
+                                item: {
+                                    id: vendor.id,
+                                    number: vendor.number,
+                                    name: vendor.name,
+                                    status: vendor.status,
+                                },
+                            });
+                            onChange(vendor.id);
+                            setCreating(false);
+                        }}
+                    />
+                </Suspense>
+            )}
+        </>
     );
 }
 

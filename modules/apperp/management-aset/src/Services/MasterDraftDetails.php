@@ -18,6 +18,8 @@ use Modules\Apperp\ManagementAset\Http\Controllers\master\MaintenancePlanDetailC
 use Modules\Apperp\ManagementAset\Http\Controllers\master\MaintenanceSetupLinkController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\ModelAsetController;
 use Modules\Apperp\ManagementAset\Http\Controllers\master\TipeAtributNilaiController;
+use Modules\Apperp\ManagementAset\Models\master\MaintenanceJobTypeVariant;
+use Modules\Apperp\ManagementAset\Models\master\ModelAset;
 use Modules\Apperp\ManagementAset\Models\MasterData;
 
 final class MasterDraftDetails
@@ -33,7 +35,32 @@ final class MasterDraftDetails
         'rencana-pemeliharaan' => ['lines', 'targets'],
     ];
 
-    public function save(Request $request, AssetNumberSequenceIssuer $numbers, string $resource, MasterData $record, mixed $input): void
+    public static function supports(string $resource): bool
+    {
+        return isset(self::SECTIONS[$resource]);
+    }
+
+    /** @return array<string, list<string>> */
+    public static function rules(string $resource): array
+    {
+        $sections = self::SECTIONS[$resource] ?? [];
+
+        return ['details' => $sections === [] ? ['prohibited'] : ['sometimes', 'array:'.implode(',', $sections)], 'details.*' => ['array']];
+    }
+
+    /** @param array<string, mixed> $details */
+    public function lockBeforeOwner(Request $request, string $resource, string $id, array $details): void
+    {
+        if ($resource === 'jenis-aset' && isset($details['job_types'])) {
+            try {
+                app(MaintenanceSetupLinkController::class)->lockJenisAsetJobTypes($request, $id, $details['job_types']);
+            } catch (ValidationException $failure) {
+                $this->prefix($failure, 'details.job_types');
+            }
+        }
+    }
+
+    public function save(Request $request, AssetNumberSequenceIssuer $numbers, string $resource, MasterData $record, mixed $input, bool $updating = false): void
     {
         $allowed = self::SECTIONS[$resource] ?? [];
         if ($allowed === [] && $input !== []) {
@@ -46,21 +73,7 @@ final class MasterDraftDetails
         foreach ($details as $section => $payload) {
             try {
                 if (($resource === 'pabrikan-aset' && $section === 'models') || ($resource === 'maintenance-job-types' && $section === 'variants')) {
-                    validator($payload, ['rows' => ['present', 'array', 'list', 'max:100'], 'rows.*' => ['array'], 'rows.*.kode' => ['sometimes', 'nullable', 'string', 'distinct']])->validate();
-                    foreach ($payload['rows'] as $index => $row) {
-                        try {
-                            $controller = $resource === 'pabrikan-aset' ? app(ModelAsetController::class) : app(MaintenanceJobTypeVariantController::class);
-                            $ownerField = $resource === 'pabrikan-aset' ? 'pabrikan_aset_id' : 'maintenance_job_type_id';
-                            $response = $controller->storePayload($request, $numbers,
-                                [...$row, $ownerField => (string) $record->getKey()],
-                                'draft:'.hash('sha256', $record->getKey().'|'.$section.'|'.$index));
-                            if ($response->getStatusCode() >= 400) {
-                                throw new HttpResponseException($response);
-                            }
-                        } catch (ValidationException $failure) {
-                            $this->prefix($failure, 'rows.'.$index);
-                        }
-                    }
+                    $this->saveChildren($request, $numbers, $resource, $section, $record, $payload, $updating);
 
                     continue;
                 }
@@ -69,6 +82,56 @@ final class MasterDraftDetails
                 $this->replace($request, $resource, $section, $id, $payload, $version);
             } catch (ValidationException $failure) {
                 $this->prefix($failure, 'details.'.$section);
+            }
+        }
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function saveChildren(Request $request, AssetNumberSequenceIssuer $numbers, string $resource, string $section, MasterData $record, array $payload, bool $updating): void
+    {
+        validator($payload, [
+            'rows' => ['present', 'array', 'list', 'max:100'],
+            'rows.*' => ['array'],
+            'rows.*.id' => ['sometimes', 'ulid', 'distinct'],
+            'rows.*.version' => ['required_with:rows.*.id', 'integer', 'min:1'],
+            'rows.*.creation_key' => ['sometimes', 'string', 'max:133', 'regex:/^[A-Za-z0-9._:-]+$/', 'distinct'],
+            'rows.*.kode' => ['sometimes', 'nullable', 'string', 'distinct'],
+            'deleted' => ['sometimes', 'array', 'list', 'max:100'],
+            'deleted.*.id' => ['required', 'ulid', 'distinct'],
+            'deleted.*.version' => ['required', 'integer', 'min:1'],
+        ])->validate();
+        $manufacturer = $resource === 'pabrikan-aset';
+        $controller = $manufacturer ? app(ModelAsetController::class) : app(MaintenanceJobTypeVariantController::class);
+        $model = $manufacturer ? ModelAset::class : MaintenanceJobTypeVariant::class;
+        $ownerField = $manufacturer ? 'pabrikan_aset_id' : 'maintenance_job_type_id';
+        $ownerId = (string) $record->getKey();
+        $deletedIds = array_column($payload['deleted'] ?? [], 'id');
+        foreach (['rows' => $payload['rows'], 'deleted' => $payload['deleted'] ?? []] as $operation => $rows) {
+            foreach ($rows as $index => $row) {
+                try {
+                    if (isset($row['id'])) {
+                        if (! $updating || ! $model::query()->where('tenant_id', $record->tenant_id)->where($ownerField, $ownerId)->whereKey($row['id'])->lockForUpdate()->exists()) {
+                            throw ValidationException::withMessages(['id' => 'Baris ini bukan rincian data yang sedang diubah.']);
+                        }
+                        if ($operation === 'rows' && in_array($row['id'], $deletedIds, true)) {
+                            throw ValidationException::withMessages(['id' => 'Baris yang dihapus tidak dapat diubah sekaligus.']);
+                        }
+                        $response = $operation === 'deleted'
+                            ? $controller->destroyPayload($request, $row['id'], (int) $row['version'])
+                            : $controller->updatePayload($request, $row['id'], [...$row, $ownerField => $ownerId], (int) $row['version']);
+                    } else {
+                        if ($updating && ! isset($row['creation_key'])) {
+                            throw ValidationException::withMessages(['creation_key' => 'Kunci baris baru wajib dikirim.']);
+                        }
+                        $key = $row['creation_key'] ?? 'draft:'.hash('sha256', $ownerId.'|'.$section.'|'.$index);
+                        $response = $controller->storePayload($request, $numbers, [...$row, $ownerField => $ownerId], $key);
+                    }
+                    if ($response->getStatusCode() >= 400) {
+                        throw new HttpResponseException($response);
+                    }
+                } catch (ValidationException $failure) {
+                    $this->prefix($failure, $operation.'.'.$index);
+                }
             }
         }
     }

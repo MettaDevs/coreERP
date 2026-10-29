@@ -263,7 +263,7 @@ class PushContractTest extends TestCase
         ])->assertStatus(422)->assertJsonPath('errors.push_url', ['URL tujuan harus alamat https:// yang lengkap.']);
         $this->assertSame('URL tujuan harus alamat https:// yang lengkap.', (new PushDestination)->reject('http://finance.example.test/hook'));
 
-        $addresses = ['203.0.113.20'];
+        $addresses = ['8.8.8.8'];
         $this->app->instance(PushDestination::class, new PushDestination(function () use (&$addresses): array {
             return $addresses;
         }));
@@ -281,11 +281,11 @@ class PushContractTest extends TestCase
         $this->assertSame('URL tujuan menunjuk jaringan privat. Dari layanan SaaS, aplikasi finance harus dapat dijangkau lewat alamat publik.', $privat->last_error);
 
         // Alamat publik: dikirim ke alamat yang baru saja diperiksa.
-        $addresses = ['203.0.113.20'];
+        $addresses = ['8.8.8.8'];
         $this->publish($this->acquisition('AST-ACQ-PUBLIK', '2026-09-29'));
         app(PostingPusher::class)->run();
         $this->assertCount(1, $this->sent);
-        $this->assertSame(['finance.example.test:443:203.0.113.20'], $this->sent[0]['options']['curl'][CURLOPT_RESOLVE]);
+        $this->assertSame(['finance.example.test:443:8.8.8.8'], $this->sent[0]['options']['curl'][CURLOPT_RESOLVE]);
 
         // On-prem: jaringan privat boleh, dan resolusi DNS diserahkan ke sistem.
         config(['coreerp.base_domain' => null]);
