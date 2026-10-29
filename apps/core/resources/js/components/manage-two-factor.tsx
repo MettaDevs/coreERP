@@ -2,9 +2,11 @@ import { Button } from '@apperp/ui/button';
 import { Form } from '@inertiajs/react';
 import { ShieldCheck } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { FormErrorHeader } from '@/components/form-error-header';
 import Heading from '@/components/heading';
 import TwoFactorRecoveryCodes from '@/components/two-factor-recovery-codes';
 import TwoFactorSetupModal from '@/components/two-factor-setup-modal';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import { useTwoFactorAuth } from '@/hooks/use-two-factor-auth';
 import { disable, enable } from '@/routes/two-factor';
 
@@ -15,6 +17,11 @@ export type Props = {
 };
 
 export default function ManageTwoFactor(props: Props) {
+    const { wrap: wrapFormResponse1, summary: formResponse1Summary } =
+        useInertiaFeedback();
+    const { wrap: wrapFormResponse2, summary: formResponse2Summary } =
+        useInertiaFeedback();
+
     const requiresConfirmation = props.requiresConfirmation ?? false;
     const twoFactorEnabled = props.twoFactorEnabled ?? false;
 
@@ -60,15 +67,25 @@ export default function ManageTwoFactor(props: Props) {
                     </p>
 
                     <div className="relative inline">
-                        <Form {...disable.form()}>
-                            {({ processing }) => (
-                                <Button
-                                    variant="destructive"
-                                    type="submit"
-                                    disabled={processing}
-                                >
-                                    Disable 2FA
-                                </Button>
+                        <Form
+                            noValidate
+                            {...disable.form()}
+                            options={wrapFormResponse1({})}
+                        >
+                            {({ processing, errors }) => (
+                                <>
+                                    <>
+                                        {formResponse1Summary}
+                                        <FormErrorHeader errors={errors} />
+                                    </>
+                                    <Button
+                                        variant="destructive"
+                                        type="submit"
+                                        disabled={processing}
+                                    >
+                                        Disable 2FA
+                                    </Button>
+                                </>
                             )}
                         </Form>
                     </div>
@@ -96,13 +113,24 @@ export default function ManageTwoFactor(props: Props) {
                             </Button>
                         ) : (
                             <Form
+                                noValidate
                                 {...enable.form()}
                                 onSuccess={() => setShowSetupModal(true)}
+                                options={wrapFormResponse2({})}
                             >
-                                {({ processing }) => (
-                                    <Button type="submit" disabled={processing}>
-                                        Enable 2FA
-                                    </Button>
+                                {({ processing, errors }) => (
+                                    <>
+                                        <>
+                                            {formResponse2Summary}
+                                            <FormErrorHeader errors={errors} />
+                                        </>
+                                        <Button
+                                            type="submit"
+                                            disabled={processing}
+                                        >
+                                            Enable 2FA
+                                        </Button>
+                                    </>
                                 )}
                             </Form>
                         )}

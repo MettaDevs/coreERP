@@ -25,8 +25,10 @@ import {
     EmptyTitle,
 } from '@apperp/ui/empty';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
-import { api, errorMessage } from '../../api';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
+import type { ApiValidationErrors } from '../../api';
 import { useRecordList } from '../../use-record-list';
+import type { MasterDetailsPayload } from '../DraftMasterDetails';
 import type { MasterRecord, ParentSummary } from '../masters';
 import ModelAsetFormSheet from './ModelAsetFormSheet';
 import type { PabrikanModelRecord } from './pabrikanAsetDetail';
@@ -39,7 +41,8 @@ export default function PabrikanModels({
     canUpdate,
     canArchive,
     canReadAset,
-    onChanged,
+    onChange,
+    validationErrors,
 }: {
     manufacturer: MasterRecord;
     canReadModels: boolean;
@@ -48,30 +51,28 @@ export default function PabrikanModels({
     canUpdate: boolean;
     canArchive: boolean;
     canReadAset: boolean;
-    onChanged: () => void;
+    onChange: (details: MasterDetailsPayload) => void;
+    validationErrors?: ApiValidationErrors;
 }) {
-    const [modelBusy, setModelBusy] = useState(false);
     const [modelDirty, setModelDirty] = useState(false);
-    const discardModel = () =>
-        !modelDirty || window.confirm('Buang perubahan yang belum disimpan?');
+    const {
+        request: requestModelTransition,
+        confirmation: modelTransitionConfirmation,
+    } = useRecordTransition(modelDirty, false);
     const closeModel = () => {
-        if (!modelBusy && discardModel()) {
+        requestModelTransition(() => {
             setEditing(undefined);
             setModelDirty(false);
-        }
+        });
     };
     const createModel = () => {
-        if (!modelBusy && discardModel()) {
+        requestModelTransition(() => {
             setEditing(null);
             setModelDirty(false);
-        }
+        });
     };
-    const [error, setError] = useState('');
-    // Effect adalah satu-satunya pemilik pengambilan data; pemuatan ulang setelah
-    // simpan atau arsip dinyatakan dengan menaikkan penanda ini.
     const [versiMuat, setVersiMuat] = useState(0);
     const muatUlang = () => {
-        setError('');
         setVersiMuat((versi) => versi + 1);
     };
     const [editing, setEditing] = useState<
@@ -80,6 +81,33 @@ export default function PabrikanModels({
     const [archiving, setArchiving] = useState<PabrikanModelRecord | null>(
         null,
     );
+    const [changedModels, setChangedModels] = useState<PabrikanModelRecord[]>(
+        [],
+    );
+    const [deletedModels, setDeletedModels] = useState<
+        { id: string; version: number }[]
+    >([]);
+    function publishModels(
+        rows: PabrikanModelRecord[],
+        deleted: { id: string; version: number }[],
+    ) {
+        setChangedModels(rows);
+        setDeletedModels(deleted);
+        onChange({
+            models: {
+                rows: rows.map((row) => ({
+                    ...(row.creation_key
+                        ? { creation_key: row.creation_key }
+                        : { id: row.id, version: row.version }),
+                    nama: row.nama,
+                    keterangan: row.keterangan,
+                    aktif: row.aktif,
+                    jenis_aset_id: row.jenis_aset_id,
+                })),
+                deleted,
+            },
+        });
+    }
 
     const list = useRecordList<PabrikanModelRecord>(
         '/model-aset',
@@ -87,7 +115,20 @@ export default function PabrikanModels({
         { pabrikan_aset_id: manufacturer.id, refresh: String(versiMuat) },
         canReadModels,
     );
-    const { items, loading } = list;
+    const { loading } = list;
+    const items = [
+        ...changedModels.filter((row) => row.creation_key),
+        ...list.items
+            .filter(
+                (row) =>
+                    !deletedModels.some((deleted) => deleted.id === row.id),
+            )
+            .map(
+                (row) =>
+                    changedModels.find((changed) => changed.id === row.id) ??
+                    row,
+            ),
+    ];
 
     const modelNavigation = useRecordNavigation({
         items,
@@ -104,27 +145,26 @@ export default function PabrikanModels({
         hasMore: list.hasMore,
         loading: list.loading,
         loadMore: list.loadMore,
-        disabled: modelBusy || modelDirty,
+        disabled: modelDirty,
     });
-    async function archive() {
+    function archive() {
         if (!archiving) {
             return;
         }
 
-        try {
-            await api(`/model-aset/${archiving.id}`, {
-                method: 'DELETE',
-                body: JSON.stringify({ version: archiving.version }),
-            });
-            setEditing((current) =>
-                current?.id === archiving.id ? undefined : current,
-            );
-            setArchiving(null);
-            muatUlang();
-            onChanged();
-        } catch (caught) {
-            setError(errorMessage(caught, 'Model belum dapat diarsipkan.'));
-        }
+        publishModels(
+            changedModels.filter((row) => row.id !== archiving.id),
+            archiving.creation_key
+                ? deletedModels
+                : [
+                      ...deletedModels,
+                      { id: archiving.id, version: archiving.version },
+                  ],
+        );
+        setEditing((current) =>
+            current?.id === archiving.id ? undefined : current,
+        );
+        setArchiving(null);
     }
 
     if (!canReadModels) {
@@ -202,6 +242,14 @@ export default function PabrikanModels({
 
     return (
         <div className="space-y-3">
+            {modelTransitionConfirmation}
+            {Object.entries(validationErrors ?? {})
+                .filter(([field]) => field.startsWith('details.models.'))
+                .map(([field, messages]) => (
+                    <p key={field} className="text-destructive text-sm">
+                        {messages[0]}
+                    </p>
+                ))}
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                     <p className="font-semibold">Model</p>
@@ -224,13 +272,11 @@ export default function PabrikanModels({
                 <Empty>
                     <EmptyDescription>Memuat model…</EmptyDescription>
                 </Empty>
-            ) : error || list.error ? (
+            ) : list.error ? (
                 <Empty>
                     <EmptyHeader>
                         <EmptyTitle>Model belum dapat ditampilkan</EmptyTitle>
-                        <EmptyDescription>
-                            {error || list.error}
-                        </EmptyDescription>
+                        <EmptyDescription>{list.error}</EmptyDescription>
                     </EmptyHeader>
                     <Button variant="outline" onClick={muatUlang}>
                         Coba lagi
@@ -281,12 +327,19 @@ export default function PabrikanModels({
                     onClose={closeModel}
                     onNew={canCreate ? createModel : undefined}
                     navigation={modelNavigation}
-                    onBusyChange={setModelBusy}
                     onDirtyChange={setModelDirty}
-                    onSaved={() => {
+                    onSaved={(row) => {
+                        publishModels(
+                            [
+                                ...changedModels.filter(
+                                    (item) => item.id !== row.id,
+                                ),
+                                row,
+                            ],
+                            deletedModels,
+                        );
                         setEditing(undefined);
-                        muatUlang();
-                        onChanged();
+                        setModelDirty(false);
                     }}
                 />
             )}
@@ -308,7 +361,10 @@ export default function PabrikanModels({
                     <AlertDialogFooter>
                         <AlertDialogCancel>Batal</AlertDialogCancel>
                         <AlertDialogAction
-                            onClick={() => void archive()}
+                            onClick={(event) => {
+                                event.preventDefault();
+                                void archive();
+                            }}
                             asChild
                         >
                             <ActionButton action="archive" />

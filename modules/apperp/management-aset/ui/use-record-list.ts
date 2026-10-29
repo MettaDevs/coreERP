@@ -64,12 +64,14 @@ export function useRecordList<T extends { id: string }>(
         [path, filterKey, onItems],
     );
 
-    return useIncrementalList({
+    const list = useIncrementalList({
         loadItems,
         query,
         active,
         getKey,
     });
+
+    return { ...list, loadItems };
 }
 
 /** Label pilihan tersimpan dipertahankan, sedangkan isi popup selalu hasil pencarian server. */
@@ -158,9 +160,19 @@ export function useRecordOptions<T extends { id: string }>(
         return () => request.abort();
     }, [path, selectedKey, source]);
     const options = known.source === source ? known.options : [];
+    const sourceLoader = list.loadItems;
+    const loadItems = useCallback(
+        (request: Omit<ListRequest, 'sort'>) =>
+            sourceLoader({ ...request, sort: null }),
+        [sourceLoader],
+    );
 
     return {
+        sourcePath: path,
+        getLabel: label,
         options,
+        loadItems,
+        acceptItems,
         error: list.error,
         loading: list.loading,
         reload: list.reload,

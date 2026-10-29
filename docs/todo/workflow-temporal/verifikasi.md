@@ -88,8 +88,10 @@ python contracts/bundle.py
 python contracts/check-contract-coverage.py
 ```
 
-Formatter/lint/type check hanya scope berubah dahulu. UI harus rebuild/recreate container dan
-dilihat di localhost:8000; manifest/migration diverifikasi dari container, mengikuti AGENTS.md.
+Formatter/lint/type check hanya scope berubah dahulu. Dengan HotReload aktif, perubahan UI masuk ke
+runtime yang sudah menyala tanpa rebuild atau reload manual. Jika user/developer melaporkan layar stale,
+periksa Vite/mount dan gunakan fallback seperlunya. Manifest/migration tetap diverifikasi dari container,
+mengikuti AGENTS.md.
 
 ## Beban dan performa
 

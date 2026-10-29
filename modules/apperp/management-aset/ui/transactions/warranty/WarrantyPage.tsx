@@ -6,6 +6,7 @@ import { Badge } from '@apperp/ui/badge';
 
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
+import { DatePicker } from '@apperp/ui/date-picker';
 
 import {
     Empty,
@@ -13,9 +14,9 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
-import { Field, FieldDescription } from '@apperp/ui/field';
+import { FieldError } from '@apperp/ui/field';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
-import { MultiSelect } from '@apperp/ui/multi-select';
 import {
     PageDialog,
     PageDialogContent,
@@ -28,17 +29,15 @@ import { Select } from '@apperp/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@apperp/ui/tabs';
 import { Textarea } from '@apperp/ui/textarea';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
 import { day, money } from '../../_shared/format';
+import { RecordLookup } from '../../_shared/RecordLookup';
+import { RecordMultiLookup } from '../../_shared/RecordMultiLookup';
 import { useVendors } from '../../_shared/useVendors';
-import {
-    ApiError,
-    api,
-    errorMessage,
-    newIdempotencyKey,
-    toastSaveError,
-} from '../../api';
+import { ApiError, api, errorMessage, newIdempotencyKey } from '../../api';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import { useRecordList } from '../../use-record-list';
+import { useSaveFeedback } from '../../use-save-feedback';
 import { RecordCardHeader, recordQueryUrl } from '../_shared/record-card';
 import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
 import { useRecordQueryTarget } from '../_shared/use-record-query-target';
@@ -104,6 +103,17 @@ export default function WarrantyPage({
     context: { legal_entity_id: string | null };
     permissions: string[];
 }) {
+    const {
+        scopeRef: pageFeedbackScopeRef,
+        feedbackSummary: pageFeedbackSummary,
+        reportSaveError: pageFeedbackReportSaveError,
+        clearSaveFeedback: pageFeedbackClearSaveFeedback,
+    } = useSaveFeedback();
+    const pageFeedback = {
+        reportSaveError: pageFeedbackReportSaveError,
+        clearSaveFeedback: pageFeedbackClearSaveFeedback,
+    };
+
     const can = (permission: string) =>
         permissions.includes(`management-aset.${permission}`);
     const today = useToday();
@@ -125,7 +135,37 @@ export default function WarrantyPage({
     const [warrantyDirty, setWarrantyDirty] = useState(false);
     const [contractDirty, setContractDirty] = useState(false);
     const warrantyRef = useRef<HTMLDivElement>(null);
+    const {
+        feedbackSummary: warrantyFeedbackSummary,
+        reportSaveError: warrantyFeedbackReportSaveError,
+        clearSaveFeedback: warrantyFeedbackClearSaveFeedback,
+    } = useSaveFeedback(
+        warrantyRef,
+        warrantyDraft || openedWarranty
+            ? `warranty:${openedWarranty?.id ?? 'new'}`
+            : 'closed',
+    );
+    const warrantyFeedback = {
+        reportSaveError: warrantyFeedbackReportSaveError,
+        clearSaveFeedback: warrantyFeedbackClearSaveFeedback,
+    };
+
     const contractRef = useRef<HTMLDivElement>(null);
+    const {
+        feedbackSummary: contractFeedbackSummary,
+        reportSaveError: contractFeedbackReportSaveError,
+        clearSaveFeedback: contractFeedbackClearSaveFeedback,
+    } = useSaveFeedback(
+        contractRef,
+        contractDraft || openedContract
+            ? `contract:${openedContract?.id ?? 'new'}`
+            : 'closed',
+    );
+    const contractFeedback = {
+        reportSaveError: contractFeedbackReportSaveError,
+        clearSaveFeedback: contractFeedbackClearSaveFeedback,
+    };
+
     const assetSource = useMasterOptions(
         warrantyDraft || contractDraft ? 'aset' : null,
         '',
@@ -237,6 +277,7 @@ export default function WarrantyPage({
                       headers: { 'Idempotency-Key': newIdempotencyKey() },
                       body: JSON.stringify({ ...body, aset_id: draft.aset_id }),
                   }));
+            warrantyFeedback.clearSaveFeedback();
             toast.success('Garansi disimpan.');
             clearRecordTarget();
             setWarrantyDraft(null);
@@ -246,7 +287,10 @@ export default function WarrantyPage({
                 setErrors(caught.validationErrors);
             }
 
-            toastSaveError(caught, 'Garansi belum dapat disimpan.');
+            warrantyFeedback.reportSaveError(
+                caught,
+                'Garansi belum dapat disimpan.',
+            );
         } finally {
             setBusy(false);
         }
@@ -286,6 +330,7 @@ export default function WarrantyPage({
                       headers: { 'Idempotency-Key': newIdempotencyKey() },
                       body: JSON.stringify(body),
                   }));
+            contractFeedback.clearSaveFeedback();
             toast.success('Kontrak servis disimpan.');
             clearRecordTarget();
             setContractDraft(null);
@@ -295,7 +340,10 @@ export default function WarrantyPage({
                 setErrors(caught.validationErrors);
             }
 
-            toastSaveError(caught, 'Kontrak servis belum dapat disimpan.');
+            contractFeedback.reportSaveError(
+                caught,
+                'Kontrak servis belum dapat disimpan.',
+            );
         } finally {
             setBusy(false);
         }
@@ -309,13 +357,19 @@ export default function WarrantyPage({
                 method: 'DELETE',
                 body: JSON.stringify({ version }),
             });
+            pageFeedback.clearSaveFeedback();
             toast.success(done);
             clearRecordTarget();
             refresh();
 
             return true;
         } catch (caught) {
-            toastSaveError(caught, 'Belum dapat diarsipkan.');
+            (openedWarranty && path.endsWith(`/${openedWarranty.id}`)
+                ? warrantyFeedback
+                : openedContract && path.endsWith(`/${openedContract.id}`)
+                  ? contractFeedback
+                  : pageFeedback
+            ).reportSaveError(caught, 'Belum dapat diarsipkan.');
 
             return false;
         } finally {
@@ -509,14 +563,16 @@ export default function WarrantyPage({
     const warrantyEditable = warrantyDraft?.id
         ? can('garansi-aset.update')
         : can('garansi-aset.create');
-    const discardWarranty = () =>
-        !warrantyDirty ||
-        window.confirm('Buang perubahan yang belum disimpan?');
-    const discardContract = () =>
-        !contractDirty ||
-        window.confirm('Buang perubahan yang belum disimpan?');
+    const {
+        request: requestWarrantyTransition,
+        confirmation: warrantyTransitionConfirmation,
+    } = useRecordTransition(warrantyDirty, busy);
+    const {
+        request: requestContractTransition,
+        confirmation: contractTransitionConfirmation,
+    } = useRecordTransition(contractDirty, busy);
     const newWarranty = () => {
-        if (!busy && discardWarranty()) {
+        requestWarrantyTransition(() => {
             clearRecordTarget();
             (() => {
                 setErrors({});
@@ -533,10 +589,10 @@ export default function WarrantyPage({
                     catatan: '',
                 });
             })();
-        }
+        });
     };
     const newContract = () => {
-        if (!busy && discardContract()) {
+        requestContractTransition(() => {
             clearRecordTarget();
             (() => {
                 setErrors({});
@@ -554,19 +610,19 @@ export default function WarrantyPage({
                     aset_ids: [],
                 });
             })();
-        }
+        });
     };
     const closeWarranty = () => {
-        if (!busy && discardWarranty()) {
+        requestWarrantyTransition(() => {
             clearRecordTarget();
             setWarrantyDraft(null);
-        }
+        });
     };
     const closeContract = () => {
-        if (!busy && discardContract()) {
+        requestContractTransition(() => {
             clearRecordTarget();
             setContractDraft(null);
-        }
+        });
     };
     useRecordCardDirty({
         value: warrantyDraft,
@@ -633,8 +689,13 @@ export default function WarrantyPage({
     });
 
     return (
-        <Tabs value={tab} onValueChange={setTab}>
-            <RecordActionBar title="Garansi dan kontrak servis">
+        <Tabs ref={pageFeedbackScopeRef} value={tab} onValueChange={setTab}>
+            {warrantyTransitionConfirmation}
+            {contractTransitionConfirmation}
+            <RecordActionBar
+                feedback={pageFeedbackSummary}
+                title="Garansi dan kontrak servis"
+            >
                 {tab === 'garansi' && can('garansi-aset.create') && (
                     <ActionButton
                         action="create"
@@ -766,13 +827,17 @@ export default function WarrantyPage({
             <TabsContent value="berakhir">
                 <div className="border-b px-5 py-3">
                     <div className="w-full sm:w-48">
-                        <Select
-                            label="Berakhir dalam"
-                            items={WINDOWS}
-                            value={days}
-                            ariaLabel="Rentang hari"
-                            onValueChange={(value) => setDays(value ?? '30')}
-                        />
+                        <FormControl>
+                            <Select
+                                label="Berakhir dalam"
+                                items={WINDOWS}
+                                value={days}
+                                ariaLabel="Rentang hari"
+                                onValueChange={(value) =>
+                                    setDays(value ?? '30')
+                                }
+                            />
+                        </FormControl>
                     </div>
                 </div>
                 {expiring !== null &&
@@ -879,12 +944,13 @@ export default function WarrantyPage({
                             </PageDialogClose>
                         </PageDialogToolbar>
                     )}
+                    {warrantyFeedbackSummary}
                     {warrantyDraft && (
                         <PageDialogBody className="space-y-4">
-                            <Field>
+                            <FormControl data-error-field="aset_id">
                                 {warrantyEditable ? (
-                                    <Select
-                                        {...assetSource.selectProps}
+                                    <RecordLookup
+                                        source={assetSource}
                                         label="Aset"
                                         required
                                         items={assetChoices}
@@ -927,15 +993,21 @@ export default function WarrantyPage({
                                     />
                                 )}
                                 {message('aset_id') && (
-                                    <FieldDescription>
+                                    <FieldError>
                                         {message('aset_id')}
-                                    </FieldDescription>
+                                    </FieldError>
                                 )}
-                            </Field>
-                            <Field>
+                            </FormControl>
+                            <FormControl
+                                data-error-field="vendor_id"
+                                error={message('vendor_id')}
+                                hint={
+                                    'Boleh kosong bila penjaminnya bukan vendor yang tercatat.'
+                                }
+                            >
                                 {warrantyEditable ? (
-                                    <Select
-                                        {...warrantyVendorsSource.selectProps}
+                                    <RecordLookup
+                                        source={warrantyVendorsSource}
                                         label="Penjamin"
                                         items={warrantyVendors.map(
                                             (vendor) => ({
@@ -972,12 +1044,17 @@ export default function WarrantyPage({
                                         }
                                     />
                                 )}
-                                <FieldDescription>
-                                    {message('vendor_id') ??
-                                        'Boleh kosong bila penjaminnya bukan vendor yang tercatat.'}
-                                </FieldDescription>
-                            </Field>
-                            <Field>
+                            </FormControl>
+                            <FormControl
+                                data-error-field="jenis_garansi"
+                                hint={
+                                    <>
+                                        Sebagian berarti hanya bagian tertentu
+                                        yang ditanggung, misalnya suku cadang
+                                        tanpa jasa. Tulis rinciannya di catatan.
+                                    </>
+                                }
+                            >
                                 {warrantyEditable ? (
                                     <Select
                                         label="Cakupan garansi"
@@ -1006,70 +1083,75 @@ export default function WarrantyPage({
                                         }
                                     />
                                 )}
-                                <FieldDescription>
-                                    Sebagian berarti hanya bagian tertentu yang
-                                    ditanggung, misalnya suku cadang tanpa jasa.
-                                    Tulis rinciannya di catatan.
-                                </FieldDescription>
-                            </Field>
-                            <Input
-                                readOnly={!warrantyEditable}
-                                label="No. kartu garansi"
-                                maxLength={80}
-                                value={warrantyDraft.nomor_referensi}
-                                onChange={(event) =>
-                                    setWarrantyDraft({
-                                        ...warrantyDraft,
-                                        nomor_referensi: event.target.value,
-                                    })
-                                }
-                            />
-                            <div className="grid grid-cols-2 gap-3">
+                            </FormControl>
+                            <FormControl data-error-field="nomor_referensi">
                                 <Input
                                     readOnly={!warrantyEditable}
-                                    label="Berlaku mulai"
-                                    type="date"
-                                    required
-                                    value={warrantyDraft.berlaku_mulai}
+                                    label="No. kartu garansi"
+                                    maxLength={80}
+                                    value={warrantyDraft.nomor_referensi}
                                     onChange={(event) =>
                                         setWarrantyDraft({
                                             ...warrantyDraft,
-                                            berlaku_mulai: event.target.value,
+                                            nomor_referensi: event.target.value,
                                         })
                                     }
                                 />
-                                <Input
-                                    readOnly={!warrantyEditable}
-                                    label="Berlaku sampai"
-                                    type="date"
-                                    required
-                                    value={warrantyDraft.berlaku_sampai}
-                                    onChange={(event) =>
-                                        setWarrantyDraft({
-                                            ...warrantyDraft,
-                                            berlaku_sampai: event.target.value,
-                                        })
-                                    }
-                                />
-                            </div>
+                            </FormControl>
+                            <FormGrid>
+                                <FormControl data-error-field="berlaku_mulai">
+                                    <DatePicker
+                                        portalContainer={warrantyRef}
+                                        readOnly={!warrantyEditable}
+                                        label="Berlaku mulai"
+
+                                        required
+                                        value={warrantyDraft.berlaku_mulai}
+                                        onValueChange={(value) =>
+                                            setWarrantyDraft({
+                                                ...warrantyDraft,
+                                                berlaku_mulai: value,
+                                            })
+                                        }
+                                    />
+                                </FormControl>
+                                <FormControl data-error-field="berlaku_sampai">
+                                    <DatePicker
+                                        portalContainer={warrantyRef}
+                                        readOnly={!warrantyEditable}
+                                        label="Berlaku sampai"
+
+                                        required
+                                        value={warrantyDraft.berlaku_sampai}
+                                        onValueChange={(value) =>
+                                            setWarrantyDraft({
+                                                ...warrantyDraft,
+                                                berlaku_sampai: value,
+                                            })
+                                        }
+                                    />
+                                </FormControl>
+                            </FormGrid>
                             {message('berlaku_sampai') && (
                                 <p className="text-destructive text-sm">
                                     {message('berlaku_sampai')}
                                 </p>
                             )}
-                            <Textarea
-                                readOnly={!warrantyEditable}
-                                rows={2}
-                                maxLength={2000}
-                                placeholder="Catatan, misalnya syarat klaim"
-                                value={warrantyDraft.catatan}
-                                onChange={(event) =>
-                                    setWarrantyDraft({
-                                        ...warrantyDraft,
-                                        catatan: event.target.value,
-                                    })
-                                }
-                            />
+                            <FormControl data-error-field="catatan">
+                                <Textarea
+                                    readOnly={!warrantyEditable}
+                                    rows={2}
+                                    maxLength={2000}
+                                    placeholder="Catatan, misalnya syarat klaim"
+                                    value={warrantyDraft.catatan}
+                                    onChange={(event) =>
+                                        setWarrantyDraft({
+                                            ...warrantyDraft,
+                                            catatan: event.target.value,
+                                        })
+                                    }
+                                />
+                            </FormControl>
                         </PageDialogBody>
                     )}
                 </PageDialogContent>
@@ -1163,28 +1245,32 @@ export default function WarrantyPage({
                             )}
                         </PageDialogToolbar>
                     )}
+                    {contractFeedbackSummary}
                     {contractDraft && (
                         <PageDialogBody className="space-y-4">
-                            <div className="grid gap-3 sm:grid-cols-2">
-                                <Input
-                                    label="Nomor kontrak"
-                                    required
-                                    maxLength={80}
-                                    readOnly={
-                                        !can('kontrak-servis.update') &&
-                                        contractDraft.id !== null
-                                    }
-                                    value={contractDraft.nomor_kontrak}
-                                    onChange={(event) =>
-                                        setContractDraft({
-                                            ...contractDraft,
-                                            nomor_kontrak: event.target.value,
-                                        })
-                                    }
-                                />
-                                <Field>
-                                    <Select
-                                        {...contractVendorsSource.selectProps}
+                            <FormGrid>
+                                <FormControl data-error-field="nomor_kontrak">
+                                    <Input
+                                        label="Nomor kontrak"
+                                        required
+                                        maxLength={80}
+                                        readOnly={
+                                            !can('kontrak-servis.update') &&
+                                            contractDraft.id !== null
+                                        }
+                                        value={contractDraft.nomor_kontrak}
+                                        onChange={(event) =>
+                                            setContractDraft({
+                                                ...contractDraft,
+                                                nomor_kontrak:
+                                                    event.target.value,
+                                            })
+                                        }
+                                    />
+                                </FormControl>
+                                <FormControl data-error-field="vendor_id">
+                                    <RecordLookup
+                                        source={contractVendorsSource}
                                         label="Vendor servis"
                                         required
                                         items={contractVendors.map(
@@ -1206,57 +1292,66 @@ export default function WarrantyPage({
                                         }
                                     />
                                     {message('vendor_id') && (
-                                        <FieldDescription>
+                                        <FieldError>
                                             {message('vendor_id')}
-                                        </FieldDescription>
+                                        </FieldError>
                                     )}
-                                </Field>
-                                <Input
-                                    label="Berlaku mulai"
-                                    type="date"
-                                    required
-                                    value={contractDraft.berlaku_mulai}
-                                    onChange={(event) =>
-                                        setContractDraft({
-                                            ...contractDraft,
-                                            berlaku_mulai: event.target.value,
-                                        })
-                                    }
-                                />
-                                <Input
-                                    label="Berlaku sampai"
-                                    type="date"
-                                    required
-                                    value={contractDraft.berlaku_sampai}
-                                    onChange={(event) =>
-                                        setContractDraft({
-                                            ...contractDraft,
-                                            berlaku_sampai: event.target.value,
-                                        })
-                                    }
-                                />
-                                <Input
-                                    label="Nilai kontrak"
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    value={contractDraft.nilai_kontrak}
-                                    onChange={(event) =>
-                                        setContractDraft({
-                                            ...contractDraft,
-                                            nilai_kontrak: event.target.value,
-                                        })
-                                    }
-                                />
-                            </div>
+                                </FormControl>
+                                <FormControl data-error-field="berlaku_mulai">
+                                    <DatePicker
+                                        portalContainer={contractRef}
+                                        label="Berlaku mulai"
+
+                                        required
+                                        value={contractDraft.berlaku_mulai}
+                                        onValueChange={(value) =>
+                                            setContractDraft({
+                                                ...contractDraft,
+                                                berlaku_mulai: value,
+                                            })
+                                        }
+                                    />
+                                </FormControl>
+                                <FormControl data-error-field="berlaku_sampai">
+                                    <DatePicker
+                                        portalContainer={contractRef}
+                                        label="Berlaku sampai"
+
+                                        required
+                                        value={contractDraft.berlaku_sampai}
+                                        onValueChange={(value) =>
+                                            setContractDraft({
+                                                ...contractDraft,
+                                                berlaku_sampai: value,
+                                            })
+                                        }
+                                    />
+                                </FormControl>
+                                <FormControl data-error-field="nilai_kontrak">
+                                    <Input
+                                        label="Nilai kontrak"
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={contractDraft.nilai_kontrak}
+                                        onChange={(event) =>
+                                            setContractDraft({
+                                                ...contractDraft,
+                                                nilai_kontrak:
+                                                    event.target.value,
+                                            })
+                                        }
+                                    />
+                                </FormControl>
+                            </FormGrid>
                             {message('berlaku_sampai') && (
                                 <p className="text-destructive text-sm">
                                     {message('berlaku_sampai')}
                                 </p>
                             )}
-                            <Field>
-                                <MultiSelect
-                                    {...assetSource.selectProps}
+                            <FormControl data-error-field="aset_ids">
+                                <RecordMultiLookup
+                                    source={assetSource}
                                     label="Aset yang ditanggung"
                                     items={assetChoices}
                                     value={contractDraft.aset_ids}
@@ -1270,35 +1365,39 @@ export default function WarrantyPage({
                                     }
                                 />
                                 {message('aset_ids') && (
-                                    <FieldDescription>
+                                    <FieldError>
                                         {message('aset_ids')}
-                                    </FieldDescription>
+                                    </FieldError>
                                 )}
-                            </Field>
-                            <Textarea
-                                rows={3}
-                                maxLength={4000}
-                                placeholder="Cakupan, misalnya kunjungan bulanan, jasa, dan suku cadang yang ditanggung"
-                                value={contractDraft.cakupan}
-                                onChange={(event) =>
-                                    setContractDraft({
-                                        ...contractDraft,
-                                        cakupan: event.target.value,
-                                    })
-                                }
-                            />
-                            <Textarea
-                                rows={2}
-                                maxLength={2000}
-                                placeholder="Keterangan"
-                                value={contractDraft.keterangan}
-                                onChange={(event) =>
-                                    setContractDraft({
-                                        ...contractDraft,
-                                        keterangan: event.target.value,
-                                    })
-                                }
-                            />
+                            </FormControl>
+                            <FormControl data-error-field="cakupan">
+                                <Textarea
+                                    rows={3}
+                                    maxLength={4000}
+                                    placeholder="Cakupan, misalnya kunjungan bulanan, jasa, dan suku cadang yang ditanggung"
+                                    value={contractDraft.cakupan}
+                                    onChange={(event) =>
+                                        setContractDraft({
+                                            ...contractDraft,
+                                            cakupan: event.target.value,
+                                        })
+                                    }
+                                />
+                            </FormControl>
+                            <FormControl data-error-field="keterangan">
+                                <Textarea
+                                    rows={2}
+                                    maxLength={2000}
+                                    placeholder="Keterangan"
+                                    value={contractDraft.keterangan}
+                                    onChange={(event) =>
+                                        setContractDraft({
+                                            ...contractDraft,
+                                            keterangan: event.target.value,
+                                        })
+                                    }
+                                />
+                            </FormControl>
                         </PageDialogBody>
                     )}
                 </PageDialogContent>

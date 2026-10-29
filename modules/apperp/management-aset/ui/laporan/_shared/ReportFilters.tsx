@@ -1,15 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Field, FieldDescription } from '@apperp/ui/field';
+import { useMemo } from 'react';
+import { DatePicker } from '@apperp/ui/date-picker';
+import { FieldDescription } from '@apperp/ui/field';
+import { FormControl } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { MultiSelect } from '@apperp/ui/multi-select';
 import { Select } from '@apperp/ui/select';
-import { api } from '../../api';
+import RecordLookup from '../../_shared/RecordLookup';
+import RecordMultiLookup from '../../_shared/RecordMultiLookup';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
+import { useRecordOptions } from '../../use-record-list';
 
 /*
- * Filter yang dipakai bersama oleh halaman laporan. Halaman memilih filter mana yang ia
- * butuhkan dan menaruhnya di dalam `ReportFilterBar`; tiap filter mengikat satu parameter
- * laporan lewat `bindFilter()` dari `useReportData`.
+ * Kontrol yang dipakai bersama oleh mesin filter laporan. `ReportFilterEngine` memilih kontrol
+ * dari profil, lalu mengikat parameter laporan lewat `useReportData`.
  */
 
 export type FilterProps = {
@@ -23,12 +26,29 @@ export type MultiFilterProps = {
     onChange: (value: string[]) => void;
 };
 
-/**
- * Nilai pilihan "semua". `Select` baru menampilkan label pilihan terpilih bila nilainya
- * tidak kosong, jadi "semua" tidak boleh bernilai string kosong; di luar komponen ini ia
- * tetap diterjemahkan menjadi parameter yang tidak diisi.
- */
-const ALL = '__all__';
+/** Pilihan tunggal dengan nilai bawaan yang juga dipakai server laporan. */
+export function ChoiceFilter({
+    value,
+    onChange,
+    label,
+    items,
+    defaultValue,
+}: FilterProps & {
+    label: string;
+    items: readonly { value: string; label: string }[];
+    defaultValue: string;
+}) {
+    return (
+        <FormControl className="w-full">
+            <Select
+                label={label}
+                items={[...items]}
+                value={value || defaultValue}
+                onValueChange={(next) => onChange(next ?? defaultValue)}
+            />
+        </FormControl>
+    );
+}
 
 type MasterFilterProps = MultiFilterProps & {
     resource: string;
@@ -59,104 +79,53 @@ export function MasterFilter({
     );
 
     return (
-        <Field className="w-full sm:w-56">
-            <MultiSelect
-                {...master.selectProps}
+        <FormControl className="w-full">
+            <RecordMultiLookup
+                source={master}
+                allowCreate={false}
                 label={label}
                 items={items}
                 value={value}
                 onValueChange={onChange}
-                searchPlaceholder={`Cari ${label.toLowerCase()}`}
+                placeholder={`Cari ${label.toLowerCase()}`}
                 emptyMessage={`${label} tidak ditemukan.`}
             />
             {master.error && <FieldDescription>{unavailable}</FieldDescription>}
-        </Field>
-    );
-}
-
-export function AssetGroupFilter(props: MultiFilterProps) {
-    return (
-        <MasterFilter
-            {...props}
-            resource="group-aset"
-            label="Group aset"
-            unavailable="Pilihan group aset tidak dapat dimuat. Minta administrator memberi Anda akses lihat group aset."
-        />
-    );
-}
-
-export function AssetTypeFilter(props: MultiFilterProps) {
-    return (
-        <MasterFilter
-            {...props}
-            resource="jenis-aset"
-            label="Jenis aset"
-            unavailable="Pilihan jenis aset tidak dapat dimuat. Minta administrator memberi Anda akses lihat jenis aset."
-        />
-    );
-}
-
-export function FiscalClassificationFilter(props: MultiFilterProps) {
-    return (
-        <MasterFilter
-            {...props}
-            resource="reference-data/kelompok-harta-fiskal"
-            label="Kelompok harta fiskal"
-            unavailable="Pilihan kelompok harta fiskal tidak dapat dimuat. Minta administrator memberi Anda akses lihat group aset."
-        />
-    );
-}
-
-export function LocationFilter(props: MultiFilterProps) {
-    return (
-        <MasterFilter
-            {...props}
-            resource="lokasi-aset"
-            label="Lokasi"
-            unavailable="Pilihan lokasi tidak dapat dimuat. Minta administrator memberi Anda akses lihat lokasi aset."
-        />
-    );
-}
-
-export function ConditionFilter(props: MultiFilterProps) {
-    return (
-        <MasterFilter
-            {...props}
-            resource="kondisi-aset"
-            label="Kondisi"
-            unavailable="Pilihan kondisi tidak dapat dimuat. Minta administrator memberi Anda akses lihat kondisi aset."
-        />
+        </FormControl>
     );
 }
 
 /**
- * Filter buku penyusutan. Tanpa pilihan, laporan memakai buku komersial saja: buku fiskal
- * menyusutkan aset yang sama, jadi menjumlahkan semua buku membuat totalnya dobel.
+ * Filter buku penyusutan. Laporan keuangan memakai buku komersial bila tidak dipilih;
+ * daftar perolehan memakai seluruh register. Profil menerangkan nilai kosong lewat `emptyLabel`.
  */
-export function DepreciationBookFilter({ value, onChange }: FilterProps) {
+export function DepreciationBookFilter({
+    value,
+    onChange,
+    emptyLabel = 'Semua buku komersial',
+}: FilterProps & { emptyLabel?: string }) {
     const master = useMasterOptions('buku-penyusutan', '', value ?? '');
     const items = useMemo(
         () => [
-            { value: ALL, label: 'Semua buku komersial' },
+            { value: '', label: emptyLabel },
             ...master.options.map((option) => ({
                 value: option.id,
                 label: optionLabel(option),
             })),
         ],
-        [master.options],
+        [master.options, emptyLabel],
     );
 
     return (
-        <Field className="w-full sm:w-52">
-            <Select
-                {...master.selectProps}
+        <FormControl className="w-full">
+            <RecordLookup
+                source={master}
+                allowCreate={false}
                 label="Buku penyusutan"
                 items={items}
-                value={value || ALL}
-                onValueChange={(next) =>
-                    onChange(next === null || next === ALL ? '' : next)
-                }
-                searchPlaceholder="Cari buku penyusutan"
+                value={value || null}
+                onValueChange={(next) => onChange(next ?? '')}
+                placeholder="Cari buku penyusutan"
                 emptyMessage="Buku penyusutan tidak ditemukan."
             />
             {master.error && (
@@ -165,29 +134,7 @@ export function DepreciationBookFilter({ value, onChange }: FilterProps) {
                     administrator memberi Anda akses lihat buku penyusutan.
                 </FieldDescription>
             )}
-        </Field>
-    );
-}
-
-export function OrganizationUnitFilter(props: MultiFilterProps) {
-    return (
-        <MasterFilter
-            {...props}
-            resource="reference-data/unit-kerja"
-            label="Unit organisasi"
-            unavailable="Pilihan unit organisasi tidak dapat dimuat."
-        />
-    );
-}
-
-export function PersonFilter(props: MultiFilterProps) {
-    return (
-        <MasterFilter
-            {...props}
-            resource="reference-data/anggota"
-            label="Penanggung jawab"
-            unavailable="Pilihan penanggung jawab tidak dapat dimuat."
-        />
+        </FormControl>
     );
 }
 
@@ -207,118 +154,79 @@ const assetLabel = (asset: AssetOption) =>
  * mengetik kode atau nama, dan `GET /aset?q=` yang mencarikannya.
  */
 export function AssetFilter({ value, onChange }: FilterProps) {
-    const [query, setQuery] = useState('');
-    const [results, setResults] = useState<AssetOption[]>([]);
-    const [searching, setSearching] = useState(false);
-    const [failed, setFailed] = useState(false);
-    // Aset terpilih disimpan tersendiri supaya labelnya tetap tampil walau hasil pencarian
-    // berikutnya tidak lagi memuatnya.
-    const [selected, setSelected] = useState<AssetOption | null>(null);
-    const timer = useRef<number | undefined>(undefined);
-    const latest = useRef(0);
-
-    useEffect(() => () => window.clearTimeout(timer.current), []);
-
-    // Satu permintaan setelah pengguna berhenti mengetik. Jawaban yang datang terlambat
-    // untuk kata kunci lama dibuang supaya tidak menimpa hasil yang lebih baru.
-    const search = (next: string) => {
-        window.clearTimeout(timer.current);
-        const q = next.trim();
-        setQuery(q);
-
-        if (q === '') {
-            setResults([]);
-            setSearching(false);
-
-            return;
-        }
-
-        setSearching(true);
-        timer.current = window.setTimeout(() => {
-            const request = ++latest.current;
-
-            api<{ data: AssetOption[] }>(`/aset?q=${encodeURIComponent(q)}`)
-                .then((response) => {
-                    if (request === latest.current) {
-                        setResults(response.data);
-                        setFailed(false);
-                        setSearching(false);
-                    }
-                })
-                .catch(() => {
-                    if (request === latest.current) {
-                        setResults([]);
-                        setFailed(true);
-                        setSearching(false);
-                    }
-                });
-        }, 250);
-    };
-
-    const current = selected && selected.id === value ? selected : null;
-    const items = useMemo(() => {
-        const shown =
-            current && !results.some((asset) => asset.id === current.id)
-                ? [current, ...results]
-                : results;
-
-        return [
-            { value: ALL, label: 'Semua aset' },
-            ...shown.map((asset) => ({
-                value: asset.id,
-                label: assetLabel(asset),
-            })),
-        ];
-    }, [current, results]);
+    const source = useRecordOptions<AssetOption>(
+        '/aset',
+        assetLabel,
+        value ?? '',
+    );
 
     return (
-        <Field className="w-full sm:w-64">
-            <Select
+        <FormControl className="w-full" error={source.error}>
+            <RecordLookup
+                source={source}
+                allowCreate={false}
                 label="Aset"
-                items={items}
-                value={value || ALL}
-                onSearchChange={search}
-                onValueChange={(next) => {
-                    const id = next === null || next === ALL ? '' : next;
-
-                    setSelected(
-                        id === ''
-                            ? null
-                            : (results.find((asset) => asset.id === id) ??
-                                  current),
-                    );
-                    onChange(id);
-                }}
-                searchPlaceholder="Ketik kode atau nama aset"
+                value={value || null}
+                items={[
+                    { value: '', label: 'Semua aset' },
+                    ...source.options.map((asset) => ({
+                        value: asset.id,
+                        label: assetLabel(asset),
+                    })),
+                ]}
+                onValueChange={(next) => onChange(next ?? '')}
+                placeholder="Ketik kode atau nama aset"
                 emptyMessage={
-                    searching
+                    source.loading
                         ? 'Mencari aset…'
-                        : query
+                        : source.selectProps.searchValue
                           ? 'Aset tidak ditemukan.'
                           : 'Ketik kode atau nama aset untuk mencarinya.'
                 }
             />
-            {failed && (
-                <FieldDescription>
-                    Daftar aset tidak dapat dimuat. Minta administrator memberi
-                    Anda akses lihat aset.
-                </FieldDescription>
-            )}
-        </Field>
+        </FormControl>
     );
 }
 
-/** Satu bulan, untuk laporan yang dihitung per periode seperti penyusutan. */
-export function PeriodFilter({ value, onChange }: FilterProps) {
+/** Filter bulan; dipakai untuk periode penyusutan dan rentang proyeksi. */
+export function MonthFilter({
+    label,
+    value,
+    onChange,
+}: FilterProps & { label: string }) {
     return (
-        <div className="w-full sm:w-44">
+        <FormControl className="w-full">
             <Input
-                label="Periode"
+                label={label}
                 type="month"
                 value={value ?? ''}
                 onChange={(event) => onChange(event.target.value)}
             />
-        </div>
+        </FormControl>
+    );
+}
+
+/** Filter banyak pilihan statis, seperti status proses laporan. */
+export function OptionsFilter({
+    label,
+    items,
+    value,
+    onChange,
+}: MultiFilterProps & {
+    label: string;
+    items: readonly { value: string; label: string }[];
+}) {
+    return (
+        <FormControl className="w-full">
+            <MultiSelect
+                label={label}
+                items={[...items]}
+                value={value}
+                onValueChange={onChange}
+                searchPlaceholder={`Cari ${label.toLowerCase()}`}
+                emptyMessage={`${label} tidak ditemukan.`}
+            />
+        </FormControl>
     );
 }
 
@@ -329,13 +237,12 @@ export function DateFilter({
     onChange,
 }: FilterProps & { label: string }) {
     return (
-        <div className="w-full sm:w-44">
-            <Input
+        <FormControl className="w-full">
+            <DatePicker
                 label={label}
-                type="date"
                 value={value ?? ''}
-                onChange={(event) => onChange(event.target.value)}
+                onValueChange={onChange}
             />
-        </div>
+        </FormControl>
     );
 }

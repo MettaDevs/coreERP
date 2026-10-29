@@ -8,6 +8,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@apperp/ui/card';
+import { DatePicker } from '@apperp/ui/date-picker';
 
 import {
     Empty,
@@ -15,7 +16,8 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
-import { Field } from '@apperp/ui/field';
+
+import { FormControl } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import {
     PageDialog,
@@ -23,13 +25,10 @@ import {
     PageDialogToolbar,
     PageDialogBody,
 } from '@apperp/ui/page-dialog';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
 
-import {
-    api,
-    errorMessage,
-    newIdempotencyKey,
-    saveErrorMessage,
-} from '../../api';
+import { api, errorMessage, newIdempotencyKey } from '../../api';
+import { useSaveFeedback } from '../../use-save-feedback';
 
 type Context = { legal_entity_id: string | null; org_unit_id: string | null };
 type Record = {
@@ -54,6 +53,8 @@ export default function LifecycleDocumentPage({
     context: Context;
     config: LifecycleConfig;
 }) {
+    const { scopeRef, feedbackSummary, reportSaveError, clearSaveFeedback } =
+        useSaveFeedback(undefined, config.resource);
     const [records, setRecords] = useState<Record[]>([]);
     const [open, setOpen] = useState(false);
     const [error, setError] = useState('');
@@ -73,7 +74,8 @@ export default function LifecycleDocumentPage({
     }, [load]);
     async function save(form: HTMLFormElement) {
         if (!context.legal_entity_id || !context.org_unit_id) {
-            setError(
+            reportSaveError(
+                null,
                 'Pilih perusahaan dan unit kerja aktif di CoreERP sebelum membuat dokumen.',
             );
 
@@ -97,34 +99,33 @@ export default function LifecycleDocumentPage({
                     keterangan: values.get('keterangan') || null,
                 }),
             });
+            clearSaveFeedback();
             setOpen(false);
             form.reset();
             await load();
         } catch (caught) {
-            setError(saveErrorMessage(caught, 'Dokumen belum dapat disimpan.'));
+            reportSaveError(caught, 'Dokumen belum dapat disimpan.');
         } finally {
             setSaving(false);
         }
     }
 
-    const closeDocument = () => {
-        if (
-            !saving &&
-            (!draftDirty ||
-                window.confirm('Buang perubahan yang belum disimpan?'))
-        ) {
-            setOpen(false);
-        }
-    };
+    const {
+        request: requestDocumentTransition,
+        confirmation: documentTransitionConfirmation,
+    } = useRecordTransition(draftDirty, saving);
+    const closeDocument = () => requestDocumentTransition(() => setOpen(false));
 
     return (
         <Card className="min-h-full rounded-none border-0 shadow-none">
+            {documentTransitionConfirmation}
             <CardHeader className="border-b">
                 <CardTitle>{config.title}</CardTitle>
                 <CardAction>
                     <ActionButton
                         action="create"
                         onClick={() => {
+                            clearSaveFeedback();
                             setDraftDirty(false);
                             setOpen(true);
                         }}
@@ -178,8 +179,13 @@ export default function LifecycleDocumentPage({
                     }
                 }}
             >
-                <PageDialogContent title={config.title} busy={saving}>
+                <PageDialogContent
+                    ref={scopeRef}
+                    title={config.title}
+                    busy={saving}
+                >
                     <form
+                        noValidate
                         onChangeCapture={() => setDraftDirty(true)}
                         className="flex min-h-0 flex-1 flex-col"
                         onSubmit={(event) => {
@@ -200,26 +206,27 @@ export default function LifecycleDocumentPage({
                                 onClick={closeDocument}
                             />
                         </PageDialogToolbar>
+                        {feedbackSummary}
                         <PageDialogBody className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
-                            <Field>
-                                <Input
+                            <FormControl>
+                                <DatePicker
                                     name="tanggal"
                                     label="Tanggal"
-                                    type="date"
+
                                     required
                                 />
-                            </Field>
+                            </FormControl>
                             {config.needsAset && (
-                                <Field>
+                                <FormControl>
                                     <Input
                                         name="aset_id"
                                         label="ID aset"
                                         required
                                     />
-                                </Field>
+                                </FormControl>
                             )}
                             {config.financial && (
-                                <Field>
+                                <FormControl>
                                     <Input
                                         name="nilai"
                                         label="Nilai usulan"
@@ -227,11 +234,11 @@ export default function LifecycleDocumentPage({
                                         min="0"
                                         step="0.01"
                                     />
-                                </Field>
+                                </FormControl>
                             )}
-                            <Field>
+                            <FormControl>
                                 <Input name="keterangan" label="Keterangan" />
-                            </Field>
+                            </FormControl>
                         </PageDialogBody>
                     </form>
                 </PageDialogContent>

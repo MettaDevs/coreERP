@@ -1,4 +1,5 @@
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
+import { FormGrid } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import type { PabrikanAsetDetail } from './pabrikanAsetDetail';
 
@@ -34,7 +35,7 @@ export default function PabrikanAsetCounters({
     }
 
     return (
-        <div className="grid gap-4 pt-1 sm:grid-cols-2">
+        <FormGrid>
             <Input
                 id="jumlah-model"
                 label="Model"
@@ -47,6 +48,6 @@ export default function PabrikanAsetCounters({
                 value={detail.aset_count ?? '–'}
                 disabled
             />
-        </div>
+        </FormGrid>
     );
 }

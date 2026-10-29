@@ -34,6 +34,7 @@ use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\BukuAset;
 use Modules\Apperp\ManagementAset\Services\AssetNumberSequenceIssuer;
 use Modules\Apperp\ManagementAset\Services\MasterDraftDetails;
 use Modules\Apperp\ManagementAset\Services\NumberSequenceException;
+use Modules\Apperp\ManagementAset\Support\CreationPayload;
 use Modules\Apperp\ManagementAset\Support\MasterChild;
 use Modules\Apperp\ManagementAset\Support\MasterParent;
 use RuntimeException;
@@ -192,14 +193,18 @@ abstract class MasterDataController extends Controller
         validator(['key' => $creationKey], ['key' => ['required', 'string', 'max:133', 'regex:/^[A-Za-z0-9._:-]+$/']])->validate();
         $tenantId = $this->tenantId($request);
         $data = validator($input, $this->writeRules($tenantId, creating: true))->validate();
-        $details = $input['details'] ?? [];
+        $details = $data['details'] ?? [];
+        unset($data['details']);
         $payload = $this->payload($data);
         if (($manualValue = $this->trimmedOrNull($data['kode'] ?? null)) !== null) {
             $payload['kode'] = $manualValue;
         }
 
+        $creationHash = MasterDraftDetails::supports($this->resource())
+            ? CreationPayload::hash(['header' => (new ($this->model()))->forceFill($payload)->only(array_keys($payload)), 'details' => $details])
+            : null;
         if ($existing = $this->creationKeyQuery($creationKey)->first()) {
-            return $this->replay($existing, $payload);
+            return $this->replay($existing, $payload, $creationHash, $details !== []);
         }
         $this->afterWriteValidation($data, $tenantId, creating: true);
 
@@ -212,7 +217,7 @@ abstract class MasterDataController extends Controller
             //
             // Sekarang keduanya berjalan pada koneksi yang sama, jadi keduanya batal bersama.
             // Ini keuntungan yang membenarkan seluruh pemindahan ke satu runtime.
-            $record = DB::transaction(function () use ($request, $numbers, $tenantId, $creationKey, $payload, $details) {
+            $record = DB::transaction(function () use ($request, $numbers, $tenantId, $creationKey, $payload, $details, $creationHash) {
                 $code = $numbers->issue(
                     static::APP_ID.'.'.$this->resource(),
                     $tenantId,
@@ -221,12 +226,17 @@ abstract class MasterDataController extends Controller
                 );
 
                 // Dibaca ulang supaya jawaban membawa versi awal yang diisi database.
-                $record = $this->newQuery()->create([
+                $record = $this->newQuery()->make([
                     'tenant_id' => $tenantId,
                     'creation_key' => $creationKey,
                     'kode' => $code,
                     ...$payload,
-                ])->refresh();
+                ]);
+                if ($creationHash !== null) {
+                    $record->forceFill(['creation_payload_hash' => $creationHash]);
+                }
+                $record->save();
+                $record->refresh();
                 app(MasterDraftDetails::class)->save($request, $numbers, $this->resource(), $record, $details);
 
                 return $record->refresh();
@@ -243,7 +253,7 @@ abstract class MasterDataController extends Controller
                 throw $exception;
             }
 
-            return $this->replay($existing, $payload);
+            return $this->replay($existing, $payload, $creationHash, $details !== []);
         }
 
         return response()->json(['data' => $this->present($record)], 201, [
@@ -271,21 +281,33 @@ abstract class MasterDataController extends Controller
 
     public function update(Request $request, string $id): JsonResponse
     {
+        return $this->updatePayload($request, $id, $request->all(), null);
+    }
+
+    /** @param array<string, mixed> $input */
+    public function updatePayload(Request $request, string $id, array $input, ?int $expected): JsonResponse
+    {
         $this->requirePermission($request, 'update');
         $tenantId = $this->tenantId($request);
-        $data = $request->validate($this->writeRules($tenantId, creating: false));
-        $expected = RowVersion::expected($request);
+        $data = validator($input, $this->writeRules($tenantId, creating: false))->validate();
+        $expected ??= RowVersion::expected($request);
+        $details = $data['details'] ?? [];
+        unset($data['details']);
 
-        return DB::transaction(function () use ($request, $id, $data, $tenantId, $expected): JsonResponse {
+        return DB::transaction(function () use ($request, $id, $data, $details, $tenantId, $expected): JsonResponse {
             // Klaim versi sebelum pemeriksaan apa pun: ia memegang kunci baris sampai transaksi
             // selesai, jadi pemeriksaan sesudahnya membaca keadaan yang tidak dapat disela
             // penyimpanan lain. Record yang dibaca sebelum klaim tetap sahih, sebab klaim hanya
             // berhasil bila versinya — dan dengan itu isinya — belum berubah sejak dibaca.
+            app(MasterDraftDetails::class)->lockBeforeOwner($request, $this->resource(), $id, $details);
             $record = $this->find($request, $id);
             RowVersion::claim($record, $expected);
             $this->afterWriteValidation($data, $tenantId, creating: false, record: $record);
             $this->rejectParentCycle($record, $data);
             $record->update($this->changes($data));
+            if ($details !== []) {
+                app(MasterDraftDetails::class)->save($request, app(AssetNumberSequenceIssuer::class), $this->resource(), $record, $details, updating: true);
+            }
 
             // Dibaca ulang: versi dinaikkan trigger di database, dan induk boleh berpindah
             // sehingga relasi lama tidak boleh ikut disajikan.
@@ -295,8 +317,13 @@ abstract class MasterDataController extends Controller
 
     public function destroy(Request $request, string $id): JsonResponse
     {
+        return $this->destroyPayload($request, $id, null);
+    }
+
+    public function destroyPayload(Request $request, string $id, ?int $expected): JsonResponse
+    {
         $this->requirePermission($request, 'archive');
-        $expected = RowVersion::expected($request);
+        $expected ??= RowVersion::expected($request);
 
         return DB::transaction(function () use ($request, $id, $expected): JsonResponse {
             $record = $this->find($request, $id);
@@ -426,6 +453,7 @@ abstract class MasterDataController extends Controller
             'nama' => [...$required, 'string', 'max:150'],
             'keterangan' => [...$optional, 'string', 'max:2000'],
             'aktif' => ['sometimes', 'boolean'],
+            ...MasterDraftDetails::rules($this->resource()),
         ];
 
         foreach ($this->parentMasters() as $parent) {
@@ -521,12 +549,16 @@ abstract class MasterDataController extends Controller
      * @param  TModel  $record
      * @param  array<string, mixed>  $payload
      */
-    private function replay(MasterData $record, array $payload): JsonResponse
+    private function replay(MasterData $record, array $payload, ?string $creationHash = null, bool $hasDetails = false): JsonResponse
     {
         $model = $this->model();
         $normalized = (new $model)->forceFill($payload)->only(array_keys($payload));
 
-        if ($record->only(array_keys($payload)) !== $normalized) {
+        $storedHash = $creationHash === null ? null : $record->getAttribute('creation_payload_hash');
+        $conflict = $creationHash !== null && $storedHash !== null
+            ? ! hash_equals((string) $storedHash, $creationHash)
+            : ($hasDetails || $record->only(array_keys($payload)) !== $normalized);
+        if ($conflict) {
             return response()->json(['error' => [
                 'code' => 'idempotency_conflict',
                 'message' => 'Kunci permintaan sudah dipakai untuk data yang berbeda.',

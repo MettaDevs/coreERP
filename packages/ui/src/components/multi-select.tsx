@@ -143,9 +143,8 @@ function MultiSelect({
                     aria-label={ariaLabel ?? label}
                     className={cn(
                         label
-                            ? 'dark:border-input dark:bg-input/30 dark:text-foreground flex h-10 w-full items-center justify-between gap-2 rounded-[4px] border border-[#d9dfe7] bg-white px-3 py-2 text-left text-sm text-[#1f2937] shadow-none outline-none transition-colors focus:border-[#0284c7] focus:ring-2 focus:ring-[#0284c7]/15 disabled:cursor-not-allowed disabled:opacity-50 data-[popup-open]:border-[#0284c7] data-[popup-open]:ring-2 data-[popup-open]:ring-[#0284c7]/15 [&>[data-slot=combobox-trigger-icon]]:ml-auto [&>[data-slot=combobox-trigger-icon]]:shrink-0'
+                            ? 'dark:border-input dark:bg-input/30 dark:text-foreground flex h-9 w-full items-center justify-between gap-2 rounded-[4px] border border-[#d9dfe7] bg-white px-3 py-1 text-left text-sm text-[#1f2937] shadow-none outline-none transition-colors focus:border-[#0284c7] focus:ring-2 focus:ring-[#0284c7]/15 disabled:cursor-not-allowed disabled:opacity-50 data-[popup-open]:border-[#0284c7] data-[popup-open]:ring-2 data-[popup-open]:ring-[#0284c7]/15 [&>[data-slot=combobox-trigger-icon]]:ml-auto [&>[data-slot=combobox-trigger-icon]]:shrink-0'
                             : 'border-input shadow-xs focus-visible:border-ring focus-visible:ring-ring/50 data-[placeholder]:text-muted-foreground dark:bg-input/30 flex min-h-9 w-full items-center justify-between rounded-md border bg-transparent px-3 py-1.5 text-sm outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50',
-                        label && hasValue && 'pt-3',
                         className,
                     )}
                 >

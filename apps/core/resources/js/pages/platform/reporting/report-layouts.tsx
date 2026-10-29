@@ -12,25 +12,24 @@ import {
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@apperp/ui/card';
-import {
     CollapsibleSection,
     CollapsibleSectionGroup,
 } from '@apperp/ui/collapsible-section';
-import { DataTable } from '@apperp/ui/data-table';
+import { DataTable, DataTableText } from '@apperp/ui/data-table';
 import type {
     DataTableColumn,
     DataTableRowAction,
 } from '@apperp/ui/data-table';
-
+import {
+    Empty,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyTitle,
+} from '@apperp/ui/empty';
 import { Field, FieldDescription, FieldLabel } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
-import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
+import { ListPageLayout } from '@apperp/ui/list-page-layout';
+import { MasterDetailLayout } from '@apperp/ui/master-detail-layout';
 import {
     PageDialog,
     PageDialogContent,
@@ -46,7 +45,7 @@ import { Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDateTimeFormat } from '@/hooks/use-date-time';
-import { toastSaveError } from '@/lib/core-api';
+import { useSaveFeedback } from '@/hooks/use-save-feedback';
 import type {
     DefaultVersions,
     Layout,
@@ -76,7 +75,7 @@ type Scope = 'tenant' | 'legal_entity';
 function warnUnknown(list: string[]) {
     if (list.length) {
         toast.warning(
-            `Placeholder tidak dikenal dan akan dicetak kosong: ${list.map((p) => `\${${p}}`).join(', ')}`,
+            `Variabel tidak dikenal dan akan menghasilkan nilai kosong saat laporan dibuat: ${list.map((p) => `\${${p}}`).join(', ')}`,
             { duration: 10_000 },
         );
     }
@@ -99,6 +98,15 @@ export default function ReportLayouts({
 }: Props) {
     const formatTime = useDateTimeFormat();
     const [code, setCode] = useState(reports[0]?.code ?? '');
+    const {
+        report: saveReport,
+        clear: saveClear,
+        summary: saveSummary,
+        scopeRef: saveScopeRef,
+    } = useSaveFeedback<HTMLDivElement>(code);
+
+    const [showDetail, setShowDetail] = useState(false);
+    const [reportSearch, setReportSearch] = useState('');
     const [layouts, setLayouts] = useState<Layout[]>([]);
     const [defaultRef, setDefaultRef] = useState('');
     const [defaultVersions, setDefaultVersions] = useState<DefaultVersions>({
@@ -107,41 +115,89 @@ export default function ReportLayouts({
     });
     const [fields, setFields] = useState<ReportField[]>([]);
     const [error, setError] = useState('');
+    const [loading, setLoading] = useState(Boolean(reports[0]));
     const [uploading, setUploading] = useState(false);
     const [removing, setRemoving] = useState<Layout | null>(null);
     const replaceInput = useRef<HTMLInputElement>(null);
     const [replacing, setReplacing] = useState<Layout | null>(null);
+    const loadSequence = useRef(0);
 
     const load = useCallback(async () => {
+        const sequence = ++loadSequence.current;
+
         if (!code) {
+            setLayouts([]);
+            setFields([]);
+            setDefaultRef('');
+            setLoading(false);
+
             return;
         }
+
+        setLoading(true);
 
         try {
             const [result, definition] = await Promise.all([
                 listLayouts(code),
                 listFields(code),
             ]);
+
+            if (sequence !== loadSequence.current) {
+                return;
+            }
+
             setLayouts(result.data);
             setDefaultRef(result.meta.default_ref);
             setDefaultVersions(result.meta.default_versions);
             setFields(definition.data);
             setError('');
         } catch (caught) {
+            if (sequence !== loadSequence.current) {
+                return;
+            }
+
             setError(
                 caught instanceof Error && caught.message
                     ? caught.message
                     : 'Layout belum dapat dimuat.',
             );
+        } finally {
+            if (sequence === loadSequence.current) {
+                setLoading(false);
+            }
         }
     }, [code]);
 
     useEffect(() => {
         // Dimuat di microtask supaya effect tidak memanggil setState secara sinkron.
         void Promise.resolve().then(load);
+
+        return () => {
+            loadSequence.current += 1;
+        };
     }, [load]);
 
+    const selectReport = (selected: Report) => {
+        setShowDetail(true);
+
+        if (selected.code === code) {
+            return;
+        }
+
+        loadSequence.current += 1;
+        saveClear();
+        setCode(selected.code);
+        setLoading(true);
+        setLayouts([]);
+        setDefaultRef('');
+        setDefaultVersions({ tenant: 0, legal_entity: null });
+        setFields([]);
+        setError('');
+    };
+
     const makeDefault = async (layout: Layout | null, scope: Scope) => {
+        saveClear();
+
         try {
             const result = await setDefaultLayout(
                 code,
@@ -158,7 +214,7 @@ export default function ReportLayouts({
                     : 'Pilihan default dihapus; laporan kembali memakai layout bawaan.',
             );
         } catch (caught) {
-            toastSaveError(caught, 'Default belum dapat diubah.');
+            saveReport(caught, 'Default belum dapat diubah.');
         }
     };
 
@@ -167,13 +223,15 @@ export default function ReportLayouts({
             return;
         }
 
+        saveClear();
+
         try {
             await deleteLayout(code, removing.ref, removing.version ?? 0);
             toast.success(`${removing.name} dihapus.`);
             setRemoving(null);
             await load();
         } catch (caught) {
-            toastSaveError(caught, 'Layout belum dapat dihapus.');
+            saveReport(caught, 'Layout belum dapat dihapus.');
         }
     };
 
@@ -181,6 +239,8 @@ export default function ReportLayouts({
         if (!file || !replacing) {
             return;
         }
+
+        saveClear();
 
         try {
             const result = await replaceLayoutFile(
@@ -193,7 +253,7 @@ export default function ReportLayouts({
             toast.success(`Berkas ${replacing.name} diganti.`);
             await load();
         } catch (caught) {
-            toastSaveError(caught, 'Berkas belum dapat diganti.');
+            saveReport(caught, 'Berkas belum dapat diganti.');
         } finally {
             setReplacing(null);
 
@@ -320,7 +380,34 @@ export default function ReportLayouts({
         },
     ];
 
+    const reportColumns: DataTableColumn<Report>[] = [
+        {
+            id: 'report',
+            header: 'Laporan',
+            cell: (item) => (
+                <div className="min-w-0 space-y-0.5">
+                    <DataTableText>{item.name}</DataTableText>
+                    <DataTableText>{item.app_name}</DataTableText>
+                    {item.description && (
+                        <DataTableText>{item.description}</DataTableText>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                        {item.builtin_layouts.length} layout bawaan
+                    </p>
+                </div>
+            ),
+            sortValue: (item) => item.name,
+        },
+    ];
+
     const report = reports.find((item) => item.code === code);
+    const normalizedSearch = reportSearch.trim().toLocaleLowerCase('id');
+    const visibleReports = reports.filter((item) =>
+        [item.code, item.name, item.app_name, item.description ?? '']
+            .join(' ')
+            .toLocaleLowerCase('id')
+            .includes(normalizedSearch),
+    );
     const rowActions = layouts.length
         ? actionsFor(
               layouts.find((layout) => layout.source === 'uploaded') ??
@@ -331,124 +418,193 @@ export default function ReportLayouts({
     return (
         <>
             <Head title="Layout laporan" />
-            <main className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 p-6">
-                <RecordActionBar>
-                    <h1 className="text-sm font-semibold">Layout laporan</h1>
-                    <CardDescription>
-                        Tampilan dokumen cetak dan ekspor dari semua aplikasi,
-                        per laporan dan per perusahaan.
-                    </CardDescription>
-                    {canManage && code && (
-                        <ActionButton
-                            action="create"
-                            type="button"
-                            onClick={() => setUploading(true)}
-                        />
-                    )}
-                </RecordActionBar>
-                {error && <p className="text-sm text-destructive">{error}</p>}
-                {reports.length === 0 ? (
-                    <Card>
-                        <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                            Belum ada aplikasi terpasang yang menyediakan
-                            laporan.
-                        </CardContent>
-                    </Card>
-                ) : (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Layout per laporan</CardTitle>
-                            <CardDescription>
-                                Unduh layout bawaan, ubah tampilannya di Word
-                                atau Excel tanpa mengganti placeholder, lalu
-                                unggah sebagai layout baru dan jadikan default.
-                                Layout bawaan ikut diperbarui saat aplikasi
-                                diperbarui; layout unggahan tetap milik Anda.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4 px-0">
-                            <div className="flex flex-col gap-3 px-6 sm:flex-row">
-                                <div className="w-full sm:w-80">
-                                    <NativeSelect
-                                        label="Laporan"
-                                        value={code}
-                                        onChange={(event) =>
-                                            setCode(event.target.value)
-                                        }
-                                    >
-                                        {reports.map((item) => (
-                                            <NativeSelectOption
-                                                key={item.code}
-                                                value={item.code}
-                                            >
-                                                {item.app_name} · {item.name}
-                                            </NativeSelectOption>
-                                        ))}
-                                    </NativeSelect>
-                                </div>
+            <ListPageLayout
+                ref={saveScopeRef}
+                header={
+                    <RecordActionBar
+                        title="Layout laporan"
+                        feedback={saveSummary}
+                    >
+                        {canManage && code && (
+                            <ActionButton
+                                action="create"
+                                type="button"
+                                onClick={() => setUploading(true)}
+                            />
+                        )}
+                    </RecordActionBar>
+                }
+            >
+                <MasterDetailLayout
+                    detailOpen={showDetail}
+                    onDetailOpenChange={setShowDetail}
+                    list={
+                        <aside className="flex h-full min-h-0 min-w-0 flex-col">
+                            <div className="shrink-0 border-b p-3">
+                                <Input
+                                    type="search"
+                                    aria-label="Cari laporan"
+                                    placeholder="Cari nama laporan atau aplikasi..."
+                                    value={reportSearch}
+                                    onChange={(event) =>
+                                        setReportSearch(event.target.value)
+                                    }
+                                />
                             </div>
                             <DataTable
-                                columns={columns}
-                                data={layouts}
-                                getRowKey={(layout) => layout.ref}
-                                actions={rowActions}
-                                getRowLabel={(layout) => layout.name}
-                                onRowAction={runAction}
-                                emptyMessage="Belum ada layout untuk laporan ini."
+                                columns={reportColumns}
+                                data={visibleReports}
+                                getRowKey={(item) => item.code}
+                                getRowLabel={(item) => item.name}
+                                showRowNumbers={false}
+                                activeRowKey={code || undefined}
+                                rowActivation="single-click"
+                                onRowClick={selectReport}
+                                emptyMessage={
+                                    reports.length
+                                        ? 'Tidak ada laporan yang cocok.'
+                                        : 'Belum ada aplikasi yang menyediakan laporan.'
+                                }
                             />
-                            {defaultRef && canManage && (
-                                <div className="px-6">
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() =>
-                                            void makeDefault(
-                                                null,
-                                                legalEntity
-                                                    ? 'legal_entity'
-                                                    : 'tenant',
-                                            )
-                                        }
-                                    >
-                                        Kembalikan default ke layout bawaan
-                                    </Button>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                )}
-
-                {report && (
-                    <CollapsibleSectionGroup>
-                        <CollapsibleSection
-                            value="placeholders"
-                            title="Placeholder yang tersedia"
-                            summary={`${fields.length} placeholder untuk ${report.name}`}
-                        >
-                            <p className="mb-3 text-sm text-muted-foreground">
-                                Tulis placeholder persis seperti ini di dalam
-                                layout. Kolom yang punya nama tabel diulang per
-                                baris: letakkan di satu baris tabel Word, atau
-                                satu baris lembar Excel, dan baris itu akan
-                                digandakan.
-                            </p>
-                            <div className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2 lg:grid-cols-3">
-                                {fields.map((field) => (
-                                    <div
-                                        key={field.key}
-                                        className="flex items-baseline gap-2"
-                                    >
-                                        <code className="rounded bg-muted px-1 text-xs">{`\${${field.key}}`}</code>
-                                        <span className="truncate text-muted-foreground">
-                                            {field.label}
-                                        </span>
+                        </aside>
+                    }
+                >
+                    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+                        {report ? (
+                            <>
+                                <header className="shrink-0 border-b px-5 py-4">
+                                    <p className="text-sm text-muted-foreground">
+                                        {report.app_name}
+                                    </p>
+                                    <h2 className="text-lg font-semibold">
+                                        {report.name}
+                                    </h2>
+                                    {report.description && (
+                                        <p className="mt-1 text-sm text-muted-foreground">
+                                            {report.description}
+                                        </p>
+                                    )}
+                                </header>
+                                <div className="flex min-w-0 shrink-0 flex-col p-4">
+                                    <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2">
+                                        <div>
+                                            <h3 className="text-sm font-semibold">
+                                                Layout tersedia
+                                            </h3>
+                                            <p className="text-sm text-muted-foreground">
+                                                Layout bawaan dan unggahan untuk
+                                                laporan ini.
+                                            </p>
+                                        </div>
+                                        {defaultRef &&
+                                            canManage &&
+                                            !loading && (
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        void makeDefault(
+                                                            null,
+                                                            legalEntity
+                                                                ? 'legal_entity'
+                                                                : 'tenant',
+                                                        )
+                                                    }
+                                                >
+                                                    Kembalikan default ke layout
+                                                    bawaan
+                                                </Button>
+                                            )}
                                     </div>
-                                ))}
-                            </div>
-                        </CollapsibleSection>
-                    </CollapsibleSectionGroup>
-                )}
+                                    {error && (
+                                        <div
+                                            role="alert"
+                                            className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-md border border-destructive/30 px-3 py-2 text-sm"
+                                        >
+                                            <span>{error}</span>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => void load()}
+                                            >
+                                                Coba lagi
+                                            </Button>
+                                        </div>
+                                    )}
+                                    <div className="max-h-56 shrink-0 overflow-y-auto">
+                                        <DataTable
+                                            scrollMode="inline"
+                                            columns={columns}
+                                            data={loading ? [] : layouts}
+                                            getRowKey={(layout) => layout.ref}
+                                            actions={rowActions}
+                                            getRowActions={actionsFor}
+                                            getRowLabel={(layout) =>
+                                                layout.name
+                                            }
+                                            onRowAction={runAction}
+                                            emptyMessage={
+                                                loading
+                                                    ? 'Memuat layout...'
+                                                    : error
+                                                      ? 'Layout belum dapat dimuat.'
+                                                      : 'Belum ada layout untuk laporan ini.'
+                                            }
+                                        />
+                                    </div>
+                                </div>
+                                <div className="min-h-0 flex-1 overflow-y-auto">
+                                    <CollapsibleSectionGroup>
+                                        <CollapsibleSection
+                                            value="variables"
+                                            title="Variabel laporan"
+                                            summary={`${fields.length} variabel untuk ${report.name}`}
+                                        >
+                                            <p className="mb-4 text-sm text-muted-foreground">
+                                                Tulis nama variabel persis
+                                                seperti ini di layout. Baris
+                                                yang memakai variabel dari tabel
+                                                akan diulang per data; letakkan
+                                                variabel itu dalam satu baris
+                                                tabel Word atau lembar Excel.
+                                            </p>
+                                            <div className="grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                                                {fields.map((field) => (
+                                                    <div
+                                                        key={field.key}
+                                                        className="flex items-baseline gap-2"
+                                                    >
+                                                        <code className="rounded bg-muted px-1 text-xs">{`\${${field.key}}`}</code>
+                                                        <span className="truncate text-muted-foreground">
+                                                            {field.label}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </CollapsibleSection>
+                                    </CollapsibleSectionGroup>
+                                </div>
+                            </>
+                        ) : (
+                            <Empty>
+                                <EmptyHeader>
+                                    <EmptyTitle>
+                                        {reports.length
+                                            ? 'Pilih laporan'
+                                            : 'Belum ada laporan'}
+                                    </EmptyTitle>
+                                    <EmptyDescription>
+                                        {reports.length
+                                            ? 'Pilih laporan di daftar untuk melihat dan mengatur layout-nya.'
+                                            : 'Belum ada aplikasi yang menyediakan laporan untuk dicetak atau diekspor.'}
+                                    </EmptyDescription>
+                                </EmptyHeader>
+                            </Empty>
+                        )}
+                    </div>
+                </MasterDetailLayout>
 
                 <input
                     ref={replaceInput}
@@ -498,7 +654,7 @@ export default function ReportLayouts({
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
-            </main>
+            </ListPageLayout>
         </>
     );
 }
@@ -514,6 +670,12 @@ function UploadSheet({
     onClose: () => void;
     onSaved: () => void;
 }) {
+    const {
+        report: saveReport,
+        clear: saveClear,
+        summary: saveSummary,
+        scopeRef: saveScopeRef,
+    } = useSaveFeedback<HTMLDivElement>(code);
     const [file, setFile] = useState<File | null>(null);
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
@@ -524,12 +686,17 @@ function UploadSheet({
 
     const save = async () => {
         if (!file) {
-            toast.error('Pilih berkas layout lebih dahulu.');
+            saveReport(
+                new Error('Pilih berkas layout lebih dahulu.'),
+                'Layout belum dapat diunggah.',
+            );
 
             return;
         }
 
         setSaving(true);
+
+        saveClear();
 
         try {
             const result = await uploadLayout(code, {
@@ -542,11 +709,7 @@ function UploadSheet({
             toast.success(`Layout ${result.data.name} tersimpan.`);
             onSaved();
         } catch (caught) {
-            toast.error(
-                caught instanceof Error && caught.message
-                    ? caught.message
-                    : 'Layout belum dapat diunggah.',
-            );
+            saveReport(caught, 'Layout belum dapat diunggah.');
         } finally {
             setSaving(false);
         }
@@ -590,13 +753,15 @@ function UploadSheet({
                         onClick={onClose}
                     />
                 </PageDialogToolbar>
-                <PageDialogBody className="space-y-4">
+                {saveSummary}
+                <PageDialogBody ref={saveScopeRef} className="space-y-4">
                     <Field>
                         <FieldLabel htmlFor="layout-file">
                             Berkas layout
                         </FieldLabel>
                         <Input
                             id="layout-file"
+                            data-error-field="file"
                             type="file"
                             accept=".docx,.xlsx"
                             required
@@ -618,6 +783,7 @@ function UploadSheet({
                     <Field>
                         <Input
                             label="Nama layout"
+                            data-error-field="name"
                             required
                             value={name}
                             onChange={(event) => setName(event.target.value)}
@@ -626,6 +792,7 @@ function UploadSheet({
                     <Field>
                         <Textarea
                             label="Keterangan"
+                            data-error-field="description"
                             value={description}
                             onChange={(event) =>
                                 setDescription(event.target.value)

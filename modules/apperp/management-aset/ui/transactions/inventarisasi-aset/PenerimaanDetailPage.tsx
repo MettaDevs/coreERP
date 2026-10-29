@@ -2,6 +2,8 @@ import { usePage } from '@inertiajs/react';
 import { Info, Trash2, TriangleAlert } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { DraftRecordAttachments } from '@/components/draft-record-attachments';
+import type { DraftAttachmentLimits } from '@/components/draft-record-attachments';
 import { RecordAttachments } from '@/components/record-attachments';
 import { useWorkDate } from '@/hooks/use-work-date';
 import type { Workspace } from '@/types';
@@ -24,12 +26,10 @@ import {
 } from '@apperp/ui/collapsible-section';
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
-import {
-    FieldHint,
-    FieldError,
-    Field,
-    FieldDescription,
-} from '@apperp/ui/field';
+import { DatePicker } from '@apperp/ui/date-picker';
+import { FieldHint } from '@apperp/ui/field';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
+import { getFormValidationErrors } from '@apperp/ui/form-feedback';
 import { Input } from '@apperp/ui/input';
 import { usePageDialogRecord } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
@@ -37,17 +37,12 @@ import { Select } from '@apperp/ui/select';
 
 import { Textarea } from '@apperp/ui/textarea';
 import EditShield from '../../_shared/EditShield';
-import {
-    ApiError,
-    api,
-    errorMessage,
-    newIdempotencyKey,
-    toastSaveError,
-} from '../../api';
+import { ApiError, api, errorMessage, newIdempotencyKey } from '../../api';
 import AssetConditionSelect from '../../master/AssetConditionSelect';
 import { defaultDepartmentOf } from '../../master/locationDefaults';
-import type { MasterOption } from '../../master/useMasterOptions';
-import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
+import MasterLookup from '../../master/MasterLookup';
+import { useMasterOptions } from '../../master/useMasterOptions';
+import { useSaveFeedback } from '../../use-save-feedback';
 import { CancellationAction } from '../_shared/CancellationAction';
 import { CancellationStatus } from '../_shared/CancellationStatus';
 import { RecordCardHeader } from '../_shared/record-card';
@@ -83,6 +78,7 @@ import {
     tanggalTampil,
 } from './penerimaan';
 import PurchaseRequestPicker from './PurchaseRequestPicker';
+import { appendRequestLines, requestLinePatch } from './receipt-request-lines';
 import ReceiptAttributes from './ReceiptAttributes';
 
 type Mode = 'create' | 'view' | 'edit';
@@ -121,6 +117,35 @@ export default function PenerimaanDetailPage({
     penerimaanId?: string;
     mode: Mode;
 } & RecordCardControls) {
+    const [feedbackSections, setFeedbackSections] = useState<string[]>([
+        'kedatangan',
+        'vendor',
+        'barang',
+        'atribut',
+        'jurnal',
+    ]);
+
+    const {
+        scopeRef: feedbackScopeRef,
+        feedbackSummary,
+        reportSaveError,
+        clearSaveFeedback,
+    } = useSaveFeedback(undefined, penerimaanId, () =>
+        setFeedbackSections([
+            'kedatangan',
+            'vendor',
+            'pihak',
+            'barang',
+            'atribut',
+            'saldo-awal',
+            'pabrikan',
+            'dokumen-pendukung',
+            'keterangan',
+            'jurnal',
+            'terbit',
+        ]),
+    );
+
     const embedded = usePageDialogRecord(undefined);
 
     const bukaPenerimaan = (id: string) => (onRequestView ?? navigateView)(id);
@@ -129,6 +154,7 @@ export default function PenerimaanDetailPage({
     const bukaPenerimaanDaftar = () => (onClose ?? navigateClose)();
 
     const can = izin(permissions);
+    const canAttach = can('update');
     const { workspace } = usePage<{ workspace: Workspace }>().props;
     const canRegister = bolehMendaftarkan(permissions);
     // Nomor seri mengubah aset, bukan dokumen, jadi izinnya izin koreksi aset. Dokumen
@@ -143,6 +169,7 @@ export default function PenerimaanDetailPage({
     const [tersimpan, setTersimpan] = useState<Penerimaan | null>(null);
     const [ringkasan, setRingkasan] = useState<Ringkasan | null>(null);
     const [terbit, setTerbit] = useState<AsetTerbit[]>([]);
+    const savedIssuedAssets = useRef<AsetTerbit[]>([]);
     const [issuedLoaded, setIssuedLoaded] = useState(false);
     const [memuat, setMemuat] = useState(mode !== 'create');
     const [menyimpan, setMenyimpan] = useState(false);
@@ -153,6 +180,48 @@ export default function PenerimaanDetailPage({
     }, [menyimpan, onBusyChange]);
     const [galat, setGalat] = useState<Record<string, string[]>>({});
     const [saveError, setSaveError] = useState<string | null>(null);
+    const [draftAttachments, setDraftAttachments] = useState<File[]>([]);
+    const attachmentRevision = useRef(0);
+    const createRequest = useRef<{ signature: string; key: string } | null>(
+        null,
+    );
+    const [attachmentLimits, setAttachmentLimits] =
+        useState<DraftAttachmentLimits | null>(null);
+    const [attachmentLimitsError, setAttachmentLimitsError] = useState<
+        string | null
+    >(null);
+    const [attachmentLimitsReload, setAttachmentLimitsReload] = useState(0);
+    useEffect(() => {
+        if (mode !== 'create' || !canAttach) {
+            return;
+        }
+
+        const controller = new AbortController();
+        api<{ data: DraftAttachmentLimits }>(
+            '/penerimaan-aset/attachment-limits',
+            {
+                signal: controller.signal,
+            },
+        )
+            .then((result) => {
+                if (!controller.signal.aborted) {
+                    setAttachmentLimits(result.data);
+                    setAttachmentLimitsError(null);
+                }
+            })
+            .catch((caught: unknown) => {
+                if (!controller.signal.aborted) {
+                    setAttachmentLimitsError(
+                        errorMessage(
+                            caught,
+                            'Pilihan lampiran belum dapat dimuat.',
+                        ),
+                    );
+                }
+            });
+
+        return () => controller.abort();
+    }, [mode, canAttach, attachmentLimitsReload]);
     const [konfirmasiSelesai, setKonfirmasiSelesai] = useState(false);
     const [konfirmasiArsip, setKonfirmasiArsip] = useState(false);
     // Pratinjau disimpan bersama versi dokumen yang melahirkannya: pratinjau versi lama tidak
@@ -218,7 +287,7 @@ export default function PenerimaanDetailPage({
         saldoAwal,
     );
 
-    const readOnly = mode === 'view';
+    const readOnly = mode === 'view' || menyimpan;
     const selesai = tersimpan !== null && tersimpan.status !== 'draft';
 
     useEffect(() => {
@@ -349,7 +418,12 @@ export default function PenerimaanDetailPage({
 
         let dibatalkan = false;
         api<{ data: AsetTerbit[] }>(`/penerimaan-aset/${penerimaanId}/aset`)
-            .then((result) => !dibatalkan && setTerbit(result.data))
+            .then((result) => {
+                if (!dibatalkan) {
+                    savedIssuedAssets.current = result.data;
+                    setTerbit(result.data);
+                }
+            })
             .catch(() => undefined)
             .finally(() => {
                 if (!dibatalkan) {
@@ -363,13 +437,6 @@ export default function PenerimaanDetailPage({
     }, [penerimaanId, selesai]);
 
     const pesan = (field: string) => galat[field]?.[0];
-
-    const idDari = (options: MasterOption[], label: string | null) =>
-        options.find((option) => optionLabel(option) === label)?.id ?? '';
-    const labelDari = (options: MasterOption[], id: unknown) =>
-        options
-            .filter((option) => option.id === String(id ?? ''))
-            .map(optionLabel)[0] ?? null;
 
     function ubahBaris(index: number, patch: Partial<BarisPenerimaan>) {
         setRecord((sebelumnya) => ({
@@ -397,10 +464,30 @@ export default function PenerimaanDetailPage({
     const penghalang = pratinjauSekarang?.blockers ?? [];
 
     async function simpan() {
+        clearSaveFeedback();
+        const validationErrors = panelRef.current
+            ? getFormValidationErrors(panelRef.current)
+            : {};
+
+        if (Object.keys(validationErrors).length) {
+            setGalat(validationErrors);
+            reportSaveError(
+                new ApiError(
+                    'Periksa isian yang ditandai.',
+                    validationErrors,
+                    422,
+                ),
+                'Data belum dapat disimpan.',
+            );
+
+            return;
+        }
+
         setSaveError(null);
 
         if (!context.legal_entity_id) {
-            toast.error(
+            reportSaveError(
+                null,
                 'Pilih perusahaan aktif terlebih dahulu pada header CoreERP.',
             );
 
@@ -474,17 +561,45 @@ export default function PenerimaanDetailPage({
 
         try {
             if (mode === 'create') {
+                const signature = JSON.stringify([
+                    payload,
+                    attachmentRevision.current,
+                ]);
+
+                if (createRequest.current?.signature !== signature) {
+                    createRequest.current = {
+                        signature,
+                        key: newIdempotencyKey(),
+                    };
+                }
+
+                let body: string | FormData = JSON.stringify(payload);
+
+                if (draftAttachments.length > 0) {
+                    body = new FormData();
+                    body.append('payload', JSON.stringify(payload));
+
+                    for (const file of draftAttachments) {
+                        body.append('attachments[]', file);
+                    }
+                }
+
                 const hasil = await api<{ data: Penerimaan }>(
                     '/penerimaan-aset',
                     {
                         method: 'POST',
-                        headers: { 'Idempotency-Key': newIdempotencyKey() },
-                        body: JSON.stringify(payload),
+                        headers: {
+                            'Idempotency-Key': createRequest.current.key,
+                        },
+                        body,
                     },
                 );
+                clearSaveFeedback();
                 toast.success(
                     `Penerimaan ${hasil.data.kode} disimpan sebagai draf.`,
                 );
+                setDraftAttachments([]);
+                createRequest.current = null;
                 (onSaved ?? bukaPenerimaan)(hasil.data.id);
 
                 return;
@@ -501,6 +616,7 @@ export default function PenerimaanDetailPage({
                 },
             );
             setTersimpan(hasil.data);
+            clearSaveFeedback();
             toast.success('Perubahan penerimaan disimpan.');
             (onSaved ?? bukaPenerimaan)(String(penerimaanId));
         } catch (caught) {
@@ -514,7 +630,7 @@ export default function PenerimaanDetailPage({
                     : errorMessage(caught, 'Penerimaan belum dapat disimpan.'),
             );
             panelRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-            toastSaveError(caught, 'Penerimaan belum dapat disimpan.');
+            reportSaveError(caught, 'Penerimaan belum dapat disimpan.');
         } finally {
             setMenyimpan(false);
         }
@@ -534,6 +650,7 @@ export default function PenerimaanDetailPage({
                 },
             );
             setTersimpan(hasil.data);
+            clearSaveFeedback();
             toast.success(
                 `Penerimaan diselesaikan. ${totalAset} aset terdaftar dengan kodenya masing-masing.`,
             );
@@ -552,7 +669,7 @@ export default function PenerimaanDetailPage({
                       ),
             );
             panelRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
-            toastSaveError(caught, 'Penerimaan belum dapat diselesaikan.');
+            reportSaveError(caught, 'Penerimaan belum dapat diselesaikan.');
         } finally {
             setMenyimpan(false);
         }
@@ -584,14 +701,16 @@ export default function PenerimaanDetailPage({
                 },
             );
             setTerbit(hasil.data);
+            savedIssuedAssets.current = hasil.data;
             setTersimpan((sebelumnya) =>
                 sebelumnya
                     ? { ...sebelumnya, version: hasil.version }
                     : sebelumnya,
             );
+            clearSaveFeedback();
             toast.success('Nomor seri disimpan.');
         } catch (caught) {
-            toastSaveError(caught, 'Nomor seri belum dapat disimpan.');
+            reportSaveError(caught, 'Nomor seri belum dapat disimpan.');
         } finally {
             setMenyimpan(false);
         }
@@ -606,21 +725,37 @@ export default function PenerimaanDetailPage({
                 method: 'DELETE',
                 body: JSON.stringify({ version: tersimpan?.version }),
             });
+            clearSaveFeedback();
             toast.success('Draf penerimaan diarsipkan.');
             bukaPenerimaanDaftar();
         } catch (caught) {
-            toastSaveError(caught, 'Penerimaan belum dapat diarsipkan.');
+            reportSaveError(caught, 'Penerimaan belum dapat diarsipkan.');
         } finally {
             setMenyimpan(false);
         }
     }
 
     useRecordCardDirty({
-        value: { record, terbit },
+        value: {
+            record,
+            terbit,
+            attachments: draftAttachments.map((file) => [
+                file.name,
+                file.size,
+                file.lastModified,
+            ]),
+        },
         ready: !memuat && (!selesai || issuedLoaded),
         scopeKey: JSON.stringify([penerimaanId, mode, tersimpan?.version]),
         onDirtyChange: onDirtyChange,
     });
+
+    const editingSerial =
+        selesai &&
+        mode === 'view' &&
+        canCorrect &&
+        issuedLoaded &&
+        terbit.length > 0;
 
     if (memuat) {
         return (
@@ -642,16 +777,10 @@ export default function PenerimaanDetailPage({
                   .filter(Boolean)
                   .join(' · ');
 
-    /** Satu Select penunjuk master, dipakai berkali-kali pada kepala dan baris. */
+    /** Lookup SDK yang sama untuk referensi pada kepala dan baris. */
     const pilihan = (
         label: string,
-        sumber: {
-            options: MasterOption[];
-            selectProps?: ReturnType<typeof useMasterOptions>['selectProps'];
-            error?: string | null;
-            loading?: boolean;
-            reload?: () => void;
-        },
+        sumber: ReturnType<typeof useMasterOptions>,
         nilai: unknown,
         onPilih: (id: string) => void,
         opsi: { required?: boolean; placeholder?: string } = {},
@@ -664,26 +793,16 @@ export default function PenerimaanDetailPage({
             }
         >
             <div>
-                <Select
-                    {...sumber.selectProps}
+                <MasterLookup
+                    source={sumber}
                     label={label}
                     required={opsi.required}
-                    items={sumber.options.map(optionLabel)}
-                    value={labelDari(sumber.options, nilai)}
-                    placeholder={
-                        opsi.placeholder ?? `Pilih ${label.toLowerCase()}`
-                    }
-                    searchPlaceholder={`Cari ${label.toLowerCase()}`}
-                    emptyMessage={
-                        sumber.loading
-                            ? 'Memuat pilihan…'
-                            : sumber.error || `${label} tidak ditemukan.`
-                    }
-                    ariaLabel={label}
+                    value={String(nilai ?? '')}
+                    onValueChange={onPilih}
+                    placeholder={opsi.placeholder}
+                    disabled={readOnly}
+                    permissions={permissions}
                     portalContainer={portalContainer ?? panelRef}
-                    onValueChange={(item) =>
-                        onPilih(idDari(sumber.options, item))
-                    }
                 />
                 {sumber.error && (
                     <div role="alert" className="text-destructive mt-1 text-sm">
@@ -704,7 +823,10 @@ export default function PenerimaanDetailPage({
     );
 
     return (
-        <div className="flex h-full min-h-0 flex-col overflow-hidden">
+        <div
+            ref={feedbackScopeRef}
+            className="flex h-full min-h-0 flex-col overflow-hidden"
+        >
             <RecordCardHeader
                 recordTitle={tersimpan?.kode ?? 'Baru'}
                 editing={!readOnly}
@@ -725,6 +847,7 @@ export default function PenerimaanDetailPage({
                 }
             />
             <RecordActionBar
+                feedback={feedbackSummary}
                 title={embedded ? undefined : judul}
                 trailing={
                     tersimpan ? (
@@ -755,12 +878,16 @@ export default function PenerimaanDetailPage({
                         onClick={() => setKonfirmasiArsip(true)}
                     />
                 )}
-                {mode !== 'view' && (
+                {(mode !== 'view' || editingSerial) && (
                     <>
                         <ActionButton
                             action="save"
                             type="button"
-                            onClick={() => void simpan()}
+                            onClick={() =>
+                                void (editingSerial
+                                    ? simpanNomorSeri()
+                                    : simpan())
+                            }
                             disabled={menyimpan}
                             pending={menyimpan}
                         />
@@ -768,11 +895,16 @@ export default function PenerimaanDetailPage({
                             action="cancel"
                             disabled={menyimpan}
                             type="button"
-                            onClick={() =>
-                                penerimaanId
-                                    ? bukaPenerimaan(penerimaanId)
-                                    : bukaPenerimaanDaftar()
-                            }
+                            onClick={() => {
+                                if (editingSerial) {
+                                    setTerbit(savedIssuedAssets.current);
+                                    clearSaveFeedback();
+                                } else if (penerimaanId) {
+                                    bukaPenerimaan(penerimaanId);
+                                } else {
+                                    bukaPenerimaanDaftar();
+                                }
+                            }}
                         />
                     </>
                 )}
@@ -816,6 +948,7 @@ export default function PenerimaanDetailPage({
 
             <div
                 data-page-dialog-body
+                inert={menyimpan || undefined}
                 ref={panelRef}
                 className="min-h-0 flex-1 overflow-y-auto"
             >
@@ -847,106 +980,108 @@ export default function PenerimaanDetailPage({
                     )}
 
                     <CollapsibleSectionGroup
-                        defaultValue={[
-                            'kedatangan',
-                            'vendor',
-                            'barang',
-                            'atribut',
-                            'jurnal',
-                        ]}
+                        value={feedbackSections}
+                        onValueChange={setFeedbackSections}
                     >
                         <CollapsibleSection
                             value="kedatangan"
                             title="Kedatangan"
                             summary={tanggalTampil(record.tanggal)}
                         >
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <Field>
-                                    <Input
+                            <FormGrid>
+                                <FormControl
+                                    data-error-field="tanggal"
+                                    hint={
+                                        (pesan('tanggal') || saldoAwal) &&
+                                        (pesan('tanggal') ? undefined : (
+                                            <>
+                                                {
+                                                    'Tanggal aset diperoleh di sistem lama, paling lambat tanggal cutover. Jurnal saldo awalnya bertanggal cutover.'
+                                                }
+                                            </>
+                                        ))
+                                    }
+                                    error={
+                                        (pesan('tanggal') || saldoAwal) &&
+                                        (pesan('tanggal') ? (
+                                            <>{pesan('tanggal')}</>
+                                        ) : undefined)
+                                    }
+                                >
+                                    <DatePicker
                                         label={
                                             saldoAwal
                                                 ? 'Tanggal perolehan'
                                                 : 'Tanggal terima'
                                         }
-                                        type="date"
+
                                         required
                                         readOnly={readOnly}
                                         value={record.tanggal ?? ''}
-                                        onChange={(event) =>
+                                        onValueChange={(value) =>
                                             setRecord({
                                                 ...record,
-                                                tanggal: event.target.value,
+                                                tanggal: value,
                                             })
                                         }
+                                        portalContainer={
+                                            portalContainer ?? panelRef
+                                        }
                                     />
-                                    {(pesan('tanggal') || saldoAwal) &&
-                                        (pesan('tanggal') ? (
-                                            <FieldError>
-                                                {pesan('tanggal')}
-                                            </FieldError>
-                                        ) : (
-                                            <FieldHint
-                                                hint={
-                                                    <>
-                                                        {
-                                                            'Tanggal aset diperoleh di sistem lama, paling lambat tanggal cutover. Jurnal saldo awalnya bertanggal cutover.'
-                                                        }
-                                                    </>
-                                                }
-                                            >
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon-sm"
-                                                    aria-label="Bantuan field"
-                                                >
-                                                    <Info aria-hidden="true" />
-                                                </Button>
-                                            </FieldHint>
-                                        ))}
-                                </Field>
+                                </FormControl>
 
-                                <Field>
-                                    <Input
+                                <FormControl
+                                    data-error-field="tanggal_siap_pakai"
+                                    hint={
+                                        pesan(
+                                            'tanggal_siap_pakai',
+                                        ) ? undefined : (
+                                            <>
+                                                {saldoAwal
+                                                    ? 'Tanggal aset mulai dipakai di sistem lama. Penyusutannya di sini berlanjut mulai cutover.'
+                                                    : 'Penyusutan dimulai dari tanggal ini, bukan dari tanggal barang tiba. Kosongkan bila keduanya sama.'}
+                                            </>
+                                        )
+                                    }
+                                    error={
+                                        pesan('tanggal_siap_pakai') ? (
+                                            <>{pesan('tanggal_siap_pakai')}</>
+                                        ) : undefined
+                                    }
+                                >
+                                    <DatePicker
                                         label="Tanggal siap dipakai"
-                                        type="date"
+
                                         readOnly={readOnly}
                                         value={record.tanggal_siap_pakai ?? ''}
-                                        onChange={(event) =>
+                                        onValueChange={(value) =>
                                             setRecord({
                                                 ...record,
-                                                tanggal_siap_pakai:
-                                                    event.target.value,
+                                                tanggal_siap_pakai: value,
                                             })
                                         }
+                                        portalContainer={
+                                            portalContainer ?? panelRef
+                                        }
                                     />
-                                    {pesan('tanggal_siap_pakai') ? (
-                                        <FieldError>
-                                            {pesan('tanggal_siap_pakai')}
-                                        </FieldError>
-                                    ) : (
-                                        <FieldHint
-                                            hint={
-                                                <>
-                                                    {saldoAwal
-                                                        ? 'Tanggal aset mulai dipakai di sistem lama. Penyusutannya di sini berlanjut mulai cutover.'
-                                                        : 'Penyusutan dimulai dari tanggal ini, bukan dari tanggal barang tiba. Kosongkan bila keduanya sama.'}
-                                                </>
-                                            }
-                                        >
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon-sm"
-                                                aria-label="Bantuan field"
-                                            >
-                                                <Info aria-hidden="true" />
-                                            </Button>
-                                        </FieldHint>
-                                    )}
-                                </Field>
+                                </FormControl>
 
-                                <Field>
+                                <FormControl
+                                    hint={
+                                        lokasi.error ? undefined : (
+                                            <>
+                                                {
+                                                    'Lokasi yang dipetakan ke unit organisasi menentukan dimensi keuangan aset.'
+                                                }
+                                            </>
+                                        )
+                                    }
+                                    error={
+                                        lokasi.error ? (
+                                            <>{lokasi.error}</>
+                                        ) : undefined
+                                    }
+                                >
                                     {pilihan(
                                         'Lokasi awal',
                                         lokasi,
@@ -969,31 +1104,16 @@ export default function PenerimaanDetailPage({
                                             }),
                                         { placeholder: 'Tanpa lokasi' },
                                     )}
-                                    {lokasi.error ? (
-                                        <FieldError>{lokasi.error}</FieldError>
-                                    ) : (
-                                        <FieldHint
-                                            hint={
-                                                <>
-                                                    {
-                                                        'Lokasi yang dipetakan ke unit organisasi menentukan dimensi keuangan aset.'
-                                                    }
-                                                </>
-                                            }
-                                        >
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon-sm"
-                                                aria-label="Bantuan field"
-                                            >
-                                                <Info aria-hidden="true" />
-                                            </Button>
-                                        </FieldHint>
-                                    )}
-                                </Field>
+                                </FormControl>
 
-                                <Field>
+                                <FormControl
+                                    data-error-field="currency_code"
+                                    error={
+                                        pesan('currency_code') && (
+                                            <>{pesan('currency_code')}</>
+                                        )
+                                    }
+                                >
                                     <Input
                                         label="Mata uang"
                                         required
@@ -1008,13 +1128,8 @@ export default function PenerimaanDetailPage({
                                             })
                                         }
                                     />
-                                    {pesan('currency_code') && (
-                                        <FieldDescription>
-                                            {pesan('currency_code')}
-                                        </FieldDescription>
-                                    )}
-                                </Field>
-                            </div>
+                                </FormControl>
+                            </FormGrid>
                         </CollapsibleSection>
 
                         <CollapsibleSection
@@ -1028,8 +1143,24 @@ export default function PenerimaanDetailPage({
                                       : (tersimpan?.vendor?.name ?? 'Pembelian')
                             }
                         >
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <Field>
+                            <FormGrid>
+                                <FormControl
+                                    data-error-field="cara_perolehan"
+                                    hint={
+                                        pesan('cara_perolehan') ? undefined : (
+                                            <>
+                                                {saldoAwal
+                                                    ? 'Aset lama dari sistem sebelumnya: jurnalnya saldo awal, dengan akumulasi penyusutan sampai cutover.'
+                                                    : 'Hibah tidak ditagih vendor: jurnalnya ke akun lawan hibah, bukan hutang.'}
+                                            </>
+                                        )
+                                    }
+                                    error={
+                                        pesan('cara_perolehan') ? (
+                                            <>{pesan('cara_perolehan')}</>
+                                        ) : undefined
+                                    }
+                                >
                                     {readOnly ? (
                                         <Input
                                             label="Cara perolehan"
@@ -1064,31 +1195,7 @@ export default function PenerimaanDetailPage({
                                             }
                                         />
                                     )}
-                                    {pesan('cara_perolehan') ? (
-                                        <FieldError>
-                                            {pesan('cara_perolehan')}
-                                        </FieldError>
-                                    ) : (
-                                        <FieldHint
-                                            hint={
-                                                <>
-                                                    {saldoAwal
-                                                        ? 'Aset lama dari sistem sebelumnya: jurnalnya saldo awal, dengan akumulasi penyusutan sampai cutover.'
-                                                        : 'Hibah tidak ditagih vendor: jurnalnya ke akun lawan hibah, bukan hutang.'}
-                                                </>
-                                            }
-                                        >
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon-sm"
-                                                aria-label="Bantuan field"
-                                            >
-                                                <Info aria-hidden="true" />
-                                            </Button>
-                                        </FieldHint>
-                                    )}
-                                </Field>
+                                </FormControl>
 
                                 {!tanpaVendor && (
                                     <VendorPicker
@@ -1111,7 +1218,20 @@ export default function PenerimaanDetailPage({
                                 )}
 
                                 {!tanpaVendor && (
-                                    <Field>
+                                    <FormControl
+                                        data-error-field="vendor_invoice_reference"
+                                        error={
+                                            pesan(
+                                                'vendor_invoice_reference',
+                                            ) && (
+                                                <>
+                                                    {pesan(
+                                                        'vendor_invoice_reference',
+                                                    )}
+                                                </>
+                                            )
+                                        }
+                                    >
                                         <Input
                                             label="Nomor faktur vendor"
                                             maxLength={80}
@@ -1128,17 +1248,32 @@ export default function PenerimaanDetailPage({
                                                 })
                                             }
                                         />
-                                        {pesan('vendor_invoice_reference') && (
-                                            <FieldDescription>
-                                                {pesan(
-                                                    'vendor_invoice_reference',
-                                                )}
-                                            </FieldDescription>
-                                        )}
-                                    </Field>
+                                    </FormControl>
                                 )}
 
-                                <Field>
+                                <FormControl
+                                    data-error-field="purchase_order_reference"
+                                    hint={
+                                        pesan(
+                                            'purchase_order_reference',
+                                        ) ? undefined : (
+                                            <>
+                                                {
+                                                    'Isi nomor pada dokumen PO. Kosongkan jika tidak ada.'
+                                                }
+                                            </>
+                                        )
+                                    }
+                                    error={
+                                        pesan('purchase_order_reference') ? (
+                                            <>
+                                                {pesan(
+                                                    'purchase_order_reference',
+                                                )}
+                                            </>
+                                        ) : undefined
+                                    }
+                                >
                                     <Input
                                         label="Nomor PO"
                                         maxLength={80}
@@ -1155,76 +1290,52 @@ export default function PenerimaanDetailPage({
                                             })
                                         }
                                     />
-                                    {pesan('purchase_order_reference') ? (
-                                        <FieldError>
-                                            {pesan('purchase_order_reference')}
-                                        </FieldError>
-                                    ) : (
-                                        <FieldHint
-                                            hint={
-                                                <>
-                                                    {
-                                                        'Isi nomor pada dokumen PO. Kosongkan jika tidak ada.'
-                                                    }
-                                                </>
-                                            }
-                                        >
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon-sm"
-                                                aria-label="Bantuan field"
-                                            >
-                                                <Info aria-hidden="true" />
-                                            </Button>
-                                        </FieldHint>
-                                    )}
-                                </Field>
+                                </FormControl>
 
                                 {!tanpaVendor && (
-                                    <Field>
-                                        <Input
+                                    <FormControl
+                                        data-error-field="vendor_invoice_date"
+                                        hint={
+                                            pesan(
+                                                'vendor_invoice_date',
+                                            ) ? undefined : (
+                                                <>
+                                                    {
+                                                        'Menjadi tanggal dokumen jurnalnya. Kosongkan bila fakturnya belum datang.'
+                                                    }
+                                                </>
+                                            )
+                                        }
+                                        error={
+                                            pesan('vendor_invoice_date') ? (
+                                                <>
+                                                    {pesan(
+                                                        'vendor_invoice_date',
+                                                    )}
+                                                </>
+                                            ) : undefined
+                                        }
+                                    >
+                                        <DatePicker
                                             label="Tanggal faktur vendor"
-                                            type="date"
+
                                             readOnly={readOnly}
                                             value={
                                                 record.vendor_invoice_date ?? ''
                                             }
-                                            onChange={(event) =>
+                                            onValueChange={(value) =>
                                                 setRecord({
                                                     ...record,
-                                                    vendor_invoice_date:
-                                                        event.target.value,
+                                                    vendor_invoice_date: value,
                                                 })
                                             }
+                                            portalContainer={
+                                                portalContainer ?? panelRef
+                                            }
                                         />
-                                        {pesan('vendor_invoice_date') ? (
-                                            <FieldError>
-                                                {pesan('vendor_invoice_date')}
-                                            </FieldError>
-                                        ) : (
-                                            <FieldHint
-                                                hint={
-                                                    <>
-                                                        {
-                                                            'Menjadi tanggal dokumen jurnalnya. Kosongkan bila fakturnya belum datang.'
-                                                        }
-                                                    </>
-                                                }
-                                            >
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon-sm"
-                                                    aria-label="Bantuan field"
-                                                >
-                                                    <Info aria-hidden="true" />
-                                                </Button>
-                                            </FieldHint>
-                                        )}
-                                    </Field>
+                                    </FormControl>
                                 )}
-                            </div>
+                            </FormGrid>
                         </CollapsibleSection>
 
                         <CollapsibleSection
@@ -1235,8 +1346,23 @@ export default function PenerimaanDetailPage({
                                 undefined
                             }
                         >
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <Field>
+                            <FormGrid>
+                                <FormControl
+                                    hint={
+                                        unitKerja.error ? undefined : (
+                                            <>
+                                                {
+                                                    'Unit kerja yang menanggung seluruh aset pada dokumen ini setelah diterima. Terisi sendiri dari unit kerja bawaan lokasi awal, dan masih dapat diganti.'
+                                                }
+                                            </>
+                                        )
+                                    }
+                                    error={
+                                        unitKerja.error ? (
+                                            <>{unitKerja.error}</>
+                                        ) : undefined
+                                    }
+                                >
                                     {pilihan(
                                         'Unit pengguna',
                                         unitKerja,
@@ -1248,33 +1374,17 @@ export default function PenerimaanDetailPage({
                                             }),
                                         { required: true },
                                     )}
-                                    {unitKerja.error ? (
-                                        <FieldError>
-                                            {unitKerja.error}
-                                        </FieldError>
-                                    ) : (
-                                        <FieldHint
-                                            hint={
-                                                <>
-                                                    {
-                                                        'Unit kerja yang menanggung seluruh aset pada dokumen ini setelah diterima. Terisi sendiri dari unit kerja bawaan lokasi awal, dan masih dapat diganti.'
-                                                    }
-                                                </>
-                                            }
-                                        >
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon-sm"
-                                                aria-label="Bantuan field"
-                                            >
-                                                <Info aria-hidden="true" />
-                                            </Button>
-                                        </FieldHint>
-                                    )}
-                                </Field>
+                                </FormControl>
 
-                                <Field>
+                                <FormControl
+                                    hint={
+                                        <>
+                                            Loket atau gudang yang menerima
+                                            fisiknya. Sering berbeda dari unit
+                                            pengguna.
+                                        </>
+                                    }
+                                >
                                     {pilihan(
                                         'Unit penerima',
                                         unitKerja,
@@ -1285,27 +1395,15 @@ export default function PenerimaanDetailPage({
                                                 receiving_org_unit_id: id,
                                             }),
                                     )}
-                                    <FieldHint
-                                        hint={
-                                            <>
-                                                Loket atau gudang yang menerima
-                                                fisiknya. Sering berbeda dari
-                                                unit pengguna.
-                                            </>
-                                        }
-                                    >
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            aria-label="Bantuan field"
-                                        >
-                                            <Info aria-hidden="true" />
-                                        </Button>
-                                    </FieldHint>
-                                </Field>
+                                </FormControl>
 
-                                <Field>
+                                <FormControl
+                                    error={
+                                        anggota.error ? (
+                                            <>{anggota.error}</>
+                                        ) : undefined
+                                    }
+                                >
                                     {pilihan(
                                         'Diterima oleh',
                                         anggota,
@@ -1316,12 +1414,17 @@ export default function PenerimaanDetailPage({
                                                 diterima_oleh_user_id: id,
                                             }),
                                     )}
-                                    {anggota.error ? (
-                                        <FieldError>{anggota.error}</FieldError>
-                                    ) : null}
-                                </Field>
+                                    {anggota.error ? undefined : null}
+                                </FormControl>
 
-                                <Field>
+                                <FormControl
+                                    hint={
+                                        <>
+                                            Tercatat sebagai pemegang pertama
+                                            pada riwayat penempatan tiap aset.
+                                        </>
+                                    }
+                                >
                                     {pilihan(
                                         'Penanggung jawab',
                                         anggota,
@@ -1332,26 +1435,8 @@ export default function PenerimaanDetailPage({
                                                 penanggung_jawab_user_id: id,
                                             }),
                                     )}
-                                    <FieldHint
-                                        hint={
-                                            <>
-                                                Tercatat sebagai pemegang
-                                                pertama pada riwayat penempatan
-                                                tiap aset.
-                                            </>
-                                        }
-                                    >
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            aria-label="Bantuan field"
-                                        >
-                                            <Info aria-hidden="true" />
-                                        </Button>
-                                    </FieldHint>
-                                </Field>
-                            </div>
+                                </FormControl>
+                            </FormGrid>
                         </CollapsibleSection>
 
                         <CollapsibleSection
@@ -1365,6 +1450,33 @@ export default function PenerimaanDetailPage({
                                         {pesan('details')}
                                     </p>
                                 )}
+                                <div className="flex items-center gap-1 text-sm">
+                                    <span>Nilai per unit</span>
+                                    <FieldHint
+                                        hint={
+                                            <>
+                                                {saldoAwal
+                                                    ? 'Akumulasi dan periode berjalan adalah angka buku yang di-post ke finance sampai cutover; buku lain diatur di bagian Saldo awal per buku. Nilai dan akumulasi diisi per unit, bukan total. '
+                                                    : 'Nilai dan PPN diisi per unit, bukan total. '}
+                                                Ambang kapitalisasi group
+                                                dibandingkan terhadap nilai satu
+                                                aset — dua puluh kursi lima
+                                                ratus ribu tidak melewati ambang
+                                                sepuluh juta hanya karena datang
+                                                bersamaan.
+                                            </>
+                                        }
+                                    >
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            aria-label="Bantuan field"
+                                        >
+                                            <Info aria-hidden="true" />
+                                        </Button>
+                                    </FieldHint>
+                                </div>
                                 {(() => {
                                     const sdkRows = record.details.map(
                                         (baris, index) => {
@@ -1390,6 +1502,7 @@ export default function PenerimaanDetailPage({
                                         'pembelian'
                                             ? [
                                                   {
+                                                      content: 'control',
                                                       id: 'column-1',
                                                       header: 'Permintaan asal',
                                                       minWidth: 256,
@@ -1423,44 +1536,68 @@ export default function PenerimaanDetailPage({
                                                                           portalContainer ??
                                                                           panelRef
                                                                       }
+                                                                      permissions={
+                                                                          permissions
+                                                                      }
+                                                                      orgUnitId={
+                                                                          context.org_unit_id
+                                                                      }
+                                                                      rows={
+                                                                          record.details
+                                                                      }
+                                                                      rowIndex={
+                                                                          index
+                                                                      }
+                                                                      onSelectLines={(
+                                                                          request,
+                                                                          ids,
+                                                                      ) =>
+                                                                          setRecord(
+                                                                              (
+                                                                                  previous,
+                                                                              ) => ({
+                                                                                  ...previous,
+                                                                                  details:
+                                                                                      appendRequestLines(
+                                                                                          previous.details,
+                                                                                          index,
+                                                                                          request,
+                                                                                          ids,
+                                                                                          barisKosong,
+                                                                                      ),
+                                                                              }),
+                                                                          )
+                                                                      }
                                                                       onChange={(
                                                                           line,
+                                                                          request,
                                                                       ) =>
                                                                           ubahBaris(
                                                                               index,
-                                                                              line
+                                                                              line &&
+                                                                                  request
                                                                                   ? {
-                                                                                        permintaan_pembelian_detail_id:
-                                                                                            line.id ??
-                                                                                            '',
-                                                                                        nama: line.nama_aset,
-                                                                                        jenis_aset_id:
-                                                                                            line.jenis_aset_id,
+                                                                                        ...requestLinePatch(
+                                                                                            line,
+                                                                                            request,
+                                                                                        ),
                                                                                         atribut:
                                                                                             line.jenis_aset_id ===
                                                                                             baris.jenis_aset_id
                                                                                                 ? baris.atribut
                                                                                                 : [],
-                                                                                        kondisi_aset_id:
-                                                                                            '',
                                                                                         model_aset_id:
                                                                                             '',
                                                                                         model_number:
                                                                                             '',
-                                                                                        jumlah: Math.max(
-                                                                                            1,
-                                                                                            Math.floor(
-                                                                                                Number(
-                                                                                                    line.remaining_quantity,
-                                                                                                ),
-                                                                                            ),
-                                                                                        ),
-                                                                                        keterangan:
-                                                                                            line.specification,
                                                                                     }
                                                                                   : {
                                                                                         permintaan_pembelian_detail_id:
                                                                                             '',
+                                                                                        purchase_request_id:
+                                                                                            null,
+                                                                                        purchase_request_code:
+                                                                                            null,
                                                                                     },
                                                                           )
                                                                       }
@@ -1474,30 +1611,37 @@ export default function PenerimaanDetailPage({
                                               ]
                                             : []),
                                         {
+                                            content: 'control',
                                             id: 'column-2',
                                             header: 'Nama barang',
                                             minWidth: 208,
                                             cell: ({ baris, index }) => (
                                                 <>
-                                                    <Input
-                                                        aria-label="Nama barang"
-                                                        maxLength={150}
-                                                        readOnly={readOnly}
-                                                        value={baris.nama}
-                                                        onChange={(event) =>
-                                                            ubahBaris(index, {
-                                                                nama: event
-                                                                    .target
-                                                                    .value,
-                                                            })
-                                                        }
-                                                    />
+                                                    <FormControl>
+                                                        <Input
+                                                            aria-label="Nama barang"
+                                                            maxLength={150}
+                                                            readOnly={readOnly}
+                                                            value={baris.nama}
+                                                            onChange={(event) =>
+                                                                ubahBaris(
+                                                                    index,
+                                                                    {
+                                                                        nama: event
+                                                                            .target
+                                                                            .value,
+                                                                    },
+                                                                )
+                                                            }
+                                                        />
+                                                    </FormControl>
                                                 </>
                                             ),
                                         } satisfies DataTableColumn<
                                             (typeof sdkRows)[number]
                                         >,
                                         {
+                                            content: 'control',
                                             id: 'column-3',
                                             header: 'Group aset',
                                             minWidth: 176,
@@ -1519,6 +1663,7 @@ export default function PenerimaanDetailPage({
                                             (typeof sdkRows)[number]
                                         >,
                                         {
+                                            content: 'control',
                                             id: 'column-4',
                                             header: 'Jenis aset',
                                             minWidth: 176,
@@ -1551,6 +1696,7 @@ export default function PenerimaanDetailPage({
                                             (typeof sdkRows)[number]
                                         >,
                                         {
+                                            content: 'control',
                                             id: 'column-5',
                                             header: 'Kondisi',
                                             minWidth: 160,
@@ -1564,6 +1710,9 @@ export default function PenerimaanDetailPage({
                                                         )?.nama ?? '—')
                                                     ) : (
                                                         <AssetConditionSelect
+                                                            permissions={
+                                                                permissions
+                                                            }
                                                             assetTypeId={
                                                                 baris.jenis_aset_id
                                                             }
@@ -1592,56 +1741,69 @@ export default function PenerimaanDetailPage({
                                             (typeof sdkRows)[number]
                                         >,
                                         {
+                                            content: 'control',
                                             id: 'column-6',
                                             header: 'Jumlah',
                                             width: 96,
                                             align: 'right',
                                             cell: ({ baris, index }) => (
                                                 <>
-                                                    <Input
-                                                        aria-label="Jumlah unit"
-                                                        type="number"
-                                                        min={1}
-                                                        readOnly={readOnly}
-                                                        value={String(
-                                                            baris.jumlah,
-                                                        )}
-                                                        onChange={(event) =>
-                                                            ubahBaris(index, {
-                                                                jumlah: event
-                                                                    .target
-                                                                    .value,
-                                                            })
-                                                        }
-                                                    />
+                                                    <FormControl>
+                                                        <Input
+                                                            aria-label="Jumlah unit"
+                                                            type="number"
+                                                            min={1}
+                                                            readOnly={readOnly}
+                                                            value={String(
+                                                                baris.jumlah,
+                                                            )}
+                                                            onChange={(event) =>
+                                                                ubahBaris(
+                                                                    index,
+                                                                    {
+                                                                        jumlah: event
+                                                                            .target
+                                                                            .value,
+                                                                    },
+                                                                )
+                                                            }
+                                                        />
+                                                    </FormControl>
                                                 </>
                                             ),
                                         } satisfies DataTableColumn<
                                             (typeof sdkRows)[number]
                                         >,
                                         {
+                                            content: 'control',
                                             id: 'column-7',
                                             header: 'Nilai / unit',
                                             minWidth: 160,
                                             align: 'right',
                                             cell: ({ baris, index }) => (
                                                 <>
-                                                    <Input
-                                                        aria-label="Nilai per unit"
-                                                        type="number"
-                                                        min={0}
-                                                        readOnly={readOnly}
-                                                        value={String(
-                                                            baris.nilai_per_unit,
-                                                        )}
-                                                        onChange={(event) =>
-                                                            ubahBaris(index, {
-                                                                nilai_per_unit:
-                                                                    event.target
-                                                                        .value,
-                                                            })
-                                                        }
-                                                    />
+                                                    <FormControl>
+                                                        <Input
+                                                            aria-label="Nilai per unit"
+                                                            type="number"
+                                                            min={0}
+                                                            readOnly={readOnly}
+                                                            value={String(
+                                                                baris.nilai_per_unit,
+                                                            )}
+                                                            onChange={(event) =>
+                                                                ubahBaris(
+                                                                    index,
+                                                                    {
+                                                                        nilai_per_unit:
+                                                                            event
+                                                                                .target
+                                                                                .value,
+                                                                    },
+                                                                )
+                                                            }
+                                                        />
+                                                    </FormControl>
                                                 </>
                                             ),
                                         } satisfies DataTableColumn<
@@ -1650,6 +1812,7 @@ export default function PenerimaanDetailPage({
                                         ...(!saldoAwal
                                             ? [
                                                   {
+                                                      content: 'control',
                                                       id: 'column-8',
                                                       header: 'PPN / unit',
                                                       minWidth: 144,
@@ -1659,31 +1822,33 @@ export default function PenerimaanDetailPage({
                                                           index,
                                                       }) => (
                                                           <>
-                                                              <Input
-                                                                  aria-label="PPN per unit"
-                                                                  type="number"
-                                                                  min={0}
-                                                                  readOnly={
-                                                                      readOnly
-                                                                  }
-                                                                  value={String(
-                                                                      baris.ppn_per_unit ??
-                                                                          '',
-                                                                  )}
-                                                                  onChange={(
-                                                                      event,
-                                                                  ) =>
-                                                                      ubahBaris(
-                                                                          index,
-                                                                          {
-                                                                              ppn_per_unit:
-                                                                                  event
-                                                                                      .target
-                                                                                      .value,
-                                                                          },
-                                                                      )
-                                                                  }
-                                                              />
+                                                              <FormControl>
+                                                                  <Input
+                                                                      aria-label="PPN per unit"
+                                                                      type="number"
+                                                                      min={0}
+                                                                      readOnly={
+                                                                          readOnly
+                                                                      }
+                                                                      value={String(
+                                                                          baris.ppn_per_unit ??
+                                                                              '',
+                                                                      )}
+                                                                      onChange={(
+                                                                          event,
+                                                                      ) =>
+                                                                          ubahBaris(
+                                                                              index,
+                                                                              {
+                                                                                  ppn_per_unit:
+                                                                                      event
+                                                                                          .target
+                                                                                          .value,
+                                                                              },
+                                                                          )
+                                                                      }
+                                                                  />
+                                                              </FormControl>
                                                           </>
                                                       ),
                                                   } satisfies DataTableColumn<
@@ -1692,28 +1857,35 @@ export default function PenerimaanDetailPage({
                                               ]
                                             : []),
                                         {
+                                            content: 'control',
                                             id: 'column-9',
                                             header: 'Residu / unit',
                                             minWidth: 160,
                                             align: 'right',
                                             cell: ({ baris, index }) => (
                                                 <>
-                                                    <Input
-                                                        aria-label="Residu per unit"
-                                                        type="number"
-                                                        min={0}
-                                                        readOnly={readOnly}
-                                                        value={String(
-                                                            baris.residu_per_unit,
-                                                        )}
-                                                        onChange={(event) =>
-                                                            ubahBaris(index, {
-                                                                residu_per_unit:
-                                                                    event.target
-                                                                        .value,
-                                                            })
-                                                        }
-                                                    />
+                                                    <FormControl>
+                                                        <Input
+                                                            aria-label="Residu per unit"
+                                                            type="number"
+                                                            min={0}
+                                                            readOnly={readOnly}
+                                                            value={String(
+                                                                baris.residu_per_unit,
+                                                            )}
+                                                            onChange={(event) =>
+                                                                ubahBaris(
+                                                                    index,
+                                                                    {
+                                                                        residu_per_unit:
+                                                                            event
+                                                                                .target
+                                                                                .value,
+                                                                    },
+                                                                )
+                                                            }
+                                                        />
+                                                    </FormControl>
                                                 </>
                                             ),
                                         } satisfies DataTableColumn<
@@ -1722,6 +1894,7 @@ export default function PenerimaanDetailPage({
                                         ...(saldoAwal
                                             ? [
                                                   {
+                                                      content: 'control',
                                                       id: 'column-10',
                                                       header: 'Akumulasi / unit',
                                                       minWidth: 160,
@@ -1731,31 +1904,33 @@ export default function PenerimaanDetailPage({
                                                           index,
                                                       }) => (
                                                           <>
-                                                              <Input
-                                                                  aria-label="Akumulasi per unit"
-                                                                  type="number"
-                                                                  min={0}
-                                                                  readOnly={
-                                                                      readOnly
-                                                                  }
-                                                                  value={String(
-                                                                      baris.akumulasi_per_unit ??
-                                                                          '',
-                                                                  )}
-                                                                  onChange={(
-                                                                      event,
-                                                                  ) =>
-                                                                      ubahBaris(
-                                                                          index,
-                                                                          {
-                                                                              akumulasi_per_unit:
-                                                                                  event
-                                                                                      .target
-                                                                                      .value,
-                                                                          },
-                                                                      )
-                                                                  }
-                                                              />
+                                                              <FormControl>
+                                                                  <Input
+                                                                      aria-label="Akumulasi per unit"
+                                                                      type="number"
+                                                                      min={0}
+                                                                      readOnly={
+                                                                          readOnly
+                                                                      }
+                                                                      value={String(
+                                                                          baris.akumulasi_per_unit ??
+                                                                              '',
+                                                                      )}
+                                                                      onChange={(
+                                                                          event,
+                                                                      ) =>
+                                                                          ubahBaris(
+                                                                              index,
+                                                                              {
+                                                                                  akumulasi_per_unit:
+                                                                                      event
+                                                                                          .target
+                                                                                          .value,
+                                                                              },
+                                                                          )
+                                                                      }
+                                                                  />
+                                                              </FormControl>
                                                           </>
                                                       ),
                                                   } satisfies DataTableColumn<
@@ -1766,6 +1941,7 @@ export default function PenerimaanDetailPage({
                                         ...(saldoAwal
                                             ? [
                                                   {
+                                                      content: 'control',
                                                       id: 'column-11',
                                                       header: 'Periode berjalan',
                                                       minWidth: 128,
@@ -1775,32 +1951,34 @@ export default function PenerimaanDetailPage({
                                                           index,
                                                       }) => (
                                                           <>
-                                                              <Input
-                                                                  aria-label="Periode berjalan"
-                                                                  type="number"
-                                                                  min={0}
-                                                                  step={1}
-                                                                  readOnly={
-                                                                      readOnly
-                                                                  }
-                                                                  value={String(
-                                                                      baris.periode_berjalan ??
-                                                                          '',
-                                                                  )}
-                                                                  onChange={(
-                                                                      event,
-                                                                  ) =>
-                                                                      ubahBaris(
-                                                                          index,
-                                                                          {
-                                                                              periode_berjalan:
-                                                                                  event
-                                                                                      .target
-                                                                                      .value,
-                                                                          },
-                                                                      )
-                                                                  }
-                                                              />
+                                                              <FormControl>
+                                                                  <Input
+                                                                      aria-label="Periode berjalan"
+                                                                      type="number"
+                                                                      min={0}
+                                                                      step={1}
+                                                                      readOnly={
+                                                                          readOnly
+                                                                      }
+                                                                      value={String(
+                                                                          baris.periode_berjalan ??
+                                                                              '',
+                                                                      )}
+                                                                      onChange={(
+                                                                          event,
+                                                                      ) =>
+                                                                          ubahBaris(
+                                                                              index,
+                                                                              {
+                                                                                  periode_berjalan:
+                                                                                      event
+                                                                                          .target
+                                                                                          .value,
+                                                                              },
+                                                                          )
+                                                                      }
+                                                                  />
+                                                              </FormControl>
                                                           </>
                                                       ),
                                                   } satisfies DataTableColumn<
@@ -1881,30 +2059,6 @@ export default function PenerimaanDetailPage({
                                         />
                                     );
                                 })()}
-
-                                <FieldHint
-                                    hint={
-                                        <>
-                                            {saldoAwal
-                                                ? 'Akumulasi dan periode berjalan adalah angka buku yang di-post ke finance sampai cutover; buku lain diatur di bagian Saldo awal per buku. Nilai dan akumulasi diisi per unit, bukan total. '
-                                                : 'Nilai dan PPN diisi per unit, bukan total. '}
-                                            Ambang kapitalisasi group
-                                            dibandingkan terhadap nilai satu
-                                            aset — dua puluh kursi lima ratus
-                                            ribu tidak melewati ambang sepuluh
-                                            juta hanya karena datang bersamaan.
-                                        </>
-                                    }
-                                >
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon-sm"
-                                        aria-label="Bantuan field"
-                                    >
-                                        <Info aria-hidden="true" />
-                                    </Button>
-                                </FieldHint>
                             </div>
                         </CollapsibleSection>
 
@@ -1976,19 +2130,19 @@ export default function PenerimaanDetailPage({
                         >
                             <div className="space-y-4">
                                 {record.details.map((baris, index) => (
-                                    <div
+                                    <FormGrid
                                         key={baris.id ?? `pabrikan-${index}`}
-                                        className="grid gap-4 rounded-md border px-4 py-3 sm:grid-cols-3"
+                                        className="rounded-md border px-4 py-3 sm:grid-cols-3"
                                     >
-                                        <Field>
+                                        <div>
                                             <p className="text-sm font-medium">
                                                 Baris {index + 1}
                                             </p>
-                                            <FieldDescription>
+                                            <p className="text-muted-foreground text-sm">
                                                 {baris.nama || 'Tanpa nama'}
-                                            </FieldDescription>
-                                        </Field>
-                                        <Field>
+                                            </p>
+                                        </div>
+                                        <FormControl>
                                             {pilihan(
                                                 'Pabrikan',
                                                 pabrikan,
@@ -2008,8 +2162,8 @@ export default function PenerimaanDetailPage({
                                                         'Tanpa pabrikan',
                                                 },
                                             )}
-                                        </Field>
-                                        <Field>
+                                        </FormControl>
+                                        <FormControl>
                                             {pilihan(
                                                 'Model aset',
                                                 model,
@@ -2020,8 +2174,8 @@ export default function PenerimaanDetailPage({
                                                     }),
                                                 { placeholder: 'Tanpa model' },
                                             )}
-                                        </Field>
-                                    </div>
+                                        </FormControl>
+                                    </FormGrid>
                                 ))}
                             </div>
                         </CollapsibleSection>
@@ -2032,8 +2186,8 @@ export default function PenerimaanDetailPage({
                             summary="PO, invoice, dan bukti penerimaan"
                         >
                             <p className="text-muted-foreground mb-3 text-sm">
-                                Bukti di sini berlaku untuk seluruh aset dari
-                                penerimaan ini.
+                                Saat penerimaan diselesaikan, lampiran ikut
+                                tersedia pada aset yang dihasilkan.
                             </p>
                             {tersimpan ? (
                                 <RecordAttachments
@@ -2041,10 +2195,53 @@ export default function PenerimaanDetailPage({
                                     recordType="aset_tr_penerimaan_aset"
                                     recordId={tersimpan.id}
                                 />
-                            ) : (
+                            ) : !canAttach ? (
                                 <p className="text-muted-foreground text-sm">
-                                    Simpan draf penerimaan terlebih dahulu untuk
-                                    menambahkan dokumen.
+                                    Anda belum memiliki hak melampirkan dokumen
+                                    pada penerimaan.
+                                </p>
+                            ) : attachmentLimits ? (
+                                <DraftRecordAttachments
+                                    files={draftAttachments}
+                                    limits={attachmentLimits}
+                                    disabled={menyimpan}
+                                    error={
+                                        Object.entries(galat).find(
+                                            ([key]) =>
+                                                key === 'attachments' ||
+                                                key.startsWith('attachments.'),
+                                        )?.[1]?.[0]
+                                    }
+                                    onChange={(files) => {
+                                        attachmentRevision.current += 1;
+                                        setDraftAttachments(files);
+                                    }}
+                                />
+                            ) : attachmentLimitsError ? (
+                                <Alert variant="destructive">
+                                    <AlertDescription>
+                                        {attachmentLimitsError}
+                                    </AlertDescription>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        disabled={menyimpan}
+                                        onClick={() => {
+                                            setAttachmentLimitsError(null);
+                                            setAttachmentLimitsReload(
+                                                (value) => value + 1,
+                                            );
+                                        }}
+                                    >
+                                        Coba lagi
+                                    </Button>
+                                </Alert>
+                            ) : (
+                                <p
+                                    role="status"
+                                    className="text-muted-foreground text-sm"
+                                >
+                                    Memuat pilihan lampiran…
                                 </p>
                             )}
                         </CollapsibleSection>
@@ -2054,7 +2251,15 @@ export default function PenerimaanDetailPage({
                             title="Keterangan"
                             summary={record.keterangan || undefined}
                         >
-                            <Field>
+                            <FormControl
+                                data-error-field="keterangan"
+                                hint={
+                                    <>
+                                        Mis. nomor surat jalan atau nama
+                                        pengirim.
+                                    </>
+                                }
+                            >
                                 <Textarea
                                     label="Keterangan"
                                     rows={3}
@@ -2068,24 +2273,7 @@ export default function PenerimaanDetailPage({
                                         })
                                     }
                                 />
-                                <FieldHint
-                                    hint={
-                                        <>
-                                            Mis. nomor surat jalan atau nama
-                                            pengirim.
-                                        </>
-                                    }
-                                >
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon-sm"
-                                        aria-label="Bantuan field"
-                                    >
-                                        <Info aria-hidden="true" />
-                                    </Button>
-                                </FieldHint>
-                            </Field>
+                            </FormControl>
                         </CollapsibleSection>
 
                         {mode === 'view' && (
@@ -2157,46 +2345,52 @@ export default function PenerimaanDetailPage({
                                                 (typeof sdkRows)[number]
                                             >,
                                             {
+                                                content: 'control',
                                                 id: 'column-2',
                                                 header: 'Nomor seri',
                                                 width: 256,
                                                 cell: ({ aset, index }) => (
                                                     <>
-                                                        <Input
-                                                            aria-label={`Nomor seri ${aset.kode}`}
-                                                            maxLength={150}
-                                                            placeholder="Belum bernomor seri"
-                                                            readOnly={
-                                                                !canCorrect
-                                                            }
-                                                            value={
-                                                                aset.serial_number ??
-                                                                ''
-                                                            }
-                                                            onChange={(event) =>
-                                                                setTerbit(
-                                                                    (
-                                                                        sebelumnya,
-                                                                    ) =>
-                                                                        sebelumnya.map(
-                                                                            (
-                                                                                baris,
-                                                                                posisi,
-                                                                            ) =>
-                                                                                posisi ===
-                                                                                index
-                                                                                    ? {
-                                                                                          ...baris,
-                                                                                          serial_number:
-                                                                                              event
-                                                                                                  .target
-                                                                                                  .value,
-                                                                                      }
-                                                                                    : baris,
-                                                                        ),
-                                                                )
-                                                            }
-                                                        />
+                                                        <FormControl>
+                                                            <Input
+                                                                aria-label={`Nomor seri ${aset.kode}`}
+                                                                maxLength={150}
+                                                                placeholder="Belum bernomor seri"
+                                                                readOnly={
+                                                                    !canCorrect ||
+                                                                    menyimpan
+                                                                }
+                                                                value={
+                                                                    aset.serial_number ??
+                                                                    ''
+                                                                }
+                                                                onChange={(
+                                                                    event,
+                                                                ) =>
+                                                                    setTerbit(
+                                                                        (
+                                                                            sebelumnya,
+                                                                        ) =>
+                                                                            sebelumnya.map(
+                                                                                (
+                                                                                    baris,
+                                                                                    posisi,
+                                                                                ) =>
+                                                                                    posisi ===
+                                                                                    index
+                                                                                        ? {
+                                                                                              ...baris,
+                                                                                              serial_number:
+                                                                                                  event
+                                                                                                      .target
+                                                                                                      .value,
+                                                                                          }
+                                                                                        : baris,
+                                                                            ),
+                                                                    )
+                                                                }
+                                                            />
+                                                        </FormControl>
                                                     </>
                                                 ),
                                             } satisfies DataTableColumn<
@@ -2217,37 +2411,6 @@ export default function PenerimaanDetailPage({
                                             />
                                         );
                                     })()}
-                                    {canCorrect && (
-                                        <ActionButton
-                                            action="save"
-                                            type="button"
-                                            onClick={() =>
-                                                void simpanNomorSeri()
-                                            }
-                                            disabled={menyimpan}
-                                            pending={menyimpan}
-                                        />
-                                    )}
-                                    <FieldHint
-                                        hint={
-                                            <>
-                                                Satu simpan untuk seluruh
-                                                dokumen, bukan satu per aset:
-                                                yang mengetiknya sedang memegang
-                                                setumpuk stiker dan membacanya
-                                                berurutan.
-                                            </>
-                                        }
-                                    >
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon-sm"
-                                            aria-label="Bantuan field"
-                                        >
-                                            <Info aria-hidden="true" />
-                                        </Button>
-                                    </FieldHint>
                                 </div>
                             </CollapsibleSection>
                         )}

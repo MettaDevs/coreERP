@@ -20,7 +20,8 @@ import {
 import { usePage } from '@inertiajs/react';
 import { Building2 } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { apiRequest, errorText } from '@/lib/core-api';
+import { FormErrorHeader } from '@/components/form-error-header';
+import { apiRequest, CoreApiError, errorText } from '@/lib/core-api';
 import type { Workspace } from '@/types';
 
 type PageProps = {
@@ -42,6 +43,9 @@ export function WorkspaceSwitcher() {
     );
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>(
+        {},
+    );
 
     if (!membership) {
         return null;
@@ -70,6 +74,7 @@ export function WorkspaceSwitcher() {
             setLegalEntityId(workspace.active_legal_entity?.id ?? null);
             setOrgUnitId(workspace.active_org_unit?.id ?? null);
             setError(null);
+            setFieldErrors({});
         }
 
         setOpen(nextOpen);
@@ -78,6 +83,7 @@ export function WorkspaceSwitcher() {
     const apply = async () => {
         setSaving(true);
         setError(null);
+        setFieldErrors({});
 
         try {
             await apiRequest('/api/v1/workspace-context', {
@@ -91,6 +97,10 @@ export function WorkspaceSwitcher() {
             // Muat ulang penuh agar daftar dan isian tidak menyimpan konteks sebelumnya.
             window.location.reload();
         } catch (caught) {
+            if (caught instanceof CoreApiError && caught.status < 500) {
+                setFieldErrors(caught.errors);
+            }
+
             setError(
                 errorText(caught, 'Tempat kerja belum berubah. Coba lagi.'),
             );
@@ -124,7 +134,18 @@ export function WorkspaceSwitcher() {
                         tetap berlaku.
                     </SheetDescription>
                 </SheetHeader>
+                {(error || Object.keys(fieldErrors).length > 0) && (
+                    <div className="px-6 pt-4">
+                        <FormErrorHeader
+                            scopeRef={contentRef}
+                            message={error}
+                            errors={fieldErrors}
+                            operation="Tempat kerja belum berubah"
+                        />
+                    </div>
+                )}
                 <form
+                    noValidate
                     className="flex min-h-0 flex-1 flex-col"
                     onSubmit={(event) => {
                         event.preventDefault();
@@ -134,7 +155,10 @@ export function WorkspaceSwitcher() {
                     <div className="flex-1 overflow-y-auto px-6 py-6">
                         <fieldset disabled={saving}>
                             <FieldGroup>
-                                <Field>
+                                <Field
+                                    data-error-field="membership_id"
+                                    data-invalid={!!fieldErrors.membership_id}
+                                >
                                     {workspace.memberships.length > 1 ? (
                                         <Select
                                             label="Ruang kerja"
@@ -160,6 +184,9 @@ export function WorkspaceSwitcher() {
                                             </p>
                                         </>
                                     )}
+                                    <FieldError>
+                                        {fieldErrors.membership_id?.join(' ')}
+                                    </FieldError>
                                 </Field>
                                 {changingWorkspace ? (
                                     <FieldDescription>
@@ -169,7 +196,12 @@ export function WorkspaceSwitcher() {
                                     </FieldDescription>
                                 ) : (
                                     <>
-                                        <Field>
+                                        <Field
+                                            data-error-field="legal_entity_id"
+                                            data-invalid={
+                                                !!fieldErrors.legal_entity_id
+                                            }
+                                        >
                                             {workspace.legal_entities.length >
                                             1 ? (
                                                 <Select
@@ -202,8 +234,18 @@ export function WorkspaceSwitcher() {
                                                     </p>
                                                 </>
                                             )}
+                                            <FieldError>
+                                                {fieldErrors.legal_entity_id?.join(
+                                                    ' ',
+                                                )}
+                                            </FieldError>
                                         </Field>
-                                        <Field>
+                                        <Field
+                                            data-error-field="org_unit_id"
+                                            data-invalid={
+                                                !!fieldErrors.org_unit_id
+                                            }
+                                        >
                                             {workspace.org_units.length > 1 ? (
                                                 <Select
                                                     label="Unit kerja"
@@ -235,6 +277,11 @@ export function WorkspaceSwitcher() {
                                                     </p>
                                                 </>
                                             )}
+                                            <FieldError>
+                                                {fieldErrors.org_unit_id?.join(
+                                                    ' ',
+                                                )}
+                                            </FieldError>
                                         </Field>
                                     </>
                                 )}
@@ -245,7 +292,6 @@ export function WorkspaceSwitcher() {
                                     perusahaan juga mengembalikan tanggal kerja
                                     ke hari ini.
                                 </FieldDescription>
-                                {error && <FieldError>{error}</FieldError>}
                             </FieldGroup>
                         </fieldset>
                     </div>

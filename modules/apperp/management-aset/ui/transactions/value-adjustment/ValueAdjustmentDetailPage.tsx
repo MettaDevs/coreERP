@@ -20,22 +20,21 @@ import {
 } from '@apperp/ui/collapsible-section';
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
-import { Field, FieldDescription } from '@apperp/ui/field';
+import { DatePicker } from '@apperp/ui/date-picker';
+import { FieldError } from '@apperp/ui/field';
+
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { usePageDialogRecord } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 
 import { Textarea } from '@apperp/ui/textarea';
-import {
-    ApiError,
-    api,
-    errorMessage,
-    newIdempotencyKey,
-    toastSaveError,
-} from '../../api';
-import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
+import { RecordLookup } from '../../_shared/RecordLookup';
+import { ApiError, api, errorMessage, newIdempotencyKey } from '../../api';
+import { useMasterOptions } from '../../master/useMasterOptions';
 import { useRecordOptions } from '../../use-record-list';
+import { useSaveFeedback } from '../../use-save-feedback';
 import { CancellationAction } from '../_shared/CancellationAction';
 import { CancellationStatus } from '../_shared/CancellationStatus';
 import { PostingPreviewPanel } from '../_shared/PostingPreviewPanel';
@@ -107,6 +106,20 @@ export default function ValueAdjustmentDetailPage({
     adjustmentId?: string;
     mode: Mode;
 }) {
+    const [feedbackSections, setFeedbackSections] = useState<string[]>([
+        'general',
+        'lines',
+    ]);
+
+    const {
+        scopeRef: feedbackScopeRef,
+        feedbackSummary,
+        reportSaveError,
+        clearSaveFeedback,
+    } = useSaveFeedback(undefined, adjustmentId, () =>
+        setFeedbackSections(['general', 'lines']),
+    );
+
     const embedded = usePageDialogRecord(undefined);
 
     const can = izin(permissions);
@@ -231,7 +244,8 @@ export default function ValueAdjustmentDetailPage({
             tersimpan?.legal_entity_id ?? context.legal_entity_id;
 
         if (!legalEntity) {
-            toast.error(
+            reportSaveError(
+                null,
                 'Pilih perusahaan aktif terlebih dahulu pada header CoreERP.',
             );
 
@@ -266,6 +280,7 @@ export default function ValueAdjustmentDetailPage({
                         body: JSON.stringify(payload),
                     },
                 );
+                clearSaveFeedback();
                 toast.success(
                     `Penyesuaian ${hasil.data.kode} disimpan sebagai draf.`,
                 );
@@ -281,6 +296,7 @@ export default function ValueAdjustmentDetailPage({
                     version: tersimpan?.version,
                 }),
             });
+            clearSaveFeedback();
             toast.success('Perubahan penyesuaian disimpan.');
             saveCompleted(String(adjustmentId));
         } catch (caught) {
@@ -288,7 +304,7 @@ export default function ValueAdjustmentDetailPage({
                 setGalat(caught.validationErrors);
             }
 
-            toastSaveError(caught, 'Penyesuaian belum dapat disimpan.');
+            reportSaveError(caught, 'Penyesuaian belum dapat disimpan.');
         } finally {
             setMenyimpan(false);
         }
@@ -327,6 +343,7 @@ export default function ValueAdjustmentDetailPage({
             setTersimpan(hasil.data);
             setRecord(keForm(hasil.data));
             setPratinjau(null);
+            clearSaveFeedback();
             toast.success(
                 `Nilai buku diperbarui. Jurnal: ${postingLabel(hasil.data.posting?.status)}.`,
             );
@@ -336,7 +353,7 @@ export default function ValueAdjustmentDetailPage({
                 setGalat(caught.validationErrors);
             }
 
-            toastSaveError(caught, 'Penyesuaian belum dapat diposting.');
+            reportSaveError(caught, 'Penyesuaian belum dapat diposting.');
         } finally {
             setMenyimpan(false);
         }
@@ -352,10 +369,11 @@ export default function ValueAdjustmentDetailPage({
                 method: 'DELETE',
                 body: JSON.stringify({ version: tersimpan?.version }),
             });
+            clearSaveFeedback();
             toast.success('Draf penyesuaian diarsipkan.');
             deleteCompleted();
         } catch (caught) {
-            toastSaveError(caught, 'Penyesuaian belum dapat diarsipkan.');
+            reportSaveError(caught, 'Penyesuaian belum dapat diarsipkan.');
         } finally {
             setMenyimpan(false);
         }
@@ -380,19 +398,15 @@ export default function ValueAdjustmentDetailPage({
         mode === 'create'
             ? 'Penyesuaian nilai aset baru'
             : (tersimpan?.kode ?? 'Penyesuaian nilai aset');
-    const pilihDari = (
-        options: { id: string }[],
-        id: string | null | undefined,
-    ) => {
-        const dipilih = options.find((option) => option.id === id);
 
-        return dipilih ? optionLabel(dipilih as never) : null;
-    };
     const masalahBaris = (index: number) =>
         pesan(`details.${index}.aset_id`) ?? pesan(`details.${index}.nilai`);
 
     return (
-        <div className="flex h-full min-h-0 flex-col overflow-hidden">
+        <div
+            ref={feedbackScopeRef}
+            className="flex h-full min-h-0 flex-col overflow-hidden"
+        >
             <RecordCardHeader
                 recordTitle={tersimpan?.kode ?? 'Baru'}
                 editing={!readOnly}
@@ -413,6 +427,7 @@ export default function ValueAdjustmentDetailPage({
                 }
             />
             <RecordActionBar
+                feedback={feedbackSummary}
                 title={embedded ? undefined : judul}
                 trailing={
                     tersimpan ? (
@@ -504,7 +519,8 @@ export default function ValueAdjustmentDetailPage({
             >
                 <div className="space-y-5 p-5">
                     <CollapsibleSectionGroup
-                        defaultValue={['general', 'lines']}
+                        value={feedbackSections}
+                        onValueChange={setFeedbackSections}
                     >
                         <CollapsibleSection
                             value="general"
@@ -512,8 +528,8 @@ export default function ValueAdjustmentDetailPage({
                             summary={tanggalTampil(record.tanggal)}
                         >
                             <div className="space-y-4">
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    <Field>
+                                <FormGrid>
+                                    <FormControl data-error-field="jenis">
                                         {readOnly ? (
                                             <Input
                                                 label="Jenis penyesuaian"
@@ -545,12 +561,18 @@ export default function ValueAdjustmentDetailPage({
                                             />
                                         )}
                                         {pesan('jenis') && (
-                                            <FieldDescription>
+                                            <FieldError>
                                                 {pesan('jenis')}
-                                            </FieldDescription>
+                                            </FieldError>
                                         )}
-                                    </Field>
-                                    <Field>
+                                    </FormControl>
+                                    <FormControl
+                                        data-error-field="buku_id"
+                                        error={pesan('buku_id') || buku.error}
+                                        hint={
+                                            'Jurnal hanya dikirim ke aplikasi finance bila buku ini yang membawa aset ke sana; buku lain, misalnya fiskal, hanya berubah di catatan aset.'
+                                        }
+                                    >
                                         {readOnly ? (
                                             <Input
                                                 label="Buku penyusutan"
@@ -560,17 +582,19 @@ export default function ValueAdjustmentDetailPage({
                                                 }
                                             />
                                         ) : (
-                                            <Select
-                                                {...buku.selectProps}
+                                            <RecordLookup
+                                                source={buku}
                                                 label="Buku penyusutan"
                                                 required
                                                 items={buku.options.map(
-                                                    optionLabel,
+                                                    (record) => ({
+                                                        value: record.id,
+                                                        label: buku.getLabel(
+                                                            record,
+                                                        ),
+                                                    }),
                                                 )}
-                                                value={pilihDari(
-                                                    buku.options,
-                                                    record.buku_id,
-                                                )}
+                                                value={record.buku_id || null}
                                                 placeholder="Pilih buku yang nilainya disesuaikan"
                                                 searchPlaceholder="Cari buku penyusutan"
                                                 emptyMessage="Buku penyusutan tidak ditemukan."
@@ -579,43 +603,34 @@ export default function ValueAdjustmentDetailPage({
                                                 onValueChange={(item) =>
                                                     setRecord({
                                                         ...record,
-                                                        buku_id:
-                                                            buku.options.find(
-                                                                (option) =>
-                                                                    optionLabel(
-                                                                        option,
-                                                                    ) === item,
-                                                            )?.id ?? '',
+                                                        buku_id: item ?? '',
                                                     })
                                                 }
                                             />
                                         )}
-                                        <FieldDescription>
-                                            {pesan('buku_id') ||
-                                                buku.error ||
-                                                'Jurnal hanya dikirim ke aplikasi finance bila buku ini yang membawa aset ke sana; buku lain, misalnya fiskal, hanya berubah di catatan aset.'}
-                                        </FieldDescription>
-                                    </Field>
-                                    <Field>
-                                        <Input
+                                    </FormControl>
+                                    <FormControl
+                                        data-error-field="tanggal"
+                                        error={pesan('tanggal')}
+                                        hint={
+                                            'Tanggal jurnal. Penyusutan sampai tanggal ini harus sudah difinalkan.'
+                                        }
+                                    >
+                                        <DatePicker
                                             label="Tanggal penyesuaian"
-                                            type="date"
+
                                             required
                                             readOnly={readOnly}
                                             value={record.tanggal}
-                                            onChange={(event) =>
+                                            onValueChange={(value) =>
                                                 setRecord({
                                                     ...record,
-                                                    tanggal: event.target.value,
+                                                    tanggal: value,
                                                 })
                                             }
                                         />
-                                        <FieldDescription>
-                                            {pesan('tanggal') ||
-                                                'Tanggal jurnal. Penyusutan sampai tanggal ini harus sudah difinalkan.'}
-                                        </FieldDescription>
-                                    </Field>
-                                    <Field>
+                                    </FormControl>
+                                    <FormControl data-error-field="responsible_org_unit_id">
                                         {readOnly ? (
                                             <Input
                                                 label="Unit penanggung jawab"
@@ -626,17 +641,22 @@ export default function ValueAdjustmentDetailPage({
                                                 }
                                             />
                                         ) : (
-                                            <Select
-                                                {...unitKerja.selectProps}
+                                            <RecordLookup
+                                                source={unitKerja}
                                                 label="Unit penanggung jawab"
                                                 required
                                                 items={unitKerja.options.map(
-                                                    optionLabel,
+                                                    (record) => ({
+                                                        value: record.id,
+                                                        label: unitKerja.getLabel(
+                                                            record,
+                                                        ),
+                                                    }),
                                                 )}
-                                                value={pilihDari(
-                                                    unitKerja.options,
-                                                    record.responsible_org_unit_id,
-                                                )}
+                                                value={
+                                                    record.responsible_org_unit_id ||
+                                                    null
+                                                }
                                                 placeholder="Pilih unit kerja"
                                                 searchPlaceholder="Cari unit kerja"
                                                 emptyMessage="Unit kerja tidak ditemukan."
@@ -646,26 +666,27 @@ export default function ValueAdjustmentDetailPage({
                                                     setRecord({
                                                         ...record,
                                                         responsible_org_unit_id:
-                                                            unitKerja.options.find(
-                                                                (option) =>
-                                                                    optionLabel(
-                                                                        option,
-                                                                    ) === item,
-                                                            )?.id ?? '',
+                                                            item ?? '',
                                                     })
                                                 }
                                             />
                                         )}
                                         {pesan('responsible_org_unit_id') && (
-                                            <FieldDescription>
+                                            <FieldError>
                                                 {pesan(
                                                     'responsible_org_unit_id',
                                                 )}
-                                            </FieldDescription>
+                                            </FieldError>
                                         )}
-                                    </Field>
-                                </div>
-                                <Field>
+                                    </FormControl>
+                                </FormGrid>
+                                <FormControl
+                                    data-error-field="keterangan"
+                                    error={pesan('keterangan')}
+                                    hint={
+                                        'Ikut ke keterangan jurnal di aplikasi finance, misalnya hasil penilaian atau kerusakan yang ditemukan.'
+                                    }
+                                >
                                     <Textarea
                                         label="Alasan"
                                         required
@@ -680,11 +701,7 @@ export default function ValueAdjustmentDetailPage({
                                             })
                                         }
                                     />
-                                    <FieldDescription>
-                                        {pesan('keterangan') ||
-                                            'Ikut ke keterangan jurnal di aplikasi finance, misalnya hasil penilaian atau kerusakan yang ditemukan.'}
-                                    </FieldDescription>
-                                </Field>
+                                </FormControl>
                             </div>
                         </CollapsibleSection>
                         <CollapsibleSection
@@ -754,6 +771,7 @@ export default function ValueAdjustmentDetailPage({
                                             {
                                                 id: 'column-1',
                                                 header: 'Aset',
+                                                content: 'control',
                                                 cell: ({
                                                     baris,
                                                     index,
@@ -763,47 +781,47 @@ export default function ValueAdjustmentDetailPage({
                                                     <>
                                                         {!baris.id &&
                                                         !readOnly ? (
-                                                            <Select
-                                                                {...assetSource.selectProps}
-                                                                items={aset.map(
-                                                                    labelAset,
-                                                                )}
-                                                                value={
-                                                                    dipilih
-                                                                        ? labelAset(
-                                                                              dipilih,
-                                                                          )
-                                                                        : null
-                                                                }
-                                                                placeholder="Pilih aset"
-                                                                searchPlaceholder="Cari kode atau nama aset"
-                                                                emptyMessage="Aset tidak ditemukan."
-                                                                ariaLabel={`Aset baris ${index + 1}`}
-                                                                portalContainer={
-                                                                    lookupPortal
-                                                                }
-                                                                onValueChange={(
-                                                                    item,
-                                                                ) =>
-                                                                    ubahBaris(
-                                                                        index,
-                                                                        {
-                                                                            aset_id:
-                                                                                aset.find(
-                                                                                    (
-                                                                                        calon,
-                                                                                    ) =>
-                                                                                        labelAset(
-                                                                                            calon,
-                                                                                        ) ===
-                                                                                        item,
-                                                                                )
-                                                                                    ?.id ??
-                                                                                '',
-                                                                        },
-                                                                    )
-                                                                }
-                                                            />
+                                                            <FormControl>
+                                                                <RecordLookup
+                                                                    label="Pilih aset"
+                                                                    source={
+                                                                        assetSource
+                                                                    }
+                                                                    items={aset.map(
+                                                                        (
+                                                                            record,
+                                                                        ) => ({
+                                                                            value: record.id,
+                                                                            label: assetSource.getLabel(
+                                                                                record,
+                                                                            ),
+                                                                        }),
+                                                                    )}
+                                                                    value={
+                                                                        dipilih?.id ??
+                                                                        null
+                                                                    }
+                                                                    placeholder="Pilih aset"
+                                                                    searchPlaceholder="Cari kode atau nama aset"
+                                                                    emptyMessage="Aset tidak ditemukan."
+                                                                    ariaLabel={`Aset baris ${index + 1}`}
+                                                                    portalContainer={
+                                                                        lookupPortal
+                                                                    }
+                                                                    onValueChange={(
+                                                                        item,
+                                                                    ) =>
+                                                                        ubahBaris(
+                                                                            index,
+                                                                            {
+                                                                                aset_id:
+                                                                                    item ??
+                                                                                    '',
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </FormControl>
                                                         ) : (
                                                             <span>
                                                                 {labelAset({
@@ -832,32 +850,35 @@ export default function ValueAdjustmentDetailPage({
                                                 id: 'column-2',
                                                 header: 'Nilai penyesuaian',
                                                 align: 'right',
+                                                content: 'control',
                                                 cell: ({ baris, index }) => (
                                                     <div className="text-right">
                                                         {readOnly ? (
                                                             uang(baris.nilai)
                                                         ) : (
-                                                            <Input
-                                                                aria-label={`Nilai penyesuaian baris ${index + 1}`}
-                                                                type="number"
-                                                                min="0"
-                                                                step="0.01"
-                                                                value={
-                                                                    baris.nilai
-                                                                }
-                                                                onChange={(
-                                                                    event,
-                                                                ) =>
-                                                                    ubahBaris(
-                                                                        index,
-                                                                        {
-                                                                            nilai: event
-                                                                                .target
-                                                                                .value,
-                                                                        },
-                                                                    )
-                                                                }
-                                                            />
+                                                            <FormControl>
+                                                                <Input
+                                                                    aria-label={`Nilai penyesuaian baris ${index + 1}`}
+                                                                    type="number"
+                                                                    min="0"
+                                                                    step="0.01"
+                                                                    value={
+                                                                        baris.nilai
+                                                                    }
+                                                                    onChange={(
+                                                                        event,
+                                                                    ) =>
+                                                                        ubahBaris(
+                                                                            index,
+                                                                            {
+                                                                                nilai: event
+                                                                                    .target
+                                                                                    .value,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </FormControl>
                                                         )}
                                                     </div>
                                                 ),
@@ -895,31 +916,34 @@ export default function ValueAdjustmentDetailPage({
                                             {
                                                 id: 'column-5',
                                                 header: 'Keterangan',
+                                                content: 'control',
                                                 cell: ({ baris, index }) => (
                                                     <>
                                                         {readOnly ? (
                                                             baris.keterangan ||
                                                             '—'
                                                         ) : (
-                                                            <Input
-                                                                aria-label={`Keterangan baris ${index + 1}`}
-                                                                value={
-                                                                    baris.keterangan
-                                                                }
-                                                                onChange={(
-                                                                    event,
-                                                                ) =>
-                                                                    ubahBaris(
-                                                                        index,
-                                                                        {
-                                                                            keterangan:
-                                                                                event
-                                                                                    .target
-                                                                                    .value,
-                                                                        },
-                                                                    )
-                                                                }
-                                                            />
+                                                            <FormControl>
+                                                                <Input
+                                                                    aria-label={`Keterangan baris ${index + 1}`}
+                                                                    value={
+                                                                        baris.keterangan
+                                                                    }
+                                                                    onChange={(
+                                                                        event,
+                                                                    ) =>
+                                                                        ubahBaris(
+                                                                            index,
+                                                                            {
+                                                                                keterangan:
+                                                                                    event
+                                                                                        .target
+                                                                                        .value,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </FormControl>
                                                         )}
                                                     </>
                                                 ),

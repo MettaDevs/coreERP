@@ -15,6 +15,7 @@ import { Switch } from '@apperp/ui/switch';
 import { Info } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import type { FormEvent, RefObject } from 'react';
+import { FormErrorHeader } from '@/components/form-error-header';
 import { apiJson, CoreApiError, errorText } from '@/lib/core-api';
 import { catalogLoader, endpoint } from './types';
 import type { Catalog, Choice, Conversion, Draft, Unit } from './types';
@@ -195,6 +196,7 @@ export function CatalogForm({
                 busy={saving}
             >
                 <form
+                    noValidate
                     onSubmit={submit}
                     className="flex min-h-0 flex-1 flex-col overflow-hidden"
                 >
@@ -212,6 +214,8 @@ export function CatalogForm({
                             onClick={onClose}
                         />
                     </PageDialogToolbar>
+                    <FormErrorHeader errors={errors} message={error} />
+
                     <PageDialogBody className="space-y-4" scroll-region="true">
                         {error && (
                             <div
@@ -223,7 +227,7 @@ export function CatalogForm({
                         )}
                         {draft.kind === 'conversions' ? (
                             <>
-                                <Field>
+                                <Field data-error-field={'from_unit_id'}>
                                     <RecordLookup<Unit>
                                         label="Dari satuan"
                                         resource="units"
@@ -247,7 +251,7 @@ export function CatalogForm({
                                     />
                                     {fieldError('from_unit_id')}
                                 </Field>
-                                <Field>
+                                <Field data-error-field={'to_unit_id'}>
                                     <RecordLookup<Unit>
                                         label="Ke satuan"
                                         resource="units"
@@ -260,7 +264,7 @@ export function CatalogForm({
                                     />
                                     {fieldError('to_unit_id')}
                                 </Field>
-                                <Field>
+                                <Field data-error-field={'factor'}>
                                     <Input
                                         label="Faktor konversi"
                                         aria-invalid={Boolean(errors.factor)}
@@ -276,7 +280,7 @@ export function CatalogForm({
                                     />
                                     {fieldError('factor')}
                                 </Field>
-                                <Field>
+                                <Field data-error-field={'offset'}>
                                     <div className="flex items-center gap-2">
                                         <Input
                                             label="Pergeseran"
@@ -303,7 +307,7 @@ export function CatalogForm({
                                     </div>
                                     {fieldError('offset')}
                                 </Field>
-                                <Field>
+                                <Field data-error-field={'rounding_scale'}>
                                     <Input
                                         label="Pembulatan desimal"
                                         aria-invalid={Boolean(
@@ -323,7 +327,7 @@ export function CatalogForm({
                             </>
                         ) : (
                             <>
-                                <Field>
+                                <Field data-error-field={'code'}>
                                     <Input
                                         label="Kode"
                                         aria-invalid={Boolean(errors.code)}
@@ -338,7 +342,7 @@ export function CatalogForm({
                                     />
                                     {fieldError('code')}
                                 </Field>
-                                <Field>
+                                <Field data-error-field={'name'}>
                                     <Input
                                         label="Nama"
                                         aria-invalid={Boolean(errors.name)}
@@ -354,7 +358,9 @@ export function CatalogForm({
                                 </Field>
                                 {draft.kind === 'units' && (
                                     <>
-                                        <Field>
+                                        <Field
+                                            data-error-field={'uom_class_id'}
+                                        >
                                             {record ? (
                                                 <Input
                                                     label="Kelas"
@@ -374,7 +380,9 @@ export function CatalogForm({
                                             )}
                                             {fieldError('uom_class_id')}
                                         </Field>
-                                        <Field>
+                                        <Field
+                                            data-error-field={'uom_system_id'}
+                                        >
                                             {record ? (
                                                 <Input
                                                     label="Sistem"
@@ -396,7 +404,7 @@ export function CatalogForm({
                                             )}
                                             {fieldError('uom_system_id')}
                                         </Field>
-                                        <Field>
+                                        <Field data-error-field={'symbol'}>
                                             <Input
                                                 label="Simbol"
                                                 aria-invalid={Boolean(
@@ -413,7 +421,9 @@ export function CatalogForm({
                                             />
                                             {fieldError('symbol')}
                                         </Field>
-                                        <Field>
+                                        <Field
+                                            data-error-field={'decimal_places'}
+                                        >
                                             <Input
                                                 label="Jumlah angka desimal"
                                                 aria-invalid={Boolean(
@@ -434,7 +444,10 @@ export function CatalogForm({
                                             {fieldError('decimal_places')}
                                         </Field>
                                         {record && (
-                                            <Field orientation="horizontal">
+                                            <Field
+                                                orientation="horizontal"
+                                                data-error-field={'active'}
+                                            >
                                                 <Switch
                                                     id="unit-active"
                                                     checked={active}

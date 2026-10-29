@@ -29,8 +29,8 @@ export default function AppLayout({
 
     return (
         <AppLayoutTemplate breadcrumbs={breadcrumbs}>
-            <Fragment key={scope}>{children}</Fragment>
             <FlashToasts />
+            <Fragment key={scope}>{children}</Fragment>
             <JembatanCetakModule />
         </AppLayoutTemplate>
     );

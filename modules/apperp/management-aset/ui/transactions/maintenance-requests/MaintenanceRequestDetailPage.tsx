@@ -30,20 +30,16 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@apperp/ui/dialog';
-import { Field, FieldDescription } from '@apperp/ui/field';
+import { FieldError } from '@apperp/ui/field';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { usePageDialogRecord } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
-import { Select } from '@apperp/ui/select';
 import { Textarea } from '@apperp/ui/textarea';
-import {
-    ApiError,
-    api,
-    errorMessage,
-    newIdempotencyKey,
-    toastSaveError,
-} from '../../api';
+import { RecordLookup } from '../../_shared/RecordLookup';
+import { ApiError, api, errorMessage, newIdempotencyKey } from '../../api';
 import type { MasterOption } from '../../master/useMasterOptions';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
+import { useSaveFeedback } from '../../use-save-feedback';
 import { RecordCardHeader } from '../_shared/record-card';
 import type { RecordCardControls } from '../_shared/record-card';
 import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
@@ -112,6 +108,19 @@ export default function MaintenanceRequestDetailPage({
     requestId?: string;
     mode: Mode;
 } & RecordCardControls) {
+    const [feedbackSections, setFeedbackSections] = useState<string[]>([
+        'general',
+    ]);
+
+    const {
+        scopeRef: feedbackScopeRef,
+        feedbackSummary,
+        reportSaveError,
+        clearSaveFeedback,
+    } = useSaveFeedback(undefined, requestId, () =>
+        setFeedbackSections(['general']),
+    );
+
     const embedded = usePageDialogRecord(undefined);
 
     const openRequest = (id: string) => (onRequestView ?? navigateView)(id);
@@ -213,7 +222,8 @@ export default function MaintenanceRequestDetailPage({
         const legalEntity = saved?.legal_entity_id ?? context.legal_entity_id;
 
         if (!legalEntity) {
-            toast.error(
+            reportSaveError(
+                null,
                 'Pilih perusahaan aktif terlebih dahulu pada header CoreERP.',
             );
 
@@ -243,6 +253,7 @@ export default function MaintenanceRequestDetailPage({
                         body: JSON.stringify(payload),
                     },
                 );
+                clearSaveFeedback();
                 toast.success(
                     `Permintaan ${result.data.kode} disimpan sebagai draf.`,
                 );
@@ -255,6 +266,7 @@ export default function MaintenanceRequestDetailPage({
                 method: 'PATCH',
                 body: JSON.stringify({ ...payload, version: saved?.version }),
             });
+            clearSaveFeedback();
             toast.success('Perubahan permintaan disimpan.');
             (onSaved ?? openRequest)(String(requestId));
         } catch (caught) {
@@ -262,7 +274,7 @@ export default function MaintenanceRequestDetailPage({
                 setErrors(caught.validationErrors);
             }
 
-            toastSaveError(caught, 'Permintaan belum dapat disimpan.');
+            reportSaveError(caught, 'Permintaan belum dapat disimpan.');
         } finally {
             setBusy(false);
         }
@@ -288,6 +300,7 @@ export default function MaintenanceRequestDetailPage({
             );
             setSaved(result.data);
             setForm(toForm(result.data));
+            clearSaveFeedback();
             toast.success(success);
 
             return true;
@@ -296,7 +309,7 @@ export default function MaintenanceRequestDetailPage({
                 setErrors(caught.validationErrors);
             }
 
-            toastSaveError(caught, failure);
+            reportSaveError(caught, failure);
 
             return false;
         } finally {
@@ -313,10 +326,11 @@ export default function MaintenanceRequestDetailPage({
                 method: 'DELETE',
                 body: JSON.stringify({ version: saved?.version }),
             });
+            clearSaveFeedback();
             toast.success('Permintaan diarsipkan.');
             openList();
         } catch (caught) {
-            toastSaveError(caught, 'Permintaan belum dapat diarsipkan.');
+            reportSaveError(caught, 'Permintaan belum dapat diarsipkan.');
         } finally {
             setBusy(false);
         }
@@ -356,7 +370,10 @@ export default function MaintenanceRequestDetailPage({
             : (saved?.kode ?? 'Permintaan pemeliharaan');
 
     return (
-        <div className="flex h-full min-h-0 flex-col overflow-hidden">
+        <div
+            ref={feedbackScopeRef}
+            className="flex h-full min-h-0 flex-col overflow-hidden"
+        >
             <RecordCardHeader
                 recordTitle={saved?.kode ?? 'Baru'}
                 editing={!readOnly}
@@ -379,6 +396,7 @@ export default function MaintenanceRequestDetailPage({
                 }
             />
             <RecordActionBar
+                feedback={feedbackSummary}
                 title={embedded ? undefined : title}
                 trailing={saved ? <StatusBadge status={status} /> : undefined}
             >
@@ -472,7 +490,10 @@ export default function MaintenanceRequestDetailPage({
                 className="min-h-0 flex-1 overflow-y-auto"
             >
                 <div className="space-y-5 p-5">
-                    <CollapsibleSectionGroup defaultValue={['general']}>
+                    <CollapsibleSectionGroup
+                        value={feedbackSections}
+                        onValueChange={setFeedbackSections}
+                    >
                         <CollapsibleSection
                             value="general"
                             title="Umum"
@@ -502,7 +523,7 @@ export default function MaintenanceRequestDetailPage({
                                                     </div>
                                                 </div>
                                             )}
-                                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                        <FormGrid>
                                             <Info label="Jenis permintaan">
                                                 {saved.jenis_permintaan_nama ??
                                                     '—'}
@@ -557,7 +578,7 @@ export default function MaintenanceRequestDetailPage({
                                                     '—'
                                                 )}
                                             </Info>
-                                        </div>
+                                        </FormGrid>
                                         <Info label="Deskripsi">
                                             <p className="whitespace-pre-line">
                                                 {saved.deskripsi}
@@ -565,10 +586,10 @@ export default function MaintenanceRequestDetailPage({
                                         </Info>
                                     </>
                                 ) : (
-                                    <div className="grid gap-4 sm:grid-cols-2">
-                                        <Field>
-                                            <Select
-                                                {...types.selectProps}
+                                    <FormGrid>
+                                        <FormControl data-error-field="jenis_permintaan_id">
+                                            <RecordLookup
+                                                source={types}
                                                 label="Jenis permintaan"
                                                 required
                                                 items={choices(types.options)}
@@ -590,16 +611,16 @@ export default function MaintenanceRequestDetailPage({
                                             />
                                             {(message('jenis_permintaan_id') ||
                                                 types.error) && (
-                                                <FieldDescription>
+                                                <FieldError>
                                                     {message(
                                                         'jenis_permintaan_id',
                                                     ) || types.error}
-                                                </FieldDescription>
+                                                </FieldError>
                                             )}
-                                        </Field>
-                                        <Field>
-                                            <Select
-                                                {...units.selectProps}
+                                        </FormControl>
+                                        <FormControl data-error-field="responsible_org_unit_id">
+                                            <RecordLookup
+                                                source={units}
                                                 label="Unit pelapor"
                                                 required
                                                 items={choices(units.options)}
@@ -623,16 +644,16 @@ export default function MaintenanceRequestDetailPage({
                                                 'responsible_org_unit_id',
                                             ) ||
                                                 units.error) && (
-                                                <FieldDescription>
+                                                <FieldError>
                                                     {message(
                                                         'responsible_org_unit_id',
                                                     ) || units.error}
-                                                </FieldDescription>
+                                                </FieldError>
                                             )}
-                                        </Field>
-                                        <Field>
-                                            <Select
-                                                {...assets.selectProps}
+                                        </FormControl>
+                                        <FormControl data-error-field="aset_id">
+                                            <RecordLookup
+                                                source={assets}
                                                 label="Aset"
                                                 items={[
                                                     {
@@ -656,15 +677,25 @@ export default function MaintenanceRequestDetailPage({
                                             />
                                             {(message('aset_id') ||
                                                 assets.error) && (
-                                                <FieldDescription>
+                                                <FieldError>
                                                     {message('aset_id') ||
                                                         assets.error}
-                                                </FieldDescription>
+                                                </FieldError>
                                             )}
-                                        </Field>
-                                        <Field>
-                                            <Select
-                                                {...locations.selectProps}
+                                        </FormControl>
+                                        <FormControl
+                                            data-error-field="lokasi_aset_id"
+                                            error={
+                                                <>
+                                                    {message(
+                                                        'lokasi_aset_id',
+                                                    ) ||
+                                                        'Isi bila yang rusak bukan satu aset tertentu, misalnya ruangan.'}
+                                                </>
+                                            }
+                                        >
+                                            <RecordLookup
+                                                source={locations}
                                                 label="Lokasi"
                                                 items={[
                                                     {
@@ -690,14 +721,10 @@ export default function MaintenanceRequestDetailPage({
                                                     })
                                                 }
                                             />
-                                            <FieldDescription>
-                                                {message('lokasi_aset_id') ||
-                                                    'Isi bila yang rusak bukan satu aset tertentu, misalnya ruangan.'}
-                                            </FieldDescription>
-                                        </Field>
-                                        <Field>
-                                            <Select
-                                                {...levels.selectProps}
+                                        </FormControl>
+                                        <FormControl data-error-field="tingkat_layanan_id">
+                                            <RecordLookup
+                                                source={levels}
                                                 label="Tingkat layanan"
                                                 items={[
                                                     {
@@ -722,10 +749,10 @@ export default function MaintenanceRequestDetailPage({
                                                     })
                                                 }
                                             />
-                                        </Field>
-                                        <Field>
-                                            <Select
-                                                {...causes.selectProps}
+                                        </FormControl>
+                                        <FormControl data-error-field="sebab_kerusakan_id">
+                                            <RecordLookup
+                                                source={causes}
                                                 label="Sebab kerusakan"
                                                 items={[
                                                     {
@@ -750,8 +777,11 @@ export default function MaintenanceRequestDetailPage({
                                                     })
                                                 }
                                             />
-                                        </Field>
-                                        <Field className="sm:col-span-2">
+                                        </FormControl>
+                                        <FormControl
+                                            data-error-field="deskripsi"
+                                            className="sm:col-span-2"
+                                        >
                                             <Textarea
                                                 label="Deskripsi"
                                                 required
@@ -765,12 +795,12 @@ export default function MaintenanceRequestDetailPage({
                                                 }
                                             />
                                             {message('deskripsi') && (
-                                                <FieldDescription>
+                                                <FieldError>
                                                     {message('deskripsi')}
-                                                </FieldDescription>
+                                                </FieldError>
                                             )}
-                                        </Field>
-                                    </div>
+                                        </FormControl>
+                                    </FormGrid>
                                 )}
                             </div>
                         </CollapsibleSection>
@@ -847,13 +877,17 @@ export default function MaintenanceRequestDetailPage({
                         </DialogDescription>
                     </DialogHeader>
                     <DialogBody className="space-y-2">
-                        <Textarea
-                            label="Alasan penolakan"
-                            required
-                            maxLength={2000}
-                            value={reason}
-                            onChange={(event) => setReason(event.target.value)}
-                        />
+                        <FormControl>
+                            <Textarea
+                                label="Alasan penolakan"
+                                required
+                                maxLength={2000}
+                                value={reason}
+                                onChange={(event) =>
+                                    setReason(event.target.value)
+                                }
+                            />
+                        </FormControl>
                         {message('alasan') && (
                             <p className="text-destructive text-sm">
                                 {message('alasan')}
@@ -897,9 +931,18 @@ export default function MaintenanceRequestDetailPage({
                     </DialogHeader>
                     <DialogBody className="space-y-4">
                         {!saved?.aset_id && (
-                            <Field>
-                                <Select
-                                    {...assets.selectProps}
+                            <FormControl
+                                data-error-field="aset_id"
+                                error={
+                                    <>
+                                        {message('aset_id') ||
+                                            assets.error ||
+                                            'Pelapor hanya menyebut lokasinya; pilih aset yang akan dikerjakan.'}
+                                    </>
+                                }
+                            >
+                                <RecordLookup
+                                    source={assets}
                                     label="Aset"
                                     required
                                     items={choices(assets.options)}
@@ -916,16 +959,11 @@ export default function MaintenanceRequestDetailPage({
                                         })
                                     }
                                 />
-                                <FieldDescription>
-                                    {message('aset_id') ||
-                                        assets.error ||
-                                        'Pelapor hanya menyebut lokasinya; pilih aset yang akan dikerjakan.'}
-                                </FieldDescription>
-                            </Field>
+                            </FormControl>
                         )}
-                        <Field>
-                            <Select
-                                {...jobTypes.selectProps}
+                        <FormControl data-error-field="maintenance_job_type_id">
+                            <RecordLookup
+                                source={jobTypes}
                                 label="Jenis pekerjaan"
                                 required
                                 items={choices(jobTypes.options)}
@@ -946,15 +984,15 @@ export default function MaintenanceRequestDetailPage({
                             />
                             {(message('maintenance_job_type_id') ||
                                 jobTypes.error) && (
-                                <FieldDescription>
+                                <FieldError>
                                     {message('maintenance_job_type_id') ||
                                         jobTypes.error}
-                                </FieldDescription>
+                                </FieldError>
                             )}
-                        </Field>
-                        <Field>
-                            <Select
-                                {...workOrderTypes.selectProps}
+                        </FormControl>
+                        <FormControl data-error-field="tipe_work_order_id">
+                            <RecordLookup
+                                source={workOrderTypes}
                                 label="Tipe work order"
                                 required
                                 items={choices(workOrderTypes.options)}
@@ -970,14 +1008,14 @@ export default function MaintenanceRequestDetailPage({
                                 }
                             />
                             {message('tipe_work_order_id') && (
-                                <FieldDescription>
+                                <FieldError>
                                     {message('tipe_work_order_id')}
-                                </FieldDescription>
+                                </FieldError>
                             )}
-                        </Field>
-                        <Field>
-                            <Select
-                                {...trades.selectProps}
+                        </FormControl>
+                        <FormControl>
+                            <RecordLookup
+                                source={trades}
                                 label="Bidang keahlian"
                                 items={[
                                     { value: '', label: 'Tidak ditentukan' },
@@ -994,7 +1032,7 @@ export default function MaintenanceRequestDetailPage({
                                     })
                                 }
                             />
-                        </Field>
+                        </FormControl>
                         {message('details') && (
                             <p className="text-destructive text-sm">
                                 {message('details')}

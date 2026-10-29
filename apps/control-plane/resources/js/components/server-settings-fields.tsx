@@ -1,15 +1,10 @@
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 
 export type ServerSettingsKey =
     'server_address' | 'update_window_start' | 'update_window_end';
 
 export type ServerSettingsData = Record<ServerSettingsKey, string>;
-
-function FieldError({ message }: { message?: string }) {
-    return message ? (
-        <p className="text-sm text-destructive">{message}</p>
-    ) : null;
-}
 
 /**
  * Alamat server — IP atau nama host mesin milik klien.
@@ -30,22 +25,21 @@ export function ServerAddressField({
     lastSeenIp?: string | null;
 }) {
     return (
-        <div className="space-y-2">
-            <Input
-                id="server_address"
-                label="Alamat server (IP atau nama host VPS)"
-                value={value}
-                autoComplete="off"
-                spellCheck={false}
-                className="font-mono"
-                onChange={(e) => onChange(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-                Mesin tempat server klien berjalan, misalnya{' '}
-                <span className="font-mono">103.122.2.72</span> atau{' '}
-                <span className="font-mono">vps1.klinik.id</span>. Tanpa
-                https://, port, atau garis miring. Boleh diisi belakangan.
-            </p>
+        <div className="space-y-3">
+            <FormControl
+                error={error}
+                hint="Isi IP publik atau nama host, tanpa https://, port, atau garis miring. Alamat ini dipakai untuk DNS aplikasi."
+            >
+                <Input
+                    id="server_address"
+                    label="Alamat server"
+                    value={value}
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="font-mono"
+                    onChange={(e) => onChange(e.target.value)}
+                />
+            </FormControl>
             {lastSeenIp && value !== lastSeenIp && (
                 <p className="text-xs text-muted-foreground">
                     Agen terakhir melapor dari{' '}
@@ -64,7 +58,6 @@ export function ServerAddressField({
                     </span>
                 </p>
             )}
-            <FieldError message={error} />
         </div>
     );
 }
@@ -85,34 +78,33 @@ export function ServerAdvancedFields({
 }) {
     return (
         <div className="space-y-3">
-            <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-2">
+            <FormGrid>
+                <FormControl error={errors.update_window_start}>
                     <Input
                         id="update_window_start"
-                        label="Jendela pembaruan mulai"
+                        label="Mulai pembaruan paling awal"
                         type="time"
                         value={data.update_window_start}
                         onChange={(e) =>
                             setData('update_window_start', e.target.value)
                         }
                     />
-                    <FieldError message={errors.update_window_start} />
-                </div>
-                <div className="space-y-2">
+                </FormControl>
+                <FormControl error={errors.update_window_end}>
                     <Input
                         id="update_window_end"
-                        label="Jendela pembaruan selesai"
+                        label="Mulai pembaruan paling lambat"
                         type="time"
                         value={data.update_window_end}
                         onChange={(e) =>
                             setData('update_window_end', e.target.value)
                         }
                     />
-                    <FieldError message={errors.update_window_end} />
-                </div>
-            </div>
+                </FormControl>
+            </FormGrid>
             <p className="text-xs text-muted-foreground">
-                Jam pembaruan yang disepakati dengan klien, waktu Jakarta.
+                Batas waktu agen mulai mengambil pembaruan, waktu Jakarta.
+                Proses yang sudah berjalan dapat selesai setelah batas ini.
                 Kosongkan keduanya bila pembaruan boleh kapan saja. Pemasangan
                 pertama tidak menunggu jendela ini.
             </p>

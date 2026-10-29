@@ -83,6 +83,10 @@ Duty `management-aset.polis-asuransi.manage` (*Kelola asuransi aset*) memuat pri
 
 Kontraknya di `contracts/src/paths/asuransi.yaml`.
 
+Kartu polis menampung perubahan pertanggungan sebagai `coverage_operations` pada draft induk. Dialog pertanggungan hanya menerima draft melalui Tambah atau Selesai. POST/PATCH polis menyimpan header serta operasi tambah, akhiri, ganti nilai, atau arsipkan dalam satu transaksi; aturan riwayat dan versi tetap berlaku. Batal membuang seluruh draft, sedangkan kegagalan Simpan mempertahankannya. Selama request berjalan, isian dikunci agar perubahan baru tidak tertinggal dari kiriman yang sedang disimpan.
+
+POST menyimpan `creation_payload_hash` bersama nomor dan record polis. Retry dengan kunci yang sama mengembalikan polis lengkap hanya bila isi kiriman sama; perubahan header atau pertanggungan mendapat `409 idempotency_conflict`.
+
 ## Belum ada
 
 - **Buku penyusutan asuransi tersendiri.** BC memilih satu buku di *FA Setup* (*Insurance Depr. Book*) sebagai sumber nilai perolehan asuransi. Sampai Parameter aset tetap memuat setelan itu, yang dipakai buku bawaan (*Default Depr. Book*) lalu buku komersial. Setelan ini sengaja tidak ditambahkan di sini karena halaman pengaturan dipegang pekerjaan lain; menambahkannya cukup mengubah `AssetBookValues`.

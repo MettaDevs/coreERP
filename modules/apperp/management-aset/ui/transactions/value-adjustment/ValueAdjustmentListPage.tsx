@@ -12,12 +12,14 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
+import { FormControl } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { PageDialog, PageDialogContent } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
 import { useRecordList } from '../../use-record-list';
 import type { RecordCardState } from '../_shared/record-card';
 import type { Context } from './valueAdjustment';
@@ -53,31 +55,33 @@ export default function ValueAdjustmentListPage({
     const [card, setCard] = useState<RecordCardState>(null);
     const [cardBusy, setCardBusy] = useState(false);
     const [cardDirty, setCardDirty] = useState(false);
-    const discardChanges = () =>
-        !cardDirty || window.confirm('Buang perubahan yang belum disimpan?');
+    const {
+        request: requestChangesTransition,
+        confirmation: changesTransitionConfirmation,
+    } = useRecordTransition(cardDirty, cardBusy);
     const openNewCard = () => {
-        if (!cardBusy && discardChanges()) {
+        requestChangesTransition(() => {
             setCardDirty(false);
             setCard({ mode: 'create' });
-        }
+        });
     };
     const closeCard = () => {
-        if (!cardBusy && discardChanges()) {
+        requestChangesTransition(() => {
             setCard(null);
             setCardDirty(false);
             list.reload();
-        }
+        });
     };
     const cardRef = useRef<HTMLDivElement>(null);
     const openView = (id: string) => {
-        if (!cardBusy && discardChanges()) {
+        requestChangesTransition(() => {
             setCard({ mode: 'view', id });
-        }
+        });
     };
     const openEdit = (id: string) => {
-        if (!cardBusy && discardChanges()) {
+        requestChangesTransition(() => {
             setCard({ mode: 'edit', id });
-        }
+        });
     };
     const [status, setStatus] = useState('');
     const [jenis, setJenis] = useState('');
@@ -184,6 +188,7 @@ export default function ValueAdjustmentListPage({
 
     return (
         <>
+            {changesTransitionConfirmation}
             <ListPageLayout
                 header={
                     <RecordActionBar title="Penyesuaian nilai aset">
@@ -192,9 +197,9 @@ export default function ValueAdjustmentListPage({
                                 action="create"
                                 type="button"
                                 onClick={() => {
-                                    if (!cardBusy && discardChanges()) {
+                                    requestChangesTransition(() => {
                                         setCard({ mode: 'create' });
-                                    }
+                                    });
                                 }}
                             />
                         )}
@@ -203,59 +208,67 @@ export default function ValueAdjustmentListPage({
                 filters={
                     <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
                         <div className="w-full sm:w-72">
-                            <Input
-                                label="Cari"
-                                type="search"
-                                placeholder="Nomor bukti, alasan, atau buku"
-                                value={search}
-                                onChange={(event) =>
-                                    setSearch(event.target.value)
-                                }
-                            />
+                            <FormControl>
+                                <Input
+                                    label="Cari"
+                                    type="search"
+                                    placeholder="Nomor bukti, alasan, atau buku"
+                                    value={search}
+                                    onChange={(event) =>
+                                        setSearch(event.target.value)
+                                    }
+                                />
+                            </FormControl>
                         </div>
                         <div className="w-full sm:w-56">
-                            <Select
-                                label="Jenis"
-                                items={PILIHAN_JENIS.map(
-                                    (pilihan) => pilihan.label,
-                                )}
-                                value={
-                                    PILIHAN_JENIS.find(
-                                        (pilihan) => pilihan.value === jenis,
-                                    )?.label ?? null
-                                }
-                                ariaLabel="Saring berdasarkan jenis"
-                                onValueChange={(value) =>
-                                    setJenis(
+                            <FormControl>
+                                <Select
+                                    label="Jenis"
+                                    items={PILIHAN_JENIS.map(
+                                        (pilihan) => pilihan.label,
+                                    )}
+                                    value={
                                         PILIHAN_JENIS.find(
                                             (pilihan) =>
-                                                pilihan.label === value,
-                                        )?.value ?? '',
-                                    )
-                                }
-                            />
+                                                pilihan.value === jenis,
+                                        )?.label ?? null
+                                    }
+                                    ariaLabel="Saring berdasarkan jenis"
+                                    onValueChange={(value) =>
+                                        setJenis(
+                                            PILIHAN_JENIS.find(
+                                                (pilihan) =>
+                                                    pilihan.label === value,
+                                            )?.value ?? '',
+                                        )
+                                    }
+                                />
+                            </FormControl>
                         </div>
                         <div className="w-full sm:w-48">
-                            <Select
-                                label="Status"
-                                items={PILIHAN_STATUS.map(
-                                    (pilihan) => pilihan.label,
-                                )}
-                                value={
-                                    PILIHAN_STATUS.find(
-                                        (pilihan) => pilihan.value === status,
-                                    )?.label ?? null
-                                }
-                                ariaLabel="Saring berdasarkan status"
-                                onValueChange={(value) =>
-                                    setStatus(
+                            <FormControl>
+                                <Select
+                                    label="Status"
+                                    items={PILIHAN_STATUS.map(
+                                        (pilihan) => pilihan.label,
+                                    )}
+                                    value={
                                         PILIHAN_STATUS.find(
                                             (pilihan) =>
-                                                pilihan.label === value,
-                                        )?.value ?? '',
-                                    )
-                                }
-                            />
+                                                pilihan.value === status,
+                                        )?.label ?? null
+                                    }
+                                    ariaLabel="Saring berdasarkan status"
+                                    onValueChange={(value) =>
+                                        setStatus(
+                                            PILIHAN_STATUS.find(
+                                                (pilihan) =>
+                                                    pilihan.label === value,
+                                            )?.value ?? '',
+                                        )
+                                    }
+                                />
+                            </FormControl>
                         </div>
                     </div>
                 }

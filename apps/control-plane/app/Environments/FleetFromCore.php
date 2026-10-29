@@ -24,10 +24,8 @@ use Illuminate\Support\Facades\Http;
  *
  * ## Bentuk yang datang diperlakukan bahan mentah
  *
- * Isinya dari aplikasi lain lewat jaringan. Baris tanpa `id` dilewati karena tidak ada yang dapat
- * dilakukan dengannya — tombolnya tidak punya sasaran. Selebihnya diisi nilai jatuhan, bukan
- * dilewati: baris yang hilang dari layar ini berarti sebuah lingkungan yang **tidak terpantau**,
- * dan itu kegagalan yang lebih mahal daripada satu kolom yang berbunyi "—".
+ * Jawaban tanpa daftar atau baris tanpa identitas ditolak. Menghilangkan sebuah lingkungan
+ * dari pemantauan akan membuat armada yang tidak lengkap terlihat sehat.
  */
 final class FleetFromCore
 {
@@ -62,19 +60,24 @@ final class FleetFromCore
         $payload = $response->json();
         $payload = is_array($payload) ? $payload : [];
 
-        if ($response->failed()) {
+        if ($response->status() !== 200) {
             throw new EnvironmentRejected($this->reason($response->status(), $payload, $endpoint));
         }
 
-        $rows = $this->rows($payload['environments'] ?? null);
+        if (! is_string($payload['platform_fingerprint'] ?? null)
+            || ! is_array($payload['counts'] ?? null)
+            || ! is_array($payload['environments'] ?? null)
+            || ! array_is_list($payload['environments'])) {
+            throw new EnvironmentRejected('Daftar pembaruan belum dapat dibaca karena jawaban Core tidak lengkap. Muat ulang untuk mencoba lagi.');
+        }
+
+        $rows = $this->rows($payload['environments']);
 
         return [
             'platform_release' => is_string($payload['platform_release'] ?? null) && $payload['platform_release'] !== ''
                 ? $payload['platform_release']
                 : null,
-            'platform_fingerprint' => is_string($payload['platform_fingerprint'] ?? null)
-                ? $payload['platform_fingerprint']
-                : '—',
+            'platform_fingerprint' => $payload['platform_fingerprint'],
             /*
              * Dihitung ulang dari baris yang benar-benar sampai ke layar, bukan disalin dari kepala
              * jawaban. Kalau sebuah baris dilewati karena bentuknya rusak, angka di kepala halaman
@@ -118,7 +121,7 @@ final class FleetFromCore
 
         foreach ($raw as $item) {
             if (! is_array($item) || ! is_string($item['id'] ?? null) || $item['id'] === '') {
-                continue;
+                throw new EnvironmentRejected('Daftar pembaruan memuat lingkungan yang tidak dapat dikenali. Muat ulang untuk mencoba lagi.');
             }
 
             $clean[] = [
@@ -139,6 +142,7 @@ final class FleetFromCore
                     ? $item['state']
                     : 'unknown',
                 'lastOperation' => $this->operation($item['last_operation'] ?? null),
+                'queued' => ($item['queued'] ?? false) === true,
             ];
         }
 

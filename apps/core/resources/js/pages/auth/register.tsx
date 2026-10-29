@@ -22,14 +22,19 @@ import { ToggleGroup, ToggleGroupItem } from '@apperp/ui/toggle-group';
 import { Head, useForm } from '@inertiajs/react';
 import { Building2, KeyRound, Package } from 'lucide-react';
 import { useState } from 'react';
+import { FormErrorHeader } from '@/components/form-error-header';
 import PasswordInput from '@/components/password-input';
 import TextLink from '@/components/text-link';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 
 type AppOption = { id: string; name: string; description: string };
 type Props = { passwordRules: string; apps: AppOption[] };
 type Step = 'business' | 'products' | 'security';
 
 export default function Register({ passwordRules, apps }: Props) {
+    const { wrap: wrapFormRequest, summary: formRequestSummary } =
+        useInertiaFeedback();
+
     const [step, setStep] = useState<Step>('business');
     const form = useForm({
         name: '',
@@ -46,22 +51,32 @@ export default function Register({ passwordRules, apps }: Props) {
     const productsComplete = form.data.app_ids.length > 0;
 
     const submit = () => {
-        form.post('/register', {
-            onError: (errors) => {
-                if (errors.name || errors.business_name || errors.email) {
-                    setStep('business');
-                } else if (errors.app_ids) {
-                    setStep('products');
-                } else {
-                    setStep('security');
-                }
-            },
-        });
+        form.post(
+            '/register',
+            wrapFormRequest({
+                onError: (errors) => {
+                    if (errors.name || errors.business_name || errors.email) {
+                        setStep('business');
+                    } else if (errors.app_ids) {
+                        setStep('products');
+                    } else {
+                        setStep('security');
+                    }
+                },
+            }),
+        );
     };
 
     return (
         <>
             <Head title="Pendaftaran bisnis" />
+            <>
+                {formRequestSummary}
+                <FormErrorHeader
+                    errors={form.errors}
+                    operation="Pendaftaran belum selesai"
+                />
+            </>
             <Tabs
                 value={step}
                 onValueChange={(value) => setStep(value as Step)}
@@ -89,7 +104,10 @@ export default function Register({ passwordRules, apps }: Props) {
                         </CardHeader>
                         <CardContent>
                             <FieldGroup>
-                                <Field data-invalid={Boolean(form.errors.name)}>
+                                <Field
+                                    data-invalid={Boolean(form.errors.name)}
+                                    data-error-field={'name'}
+                                >
                                     <Input
                                         label="Nama pemilik"
                                         value={form.data.name}
@@ -109,6 +127,7 @@ export default function Register({ passwordRules, apps }: Props) {
                                     data-invalid={Boolean(
                                         form.errors.business_name,
                                     )}
+                                    data-error-field={'business_name'}
                                 >
                                     <Input
                                         label="Nama bisnis"
@@ -130,6 +149,7 @@ export default function Register({ passwordRules, apps }: Props) {
                                 </Field>
                                 <Field
                                     data-invalid={Boolean(form.errors.email)}
+                                    data-error-field={'email'}
                                 >
                                     <Input
                                         label="Email pemilik"
@@ -251,6 +271,7 @@ export default function Register({ passwordRules, apps }: Props) {
                                 </Alert>
                                 <Field
                                     data-invalid={Boolean(form.errors.password)}
+                                    data-error-field={'password'}
                                 >
                                     <PasswordInput
                                         label="Kata sandi"
@@ -275,6 +296,7 @@ export default function Register({ passwordRules, apps }: Props) {
                                     data-invalid={Boolean(
                                         form.errors.password_confirmation,
                                     )}
+                                    data-error-field={'password_confirmation'}
                                 >
                                     <PasswordInput
                                         label="Konfirmasi kata sandi"

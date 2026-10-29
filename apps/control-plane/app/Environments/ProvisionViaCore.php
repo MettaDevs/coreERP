@@ -32,7 +32,7 @@ final class ProvisionViaCore
 {
     /**
      * @param  ?int  $requestedBy  Id operator yang menekan tombolnya; kosong berarti riwayatnya "Sistem".
-     * @return array{status: string, database: ?string, modules: list<array{id: string, version: string, status: string, seeded: bool}>}
+     * @return array{status: string, database: ?string, modules: list<array{id: string, version: string, status: string, seeded: bool}>, modules_error: ?string}
      *
      * @throws EnvironmentRejected Core menjawab, dan jawabannya "tidak".
      */
@@ -61,14 +61,25 @@ final class ProvisionViaCore
         $payload = $response->json();
         $payload = is_array($payload) ? $payload : [];
 
-        if ($response->failed()) {
+        if ($response->status() !== 200 && $response->failed()) {
             throw new EnvironmentRejected($this->reason($response->status(), $payload, $endpoint));
         }
 
+        if ($response->status() !== 200
+            || ($payload['status'] ?? null) !== 'active'
+            || ! array_key_exists('database', $payload)
+            || ($payload['database'] !== null && ! is_string($payload['database']))
+            || ! is_array($payload['modules'] ?? null)
+            || ! array_is_list($payload['modules'])
+            || (isset($payload['modules_error']) && ! is_string($payload['modules_error']))) {
+            throw new EnvironmentRejected('Hasil penyiapan belum dapat dipastikan karena jawaban Core tidak lengkap. Penyiapan mungkin sudah berjalan; muat ulang dan periksa riwayat sebelum mencoba lagi.');
+        }
+
         return [
-            'status' => is_string($payload['status'] ?? null) ? $payload['status'] : $environment->status,
+            'status' => $payload['status'],
             'database' => is_string($payload['database'] ?? null) ? $payload['database'] : null,
-            'modules' => $this->modules($payload['modules'] ?? null),
+            'modules' => $this->modules($payload['modules']),
+            'modules_error' => $payload['modules_error'] ?? null,
         ];
     }
 
@@ -93,11 +104,7 @@ final class ProvisionViaCore
     }
 
     /**
-     * Membersihkan daftar module yang datang lewat jaringan.
-     *
-     * Isinya dari aplikasi lain, jadi diperlakukan bahan mentah: baris yang bentuknya tidak
-     * dikenali dilewati, bukan dipaksa. Satu baris aneh tidak boleh menjatuhkan seluruh jawaban —
-     * kalau ia jatuh, yang hilang justru bukti bahwa penyiapannya berhasil.
+     * Jawaban pemasangan harus lengkap agar nilai jatuhan tidak menyamarkan kegagalan membaca.
      *
      * @return list<array{id: string, version: string, status: string, seeded: bool}>
      */
@@ -110,15 +117,18 @@ final class ProvisionViaCore
         $clean = [];
 
         foreach ($raw as $item) {
-            if (! is_array($item) || ! is_string($item['id'] ?? null) || $item['id'] === '') {
-                continue;
+            if (! is_array($item) || ! is_string($item['id'] ?? null) || $item['id'] === ''
+                || ! is_string($item['version'] ?? null)
+                || ! in_array($item['status'] ?? null, ['installed', 'disabled', 'uninstalled'], true)
+                || ! is_bool($item['seeded'] ?? null)) {
+                throw new EnvironmentRejected('Hasil pemasangan aplikasi belum dapat dibaca. Periksa riwayat penyiapan sebelum mencoba lagi.');
             }
 
             $clean[] = [
                 'id' => $item['id'],
-                'version' => is_string($item['version'] ?? null) ? $item['version'] : '—',
-                'status' => is_string($item['status'] ?? null) ? $item['status'] : 'installed',
-                'seeded' => ($item['seeded'] ?? false) === true,
+                'version' => $item['version'],
+                'status' => $item['status'],
+                'seeded' => $item['seeded'],
             ];
         }
 

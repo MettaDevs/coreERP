@@ -11,6 +11,7 @@ import {
 } from '@apperp/ui/alert-dialog';
 
 import { DataTable, DataTableText } from '@apperp/ui/data-table';
+import { FieldError } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
 import {
@@ -22,8 +23,9 @@ import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import { Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { FormErrorHeader } from '@/components/form-error-header';
 import { useToday } from '@/hooks/use-work-date';
-import { apiJson, apiRequest, errorText } from '@/lib/core-api';
+import { apiJson, apiRequest, CoreApiError, errorText } from '@/lib/core-api';
 import type {
     DirectoryMetadata,
     PartyDetail,
@@ -57,6 +59,9 @@ export function PartyRelationships({
     >([]);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>(
+        {},
+    );
     const contentRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
         if (!editing) {
@@ -86,6 +91,7 @@ export function PartyRelationships({
         return () => controller.abort();
     }, [editing, query, party.id]);
     const open = (row: PartyRelationship | 'new') => {
+        setFieldErrors({});
         setError('');
         setQuery('');
         setForm(
@@ -111,6 +117,7 @@ export function PartyRelationships({
         setEditing(row);
     };
     async function save(event: React.FormEvent) {
+        setFieldErrors({});
         event.preventDefault();
 
         if (!editing) {
@@ -147,6 +154,10 @@ export function PartyRelationships({
             setEditing(null);
             onChanged();
         } catch (caught) {
+            if (caught instanceof CoreApiError) {
+                setFieldErrors(caught.errors);
+            }
+
             setError(errorText(caught, 'Hubungan belum dapat disimpan.'));
         } finally {
             setBusy(false);
@@ -345,7 +356,10 @@ export function PartyRelationships({
                                 onClick={() => setEditing(null)}
                             />
                         </PageDialogToolbar>
+                        <FormErrorHeader message={error} errors={fieldErrors} />
+
                         <form
+                            noValidate
                             id="party-relationship"
                             onSubmit={(event) => void save(event)}
                             data-page-dialog-body=""
@@ -367,20 +381,40 @@ export function PartyRelationships({
                                     setQuery(event.target.value)
                                 }
                             />
-                            <Select
-                                label="Pihak terkait"
-                                required
-                                portalContainer={contentRef}
-                                items={choices}
-                                value={form.other_id || null}
-                                onValueChange={(value) =>
-                                    setForm((current) => ({
-                                        ...current,
-                                        other_id: value ?? '',
-                                    }))
+                            <div
+                                data-error-field={
+                                    form.direction === 'from'
+                                        ? 'to_party_id'
+                                        : 'from_party_id'
                                 }
-                            />
+                            >
+                                <Select
+                                    data-error-field={
+                                        form.direction === 'from'
+                                            ? 'to_party_id'
+                                            : 'from_party_id'
+                                    }
+                                    label="Pihak terkait"
+                                    required
+                                    portalContainer={contentRef}
+                                    items={choices}
+                                    value={form.other_id || null}
+                                    onValueChange={(value) =>
+                                        setForm((current) => ({
+                                            ...current,
+                                            other_id: value ?? '',
+                                        }))
+                                    }
+                                />
+                                <FieldError>
+                                    {(form.direction === 'from'
+                                        ? fieldErrors.to_party_id
+                                        : fieldErrors.from_party_id
+                                    )?.join(' ')}
+                                </FieldError>
+                            </div>
                             <NativeSelect
+                                data-error-field="relationship_type_code"
                                 label="Jenis hubungan"
                                 required
                                 value={form.relationship_type_code}
@@ -404,6 +438,9 @@ export function PartyRelationships({
                                     </NativeSelectOption>
                                 ))}
                             </NativeSelect>
+                            <FieldError>
+                                {fieldErrors.relationship_type_code?.join(' ')}
+                            </FieldError>
                             <NativeSelect
                                 label="Arah hubungan"
                                 value={form.direction}
@@ -423,6 +460,8 @@ export function PartyRelationships({
                             </NativeSelect>
                             <Input
                                 label="Berlaku sejak"
+                                data-error-field="valid_from"
+                                aria-invalid={!!fieldErrors.valid_from}
                                 type="date"
                                 required
                                 value={form.valid_from}
@@ -433,8 +472,13 @@ export function PartyRelationships({
                                     }))
                                 }
                             />
+                            <FieldError>
+                                {fieldErrors.valid_from?.join(' ')}
+                            </FieldError>
                             <Input
                                 label="Berlaku sampai"
+                                data-error-field="valid_to"
+                                aria-invalid={!!fieldErrors.valid_to}
                                 type="date"
                                 value={form.valid_to}
                                 onChange={(event) =>
@@ -444,6 +488,9 @@ export function PartyRelationships({
                                     }))
                                 }
                             />
+                            <FieldError>
+                                {fieldErrors.valid_to?.join(' ')}
+                            </FieldError>
                         </form>
                     </DialogContent>
                 </Dialog>
@@ -465,6 +512,8 @@ export function PartyRelationships({
                                 kedua pihak tetap tersimpan.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
+                        <FormErrorHeader message={error} />
+
                         {error && (
                             <p
                                 role="alert"

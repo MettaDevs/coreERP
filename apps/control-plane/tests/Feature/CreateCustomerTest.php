@@ -453,13 +453,34 @@ class CreateCustomerTest extends TestCase
                 'purge_after' => now()->addDays(30),
             ]);
 
-        $this->actingAs($operator)->get('/tenant')
+        $this->actingAs($operator)->getJson('/tenant')
             ->assertOk()
-            ->assertSee('PT Punya Dua')
+            ->assertJsonPath('data.0.name', 'PT Punya Dua')
             // Angkanya harus sama dengan yang terbaca di layar Lingkungan, yang juga menyaring
             // yang sudah dihapus lunak. Dua angka yang menyebut hal sama dengan nilai berbeda
             // membuat yang membacanya berhenti mempercayai keduanya.
-            ->assertSee('"environments":2', false);
+            ->assertJsonPath('data.0.environments', 2);
+    }
+
+    public function test_tenant_list_is_bounded_and_continues_without_duplicate_rows(): void
+    {
+        $operator = $this->operator();
+        for ($index = 1; $index <= 55; $index++) {
+            $this->tenant('Batch tenant '.$index);
+        }
+
+        $first = $this->actingAs($operator)->getJson('/tenant')->assertOk()->assertJsonCount(50, 'data');
+        $cursor = $first->json('next_cursor');
+        $this->assertIsString($cursor);
+        $second = $this->getJson('/tenant?'.http_build_query(['cursor' => $cursor]))
+            ->assertOk()->assertJsonCount(5, 'data')->assertJsonPath('next_cursor', null);
+        $ids = [...array_column($first->json('data'), 'id'), ...array_column($second->json('data'), 'id')];
+        $this->assertCount(55, array_unique($ids));
+        $this->getJson('/tenant?search=Batch%20tenant%2055')->assertOk()->assertJsonCount(1, 'data');
+        $this->getJson('/tenant?cursor=invalid')->assertUnprocessable()->assertJsonValidationErrors('cursor');
+        $this->getJson('/tenant?'.http_build_query(['cursor' => base64_encode(json_encode(['unrelated' => 'value', '_pointsToNextItems' => true], JSON_THROW_ON_ERROR))]))
+            ->assertUnprocessable()->assertJsonValidationErrors('cursor');
+        $this->getJson('/tenant?search[]=invalid')->assertUnprocessable()->assertJsonValidationErrors('search');
     }
 
     public function test_only_available_apps_are_offered(): void

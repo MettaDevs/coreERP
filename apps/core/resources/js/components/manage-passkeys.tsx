@@ -3,6 +3,7 @@ import { KeyRound } from 'lucide-react';
 import { destroy } from '@/actions/Laravel/Passkeys/Http/Controllers/PasskeyRegistrationController';
 import Heading from '@/components/heading';
 import PasskeyItem from '@/components/passkey-item';
+import type { PasskeyDeleteCallbacks } from '@/components/passkey-item';
 import PasskeyRegistration from '@/components/passkey-register';
 import type { Passkey } from '@/types/auth';
 
@@ -28,10 +29,24 @@ const EmptyState = () => {
 export default function ManagePasskeys(props: Props) {
     const passkeys = props.passkeys ?? [];
 
-    const handleDelete = (id: number, onError: () => void) => {
+    const handleDelete = (id: number, callbacks: PasskeyDeleteCallbacks) => {
         router.delete(destroy.url(id), {
             preserveScroll: true,
-            onError,
+            ...callbacks,
+            onHttpException: () => {
+                callbacks.onError({
+                    form: 'Passkey belum dapat dihapus karena gangguan sistem. Hubungi pengelola aplikasi.',
+                });
+
+                return false;
+            },
+            onNetworkError: () => {
+                callbacks.onError({
+                    form: 'Jawaban belum dapat diterima. Periksa daftar passkey sebelum mengulang penghapusan.',
+                });
+
+                return false;
+            },
         });
     };
 

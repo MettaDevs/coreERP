@@ -8,11 +8,13 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
+import { FormControl } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { PageDialog, PageDialogContent } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
 import { useRecordList } from '../../use-record-list';
 import type { RecordCardState } from '../_shared/record-card';
 import type { Disposal, DisposalResource } from './disposal';
@@ -40,20 +42,22 @@ export default function DisposalListPage({
     const [card, setCard] = useState<RecordCardState>(null);
     const [cardBusy, setCardBusy] = useState(false);
     const [cardDirty, setCardDirty] = useState(false);
-    const discardChanges = () =>
-        !cardDirty || window.confirm('Buang perubahan yang belum disimpan?');
+    const {
+        request: requestChangesTransition,
+        confirmation: changesTransitionConfirmation,
+    } = useRecordTransition(cardDirty, cardBusy);
     const openNewCard = () => {
-        if (!cardBusy && discardChanges()) {
+        requestChangesTransition(() => {
             setCardDirty(false);
             setCard({ mode: 'create' });
-        }
+        });
     };
     const closeCard = () => {
-        if (!cardBusy && discardChanges()) {
+        requestChangesTransition(() => {
             setCard(null);
             setCardDirty(false);
             list.reload();
-        }
+        });
     };
     const [cardRevision, setCardRevision] = useState(0);
     const cardContentRef = useRef<HTMLDivElement>(null);
@@ -132,6 +136,7 @@ export default function DisposalListPage({
 
     return (
         <>
+            {changesTransitionConfirmation}
             <ListPageLayout
                 header={
                     <RecordActionBar title={jenis.title}>
@@ -147,15 +152,17 @@ export default function DisposalListPage({
                 filters={
                     <div className="border-b px-5 py-3">
                         <div className="w-full sm:w-72">
-                            <Input
-                                label="Cari"
-                                type="search"
-                                placeholder="Nomor bukti, aset, atau keterangan"
-                                value={search}
-                                onChange={(event) =>
-                                    setSearch(event.target.value)
-                                }
-                            />
+                            <FormControl>
+                                <Input
+                                    label="Cari"
+                                    type="search"
+                                    placeholder="Nomor bukti, aset, atau keterangan"
+                                    value={search}
+                                    onChange={(event) =>
+                                        setSearch(event.target.value)
+                                    }
+                                />
+                            </FormControl>
                         </div>
                     </div>
                 }
@@ -224,14 +231,14 @@ export default function DisposalListPage({
                                 list.reload();
                             }}
                             onRequestView={(id) => {
-                                if (!cardBusy && discardChanges()) {
+                                requestChangesTransition(() => {
                                     setCard({ mode: 'view', id });
-                                }
+                                });
                             }}
                             onRequestEdit={(id) => {
-                                if (!cardBusy && discardChanges()) {
+                                requestChangesTransition(() => {
                                     setCard({ mode: 'edit', id });
-                                }
+                                });
                             }}
                             onDirtyChange={setCardDirty}
                         />
