@@ -98,7 +98,14 @@ export default function App({
                 />
             );
         case 'harga-perkiraan':
-            return <OwnerEstimatePage />;
+            return (
+                <OwnerEstimatePage
+                    view={view}
+                    segments={segments}
+                    permissions={permissions}
+                    context={context}
+                />
+            );
         case 'kategori-pengadaan':
             return <ProcurementCategoryPage />;
         case 'jenis-vendor':

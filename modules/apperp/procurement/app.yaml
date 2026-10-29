@@ -81,6 +81,7 @@ security:
     - { code: procurement.prakualifikasi.api, name: API prakualifikasi vendor, type: api }
     - { code: procurement.kualifikasi.form, name: Layar kualifikasi vendor, type: form }
     - { code: procurement.harga-perkiraan.form, name: Layar harga perkiraan, type: form }
+    - { code: procurement.harga-perkiraan.api, name: API harga perkiraan, type: api }
     - { code: procurement.kategori-pengadaan.form, name: Layar kategori pengadaan, type: form }
     - { code: procurement.jenis-vendor.form, name: Layar jenis vendor/supplier, type: form }
     - { code: procurement.metode-pembayaran.form, name: Layar metode pembayaran, type: form }
@@ -102,6 +103,9 @@ security:
     - { code: procurement.prakualifikasi.archive, name: Arsipkan prakualifikasi, entry_point: procurement.prakualifikasi.api, access: delete }
     - { code: procurement.kualifikasi.read, name: Lihat kualifikasi, entry_point: procurement.kualifikasi.form, access: read }
     - { code: procurement.harga-perkiraan.read, name: Lihat harga perkiraan, entry_point: procurement.harga-perkiraan.form, access: read }
+    - { code: procurement.harga-perkiraan.create, name: Tambah harga perkiraan, entry_point: procurement.harga-perkiraan.api, access: create }
+    - { code: procurement.harga-perkiraan.update, name: Ubah harga perkiraan, entry_point: procurement.harga-perkiraan.api, access: update }
+    - { code: procurement.harga-perkiraan.archive, name: Arsipkan harga perkiraan, entry_point: procurement.harga-perkiraan.api, access: delete }
     - { code: procurement.kategori-pengadaan.read, name: Lihat kategori pengadaan, entry_point: procurement.kategori-pengadaan.form, access: read }
     - { code: procurement.jenis-vendor.read, name: Lihat jenis vendor/supplier, entry_point: procurement.jenis-vendor.form, access: read }
     - { code: procurement.metode-pembayaran.read, name: Lihat metode pembayaran, entry_point: procurement.metode-pembayaran.form, access: read }
@@ -145,6 +149,16 @@ security:
       name: Lihat harga perkiraan
       permissions:
         - procurement.harga-perkiraan.read
+    - code: procurement.harga-perkiraan.maintain
+      name: Pelihara harga perkiraan
+      permissions:
+        - procurement.harga-perkiraan.read
+        - procurement.harga-perkiraan.create
+        - procurement.harga-perkiraan.update
+    - code: procurement.harga-perkiraan.retire
+      name: Arsipkan harga perkiraan
+      permissions:
+        - procurement.harga-perkiraan.archive
     - code: procurement.kategori-pengadaan.view
       name: Lihat kategori pengadaan
       permissions:
@@ -216,6 +230,11 @@ security:
       name: Lihat harga perkiraan
       privileges:
         - procurement.harga-perkiraan.view
+    - code: procurement.harga-perkiraan.manage
+      name: Kelola harga perkiraan
+      privileges:
+        - procurement.harga-perkiraan.maintain
+        - procurement.harga-perkiraan.retire
     - code: procurement.kategori-pengadaan.inquire
       name: Lihat kategori pengadaan
       privileges:
