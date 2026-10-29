@@ -46,4 +46,3 @@ class ProcurementCategory extends MasterData
         ];
     }
 }
-

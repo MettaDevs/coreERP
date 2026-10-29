@@ -430,4 +430,3 @@ final class ProcurementCategoryController extends Controller
         return $trimmed === '' ? null : $trimmed;
     }
 }
-

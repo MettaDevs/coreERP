@@ -17,4 +17,3 @@ Route::patch('kategori-pengadaan/{id}/status', [ProcurementCategoryController::c
     ->name('procurement.procurement-category.update-status');
 Route::delete('kategori-pengadaan/{id}', [ProcurementCategoryController::class, 'destroy'])
     ->name('procurement.procurement-category.destroy');
-
