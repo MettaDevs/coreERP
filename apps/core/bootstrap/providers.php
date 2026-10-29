@@ -5,6 +5,7 @@ use App\Foundation\FinancePosting\FinancePostingServiceProvider;
 use App\Foundation\FiscalCalendar\FiscalCalendarServiceProvider;
 use App\Foundation\FundingSource\FundingSourceServiceProvider;
 use App\Foundation\NumberSequence\NumberSequenceServiceProvider;
+use App\Foundation\PaymentMethod\PaymentMethodServiceProvider;
 use App\Foundation\PlanningYear\PlanningYearServiceProvider;
 use App\Foundation\UnitOfMeasure\UnitOfMeasureServiceProvider;
 use App\Foundation\Vendor\VendorServiceProvider;
@@ -25,6 +26,7 @@ return [
     FinancePostingServiceProvider::class,
     FiscalCalendarServiceProvider::class,
     FundingSourceServiceProvider::class,
+    PaymentMethodServiceProvider::class,
     PlanningYearServiceProvider::class,
     NumberSequenceServiceProvider::class,
     UnitOfMeasureServiceProvider::class,

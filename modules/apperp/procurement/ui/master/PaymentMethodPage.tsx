@@ -1,10 +1,12 @@
-import { PlaceholderPage } from '../_shared/PlaceholderPage';
+import PaymentMethodsPage from '@/pages/foundation/payment-method/payment-methods';
+import type { ModulePageProps } from '../App';
 
-export default function PaymentMethodPage() {
-    return (
-        <PlaceholderPage
-            title="Metode Pembayaran"
-            description="Konfigurasi opsi dan metode pembayaran untuk tagihan vendor/rekanan."
-        />
-    );
+export default function PaymentMethodPage({
+    permissions = [],
+}: Partial<ModulePageProps>) {
+    const canManage =
+        permissions.includes('procurement.metode-pembayaran.update') ||
+        permissions.includes('procurement.metode-pembayaran.create');
+
+    return <PaymentMethodsPage canManage={canManage} />;
 }

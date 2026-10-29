@@ -125,7 +125,14 @@ export default function App({
                 />
             );
         case 'metode-pembayaran':
-            return <PaymentMethodPage />;
+            return (
+                <PaymentMethodPage
+                    view={view}
+                    segments={segments}
+                    permissions={permissions}
+                    context={context}
+                />
+            );
         case 'termin-pembayaran':
             return <PaymentTermPage />;
         case 'item-jasa':
