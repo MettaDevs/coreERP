@@ -56,4 +56,3 @@ class OwnerEstimate extends MasterData
         ];
     }
 }
-

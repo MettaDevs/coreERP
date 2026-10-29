@@ -15,4 +15,3 @@ Route::put('harga-perkiraan/{id}', [OwnerEstimateController::class, 'update'])
     ->name('procurement.owner-estimate.update');
 Route::delete('harga-perkiraan/{id}', [OwnerEstimateController::class, 'destroy'])
     ->name('procurement.owner-estimate.destroy');
-

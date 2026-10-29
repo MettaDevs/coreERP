@@ -449,4 +449,3 @@ final class OwnerEstimateController extends Controller
         return $trimmed === '' ? null : $trimmed;
     }
 }
-
