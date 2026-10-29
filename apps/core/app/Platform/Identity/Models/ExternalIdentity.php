@@ -8,6 +8,7 @@ use App\Platform\ControlPlane\OwnedByControlPlane;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * "Subjek `subject` dari penerbit `issuer` adalah user ini." Alasan bentuknya di migration
@@ -23,6 +24,7 @@ class ExternalIdentity extends Model
 {
     use HasUlids;
     use OwnedByControlPlane;
+    use SoftDeletes;
 
     protected $table = 'external_identities';
 

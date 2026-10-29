@@ -2,6 +2,8 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master;
 
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 use Modules\Apperp\ManagementAset\Http\Controllers\MasterDataController;
 use Modules\Apperp\ManagementAset\Models\master\MaintenanceChecklistVariable;
 use Modules\Apperp\ManagementAset\Models\master\MaintenanceChecklistVariableValue;
@@ -30,6 +32,14 @@ class MaintenanceChecklistVariableController extends MasterDataController
 
     protected function extraPresent(MasterData $record): array
     {
-        return ['values_count' => MaintenanceChecklistVariableValue::query()->where('variable_id', $record->getKey())->count()];
+        return ['values_count' => (int) ($record->getAttribute('values_count') ?? MaintenanceChecklistVariableValue::query()->where('variable_id', $record->getKey())->count())];
+    }
+
+    protected function prepareQuery(Builder $query, ?Request $request = null): Builder
+    {
+        return $query->addSelect([
+            'values_count' => MaintenanceChecklistVariableValue::query()
+                ->whereColumn('variable_id', 'aset_m_maintenance_checklist_variable.id')->selectRaw('count(*)'),
+        ]);
     }
 }

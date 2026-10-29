@@ -53,11 +53,7 @@ class PersonalDataGateTest extends TestCase
     {
         parent::setUp();
         // Tabel module contoh dibuat test-nya sendiri, seperti test registry dataset.
-        Artisan::call('migrate', [
-            '--path' => dirname(__DIR__, 3).'/Fixtures/modules/apperp/contoh-a/database/migrations',
-            '--realpath' => true,
-            '--force' => true,
-        ]);
+        Artisan::call('module:migrate', ['module' => 'contoh-a']);
         $dataset = app(DatasetRegistry::class)->find(self::DATASET);
         $this->assertNotNull($dataset, 'Dataset bahan uji tidak terdaftar; test ini akan lulus tanpa menguji apa pun.');
         $this->dataset = $dataset;

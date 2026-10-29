@@ -1,13 +1,5 @@
 import { useMemo } from 'react';
 import type { DataTableColumn } from '@apperp/ui/data-table';
-import { ReportFilterBar } from './_shared/ReportFilterBar';
-import {
-    AssetFilter,
-    AssetGroupFilter,
-    AssetTypeFilter,
-    DateFilter,
-    FiscalClassificationFilter,
-} from './_shared/ReportFilters';
 import { ReportPageLayout } from './_shared/ReportPageLayout';
 import { useReportData } from './_shared/useReportData';
 
@@ -33,18 +25,8 @@ const teks = (value: unknown) =>
     value === null || value === undefined || value === '' ? '—' : String(value);
 
 export default function LaporanMutasiAsetPage() {
-    const {
-        filters,
-        bindFilter,
-        bindMultiFilter,
-        additional,
-        hasActiveFilters,
-        resetFilters,
-        rows,
-        loading,
-        error,
-        refetch,
-    } = useReportData<MutationReportRow>('daftar-mutasi-aset');
+    const { filterState, rows, loading, error, refetch } =
+        useReportData<MutationReportRow>('daftar-mutasi-aset');
 
     const columns: DataTableColumn<MutationReportRow>[] = useMemo(
         () => [
@@ -138,27 +120,8 @@ export default function LaporanMutasiAsetPage() {
         <ReportPageLayout<MutationReportRow>
             title="Laporan mutasi aset"
             description="Perpindahan aset yang sudah selesai, satu baris per aset: dari mana ke mana, siapa yang menyerahkan dan menerima, dan kondisinya."
-            reportCode="daftar-mutasi-aset"
-            filters={filters}
-            filterBar={
-                <ReportFilterBar
-                    canReset={hasActiveFilters}
-                    onReset={resetFilters}
-                    additional={additional}
-                >
-                    <AssetGroupFilter {...bindMultiFilter('group_aset_id')} />
-                    <FiscalClassificationFilter
-                        {...bindMultiFilter('kelompok_harta_fiskal_id')}
-                    />
-                    <AssetTypeFilter {...bindMultiFilter('jenis_aset_id')} />
-                    <AssetFilter {...bindFilter('asset_id')} />
-                    <DateFilter label="Dari tanggal" {...bindFilter('dari')} />
-                    <DateFilter
-                        label="Sampai tanggal"
-                        {...bindFilter('sampai')}
-                    />
-                </ReportFilterBar>
-            }
+            filterState={filterState}
+
             columns={columns}
             rows={rows}
             loading={loading}

@@ -12,8 +12,7 @@ use App\Platform\Modules\Contracts\OrganizationDirectory;
  * terjadi — batas waktu, token layanan yang tidak sinkron, dan 503 yang harus dijelaskan ke
  * pengguna padahal Core berada di proses yang sama.
  *
- * **Tanda tangan dan bentuk jawabannya sengaja dipertahankan persis seperti milik klien
- * lama.** Kontrak Core memakai kunci `id`/`nama`, sedangkan endpoint module ini sejak awal
+ * Kontrak Core memakai kunci `id`/`nama`, sedangkan endpoint module ini sejak awal
  * memulangkan `membership_id`/`name`. Yang berpindah adalah jalurnya, bukan janjinya ke
  * pemanggil, jadi penerjemahan kunci dikerjakan di sini — satu tempat, bukan di setiap
  * controller yang memakainya.
@@ -32,75 +31,29 @@ final class HrOrganizationDirectory
     public function __construct(private readonly OrganizationDirectory $directory) {}
 
     /**
-     * Anggota tenant yang cocok dengan kata pencarian.
-     *
-     * Penyaringan dan pembatasan dikerjakan di sini, bukan oleh kontrak. Kontrak Core
-     * memulangkan seluruh anggota aktif tanpa parameter pencarian, jadi menghapus penyaringan
-     * ini berarti mengubah perilaku endpoint — kata pencarian yang dikirim layar berhenti
-     * berpengaruh, dan yang dipulangkan menjadi seluruh isi direktori.
-     *
-     * @return list<array{membership_id: string, name: string, email: string}>
+     * @param  array<string, mixed>  $input
+     * @return array{data: list<array{membership_id: string, name: string, email: string}>, next_cursor: ?string}
      */
-    public function members(string $tenantId, string $query): array
+    public function members(string $tenantId, array $input): array
     {
-        $search = mb_strtolower(trim($query));
-        $result = [];
+        $batch = $this->directory->lookup($tenantId, 'memberships', ['per_page' => self::RESULT_LIMIT, ...$input]);
+        $batch['data'] = array_values($batch['data']->map(fn (\stdClass $member): array => $this->shapeMember([
+            'id' => $member->id, 'nama' => $member->nama, 'email' => $member->email,
+        ]))->all());
 
-        foreach ($this->directory->members($tenantId) as $member) {
-            if ($search !== ''
-                && ! str_contains(mb_strtolower($member['nama']), $search)
-                && ! str_contains(mb_strtolower($member['email']), $search)) {
-                continue;
-            }
-
-            $result[] = $this->shapeMember($member);
-
-            if (count($result) === self::RESULT_LIMIT) {
-                break;
-            }
-        }
-
-        return $result;
+        return $batch;
     }
 
     /**
-     * Unit kerja tenant, dengan kunci yang sama seperti yang dipulangkan endpoint lama.
-     *
-     * @return list<array{id: string, name: string}>
+     * @param  array<string, mixed>  $input
+     * @return array{data: list<array{id: string, name: string}>, next_cursor: ?string}
      */
-    public function operatingUnits(string $tenantId): array
+    public function operatingUnits(string $tenantId, array $input): array
     {
-        $result = [];
+        $batch = $this->directory->lookup($tenantId, 'operating_units', $input);
+        $batch['data'] = array_values($batch['data']->map(fn (\stdClass $unit): array => ['id' => $unit->id, 'name' => $unit->nama])->all());
 
-        foreach ($this->directory->operatingUnits($tenantId) as $unit) {
-            $result[] = ['id' => $unit['id'], 'name' => $unit['nama']];
-        }
-
-        return $result;
-    }
-
-    /**
-     * Anggota aktif tenant yang emailnya sama persis dengan email pekerja, tanpa membedakan huruf besar
-     * (TODO analisa gap BC 9.1). Dipakai sebagai usulan tautan pekerja; yang memutuskan tetap
-     * pengguna. Hanya anggota tenant itu yang bisa muncul, karena kontrak Core menyaring per tenant.
-     *
-     * @return list<array{membership_id: string, name: string, email: string}>
-     */
-    public function membersWithEmail(string $tenantId, string $email): array
-    {
-        $wanted = mb_strtolower(trim($email));
-        if ($wanted === '') {
-            return [];
-        }
-
-        $result = [];
-        foreach ($this->directory->members($tenantId) as $member) {
-            if (mb_strtolower(trim($member['email'])) === $wanted) {
-                $result[] = $this->shapeMember($member);
-            }
-        }
-
-        return $result;
+        return $batch;
     }
 
     /**
@@ -116,12 +69,9 @@ final class HrOrganizationDirectory
             return [];
         }
 
-        $wanted = array_flip($membershipIds);
         $result = [];
-        foreach ($this->directory->members($tenantId) as $member) {
-            if (isset($wanted[$member['id']])) {
-                $result[$member['id']] = $this->shapeMember($member);
-            }
+        foreach ($this->directory->membersById($tenantId, $membershipIds) as $member) {
+            $result[$member['id']] = $this->shapeMember($member);
         }
 
         return $result;

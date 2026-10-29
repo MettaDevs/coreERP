@@ -55,7 +55,7 @@ get:
                 type: array
                 items:
                   type: object
-                  required: [id, tenant, name, slug, kind, status, database, fingerprint, state, last_operation]
+                  required: [id, tenant, name, slug, kind, status, database, fingerprint, state, queued, last_operation]
                   properties:
                     id: { type: string, format: ulid }
                     tenant: { type: string }
@@ -82,6 +82,12 @@ get:
                         Satu kata yang dapat dijadikan lencana. `unknown` mencakup dua keadaan
                         yang keduanya bukan "tertinggal": sedang dikerjakan, dan belum pernah
                         punya skema sama sekali.
+                    queued:
+                      type: boolean
+                      description: |
+                        Pembaruan sudah dipesan dalam antrean dan belum memiliki operasi berjalan.
+                        Tetap true selama jeda percobaan ulang; kembali false setelah job selesai
+                        atau gagal permanen. Dibaca dari kunci unik job yang sama dengan pengantrean.
                     last_operation:
                       type: object
                       nullable: true

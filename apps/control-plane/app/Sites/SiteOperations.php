@@ -141,8 +141,22 @@ final class SiteOperations
      */
     public function expireStale(Site $site): void
     {
+        $this->expireStaleForSites([$site]);
+    }
+
+    /** @param iterable<Site> $sites */
+    public function expireStaleForSites(iterable $sites): void
+    {
+        $ids = [];
+        foreach ($sites as $site) {
+            $ids[] = $site->id;
+        }
+        if ($ids === []) {
+            return;
+        }
+
         SiteOperation::query()
-            ->where('site_id', $site->id)
+            ->whereIn('site_id', $ids)
             ->where('status', 'running')
             ->where('lease_until', '<', now())
             ->update(self::closingColumns('failed', [
@@ -150,7 +164,7 @@ final class SiteOperations
             ]));
 
         SiteOperation::query()
-            ->where('site_id', $site->id)
+            ->whereIn('site_id', $ids)
             ->where('status', 'requested')
             ->where('expires_at', '<', now())
             ->update(self::closingColumns('expired'));

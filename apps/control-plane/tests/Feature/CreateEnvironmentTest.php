@@ -8,19 +8,11 @@ use ControlPlane\Models\Environment;
 use ControlPlane\Models\User;
 use ControlPlane\Tests\CoreSchema;
 use ControlPlane\Tests\TestCase;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
-/**
- * Konsol operator benar-benar dapat membuat lingkungan, dan benar-benar menolak yang tidak boleh.
- *
- * Setiap penolakan di bawah punya pasangan hijaunya di test yang sama atau di sebelahnya. Penjaga
- * yang hijau karena butalah yang sudah dua kali membakar repo ini: ia tampak bekerja selama
- * bertahun-tahun justru karena tidak ada satu pun kasus yang benar-benar melewatinya.
- */
-class CreateEnvironmentTest extends TestCase
+final class CreateEnvironmentTest extends TestCase
 {
     use CoreSchema;
 
@@ -82,295 +74,64 @@ class CreateEnvironmentTest extends TestCase
         return $tenantId;
     }
 
-    public function test_operator_can_create_a_demo_environment(): void
+    public function test_operator_route_sends_command_and_reads_the_scoped_result(): void
     {
+        config(['core.base_url' => 'http://core.test', 'core.token' => 'creation-test']);
         $tenant = $this->tenant();
-
-        $response = $this->actingAs($this->operator())->post('/lingkungan', [
-            'tenant_id' => $tenant,
-            'kind' => 'demo',
-            'name' => 'Peragaan Penjualan',
-            'expires_at' => Carbon::now()->addDays(30)->toDateString(),
-        ]);
-
-        $environment = Environment::query()->where('tenant_id', $tenant)->where('kind', 'demo')->firstOrFail();
-
-        $response->assertRedirect('/lingkungan/'.$environment->id);
-        $this->assertSame('peragaan-penjualan', $environment->slug);
-
-        // Tercatat, tetapi belum dapat dirutekan. Hanya `active` yang boleh dimasuki, sehingga
-        // lingkungan yang penyiapannya belum selesai adalah lingkungan yang tidak bisa dibuka —
-        // bukan lingkungan yang bisa dibuka lalu ternyata kosong.
-        $this->assertSame('provisioning', $environment->status);
-        $this->assertFalse($environment->outbound_allowed);
-        $this->assertNull($environment->database_name);
-
-        $operation = $environment->operations()->sole();
-        $this->assertSame('provision', $operation->operation);
-        $this->assertSame('succeeded', $operation->status);
-        $this->assertNotNull($operation->finished_at);
-    }
-
-    public function test_production_may_contact_the_outside_world(): void
-    {
-        // Pasangan hijau dari test di bawahnya. Tanpa ini, "sandbox tidak boleh mengirim" dapat
-        // dipenuhi oleh kode yang tidak pernah mengizinkan siapa pun mengirim.
-        $tenant = $this->tenant('PT Produksi');
-
-        $this->actingAs($this->operator())->post('/lingkungan', [
-            'tenant_id' => $tenant,
-            'kind' => 'production',
-            'name' => 'Produksi',
-        ])->assertRedirect();
-
-        $this->assertTrue(
-            Environment::query()->where('tenant_id', $tenant)->sole()->outbound_allowed,
-        );
-    }
-
-    public function test_sandbox_and_demo_may_not_contact_the_outside_world(): void
-    {
-        $tenant = $this->tenant('PT Salinan');
-
-        $this->actingAs($this->operator())->post('/lingkungan', [
-            'tenant_id' => $tenant,
-            'kind' => 'sandbox',
-            'name' => 'Uji Coba',
-        ])->assertRedirect();
-
-        $this->assertFalse(
-            Environment::query()->where('tenant_id', $tenant)->sole()->outbound_allowed,
-        );
-    }
-
-    public function test_a_demo_without_an_expiry_date_is_rejected(): void
-    {
-        $this->actingAs($this->operator())
-            ->post('/lingkungan', [
-                'tenant_id' => $this->tenant('PT Lupa Tanggal'),
-                'kind' => 'demo',
-                'name' => 'Demo Abadi',
-            ])
-            ->assertSessionHasErrors('expires_at');
-
-        $this->assertSame(0, Environment::query()->where('kind', 'demo')->count());
-    }
-
-    public function test_a_second_production_for_the_same_tenant_is_rejected(): void
-    {
-        $tenant = $this->tenant('PT Dua Produksi');
         $operator = $this->operator();
-
-        $this->actingAs($operator)->post('/lingkungan', [
-            'tenant_id' => $tenant,
-            'kind' => 'production',
-            'name' => 'Produksi',
-        ])->assertRedirect();
-
-        // Ditolak oleh partial unique index, bukan oleh pemeriksaan di kode. Bedanya mengikat:
-        // dua operator yang menekan tombolnya pada detik yang sama sama-sama lolos pemeriksaan,
-        // dan hanya PostgreSQL yang dapat memutuskan siapa yang duluan.
-        $this->actingAs($operator)
-            ->post('/lingkungan', [
-                'tenant_id' => $tenant,
-                'kind' => 'production',
-                'name' => 'Produksi Lagi',
-            ])
-            ->assertSessionHasErrors('name');
-
-        $this->assertSame(1, Environment::query()->where('tenant_id', $tenant)->count());
+        $environment = Environment::create(['tenant_id' => $tenant, 'kind' => 'production', 'name' => 'Produksi', 'slug' => 'produksi', 'status' => 'provisioning', 'outbound_allowed' => true, 'hosting' => 'client_server']);
+        Http::preventStrayRequests();
+        Http::fake(['http://core.test/api/internal/v1/environments' => Http::response(['environment_id' => $environment->id, 'tenant_id' => $tenant], 201)]);
+        $this->actingAs($operator)->post('/lingkungan', ['tenant_id' => $tenant, 'kind' => 'production', 'name' => 'Produksi', 'hosting' => 'client_server'])->assertRedirect('/lingkungan/'.$environment->id);
+        Http::assertSent(fn ($request) => $request->method() === 'POST' && $request->hasHeader('Authorization', 'Bearer creation-test') && $request['requested_by'] === $operator->id && $request['tenant_id'] === $tenant && $request['hosting'] === 'client_server');
+        $this->assertSame(1, Environment::count());
+        $this->assertDatabaseCount('environment_operations', 0);
     }
 
-    /**
-     * Alamatnya `<tenant>.<jenis>.<domain>`, jadi demo kedua akan menunjuk alamat yang sama.
-     * Ditolak `environments_satu_per_jenis` di database, dan operator membaca sebabnya.
-     */
-    public function test_a_second_demo_or_sandbox_for_the_same_tenant_is_rejected(): void
+    public function test_rejection_or_invalid_success_never_creates_local_rows(): void
     {
-        $tenant = $this->tenant('PT Dua Demo');
+        config(['core.base_url' => 'http://core.test']);
+        $tenant = $this->tenant();
         $operator = $this->operator();
+        foreach ([[422, ['errors' => ['name' => ['Sudah ada.']]]], [202, []], [201, ['environment_id' => 'foreign-id', 'tenant_id' => $tenant]], [201, ['environment_id' => 'id', 'tenant_id' => 'foreign-tenant']]] as [$status, $body]) {
+            Http::fake(['http://core.test/api/internal/v1/environments' => Http::response($body, $status)]);
+            $this->actingAs($operator)->post('/lingkungan', ['tenant_id' => $tenant, 'kind' => 'production', 'name' => 'Produksi'])->assertSessionHasErrors('name');
+        }
+        $this->assertSame(0, Environment::count());
+        $this->assertDatabaseCount('environment_operations', 0);
+    }
 
-        foreach (['demo', 'sandbox'] as $kind) {
-            $fields = ['tenant_id' => $tenant, 'kind' => $kind, 'expires_at' => now()->addMonth()->toDateString()];
-
-            $this->actingAs($operator)->post('/lingkungan', $fields + ['name' => 'Pertama'])->assertRedirect();
-
-            $this->actingAs($operator)
-                ->post('/lingkungan', $fields + ['name' => 'Kedua'])
-                ->assertSessionHasErrors(['name' => 'Tenant PT Dua Demo sudah punya lingkungan '.$kind.'. Satu tenant hanya boleh punya satu demo dan satu sandbox, karena alamatnya hanya memuat tenant dan jenis.']);
+    public function test_environment_list_is_bounded_and_searches_its_tenant(): void
+    {
+        $operator = $this->operator();
+        for ($index = 1; $index <= 55; $index++) {
+            Environment::query()->create([
+                'tenant_id' => $this->tenant('Batch tenant '.$index),
+                'kind' => 'production', 'name' => 'Environment '.$index,
+                'slug' => 'production', 'status' => 'provisioning',
+                'hosting' => 'provider', 'outbound_allowed' => true,
+            ]);
         }
 
-        $this->assertSame(2, Environment::query()->where('tenant_id', $tenant)->count());
+        $first = $this->actingAs($operator)->getJson('/lingkungan')->assertOk()->assertJsonCount(50, 'data');
+        $cursor = $first->json('next_cursor');
+        $this->assertIsString($cursor);
+        $second = $this->getJson('/lingkungan?'.http_build_query(['cursor' => $cursor]))
+            ->assertOk()->assertJsonCount(5, 'data')->assertJsonPath('next_cursor', null);
+        $ids = [...array_column($first->json('data'), 'id'), ...array_column($second->json('data'), 'id')];
+        $this->assertCount(55, array_unique($ids));
+        $this->getJson('/lingkungan?search=Batch%20tenant%2055')->assertOk()->assertJsonCount(1, 'data');
+        $this->getJson('/lingkungan?cursor=invalid')->assertUnprocessable()->assertJsonValidationErrors('cursor');
+        $this->getJson('/lingkungan?'.http_build_query(['cursor' => base64_encode(json_encode(['unrelated' => 'value', '_pointsToNextItems' => true], JSON_THROW_ON_ERROR))]))
+            ->assertUnprocessable()->assertJsonValidationErrors('cursor');
+        $this->getJson('/lingkungan?search[]=invalid')->assertUnprocessable()->assertJsonValidationErrors('search');
+        $this->actingAs($this->ordinaryUser())->getJson('/lingkungan')->assertNotFound();
     }
 
-    public function test_the_same_name_in_one_tenant_gets_a_different_slug(): void
+    public function test_non_operator_cannot_send_creation_command(): void
     {
-        $tenant = $this->tenant('PT Nama Kembar');
-        $operator = $this->operator();
-
-        // Dua jenis berbeda: satu tenant hanya boleh punya satu sandbox, jadi nama kembar yang
-        // realistis datang dari jenis yang lain.
-        foreach (['sandbox', 'production'] as $kind) {
-            $this->actingAs($operator)->post('/lingkungan', [
-                'tenant_id' => $tenant,
-                'kind' => $kind,
-                'name' => 'Uji Coba',
-            ])->assertRedirect();
-        }
-
-        $slug = Environment::query()->where('tenant_id', $tenant)->pluck('slug')->all();
-        sort($slug);
-
-        $this->assertSame(['uji-coba', 'uji-coba-2'], $slug);
-    }
-
-    public function test_a_non_operator_sees_nothing(): void
-    {
-        // 404, bukan 403. Pengguna biasa tidak perlu tahu alamat ini ada.
-        $this->actingAs($this->ordinaryUser())->get('/lingkungan')->assertNotFound();
-
-        $this->actingAs($this->ordinaryUser())
-            ->post('/lingkungan', [
-                'tenant_id' => $this->tenant('PT Tanpa Izin'),
-                'kind' => 'sandbox',
-                'name' => 'Menyelinap',
-            ])
-            ->assertNotFound();
-
-        $this->assertSame(0, Environment::query()->count());
-    }
-
-    public function test_a_guest_is_redirected_to_the_login_page(): void
-    {
-        $this->get('/lingkungan')->assertRedirect('/login');
-    }
-
-    // ------------------------------------------------------------------ berjalan di mana
-
-    /**
-     * Produksi di server klien dapat dibuat dari layar Lingkungan, bukan hanya saat tenant lahir. Tanpa pilihan
-     * ini, tenant yang produksinya belum dibuat — atau dibuat "Belum" — tidak punya jalan ke server klien.
-     */
-    public function test_a_production_can_be_created_on_the_client_server(): void
-    {
-        $tenant = $this->tenant('PT Server Klien');
-
-        $response = $this->actingAs($this->operator())->post('/lingkungan', [
-            'tenant_id' => $tenant,
-            'kind' => 'production',
-            'name' => 'Produksi',
-            'hosting' => 'client_server',
-        ]);
-
-        $environment = Environment::query()->where('tenant_id', $tenant)->sole();
-
-        $response->assertSessionHasNoErrors()
-            ->assertRedirect('/lingkungan/'.$environment->id)
-            ->assertSessionHas('message', 'Lingkungan "Produksi" tercatat. Sekarang siapkan server kliennya.');
-
-        $this->assertSame('client_server', $environment->hosting);
-        $this->assertTrue($environment->runsOnClientServer());
-        $this->assertNull($environment->database_name);
-        $this->assertSame('provisioning', $environment->status);
-        $this->assertSame('client_server', $environment->operations()->sole()->detail['hosting']);
-    }
-
-    /** Pasangan hijaunya: tanpa `hosting`, produksi tetap lahir di server kita seperti sebelum pilihan ini ada. */
-    public function test_without_a_hosting_choice_the_environment_runs_on_our_server(): void
-    {
-        $tenant = $this->tenant('PT Server Kita');
-
-        $this->actingAs($this->operator())->post('/lingkungan', [
-            'tenant_id' => $tenant,
-            'kind' => 'production',
-            'name' => 'Produksi',
-        ])->assertSessionHas('message', 'Lingkungan "Produksi" tercatat. Sekarang siapkan databasenya.');
-
-        $this->assertSame('provider', Environment::query()->where('tenant_id', $tenant)->sole()->hosting);
-    }
-
-    public function test_only_a_production_may_run_on_the_client_server(): void
-    {
-        $tenant = $this->tenant('PT Demo Klien');
-        $operator = $this->operator();
-
-        $this->actingAs($operator)->post('/lingkungan', [
-            'tenant_id' => $tenant,
-            'kind' => 'demo',
-            'name' => 'Peragaan',
-            'expires_at' => Carbon::now()->addDays(7)->toDateString(),
-            'hosting' => 'client_server',
-        ])->assertSessionHasErrors(['hosting' => 'Server klien hanya untuk lingkungan produksi. Demo dan sandbox selalu berjalan di server kita.']);
-
-        $this->actingAs($operator)->post('/lingkungan', [
-            'tenant_id' => $tenant,
-            'kind' => 'production',
-            'name' => 'Produksi',
-            'hosting' => 'rumah-sendiri',
-        ])->assertSessionHasErrors('hosting');
-
-        $this->assertSame(0, Environment::query()->where('tenant_id', $tenant)->count());
-    }
-
-    /**
-     * Produksi di server klien memakai bentuk alamat yang sama dengan produksi di server kita,
-     * `<tenant>.<domain dasar>`: operator tidak memilihnya, dan record DNS yang dibuat admin.erp membawanya ke
-     * mesin klien. Keduanya dibandingkan pada tenant yang berbeda supaya yang terbukti sama adalah bentuknya.
-     */
-    public function test_a_client_server_production_gets_the_same_address_shape_as_ours(): void
-    {
-        config(['core.base_domain' => 'erp.contoh.test', 'core.address_scheme' => 'https', 'core.address_port' => null]);
-        $operator = $this->operator();
-
-        $ours = $this->tenant('PT Alamat Kita');
-        $theirs = $this->tenant('PT Alamat Klien');
-
-        $this->actingAs($operator)->post('/lingkungan', ['tenant_id' => $ours, 'kind' => 'production', 'name' => 'Produksi']);
-        $this->actingAs($operator)->post('/lingkungan', ['tenant_id' => $theirs, 'kind' => 'production', 'name' => 'Produksi', 'hosting' => 'client_server']);
-
-        $provider = Environment::query()->where('tenant_id', $ours)->sole();
-        $clientServer = Environment::query()->where('tenant_id', $theirs)->sole();
-
-        $this->assertSame('https://'.$provider->tenant?->slug.'.erp.contoh.test', $provider->url());
-        $this->assertSame('https://'.$clientServer->tenant?->slug.'.erp.contoh.test', $clientServer->url());
-
-        $this->actingAs($operator)->get('/lingkungan/'.$clientServer->id)
-            ->assertInertia(fn ($page) => $page
-                ->where('environment.url', $clientServer->url())
-                ->where('environment.hosting', 'client_server')
-                ->where('serverClient.site', null));
-
-        $this->actingAs($operator)->get('/lingkungan')
-            ->assertInertia(fn ($page) => $page
-                ->where('environments', function (Collection $rows) use ($provider, $clientServer): bool {
-                    $byId = $rows->keyBy('id');
-
-                    return data_get($byId->get($clientServer->id), 'url') === $clientServer->url()
-                        && data_get($byId->get($clientServer->id), 'site') === null
-                        && data_get($byId->get($provider->id), 'url') === $provider->url();
-                }));
-    }
-
-    public function test_the_index_and_show_screens_display_the_created_environment(): void
-    {
-        $tenant = $this->tenant('PT Terlihat');
-        $operator = $this->operator();
-
-        $this->actingAs($operator)->post('/lingkungan', [
-            'tenant_id' => $tenant,
-            'kind' => 'demo',
-            'name' => 'Peragaan',
-            'expires_at' => Carbon::now()->addDays(7)->toDateString(),
-        ])->assertRedirect();
-
-        $environment = Environment::query()->where('tenant_id', $tenant)->sole();
-
-        $this->actingAs($operator)->get('/lingkungan')
-            ->assertOk()
-            ->assertSee('Peragaan');
-
-        $this->actingAs($operator)->get('/lingkungan/'.$environment->id)
-            ->assertOk()
-            ->assertSee($environment->id);
+        Http::fake();
+        $this->actingAs($this->ordinaryUser())->post('/lingkungan', ['tenant_id' => $this->tenant(), 'kind' => 'production', 'name' => 'Produksi'])->assertNotFound();
+        Http::assertNothingSent();
     }
 }

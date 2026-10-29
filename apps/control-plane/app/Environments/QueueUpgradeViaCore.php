@@ -56,8 +56,8 @@ final class QueueUpgradeViaCore
                 ->post($endpoint, $body);
         } catch (ConnectionException $disconnected) {
             throw new EnvironmentRejected(
-                'Core tidak menjawab di '.$endpoint.' dalam batas waktu, jadi tidak ada yang '
-                .'diantrekan. Periksa COREERP_URL di konsol ini. Pesan aslinya: '
+                'Core tidak menjawab di '.$endpoint.' dalam batas waktu, sehingga hasilnya belum '
+                .'dapat dipastikan. Pembaruan mungkin sudah diantrekan; muat ulang dan periksa riwayat sebelum mencoba lagi. Pesan aslinya: '
                 .$disconnected->getMessage(),
                 previous: $disconnected,
             );
@@ -66,16 +66,26 @@ final class QueueUpgradeViaCore
         $payload = $response->json();
         $payload = is_array($payload) ? $payload : [];
 
-        if ($response->failed()) {
+        if ($response->status() !== 202 && $response->failed()) {
             throw new EnvironmentRejected($this->reason($response->status(), $payload, $endpoint));
+        }
+
+        if ($response->status() !== 202
+            || ! is_array($payload['queued'] ?? null)
+            || ! array_is_list($payload['queued'])
+            || ! is_int($payload['queued_count'] ?? null)
+            || $payload['queued_count'] !== count($payload['queued'])) {
+            throw new EnvironmentRejected('Hasil permintaan pembaruan belum dapat dipastikan. Pembaruan mungkin sudah diantrekan; muat ulang dan periksa riwayat sebelum mencoba lagi.');
         }
 
         $queued = [];
 
-        foreach (is_array($payload['queued'] ?? null) ? $payload['queued'] : [] as $id) {
-            if (is_string($id) && $id !== '') {
-                $queued[] = $id;
+        foreach ($payload['queued'] as $id) {
+            if (! is_string($id) || $id === '') {
+                throw new EnvironmentRejected('Jawaban antrean pembaruan tidak lengkap. Periksa riwayat sebelum mencoba lagi.');
             }
+
+            $queued[] = $id;
         }
 
         return [

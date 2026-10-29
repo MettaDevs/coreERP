@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ControlPlane\Http\Controllers;
 
+use ControlPlane\Models\User;
 use ControlPlane\Sso\IdentityProvider;
 use ControlPlane\Sso\SsoFailure;
 use Illuminate\Http\RedirectResponse;
@@ -48,6 +49,7 @@ class Login extends Controller
 
     public function submit(Request $request): RedirectResponse
     {
+        $request->session()->forget('console_mfa');
         $input = $request->validate([
             'email' => ['required', 'string', 'email'],
             'password' => ['required', 'string'],
@@ -77,7 +79,11 @@ class Login extends Controller
             ]);
         }
 
-        if (! Auth::attempt(['email' => $input['email'], 'password' => $input['password']], $request->boolean('remember'))) {
+        $credentials = ['email' => $input['email'], 'password' => $input['password']];
+        $provider = Auth::getProvider();
+        $user = $provider->retrieveByCredentials($credentials);
+
+        if (! $user instanceof User || ! $provider->validateCredentials($user, $credentials)) {
             RateLimiter::hit($throttleKey, 60);
 
             // Pesannya sengaja tidak membedakan "email tidak ada" dari "kata sandi salah".
@@ -86,7 +92,30 @@ class Login extends Controller
             ]);
         }
 
+        if (! $user->operator()) {
+            abort(404);
+        }
+
+        $provider->rehashPasswordIfRequired($user, $credentials);
+
+        if ($user->must_change_password) {
+            throw ValidationException::withMessages(['email' => 'Ganti kata sandi akun Anda di Core sebelum masuk ke Pusat Admin.']);
+        }
+
         RateLimiter::clear($throttleKey);
+
+        if ($user->two_factor_secret !== null && $user->two_factor_confirmed_at !== null) {
+            $request->session()->regenerate();
+            $request->session()->put('console_mfa', [
+                'user_id' => $user->id,
+                'expires_at' => now()->addMinutes(5)->getTimestamp(),
+                'remember' => $request->boolean('remember'),
+            ]);
+
+            return redirect('/login/verifikasi');
+        }
+
+        Auth::login($user, $request->boolean('remember'));
 
         if (! $passwordLoginOpen) {
             Log::warning('Konsol: akun darurat masuk dengan kata sandi.', ['email' => $email, 'ip' => $request->ip()]);

@@ -18,13 +18,14 @@ import {
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
 import { useState } from 'react';
+import { useSaveFeedback } from '@/hooks/use-save-feedback';
 import { createDashboard, updateDashboard } from '@/lib/analytics/api';
 import type {
     DashboardAbilities,
     DashboardDetail,
     DashboardSummary,
 } from '@/lib/analytics/types';
-import { CoreApiError, toastSaveError } from '@/lib/core-api';
+import { CoreApiError } from '@/lib/core-api';
 
 /**
  * Form membuat atau mengubah nama, keterangan, dan pembagian satu dasbor, di kartu `PageDialog` supaya
@@ -44,6 +45,12 @@ export function DashboardFormSheet({
     onClose: () => void;
     onSaved: (dashboard: DashboardDetail) => void;
 }) {
+    const {
+        report: saveReport,
+        clear: saveClear,
+        summary: saveSummary,
+        scopeRef: saveScopeRef,
+    } = useSaveFeedback(dashboard?.id ?? 'new');
     const [name, setName] = useState(dashboard?.name ?? '');
     const [description, setDescription] = useState(
         dashboard?.description ?? '',
@@ -56,6 +63,7 @@ export function DashboardFormSheet({
         (dashboard === null || dashboard.mine || dashboard.shared);
 
     const save = async () => {
+        saveClear();
         setSaving(true);
         setErrors({});
 
@@ -80,7 +88,7 @@ export function DashboardFormSheet({
                 setErrors(caught.errors);
             }
 
-            toastSaveError(caught, 'Dasbor belum disimpan.');
+            saveReport(caught, 'Dasbor belum disimpan.');
         } finally {
             setSaving(false);
         }
@@ -131,8 +139,11 @@ export function DashboardFormSheet({
                         onClick={onClose}
                     />
                 </PageDialogToolbar>
+                {saveSummary}
                 <PageDialogBody>
                     <form
+                        noValidate
+                        ref={saveScopeRef}
                         id="dashboard-form"
 
                         onSubmit={(event) => {
@@ -141,7 +152,10 @@ export function DashboardFormSheet({
                         }}
                     >
                         <FieldGroup>
-                            <Field data-invalid={Boolean(errors.name)}>
+                            <Field
+                                data-error-field="name"
+                                data-invalid={Boolean(errors.name)}
+                            >
                                 <Input
                                     label="Nama"
                                     required
@@ -154,7 +168,10 @@ export function DashboardFormSheet({
                                 />
                                 <FieldError>{errors.name?.[0]}</FieldError>
                             </Field>
-                            <Field data-invalid={Boolean(errors.description)}>
+                            <Field
+                                data-error-field="description"
+                                data-invalid={Boolean(errors.description)}
+                            >
                                 <Textarea
                                     label="Keterangan"
                                     maxLength={1000}
@@ -169,7 +186,10 @@ export function DashboardFormSheet({
                                 </FieldError>
                             </Field>
                             {canShare && (
-                                <Field data-invalid={Boolean(errors.shared)}>
+                                <Field
+                                    data-error-field="shared"
+                                    data-invalid={Boolean(errors.shared)}
+                                >
                                     <div className="flex items-center gap-3">
                                         <Switch
                                             id="dashboard-shared"

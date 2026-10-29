@@ -25,8 +25,10 @@ import {
     TableRow,
 } from '@apperp/ui/table';
 import { Head, useForm } from '@inertiajs/react';
+import { FormErrorHeader } from '@/components/form-error-header';
 import Heading from '@/components/heading';
 import { useDateTimeFormat } from '@/hooks/use-date-time';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import type { BreadcrumbItem } from '@/types/navigation';
 
 type Policy = {
@@ -65,6 +67,9 @@ function PolicyRow({
     policy: Policy;
     canManage: boolean;
 }) {
+    const { wrap: wrapFormRequest, summary: formRequestSummary } =
+        useInertiaFeedback();
+
     const form = useForm({
         enabled: policy.enabled,
         retention_days: String(policy.days),
@@ -74,6 +79,7 @@ function PolicyRow({
 
     return (
         <form
+            noValidate
             className="flex flex-col gap-4 rounded-lg border p-4"
             onSubmit={(event) => {
                 event.preventDefault();
@@ -82,9 +88,12 @@ function PolicyRow({
                     ...data,
                     version: policy.version,
                 }));
-                form.put(`/settings/retention/${policy.code}`, {
-                    preserveScroll: true,
-                });
+                form.put(
+                    `/settings/retention/${policy.code}`,
+                    wrapFormRequest({
+                        preserveScroll: true,
+                    }),
+                );
             }}
         >
             <RecordActionBar>
@@ -96,6 +105,11 @@ function PolicyRow({
                     />
                 )}
             </RecordActionBar>
+            <>
+                {formRequestSummary}
+                <FormErrorHeader errors={form.errors} />
+            </>
+
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex min-w-0 flex-col gap-1">
                     <div className="flex flex-wrap items-center gap-2">
@@ -122,7 +136,10 @@ function PolicyRow({
                 </div>
 
                 <div className="flex items-start gap-3">
-                    <Field data-invalid={Boolean(form.errors.retention_days)}>
+                    <Field
+                        data-invalid={Boolean(form.errors.retention_days)}
+                        data-error-field={'retention_days'}
+                    >
                         <FieldLabel htmlFor={inputId}>
                             Disimpan selama (hari)
                         </FieldLabel>

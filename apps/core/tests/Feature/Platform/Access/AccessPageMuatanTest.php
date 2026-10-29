@@ -7,6 +7,7 @@ use App\Platform\ControlPlane\Models\Client;
 use App\Platform\Identity\Models\User;
 use App\Platform\Modules\Models\CoreApp;
 use App\Platform\Organization\Models\Organization;
+use App\Platform\Tenant\Models\InvitationCode;
 use App\Platform\Tenant\Models\Tenant;
 use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -242,6 +243,36 @@ class AccessPageMuatanTest extends TestCase
             .' ketika role bertambah dari 1 menjadi 12. Ada query di dalam perulangan role; '
             .'lihat docs/dev/33-muatan-halaman-dan-paginasi.md aturan 4.'
         );
+    }
+
+    public function test_member_and_invitation_lists_resume_past_the_first_batch_without_tenant_leaks(): void
+    {
+        [$user, $tenant] = $this->tenantDenganAkses();
+        [$foreignUser, $foreignTenant] = $this->tenantDenganAkses();
+        for ($i = 0; $i < 80; $i++) {
+            TenantMembership::create(['tenant_id' => $tenant->id, 'user_id' => User::factory()->create()->id, 'status' => 'active']);
+            InvitationCode::create(['tenant_id' => $tenant->id, 'created_by' => $user->id, 'label' => 'Invitation '.$i, 'code_hash' => hash('sha256', 'code-'.$i)]);
+        }
+        $foreignInvitation = InvitationCode::create(['tenant_id' => $foreignTenant->id, 'created_by' => $foreignUser->id, 'label' => 'Other tenant', 'code_hash' => hash('sha256', 'foreign-code')]);
+        $this->actingAs($user);
+        foreach (['members' => 81, 'invitations' => 80] as $kind => $total) {
+            $ids = [];
+            $cursor = null;
+            do {
+                $batch = $this->getJson('/settings/access?'.http_build_query(['list' => $kind, 'cursor' => $cursor]))->assertOk()->json();
+                $this->assertLessThanOrEqual(40, count($batch['data']));
+                $ids = [...$ids, ...array_column($batch['data'], 'id')];
+                $cursor = $batch['next_cursor'];
+            } while ($cursor !== null);
+            $this->assertCount($total, array_unique($ids));
+            $this->assertCount($total, $ids);
+            $this->getJson('/settings/access?list='.$kind.'&per_page=101')->assertUnprocessable();
+            $this->getJson('/settings/access?list='.$kind.'&cursor=invalid')->assertUnprocessable();
+        }
+        $this->getJson('/settings/access?list=invitations&record_id='.$foreignInvitation->id)->assertOk()->assertJsonCount(0, 'data');
+        $foreignMember = TenantMembership::query()->where('tenant_id', $foreignTenant->id)->firstOrFail();
+        $this->getJson('/settings/access?list=members&record_id='.$foreignMember->id)->assertOk()->assertJsonCount(0, 'data');
+        $this->get('/settings/access')->assertInertia(fn (Assert $page) => $page->has('members', 40)->has('invitations', 40));
     }
 
     private function buatRole(Tenant $tenant, int $banyak, int $mulai = 0): void

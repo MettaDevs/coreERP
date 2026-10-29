@@ -655,8 +655,8 @@ final class ClientServerPanelTest extends SiteTestCase
         $site->forceFill(['reported_release' => '1.0.0'])->save();
         $this->assertStates($operator, $environment, 'ready', true);
 
-        $this->actingAs($operator)->get('/lingkungan')
-            ->assertInertia(fn ($page) => $page->where('environments.0.serverClient.reportedRelease', '1.0.0'));
+        $this->actingAs($operator)->getJson('/lingkungan')
+            ->assertJsonPath('data.0.serverClient.reportedRelease', '1.0.0');
 
         $this->travel(10)->minutes();
         $this->assertStates($operator, $environment, 'stale', true);
@@ -760,12 +760,12 @@ final class ClientServerPanelTest extends SiteTestCase
                 ->where('serverClient.progress.state', $state)
                 ->where('serverClient.progress.final', $final));
 
-        $this->actingAs($operator)->get('/lingkungan')
-            ->assertInertia(fn ($page) => $page
-                ->where('environments.0.id', $environment->id)
-                ->where('environments.0.serverClient.state', $state));
+        $this->actingAs($operator)->getJson('/lingkungan')
+            ->assertJsonPath('data.0.id', $environment->id)
+            ->assertJsonPath('data.0.serverClient.state', $state);
 
-        $this->actingAs($operator)->get('/situs')
-            ->assertInertia(fn ($page) => $page->where('sites.0.progress.state', $state));
+        $filter = $state === 'revoked' ? 'revoked' : 'all';
+        $this->actingAs($operator)->getJson('/situs?'.http_build_query(['filter' => $filter]))
+            ->assertJsonPath('data.0.progress.state', $state);
     }
 }

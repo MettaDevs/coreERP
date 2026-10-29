@@ -6,6 +6,7 @@ namespace ControlPlane\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
@@ -27,6 +28,7 @@ use Illuminate\Support\Carbon;
 class ExternalIdentity extends Model
 {
     use HasUlids;
+    use SoftDeletes;
 
     protected $table = 'external_identities';
 

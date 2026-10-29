@@ -7,6 +7,9 @@ namespace Tests\Feature\Database;
 use App\Foundation\FiscalCalendar\Models\FiscalCalendar;
 use App\Foundation\WorkingCalendar\Models\WorkingTimeCalendar;
 use App\Foundation\WorkingCalendar\Models\WorkingTimeTemplate;
+use App\Platform\Access\Models\AppDataPolicy;
+use App\Platform\Access\Models\RoleAssignment;
+use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\ControlPlane\Models\Client;
 use App\Platform\Identity\Models\User;
 use App\Platform\Modules\Contracts\RowVersion;
@@ -48,6 +51,15 @@ final class SettingsRowVersionTest extends TestCase
 
         $this->legalEntity = Organization::create(['tenant_id' => $this->tenant->id, 'classification' => 'legal_entity', 'name' => 'Entitas A', 'status' => 'active']);
         $this->legalEntity->legalEntity()->create(['tenant_id' => $this->tenant->id, 'company_code' => 'ENTA', 'country_code' => 'ID']);
+        AppDataPolicy::firstOrCreate(['code' => 'test.settings.organizations'], [
+            'app_id' => CoreSecurityCatalog::APP_ID, 'name' => 'Akses organisasi uji', 'protected_permissions' => [],
+            'requires_legal_entity' => false, 'requires_operating_unit' => false, 'allows_descendants' => false,
+        ]);
+        RoleAssignment::query()->where('membership_id', $this->user->activeMembership()->id)->firstOrFail()->dataPolicyScopes()->create([
+            'tenant_id' => $this->tenant->id, 'policy_code' => 'test.settings.organizations',
+            'include_descendants' => false, 'valid_from' => now(),
+        ]);
+        $this->withSession(['workspace.legal_entity_id' => $this->legalEntity->id]);
     }
 
     public function test_urutan_nomor_lewat_api_menolak_versi_basi_dan_versi_kosong(): void

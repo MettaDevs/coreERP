@@ -11,20 +11,45 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
-import { Head, usePage } from '@inertiajs/react';
+import { IncrementalListStatus } from '@apperp/ui/incremental-list-status';
+import { useIncrementalList } from '@apperp/ui/use-incremental-list';
+import type { ListLoader } from '@apperp/ui/use-incremental-list';
+import { Head } from '@inertiajs/react';
+import { useCallback } from 'react';
 import Heading from '@/components/heading';
+import { apiJson } from '@/lib/core-api';
 import type { ApprovalRequest } from './ApprovalRequestCard';
 import { ApprovalRequestCard } from './ApprovalRequestCard';
 
-type Props = { items: ApprovalRequest[] };
-export default function WorkflowInbox({ items }: Props) {
-    const { url } = usePage();
-    const target = new URLSearchParams(url.split('?')[1] ?? '').get('item');
-    const visibleItems = target
-        ? [...items].sort(
-              (a, b) => Number(b.id === target) - Number(a.id === target),
-          )
-        : items;
+type Props = { targetItem: ApprovalRequest | null };
+export default function WorkflowInbox({ targetItem }: Props) {
+    const loader = useCallback<ListLoader<ApprovalRequest>>(
+        async ({ cursor, signal }) => {
+            const params = new URLSearchParams();
+
+            if (cursor) {
+                params.set('cursor', cursor);
+            }
+
+            const result = await apiJson<{
+                data: ApprovalRequest[];
+                next_cursor: string | null;
+            }>(`/workflow-inbox?${params}`, { signal });
+
+            return { items: result.data, nextCursor: result.next_cursor };
+        },
+        [],
+    );
+    const list = useIncrementalList({
+        loadItems: loader,
+        getKey: (item) => item.id,
+    });
+    const visibleItems = targetItem
+        ? [
+              targetItem,
+              ...list.items.filter((item) => item.id !== targetItem.id),
+          ]
+        : list.items;
 
     return (
         <>
@@ -43,7 +68,9 @@ export default function WorkflowInbox({ items }: Props) {
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        {items.length === 0 ? (
+                        {!list.loading &&
+                        !list.error &&
+                        visibleItems.length === 0 ? (
                             <Empty>
                                 <EmptyHeader>
                                     <EmptyTitle>
@@ -60,9 +87,18 @@ export default function WorkflowInbox({ items }: Props) {
                                 <ApprovalRequestCard
                                     key={item.id}
                                     item={item}
+                                    onDecided={() => {
+                                        list.setItems((items) =>
+                                            items.filter(
+                                                (row) => row.id !== item.id,
+                                            ),
+                                        );
+                                        list.reload();
+                                    }}
                                 />
                             ))
                         )}
+                        <IncrementalListStatus state={list} />
                     </CardContent>
                 </Card>
             </main>

@@ -18,20 +18,19 @@ import {
     CollapsibleSection,
     CollapsibleSectionGroup,
 } from '@apperp/ui/collapsible-section';
-import { Field, FieldDescription } from '@apperp/ui/field';
+import { DatePicker } from '@apperp/ui/date-picker';
+import { FieldError } from '@apperp/ui/field';
+
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { usePageDialogRecord } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
-import { Select } from '@apperp/ui/select';
+
 import { Textarea } from '@apperp/ui/textarea';
-import {
-    ApiError,
-    api,
-    errorMessage,
-    newIdempotencyKey,
-    toastSaveError,
-} from '../../api';
+import { RecordLookup } from '../../_shared/RecordLookup';
+import { ApiError, api, errorMessage, newIdempotencyKey } from '../../api';
 import { useRecordOptions } from '../../use-record-list';
+import { useSaveFeedback } from '../../use-save-feedback';
 import { PostingPreviewPanel } from '../_shared/PostingPreviewPanel';
 import type { PostingPreview } from '../_shared/PostingPreviewPanel';
 import { RecordCardHeader } from '../_shared/record-card';
@@ -73,9 +72,6 @@ const keIsian = (data: Disposal): Isian => ({
     keterangan: data.keterangan ?? '',
 });
 
-const labelAset = (aset: AsetPilihan) =>
-    aset.nama ? `${aset.kode} · ${aset.nama}` : aset.kode;
-
 /**
  * Rincian satu penjualan atau pemusnahan aset, alur jurnal aset tetap Business Central: draf disimpan,
  * *Pratinjau posting* menampilkan nilai buku yang dikeluarkan dan jurnalnya, lalu *Posting* melepas aset,
@@ -96,6 +92,19 @@ export default function DisposalDetailPage({
     permissions: string[];
     disposalId?: string;
 } & RecordCardControls) {
+    const [feedbackSections, setFeedbackSections] = useState<string[]>([
+        'general',
+    ]);
+
+    const {
+        scopeRef: feedbackScopeRef,
+        feedbackSummary,
+        reportSaveError,
+        clearSaveFeedback,
+    } = useSaveFeedback(undefined, disposalId, () =>
+        setFeedbackSections(['general', 'notes']),
+    );
+
     const embedded = usePageDialogRecord(undefined);
 
     const bukaDokumen = (resource: DisposalResource, id: string) =>
@@ -203,6 +212,7 @@ export default function DisposalDetailPage({
                         keterangan: isian.keterangan || null,
                     }),
                 });
+                clearSaveFeedback();
                 toast.success(`Draf ${hasil.data.kode} disimpan.`);
 
                 if (onSaved) {
@@ -229,6 +239,7 @@ export default function DisposalDetailPage({
                 },
             );
             terima(hasil.data);
+            clearSaveFeedback();
             toast.success('Perubahan draf disimpan.');
             onSaved?.(hasil.data.id);
         } catch (caught) {
@@ -236,7 +247,7 @@ export default function DisposalDetailPage({
                 setGalat(caught.validationErrors);
             }
 
-            toastSaveError(caught, 'Draf belum dapat disimpan.');
+            reportSaveError(caught, 'Draf belum dapat disimpan.');
         } finally {
             setMenyimpan(false);
         }
@@ -277,6 +288,7 @@ export default function DisposalDetailPage({
             );
             terima(hasil.data);
             setPratinjau(null);
+            clearSaveFeedback();
             toast.success(
                 aksi === 'batal'
                     ? 'Draf dibatalkan.'
@@ -288,7 +300,7 @@ export default function DisposalDetailPage({
                 setGalat(caught.validationErrors);
             }
 
-            toastSaveError(
+            reportSaveError(
                 caught,
                 aksi === 'batal'
                     ? 'Draf belum dapat dibatalkan.'
@@ -318,7 +330,10 @@ export default function DisposalDetailPage({
     const jumlah = pratinjau?.amounts;
 
     return (
-        <div className="flex h-full min-h-0 flex-col overflow-hidden">
+        <div
+            ref={feedbackScopeRef}
+            className="flex h-full min-h-0 flex-col overflow-hidden"
+        >
             <RecordCardHeader
                 recordTitle={dokumen?.kode ?? 'Baru'}
                 editing={bolehUbah}
@@ -329,6 +344,7 @@ export default function DisposalDetailPage({
                 }
             />
             <RecordActionBar
+                feedback={feedbackSummary}
                 title={
                     embedded
                         ? undefined
@@ -396,26 +412,30 @@ export default function DisposalDetailPage({
                 className="min-h-0 flex-1 overflow-y-auto"
             >
                 <div className="space-y-5 p-5">
-                    <CollapsibleSectionGroup defaultValue={['general']}>
+                    <CollapsibleSectionGroup
+                        value={feedbackSections}
+                        onValueChange={setFeedbackSections}
+                    >
                         <CollapsibleSection
                             value="general"
                             title="Umum"
                             summary={tanggalTampil(isian.tanggal)}
                         >
                             <div className="space-y-4">
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    <Field>
+                                <FormGrid>
+                                    <FormControl data-error-field="aset_id">
                                         {baru ? (
-                                            <Select
+                                            <RecordLookup
                                                 label="Aset"
                                                 required
-                                                {...assetSource.selectProps}
-                                                items={aset.map(labelAset)}
-                                                value={
-                                                    dipilih
-                                                        ? labelAset(dipilih)
-                                                        : null
-                                                }
+                                                source={assetSource}
+                                                items={aset.map((record) => ({
+                                                    value: record.id,
+                                                    label: assetSource.getLabel(
+                                                        record,
+                                                    ),
+                                                }))}
+                                                value={dipilih?.id ?? null}
                                                 placeholder="Pilih aset yang sudah didekomisioning"
                                                 searchPlaceholder="Cari kode atau nama aset"
                                                 emptyMessage="Tidak ada aset yang sudah disetujui untuk dekomisioning."
@@ -426,13 +446,7 @@ export default function DisposalDetailPage({
                                                 onValueChange={(item) =>
                                                     setIsian({
                                                         ...isian,
-                                                        aset_id:
-                                                            aset.find(
-                                                                (calon) =>
-                                                                    labelAset(
-                                                                        calon,
-                                                                    ) === item,
-                                                            )?.id ?? '',
+                                                        aset_id: item ?? '',
                                                     })
                                                 }
                                             />
@@ -451,32 +465,40 @@ export default function DisposalDetailPage({
                                             />
                                         )}
                                         {pesan('aset_id') && (
-                                            <FieldDescription>
+                                            <FieldError>
                                                 {pesan('aset_id')}
-                                            </FieldDescription>
+                                            </FieldError>
                                         )}
-                                    </Field>
-                                    <Field>
-                                        <Input
+                                    </FormControl>
+                                    <FormControl
+                                        data-error-field="tanggal"
+                                        error={pesan('tanggal')}
+                                        hint={
+                                            'Tanggal jurnal dan tanggal buku aset ditutup. Penyusutan sampai tanggal ini harus sudah difinalkan.'
+                                        }
+                                    >
+                                        <DatePicker
                                             label={`Tanggal ${jenis.noun}`}
-                                            type="date"
+
                                             required
                                             readOnly={!bolehUbah}
                                             value={isian.tanggal}
-                                            onChange={(event) =>
+                                            onValueChange={(value) =>
                                                 setIsian({
                                                     ...isian,
-                                                    tanggal: event.target.value,
+                                                    tanggal: value,
                                                 })
                                             }
                                         />
-                                        <FieldDescription>
-                                            {pesan('tanggal') ||
-                                                'Tanggal jurnal dan tanggal buku aset ditutup. Penyusutan sampai tanggal ini harus sudah difinalkan.'}
-                                        </FieldDescription>
-                                    </Field>
+                                    </FormControl>
                                     {jenis.hasProceeds && (
-                                        <Field>
+                                        <FormControl
+                                            data-error-field="nilai"
+                                            error={pesan('nilai')}
+                                            hint={
+                                                'Selisihnya dengan nilai buku menjadi laba atau rugi pelepasan.'
+                                            }
+                                        >
                                             <Input
                                                 label="Nilai penjualan"
                                                 type="number"
@@ -492,13 +514,9 @@ export default function DisposalDetailPage({
                                                     })
                                                 }
                                             />
-                                            <FieldDescription>
-                                                {pesan('nilai') ||
-                                                    'Selisihnya dengan nilai buku menjadi laba atau rugi pelepasan.'}
-                                            </FieldDescription>
-                                        </Field>
+                                        </FormControl>
                                     )}
-                                </div>
+                                </FormGrid>
                             </div>
                         </CollapsibleSection>
                         <CollapsibleSection
@@ -507,7 +525,7 @@ export default function DisposalDetailPage({
                             summary={isian.keterangan || 'Belum ada keterangan'}
                         >
                             <div className="space-y-4">
-                                <Field>
+                                <FormControl>
                                     <Textarea
                                         label="Keterangan"
                                         rows={2}
@@ -520,7 +538,7 @@ export default function DisposalDetailPage({
                                             })
                                         }
                                     />
-                                </Field>
+                                </FormControl>
                             </div>
                         </CollapsibleSection>
                     </CollapsibleSectionGroup>

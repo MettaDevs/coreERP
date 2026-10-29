@@ -106,7 +106,17 @@ graph TD
 
 ---
 
-Sheet master sederhana ditutup setelah penyimpanan berhasil, lalu DataTable dimuat ulang. `MasterPage` menentukan kelanjutan dari `extraSectionFor`, bukan pengecualian nama master. Setelah create, Sheet tetap terbuka hanya bila ada rincian yang memerlukan ID record baru, misalnya pilihan nilai pada tipe atribut teks. PATCH biasa menutup Sheet. Master daftar-detail tetap mengikuti alur panelnya sendiri.
+Form master sederhana ditutup setelah penyimpanan berhasil, lalu DataTable dimuat ulang. Panel daftar-detail menampilkan record hasil simpan dalam mode baca. Rincian dapat disusun sebelum record baru tersimpan, sehingga tidak perlu penyimpanan kedua untuk mengisinya.
+
+### Satu penyimpanan per form
+
+Bagian atribut, model, kondisi, counter, buku penyusutan, varian pekerjaan, checklist, serta baris dan objek rencana hanya menyusun draft. Simpan pada toolbar induk mengirim field master dan `details` dalam satu POST atau PATCH. Kegagalan satu bagian membatalkan seluruh transaksi; isian tetap tersedia untuk diperbaiki. Batal membuang draft. Dialog baris memakai Tambah atau Selesai untuk menerima perubahan ke draft induk, tanpa menulis ke database.
+
+Model pabrikan dan varian pekerjaan mengirim operasi atas baris yang berubah beserta versi masing-masing, bukan mengganti seluruh daftar. Daftar dapat dimuat bertahap, sehingga baris yang belum dimuat tidak boleh dianggap dihapus. Hak create, update, dan archive anak tetap diperiksa. Bagian yang ditutup mempertahankan isian setelah pertama kali dibuka melalui `CollapsibleSection.keepMounted`.
+
+`creation_payload_hash` mencatat hash kiriman awal pada master yang mendukung rincian. Retry dengan kunci sama dan isi berbeda mendapat `409 idempotency_conflict`, agar perubahan rincian setelah respons terputus tidak dianggap sudah tersimpan. Hash dibuat bersama record dalam transaksi yang sama; isi kiriman asli tidak disimpan pada kolom ini.
+
+`SectionSaveOwnershipTest` menjaga pemilik tombol Simpan dan menolak request tulis mandiri dari komponen bagian master. `MasterDraftDetailsTest` menguji penyimpanan gabungan, rollback, izin, versi, kepemilikan anak, dan retry.
 
 ## Arsitektur Backend: Dua Base Controller
 

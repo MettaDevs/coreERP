@@ -182,6 +182,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import FormErrorDemo from '@/components/playground/form-error-demo';
 import { InlineLookupDemo } from './inline-lookup-demo';
 import { ModalPageStackDemo } from './modal-page-stack-demo';
 
@@ -389,6 +390,8 @@ export default function UiPlayground() {
                             </div>
                         </div>
                     </header>
+
+                    <FormErrorDemo />
 
                     <DemoCard
                         title="Component inventory"

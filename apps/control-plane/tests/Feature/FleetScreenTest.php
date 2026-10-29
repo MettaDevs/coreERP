@@ -157,7 +157,7 @@ class FleetScreenTest extends TestCase
 
         $response = $this->actingAs($this->operator())->post('/pembaruan');
 
-        $response->assertSessionHas('message', fn (string $message): bool => str_contains($message, 'Tidak ada lingkungan yang perlu diperbarui'));
+        $response->assertSessionHas('message', fn (string $message): bool => str_contains($message, 'Tidak ada pembaruan baru yang diantrekan'));
     }
 
     public function test_a_refusal_to_queue_becomes_a_readable_error_not_a_500(): void
@@ -180,7 +180,7 @@ class FleetScreenTest extends TestCase
      * yang tidak akan pernah ia temukan, dan pencarian itu berakhir dengan ia menyimpulkan layarnya
      * berbohong — yang benar, dan itulah masalahnya.
      */
-    public function test_a_malformed_row_is_dropped_and_the_header_count_shrinks_with_it(): void
+    public function test_a_malformed_row_marks_the_fleet_as_unreadable(): void
     {
         Http::fake([self::BASE_URL.'/api/internal/v1/fleet' => Http::response([
             'platform_fingerprint' => '2026_09_12_100000_tambah_kolom',
@@ -194,8 +194,8 @@ class FleetScreenTest extends TestCase
         $response = $this->actingAs($this->operator())->get('/pembaruan');
 
         $response->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
-            ->has('environments', 1)
-            ->where('counts.current', 1)
+            ->has('environments', 0)
+            ->where('unreachable', fn (mixed $message): bool => is_string($message) && $message !== '')
         );
     }
 
@@ -209,6 +209,7 @@ class FleetScreenTest extends TestCase
     {
         Http::fake([self::BASE_URL.'/api/internal/v1/fleet' => Http::response([
             'platform_fingerprint' => '2026_09_12_100000_tambah_kolom',
+            'counts' => ['current' => 0, 'behind' => 0, 'failed' => 0, 'unknown' => 1],
             'environments' => [
                 ['id' => 'env-satu', 'name' => 'Produksi', 'state' => 'sesuatu-yang-baru'],
             ],

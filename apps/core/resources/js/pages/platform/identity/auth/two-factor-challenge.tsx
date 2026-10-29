@@ -6,10 +6,15 @@ import { Spinner } from '@apperp/ui/spinner';
 import { Form, Head, setLayoutProps } from '@inertiajs/react';
 import { REGEXP_ONLY_DIGITS } from 'input-otp';
 import { useMemo, useState } from 'react';
+import { FormErrorHeader } from '@/components/form-error-header';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import { OTP_MAX_LENGTH } from '@/hooks/use-two-factor-auth';
 import { store } from '@/routes/two-factor/login';
 
 export default function TwoFactorChallenge() {
+    const { wrap: wrapFormResponse1, summary: formResponse1Summary } =
+        useInertiaFeedback();
+
     const [showRecoveryInput, setShowRecoveryInput] = useState<boolean>(false);
     const [code, setCode] = useState<string>('');
 
@@ -51,13 +56,20 @@ export default function TwoFactorChallenge() {
 
             <div className="space-y-6">
                 <Form
+                    noValidate
                     {...store.form()}
                     className="space-y-4"
                     resetOnError
                     resetOnSuccess={!showRecoveryInput}
+                    options={wrapFormResponse1({})}
                 >
                     {({ errors, processing, clearErrors }) => (
                         <>
+                            <>
+                                {formResponse1Summary}
+                                <FormErrorHeader errors={errors} />
+                            </>
+
                             {showRecoveryInput ? (
                                 <>
                                     <Input
@@ -80,7 +92,10 @@ export default function TwoFactorChallenge() {
                                     </FieldError>
                                 </>
                             ) : (
-                                <div className="flex flex-col items-center justify-center space-y-3 text-center">
+                                <div
+                                    className="flex flex-col items-center justify-center space-y-3 text-center"
+                                    data-error-field={'code'}
+                                >
                                     <FieldLabel htmlFor="code">
                                         Kode autentikasi
                                         <span

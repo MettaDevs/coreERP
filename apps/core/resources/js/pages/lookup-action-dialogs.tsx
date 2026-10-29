@@ -17,6 +17,7 @@ import {
     useInlineLookupData,
 } from '@apperp/ui/use-inline-lookup-data';
 import { useState } from 'react';
+import { FormErrorHeader } from '@/components/form-error-header';
 
 export type LookupOption = {
     code: string;
@@ -309,6 +310,7 @@ export function LookupDetailsDialog({
                 }
             >
                 <form
+                    noValidate
                     className="flex min-h-0 flex-1 flex-col"
                     onSubmit={(event) => {
                         event.preventDefault();
@@ -357,6 +359,10 @@ export function LookupDetailsDialog({
                             </Button>
                         )}
                     </PageDialogToolbar>
+                    <FormErrorHeader
+                        message={error}
+                        operation="Perubahan contoh belum disimpan"
+                    />
                     <PageDialogBody>
                         <div className="space-y-4">
                             {error && (
@@ -430,6 +436,7 @@ export function LookupCreateDialog({
                 }
             >
                 <form
+                    noValidate
                     className="flex min-h-0 flex-1 flex-col"
                     onSubmit={(event) => {
                         event.preventDefault();
@@ -470,6 +477,10 @@ export function LookupCreateDialog({
                             onClick={onClose}
                         />
                     </PageDialogToolbar>
+                    <FormErrorHeader
+                        message={error}
+                        operation="Perubahan contoh belum disimpan"
+                    />
                     <PageDialogBody>
                         <div className="space-y-4">
                             {error && (

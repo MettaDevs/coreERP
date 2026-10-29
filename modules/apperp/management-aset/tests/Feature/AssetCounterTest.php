@@ -154,6 +154,35 @@ class AssetCounterTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_selected_inactive_or_archived_counter_survives_read_and_save_but_cannot_be_newly_selected(): void
+    {
+        $type = $this->seedMaster('aset_m_jenis_aset', 'Jenis uji');
+        $counter = $this->seedCounterType();
+        $permissions = ['management-aset.jenis-aset.read', 'management-aset.jenis-aset.update'];
+        $url = '/api/modules/management-aset/v1/jenis-aset/'.$type.'/counter';
+        $this->sebagaiPengguna($this->tenantId, $permissions)
+            ->putJson($url, ['jenis_counter_ids' => [$counter], 'version' => 1])->assertOk();
+        DB::table('aset_m_jenis_counter')->where('id', $counter)->update(['aktif' => false]);
+
+        $list = $this->getJson($url)->assertOk()->assertJsonPath('data.selected.0.id', $counter)->json();
+        $this->putJson($url, ['jenis_counter_ids' => array_column($list['data']['selected'], 'id'), 'version' => $list['version']])
+            ->assertOk()->assertJsonPath('data.selected.0.id', $counter);
+        $this->assertSame(1, DB::table('aset_m_jenis_aset_counter')->where('jenis_aset_id', $type)->whereNull('deleted_at')->count());
+
+        $otherType = $this->seedMaster('aset_m_jenis_aset', 'Jenis lain');
+        $this->putJson('/api/modules/management-aset/v1/jenis-aset/'.$otherType.'/counter', ['jenis_counter_ids' => [$counter], 'version' => 1])
+            ->assertUnprocessable()->assertJsonValidationErrors('jenis_counter_ids');
+        DB::table('aset_m_jenis_counter')->where('id', $counter)->update(['deleted_at' => now()]);
+        $this->putJson('/api/modules/management-aset/v1/jenis-aset/'.$otherType.'/counter', ['jenis_counter_ids' => [$counter], 'version' => 1])
+            ->assertUnprocessable()->assertJsonValidationErrors('jenis_counter_ids.0');
+
+        $archived = $this->getJson($url)->assertOk()->assertJsonPath('data.selected.0.id', $counter)->json();
+        $this->putJson($url, ['jenis_counter_ids' => array_column($archived['data']['selected'], 'id'), 'version' => $archived['version']])
+            ->assertOk()->assertJsonPath('data.selected.0.id', $counter);
+
+        $this->sebagaiPengguna($this->buatTenantUji(), $permissions)->getJson($url)->assertNotFound();
+    }
+
     /** @return array{0: string, 1: string} */
     private function assetWithCounter(): array
     {

@@ -10,7 +10,12 @@ export type RelationshipType = ReferenceValue & {
     from_type: string;
     to_type: string;
 };
-export type AddressBook = { id: string; name: string; version: number };
+export type AddressBook = {
+    id: string;
+    name: string;
+    version: number;
+    deleted_at?: string | null;
+};
 export type PartyProfile = {
     tax_number: string | null;
     known_as: string | null;
@@ -61,6 +66,7 @@ export type PartyRelationship = {
 };
 export type PartyDetail = Party & {
     address_book_ids: string[];
+    address_books: AddressBook[];
     organization_id: string | null;
     relationships: PartyRelationship[];
     vendors: {
@@ -75,7 +81,6 @@ export type DirectoryMetadata = {
     partyTypes: ReferenceValue[];
     referenceValues: Record<string, ReferenceValue[]>;
     relationshipTypes: RelationshipType[];
-    addressBooks: AddressBook[];
     canManage: boolean;
     canManageVendors: boolean;
     canReadVendors: boolean;

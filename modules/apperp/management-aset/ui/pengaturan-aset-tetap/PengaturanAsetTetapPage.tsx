@@ -2,17 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
-import {
-    Field,
-    FieldDescription,
-    FieldLegend,
-    FieldSet,
-} from '@apperp/ui/field';
+import { FieldDescription, FieldLegend, FieldSet } from '@apperp/ui/field';
+import { FormControl } from '@apperp/ui/form-control';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
-import { Select } from '@apperp/ui/select';
 import EditShield from '../_shared/EditShield';
-import { api, errorMessage, toastSaveError } from '../api';
+import RecordLookup from '../_shared/RecordLookup';
+import { api, errorMessage } from '../api';
 import { optionLabel, useMasterOptions } from '../master/useMasterOptions';
+import { useSaveFeedback } from '../use-save-feedback';
 
 type Pengaturan = {
     version: number;
@@ -32,6 +29,17 @@ export default function PengaturanAsetTetapPage({
 }: {
     permissions: string[];
 }) {
+    const {
+        scopeRef: pageFeedbackScopeRef,
+        feedbackSummary: pageFeedbackSummary,
+        reportSaveError: pageFeedbackReportSaveError,
+        clearSaveFeedback: pageFeedbackClearSaveFeedback,
+    } = useSaveFeedback();
+    const pageFeedback = {
+        reportSaveError: pageFeedbackReportSaveError,
+        clearSaveFeedback: pageFeedbackClearSaveFeedback,
+    };
+
     const canUpdate = permissions.includes(
         'management-aset.fixed-asset-parameters.update',
     );
@@ -77,7 +85,6 @@ export default function PengaturanAsetTetapPage({
         )
             ? [tersimpan.buku_penyusutan_bawaan, ...daftarBuku.options]
             : daftarBuku.options;
-    const dipilih = pilihan.find((option) => option.id === buku);
 
     function batal() {
         setBuku(tersimpan?.buku_penyusutan_bawaan_id ?? '');
@@ -105,9 +112,10 @@ export default function PengaturanAsetTetapPage({
             setTersimpan(hasil.data);
             setBuku(hasil.data.buku_penyusutan_bawaan_id ?? '');
             setMengubah(false);
+            pageFeedback.clearSaveFeedback();
             toast.success('Parameter aset tetap disimpan.');
         } catch (caught) {
-            toastSaveError(
+            pageFeedback.reportSaveError(
                 caught,
                 'Parameter aset tetap belum dapat disimpan.',
             );
@@ -117,8 +125,14 @@ export default function PengaturanAsetTetapPage({
     }
 
     return (
-        <div className="flex h-full min-h-0 flex-col overflow-hidden">
-            <RecordActionBar title="Parameter aset tetap">
+        <div
+            ref={pageFeedbackScopeRef}
+            className="flex h-full min-h-0 flex-col overflow-hidden"
+        >
+            <RecordActionBar
+                feedback={pageFeedbackSummary}
+                title="Parameter aset tetap"
+            >
                 {!mengubah && canUpdate && tersimpan && (
                     <ActionButton
                         action="edit"
@@ -155,7 +169,14 @@ export default function PengaturanAsetTetapPage({
                     ) : (
                         <FieldSet>
                             <FieldLegend>Umum</FieldLegend>
-                            <Field>
+                            <FormControl
+                                hint={
+                                    <>
+                                        {daftarBuku.error ||
+                                            'Nilai buku dari buku ini yang dicatat saat monitoring aset. Bila kosong, yang dipakai buku komersial dengan kode paling awal.'}
+                                    </>
+                                }
+                            >
                                 <EditShield
                                     active={!mengubah}
                                     label="buku penyusutan bawaan"
@@ -163,27 +184,21 @@ export default function PengaturanAsetTetapPage({
                                         canUpdate && setMengubah(true)
                                     }
                                 >
-                                    <Select
+                                    <RecordLookup
+                                        source={daftarBuku}
                                         label="Buku penyusutan bawaan"
-                                        items={pilihan.map(optionLabel)}
-                                        value={
-                                            dipilih
-                                                ? optionLabel(dipilih)
-                                                : null
-                                        }
+                                        items={pilihan.map((item) => ({
+                                            value: item.id,
+                                            label: optionLabel(item),
+                                        }))}
+                                        value={buku || null}
                                         placeholder="Pilih buku penyusutan"
                                         searchPlaceholder="Cari buku penyusutan"
                                         emptyMessage="Buku penyusutan tidak ditemukan."
                                         ariaLabel="Buku penyusutan bawaan"
                                         portalContainer={panelRef}
                                         onValueChange={(item) =>
-                                            setBuku(
-                                                pilihan.find(
-                                                    (option) =>
-                                                        optionLabel(option) ===
-                                                        item,
-                                                )?.id ?? '',
-                                            )
+                                            setBuku(item ?? '')
                                         }
                                     />
                                 </EditShield>
@@ -198,11 +213,7 @@ export default function PengaturanAsetTetapPage({
                                         Kosongkan buku penyusutan bawaan
                                     </Button>
                                 )}
-                                <FieldDescription>
-                                    {daftarBuku.error ||
-                                        'Nilai buku dari buku ini yang dicatat saat monitoring aset. Bila kosong, yang dipakai buku komersial dengan kode paling awal.'}
-                                </FieldDescription>
-                            </Field>
+                            </FormControl>
                         </FieldSet>
                     )}
                 </div>

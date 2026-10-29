@@ -28,11 +28,8 @@ import type { ReportExport } from '@/lib/reports';
  * hasilnya menyusul di sini, di lonceng, dan di halaman Ekspor laporan.
  */
 export function ExportTray() {
-    const exports = useSyncExternalStore(
-        subscribeExports,
-        getExports,
-        () => [],
-    );
+    const exports =
+        useSyncExternalStore(subscribeExports, getExports, () => null) ?? [];
     const [manualOpen, setManualOpen] = useState(false);
     const [dismissed, setDismissed] = useState(false);
     const active = exports.filter(isActive).length;
