@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\PenerbitContoh\ChangeMe\Http\Controllers;
 
+use App\Platform\Modules\Contracts\RecordSearch;
 use App\Platform\Modules\Contracts\RequestContext;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -41,10 +42,7 @@ final class HalamanContohController
             'direction' => ['nullable', Rule::in(['asc', 'desc'])],
         ]);
         $query = Contoh::query();
-        if ($keyword = trim((string) ($filters['q'] ?? ''))) {
-            $pattern = '%'.addcslashes(mb_strtolower($keyword), '\\%_').'%';
-            $query->where(fn ($match) => $match->whereRaw('LOWER(kode) LIKE ?', [$pattern])->orWhereRaw('LOWER(nama) LIKE ?', [$pattern]));
-        }
+        RecordSearch::apply($query, ['kode', 'nama'], trim((string) ($filters['q'] ?? '')), ['kode']);
         $query->orderBy($filters['sort'] ?? 'kode', $filters['direction'] ?? 'asc')->orderBy('id');
 
         return Inertia::render('change-me::Daftar', [

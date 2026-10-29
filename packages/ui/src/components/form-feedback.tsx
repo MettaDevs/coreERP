@@ -1,4 +1,4 @@
-import { CircleAlert } from 'lucide-react';
+import { ChevronDown, ChevronUp, CircleAlert, X } from 'lucide-react';
 import * as React from 'react';
 import { createPortal } from 'react-dom';
 
@@ -356,39 +356,95 @@ export function focusFeedbackField(scope: HTMLElement, field: string): boolean {
     return true;
 }
 
+export type FormFeedbackCollection =
+    FormFeedback | readonly (FormFeedback | null)[] | null;
+
+function formFeedbackKey(feedback: FormFeedback): string {
+    return JSON.stringify([
+        feedback.title,
+        feedback.message,
+        feedback.issues,
+        feedback.details,
+        feedback.actions?.map((action) => action.label),
+    ]);
+}
+
+export function collectFormFeedback(
+    value: FormFeedbackCollection,
+): FormFeedback[] {
+    const values: readonly (FormFeedback | null)[] =
+        value === null ? [] : 'title' in value ? [value] : value;
+    const unique = new Map<string, FormFeedback>();
+
+    for (const feedback of values) {
+        if (!feedback) {
+            continue;
+        }
+
+        const key = formFeedbackKey(feedback);
+
+        if (!unique.has(key)) {
+            unique.set(key, feedback);
+        }
+    }
+
+    return [...unique.values()];
+}
+
 type FormErrorSummaryProps = {
-    feedback: FormFeedback | null;
+    feedback: FormFeedbackCollection;
     scopeRef?: React.RefObject<HTMLElement | null>;
     onFocusField?: (field: string) => void;
 };
 
 /** Ringkasan milik satu form; navigasi field dan hasil salin tidak dibagikan ke form lain. */
 export function FormErrorSummary({
-    feedback,
+    feedback: providedFeedback,
     scopeRef,
     onFocusField,
 }: FormErrorSummaryProps) {
+    const entries = React.useMemo(
+        () => collectFormFeedback(providedFeedback),
+        [providedFeedback],
+    );
+    const feedback = React.useMemo(
+        () =>
+            entries.length
+                ? {
+                      ...entries[0],
+                      issues: entries.flatMap((entry) => entry.issues ?? []),
+                      focusSummary: entries.some(
+                          (entry) => entry.focusSummary !== false,
+                      ),
+                  }
+                : null,
+        [entries],
+    );
     const summaryRef = React.useRef<HTMLDivElement>(null);
+    const previousEntries = React.useRef<readonly FormFeedback[]>([]);
     const inlineId = React.useId();
     const [inlineFields, setInlineFields] = React.useState<{
         feedback: FormFeedback;
         fields: {
             target: HTMLElement;
             id: string;
-            message: string;
+            messages: string[];
             field: string;
         }[];
     } | null>(null);
-    const [copyResult, setCopyResult] = React.useState<{
-        feedback: FormFeedback;
-        status: 'copied' | 'manual';
-    } | null>(null);
 
     React.useEffect(() => {
-        if (feedback && feedback.focusSummary !== false) {
+        const shouldFocus = entries.some(
+            (entry) =>
+                entry.focusSummary !== false &&
+                !previousEntries.current.includes(entry),
+        );
+        previousEntries.current = entries;
+
+        if (shouldFocus) {
             summaryRef.current?.focus({ preventScroll: true });
         }
-    }, [feedback]);
+    }, [entries]);
 
     React.useEffect(() => {
         const scope = scopeRef?.current;
@@ -402,7 +458,7 @@ export function FormErrorSummary({
             const fields: {
                 target: HTMLElement;
                 id: string;
-                message: string;
+                messages: string[];
                 field: string;
             }[] = [];
             const messages = new Map<
@@ -420,7 +476,9 @@ export function FormErrorSummary({
                 const existing = messages.get(control);
 
                 if (existing) {
-                    existing.messages.push(issue.message);
+                    if (!existing.messages.includes(issue.message)) {
+                        existing.messages.push(issue.message);
+                    }
                 } else {
                     messages.set(control, {
                         field: issue.field,
@@ -479,7 +537,7 @@ export function FormErrorSummary({
                 fields.push({
                     target: group,
                     id,
-                    message: issue.messages.join(' '),
+                    messages: issue.messages,
                     field: issue.field,
                 });
             }
@@ -511,6 +569,59 @@ export function FormErrorSummary({
         }
     }
 
+    return (
+        <>
+            <div
+                ref={summaryRef}
+                tabIndex={-1}
+                data-slot="form-error-summary"
+                className="focus-visible:ring-ring flex max-h-[min(16rem,35dvh)] w-full flex-col gap-2 overflow-y-auto rounded-lg outline-none focus-visible:ring-2"
+            >
+                {entries.map((entry) => (
+                    <FormErrorNotice
+                        key={formFeedbackKey(entry)}
+                        feedback={entry}
+                        onFocusField={
+                            scopeRef || onFocusField ? focusField : undefined
+                        }
+                    />
+                ))}
+            </div>
+            {inlineFields?.feedback === feedback &&
+                inlineFields.fields.map((field) =>
+                    createPortal(
+                        <FieldError
+                            id={field.id}
+                            data-sdk-inline-error=""
+                            errors={field.messages.map((message) => ({
+                                message,
+                            }))}
+                        />,
+                        field.target,
+                        field.field,
+                    ),
+                )}
+        </>
+    );
+}
+
+function FormErrorNotice({
+    feedback,
+    onFocusField,
+}: {
+    feedback: FormFeedback;
+    onFocusField?: (field: string) => void;
+}) {
+    const bodyId = React.useId();
+    const [display, setDisplay] = React.useState<{
+        feedback: FormFeedback;
+        mode: 'expanded' | 'collapsed' | 'dismissed';
+    } | null>(null);
+    const mode = display?.feedback === feedback ? display.mode : 'expanded';
+    const [copyResult, setCopyResult] = React.useState<{
+        feedback: FormFeedback;
+        status: 'copied' | 'manual';
+    } | null>(null);
     async function copyDetails(current: FormFeedback) {
         if (!current.details) {
             return;
@@ -526,99 +637,138 @@ export function FormErrorSummary({
 
     const copied = copyResult?.feedback === feedback ? copyResult.status : null;
 
-    return (
-        <>
-            <div
-                ref={summaryRef}
-                tabIndex={-1}
-                data-slot="form-error-summary"
-                className="focus-visible:ring-ring max-h-[min(16rem,35dvh)] w-full overflow-y-auto rounded-lg outline-none focus-visible:ring-2"
+    if (mode === 'dismissed') {
+        return (
+            <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground self-start"
+                onClick={() => setDisplay({ feedback, mode: 'expanded' })}
             >
-                <Alert variant="destructive">
-                    <CircleAlert aria-hidden="true" />
-                    <AlertTitle className="line-clamp-none">
-                        {feedback.title}
-                    </AlertTitle>
-                    <AlertDescription>
-                        <p>{feedback.message}</p>
-                        {!!feedback.issues?.length && (
-                            <ul className="flex flex-col gap-1">
-                                {feedback.issues.map((issue, index) => (
-                                    <li key={`${issue.field}-${index}`}>
-                                        {scopeRef || onFocusField ? (
-                                            <button
-                                                type="button"
-                                                className="text-left underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2"
-                                                onClick={() =>
-                                                    focusField(issue.field)
-                                                }
-                                            >
-                                                {issue.message}
-                                            </button>
-                                        ) : (
-                                            <span>{issue.message}</span>
-                                        )}
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                        {(feedback.actions?.length || feedback.details) && (
-                            <div className="mt-2 flex flex-wrap gap-2">
-                                {feedback.actions?.map((action) => (
-                                    <Button
-                                        key={action.label}
+                Tampilkan pesan: {feedback.title}
+            </Button>
+        );
+    }
+
+    return (
+        <Alert variant="destructive" data-slot="form-error-notice">
+            <CircleAlert aria-hidden="true" />
+            <AlertTitle className="line-clamp-none flex items-start gap-2">
+                <span className="min-w-0 flex-1">{feedback.title}</span>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={
+                        mode === 'expanded'
+                            ? 'Ringkas pesan'
+                            : 'Tampilkan rincian pesan'
+                    }
+                    title={
+                        mode === 'expanded'
+                            ? 'Ringkas pesan'
+                            : 'Tampilkan rincian pesan'
+                    }
+                    aria-expanded={mode === 'expanded'}
+                    aria-controls={bodyId}
+                    onClick={() =>
+                        setDisplay({
+                            feedback,
+                            mode:
+                                mode === 'expanded' ? 'collapsed' : 'expanded',
+                        })
+                    }
+                >
+                    {mode === 'expanded' ? (
+                        <ChevronUp aria-hidden="true" />
+                    ) : (
+                        <ChevronDown aria-hidden="true" />
+                    )}
+                </Button>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Sembunyikan pesan"
+                    title="Sembunyikan pesan"
+                    onClick={() => setDisplay({ feedback, mode: 'dismissed' })}
+                >
+                    <X aria-hidden="true" />
+                </Button>
+            </AlertTitle>
+            <AlertDescription
+                id={bodyId}
+                className={mode !== 'expanded' ? 'hidden' : undefined}
+            >
+                <p>{feedback.message}</p>
+                {!!feedback.issues?.length && (
+                    <ul className="w-full divide-y">
+                        {feedback.issues.map((issue, index) => (
+                            <li
+                                key={`${issue.field}-${index}`}
+                                className="py-1"
+                            >
+                                {onFocusField ? (
+                                    <button
                                         type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={action.onClick}
-                                    >
-                                        {action.label}
-                                    </Button>
-                                ))}
-                                {feedback.details && (
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
+                                        className="text-left underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2"
                                         onClick={() =>
-                                            void copyDetails(feedback)
+                                            onFocusField(issue.field)
                                         }
                                     >
-                                        Salin detail bantuan
-                                    </Button>
+                                        {issue.message}
+                                    </button>
+                                ) : (
+                                    <span>{issue.message}</span>
                                 )}
-                            </div>
-                        )}
-                        {copied === 'copied' && (
-                            <p role="status">Rincian sudah disalin.</p>
-                        )}
-                        {copied === 'manual' && (
-                            <div className="flex w-full flex-col gap-2">
-                                <p role="status">
-                                    Belum dapat disalin otomatis. Pilih teks
-                                    berikut dan salin secara manual.
-                                </p>
-                                <Textarea
-                                    label="Detail bantuan untuk disalin"
-                                    readOnly
-                                    value={feedback.details}
-                                    rows={4}
-                                />
-                            </div>
-                        )}
-                    </AlertDescription>
-                </Alert>
-            </div>
-            {inlineFields?.feedback === feedback &&
-                inlineFields.fields.map((field) =>
-                    createPortal(
-                        <FieldError id={field.id} data-sdk-inline-error="">
-                            {field.message}
-                        </FieldError>,
-                        field.target,
-                        field.field,
-                    ),
+                            </li>
+                        ))}
+                    </ul>
                 )}
-        </>
+                {(feedback.actions?.length || feedback.details) && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                        {feedback.actions?.map((action) => (
+                            <Button
+                                key={action.label}
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={action.onClick}
+                            >
+                                {action.label}
+                            </Button>
+                        ))}
+                        {feedback.details && (
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => void copyDetails(feedback)}
+                            >
+                                Salin detail bantuan
+                            </Button>
+                        )}
+                    </div>
+                )}
+                {copied === 'copied' && (
+                    <p role="status">Rincian sudah disalin.</p>
+                )}
+                {copied === 'manual' && (
+                    <div className="flex w-full flex-col gap-2">
+                        <p role="status">
+                            Belum dapat disalin otomatis. Pilih teks berikut dan
+                            salin secara manual.
+                        </p>
+                        <Textarea
+                            label="Detail bantuan untuk disalin"
+                            readOnly
+                            value={feedback.details}
+                            rows={4}
+                        />
+                    </div>
+                )}
+            </AlertDescription>
+        </Alert>
     );
 }

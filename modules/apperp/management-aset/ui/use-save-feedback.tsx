@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import {
     FormErrorSummary,
@@ -28,6 +28,12 @@ export function useSaveFeedback(
     const feedback =
         clientFeedback ??
         (state.recordKey === recordKey ? state.feedback : null);
+    const serverFeedback =
+        state.recordKey === recordKey ? state.feedback : null;
+    const messages = useMemo(
+        () => [clientFeedback, serverFeedback],
+        [clientFeedback, serverFeedback],
+    );
     const [focusRequest, setFocusRequest] = useState<{ field: string } | null>(
         null,
     );
@@ -60,15 +66,16 @@ export function useSaveFeedback(
                 )
                 .map((issue) => issue.message)
                 .join(' ') || undefined,
-        feedbackSummary: feedback ? (
-            <FormErrorSummary
-                feedback={feedback}
-                scopeRef={scopeRef}
-                onFocusField={(field) => {
-                    revealFields?.(field);
-                    setFocusRequest({ field });
-                }}
-            />
-        ) : null,
+        feedbackSummary:
+            clientFeedback || serverFeedback ? (
+                <FormErrorSummary
+                    feedback={messages}
+                    scopeRef={scopeRef}
+                    onFocusField={(field) => {
+                        revealFields?.(field);
+                        setFocusRequest({ field });
+                    }}
+                />
+            ) : null,
     };
 }

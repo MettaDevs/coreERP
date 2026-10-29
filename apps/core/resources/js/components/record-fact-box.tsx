@@ -13,6 +13,7 @@ export function RecordFactBox({
     recordId,
     className,
     fillHeight = false,
+    toolbarContainer,
 }: {
     children: ReactNode;
     details: ReactNode;
@@ -20,6 +21,7 @@ export function RecordFactBox({
     recordId?: string;
     className?: string;
     fillHeight?: boolean;
+    toolbarContainer?: HTMLElement | null;
 }) {
     const [documents, setDocuments] = useState<{
         id: string;
@@ -41,6 +43,7 @@ export function RecordFactBox({
         <FactBox
             className={className}
             fillHeight={fillHeight}
+            toolbarContainer={toolbarContainer}
             details={details}
             attachmentCount={count}
             attachments={

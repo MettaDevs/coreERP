@@ -20,6 +20,7 @@ use App\Platform\AddressBook\Support\OrganizationAddressBook;
 use App\Platform\AddressBook\Support\PartyDetailData;
 use App\Platform\Geography\Models\CountryRegion;
 use App\Platform\Modules\Contracts\IncrementalList;
+use App\Platform\Modules\Contracts\RecordSearch;
 use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Modules\Contracts\VendorDirectory;
 use App\Platform\Organization\Models\OrganizationParty;
@@ -54,10 +55,7 @@ final class GlobalAddressBookController extends Controller
         if (($filters['archived'] ?? null) === 'only') {
             $query->onlyTrashed();
         }
-        if (! empty($filters['q'])) {
-            $pattern = '%'.addcslashes(trim($filters['q']), '\\%_').'%';
-            $query->where(fn ($inner) => $inner->where('name', 'ilike', $pattern)->orWhere('number', 'ilike', $pattern)->orWhere('search_name', 'ilike', $pattern));
-        }
+        RecordSearch::apply($query, ['name', 'number', 'search_name'], trim((string) ($filters['q'] ?? '')), ['number']);
         foreach (['type', 'status'] as $field) {
             if (! empty($filters[$field])) {
                 $query->where($field, $filters[$field]);
@@ -128,10 +126,10 @@ final class GlobalAddressBookController extends Controller
         $membership = $this->currentMembership($request);
         abort_unless($membership->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_READ), 403);
         $filter = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
-        $pattern = '%'.addcslashes(trim($filter['q'] ?? ''), '\\%_').'%';
+        $keyword = trim((string) ($filter['q'] ?? ''));
 
         return response()->json(['data' => Party::query()->where('tenant_id', $membership->tenant_id)->where('status', 'active')
-            ->where(fn ($query) => $query->where('name', 'ilike', $pattern)->orWhere('number', 'ilike', $pattern))
+            ->tap(fn ($query) => RecordSearch::apply($query, ['name', 'number'], $keyword, ['number']))
             ->orderBy('name')->limit(30)->get(['id', 'number', 'name', 'type'])]);
     }
 

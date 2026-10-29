@@ -8,6 +8,7 @@ import {
     PopoverTitle,
     PopoverTrigger,
 } from '@apperp/ui/popover';
+import { matchesRecordSearch } from '@apperp/ui/record-search';
 import { ScrollArea } from '@apperp/ui/scroll-area';
 import { Link, usePage } from '@inertiajs/react';
 import { Boxes, Building2, Grid3X3, PackageSearch } from 'lucide-react';
@@ -102,9 +103,7 @@ export function ProductLauncher() {
     const filteredProducts = products.filter(
         (product, index, all) =>
             all.findIndex((item) => item.id === product.id) === index &&
-            product.name
-                .toLocaleLowerCase()
-                .includes(search.trim().toLocaleLowerCase()),
+            matchesRecordSearch(search, product.name),
     );
 
     return (

@@ -7,6 +7,7 @@ use App\Foundation\Workflow\Support\WorkflowParameterDefinitions;
 use App\Foundation\Workflow\Support\WorkflowParameters;
 use App\Http\Controllers\Controller;
 use App\Platform\Access\Support\CoreSecurityCatalog;
+use App\Platform\Modules\Contracts\RecordSearch;
 use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Tenant\Models\TenantMembership;
@@ -41,7 +42,7 @@ class WorkflowConfigurationController extends Controller
             'direction' => ['nullable', Rule::in(['asc', 'desc'])],
         ]);
         $keyword = trim((string) ($filters['q'] ?? ''));
-        $pattern = '%'.addcslashes($keyword, '\\%_').'%';
+
         $latestVersions = DB::table('workflow_configuration_versions')
             ->join('workflow_configurations as version_config', 'version_config.id', '=', 'workflow_configuration_versions.configuration_id')
             ->where('version_config.tenant_id', $membership->tenant_id)
@@ -59,10 +60,7 @@ class WorkflowConfigurationController extends Controller
                 ->on('latest.configuration_id', '=', 'configurations.id')
                 ->on('latest.version', '=', 'latest_versions.version'))
             ->where('configurations.tenant_id', $membership->tenant_id)
-            ->when($keyword !== '', fn ($query) => $query->where(fn ($inner) => $inner
-                ->where('configurations.name', 'ilike', $pattern)
-                ->orWhere('types.name', 'ilike', $pattern)
-                ->orWhere('apps.name', 'ilike', $pattern)))
+            ->tap(fn ($query) => RecordSearch::apply($query, ['configurations.name', 'types.name', 'apps.name'], $keyword))
             ->when($filters['status'] ?? null, fn ($query, $status) => $query->whereRaw("($statusExpression) = ?", [$status]))
             ->when($filters['app'] ?? null, fn ($query, $app) => $query->where('apps.name', $app))
             ->select(['configurations.id', 'configurations.name', 'configurations.enabled', 'configurations.legal_entity_id', 'configurations.version', 'types.name as type_name', 'types.scope', 'apps.name as app_name'])

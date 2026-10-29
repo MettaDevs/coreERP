@@ -1,9 +1,9 @@
+import { fileURLToPath } from 'node:url';
 import inertia from '@inertiajs/vite';
 import { wayfinder } from '@laravel/vite-plugin-wayfinder';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import laravel from 'laravel-vite-plugin';
-import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 
 // apps/core/vite.config.ts -> apps/core -> apps -> akar repo
@@ -74,7 +74,7 @@ export default defineConfig({
              * Daftar di bawah **ditambahkan** ke bawaan Vite, bukan menggantikannya.
              */
             ignored: [
-                '**/vendor/**',
+                '**/apps/core/vendor/**',
                 '**/storage/**',
                 '**/bootstrap/cache/**',
                 '**/public/build/**',

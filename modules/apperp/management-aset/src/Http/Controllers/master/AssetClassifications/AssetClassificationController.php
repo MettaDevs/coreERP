@@ -3,6 +3,7 @@
 namespace Modules\Apperp\ManagementAset\Http\Controllers\master\AssetClassifications;
 
 use App\Platform\Modules\Contracts\IncrementalList;
+use App\Platform\Modules\Contracts\RecordSearch;
 use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -33,9 +34,7 @@ final class AssetClassificationController extends Controller
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
         $query = KelompokHartaFiskal::query()->where('tenant_id', $request->attributes->get('coreerp.tenant_id'));
-        if (($search = trim($data['q'] ?? '')) !== '') {
-            $query->whereRaw('LOWER(label) LIKE ?', ['%'.mb_strtolower($search).'%']);
-        }
+        RecordSearch::apply($query, ['label'], trim((string) ($data['q'] ?? '')));
         if (isset($data['aktif'])) {
             $query->where('aktif', $data['aktif'] === 'true');
         }

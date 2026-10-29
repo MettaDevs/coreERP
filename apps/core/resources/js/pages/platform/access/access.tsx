@@ -55,6 +55,7 @@ import {
     PageDialogTrigger,
 } from '@apperp/ui/page-dialog';
 import { RadioGroup, RadioGroupItem } from '@apperp/ui/radio-group';
+import { matchesRecordSearch } from '@apperp/ui/record-search';
 import { Select } from '@apperp/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@apperp/ui/tabs';
 import { useIncrementalList } from '@apperp/ui/use-incremental-list';
@@ -343,12 +344,11 @@ function PolicyScopePanel({
     const hierarchyById = new Map(
         hierarchies.map((hierarchy) => [hierarchy.id, hierarchy]),
     );
-    const query = filter.trim().toLowerCase();
     const rows = hierarchyRows(
         hierarchyId ? hierarchyById.get(hierarchyId) : undefined,
         organizations,
     ).filter(({ organization }) =>
-        organization.name.toLowerCase().includes(query),
+        matchesRecordSearch(filter, organization.name),
     );
     const selectable = (organization: Organization) =>
         !policy.requires_operating_unit ||

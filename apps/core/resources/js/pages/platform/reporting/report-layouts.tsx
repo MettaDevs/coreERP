@@ -38,6 +38,7 @@ import {
 } from '@apperp/ui/page-dialog';
 import { RadioGroup, RadioGroupItem } from '@apperp/ui/radio-group';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
+import { matchesRecordSearch } from '@apperp/ui/record-search';
 
 import { Textarea } from '@apperp/ui/textarea';
 import { Head } from '@inertiajs/react';
@@ -401,12 +402,13 @@ export default function ReportLayouts({
     ];
 
     const report = reports.find((item) => item.code === code);
-    const normalizedSearch = reportSearch.trim().toLocaleLowerCase('id');
     const visibleReports = reports.filter((item) =>
-        [item.code, item.name, item.app_name, item.description ?? '']
-            .join(' ')
-            .toLocaleLowerCase('id')
-            .includes(normalizedSearch),
+        matchesRecordSearch(reportSearch, [
+            item.code,
+            item.name,
+            item.app_name,
+            item.description ?? '',
+        ]),
     );
     const rowActions = layouts.length
         ? actionsFor(

@@ -130,6 +130,9 @@ export default function AsetDetailPage({
 
     const embedded = usePageDialogRecord(undefined);
     const bodyRef = useRef<HTMLDivElement>(null);
+    const [factBoxToolbar, setFactBoxToolbar] = useState<HTMLDivElement | null>(
+        null,
+    );
 
     const bukaAset = (id: string) => (onRequestView ?? navigateView)(id);
     const bukaAsetUbah = (id: string) => (onRequestEdit ?? navigateEdit)(id);
@@ -549,9 +552,17 @@ export default function AsetDetailPage({
                 feedback={feedbackSummary}
                 title={embedded ? undefined : judul}
                 trailing={
-                    status ? (
-                        <Badge variant={status.variant}>{status.label}</Badge>
-                    ) : undefined
+                    <>
+                        {status && (
+                            <Badge variant={status.variant}>
+                                {status.label}
+                            </Badge>
+                        )}
+                        <div
+                            ref={setFactBoxToolbar}
+                            className="flex items-center gap-1"
+                        />
+                    </>
                 }
             >
                 {readOnly && canUpdate && !sudahDilepas && !embedded && (
@@ -610,6 +621,7 @@ export default function AsetDetailPage({
                 className="min-h-0 flex-1 overflow-y-auto"
             >
                 <RecordFactBox
+                    toolbarContainer={factBoxToolbar}
                     className="p-5"
                     key={asetId}
                     recordType="aset_tr_aset"

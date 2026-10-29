@@ -20,6 +20,7 @@ import {
     InlineLookupDetailsDialog,
 } from './inline-lookup-dialogs';
 import { InputGroupButton } from './input-group';
+import { matchesRecordSearch } from './record-search';
 import { TableCell, TableRow } from './table';
 import {
     lookupComparator,
@@ -114,10 +115,10 @@ export function InlineLookup<T>({
         ? columns.map((column) => ({ ...column, sortValue: undefined }))
         : columns;
     const sortedItems = data.items;
-    const searchQuery = (query ?? '').trim().toLocaleLowerCase('id-ID');
+    const searchQuery = (query ?? '').trim();
     const matchesSearch = (item: T) =>
         Boolean(loadItems) ||
-        getSearchText(item).toLocaleLowerCase('id-ID').includes(searchQuery);
+        matchesRecordSearch(query ?? '', getSearchText(item));
     const highlightedTarget =
         highlighted === null
             ? null

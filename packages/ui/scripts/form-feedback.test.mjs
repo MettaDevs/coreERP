@@ -15,6 +15,7 @@ const server = await createServer({
 try {
     const {
         FormErrorSummary,
+        collectFormFeedback,
         createSaveFeedback,
         getFormValidationErrors,
         validateFormSubmission,
@@ -48,12 +49,42 @@ try {
     assert.doesNotMatch(rendered, /role="dialog"/);
     assert.doesNotMatch(
         rendered,
-        /<button/,
+        /underline-offset-4/,
         'unscoped issues do not promise field navigation',
     );
     assert.equal(
         renderToStaticMarkup(
             React.createElement(FormErrorSummary, { feedback: null }),
+        ),
+        '',
+    );
+    assert.match(rendered, /aria-label="Ringkas pesan"/);
+    assert.match(rendered, /aria-label="Sembunyikan pesan"/);
+    assert.match(rendered, /aria-expanded="true"/);
+    const second = createSaveFeedback({
+        operation: 'Lampiran belum diunggah',
+        message: 'Berkas melebihi batas ukuran.',
+    });
+    assert.deepEqual(
+        collectFormFeedback([failure, null, second, { ...failure }]),
+        [failure, second],
+    );
+    const stacked = renderToStaticMarkup(
+        React.createElement(FormErrorSummary, { feedback: [failure, second] }),
+    );
+    assert.equal(
+        (stacked.match(/data-slot="form-error-notice"/g) ?? []).length,
+        2,
+    );
+    assert.equal(
+        (stacked.match(/aria-label="Sembunyikan pesan"/g) ?? []).length,
+        2,
+    );
+    assert.match(stacked, /Berkas melebihi batas ukuran/);
+    assert.match(stacked, /Isi jumlah minimal 1/);
+    assert.equal(
+        renderToStaticMarkup(
+            React.createElement(FormErrorSummary, { feedback: [null] }),
         ),
         '',
     );
@@ -148,7 +179,7 @@ try {
     assert.ok(
         bar.indexOf('Simpan') < bar.indexOf('data-slot="form-error-summary"'),
     );
-    assert.match(bar, /basis-full/);
+    assert.match(bar, /role="alert"/);
     const input = (name, validity, attributes = {}) => ({
         name,
         id: name,

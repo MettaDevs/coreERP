@@ -42,6 +42,10 @@ export function FormErrorHeader({
     }, [errors, message, operation]);
 
     const clientFeedback = useFormValidation(scopeRef ?? ownScope);
+    const messages = useMemo(
+        () => [clientFeedback, feedback],
+        [clientFeedback, feedback],
+    );
 
     return (
         <div
@@ -57,7 +61,7 @@ export function FormErrorHeader({
             }}
         >
             <FormErrorSummary
-                feedback={clientFeedback ?? feedback}
+                feedback={messages}
                 scopeRef={scopeRef ?? ownScope}
             />
         </div>

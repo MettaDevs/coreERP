@@ -3,10 +3,9 @@ import { FileSpreadsheet, QrCode } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { RecordFactBox } from '@/components/record-fact-box';
-import type { Workspace } from '@/types';
+import type { Auth, Workspace } from '@/types';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
-import { Button } from '@apperp/ui/button';
 import { DataTable } from '@apperp/ui/data-table';
 import type {
     DataTableColumn,
@@ -18,8 +17,6 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
-import { FormControl } from '@apperp/ui/form-control';
-import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { PageDialog, PageDialogContent } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
@@ -57,6 +54,9 @@ export default function AsetListPage({
         | { kind: 'receipt'; record: Exclude<RecordCardState, null> }
         | null
     >(null);
+    const [factBoxToolbar, setFactBoxToolbar] = useState<HTMLDivElement | null>(
+        null,
+    );
     const [cardBusy, setCardBusy] = useState(false);
     const [cardDirty, setCardDirty] = useState(false);
     const {
@@ -89,7 +89,8 @@ export default function AsetListPage({
         });
     };
 
-    const { workspace } = usePage<{ workspace: Workspace }>().props;
+    const { auth, workspace } = usePage<{ auth: Auth; workspace: Workspace }>()
+        .props;
     const legalEntityNames = new Map(
         workspace.legal_entities.map((entity) => [entity.id, entity.name]),
     );
@@ -260,37 +261,50 @@ export default function AsetListPage({
             {changesTransitionConfirmation}
             <ListPageLayout
                 header={
-                    <RecordActionBar title="Inventarisasi aset">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={exportList}
-                            disabled={memuat}
-                            title="Ekspor semua aset yang cocok dengan pencarian, dengan kolom dan urutan seperti di layar"
-                        >
-                            <FileSpreadsheet />
-                            Ekspor ke Excel
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={printLabels}
-                            disabled={memuat || !visible.length}
-                            title={
-                                selected.length
-                                    ? 'Cetak label berkode QR untuk aset yang dicentang'
-                                    : 'Cetak label untuk aset yang sudah tampil di daftar. Geser daftar ke bawah untuk menampilkan aset lainnya, atau centang aset yang ingin dicetak.'
-                            }
-                        >
-                            <QrCode />
-                            {selected.length
-                                ? `Cetak label (${selected.length})`
-                                : `Cetak label (${visible.length})`}
-                        </Button>
-                        {/*
-                         * Satu pintu. Aset hanya lahir dari dokumen penerimaan sejak 18 September
-                         * 2026 — juga yang datang satuan, yang menjadi dokumen berbaris satu.
-                         */}
+                    <RecordActionBar
+                        title="Inventarisasi aset"
+                        search={{
+                            value: search,
+                            onValueChange: setSearch,
+                            label: 'Cari aset',
+                            placeholder: 'Cari aset...',
+                        }}
+                        preferenceKey={
+                            auth.membership
+                                ? `management-aset.inventory:${auth.membership.tenant_id}:${auth.user.id}`
+                                : undefined
+                        }
+                        groups={[
+                            {
+                                id: 'home',
+                                label: 'Home',
+                                actions: [
+                                    {
+                                        id: 'labels',
+                                        label: selected.length
+                                            ? `Cetak label (${selected.length})`
+                                            : `Cetak label (${visible.length})`,
+                                        icon: <QrCode />,
+                                        disabled: memuat || !visible.length,
+                                        onSelect: printLabels,
+                                    },
+                                    {
+                                        id: 'export',
+                                        label: 'Ekspor ke Excel',
+                                        icon: <FileSpreadsheet />,
+                                        disabled: memuat,
+                                        onSelect: exportList,
+                                    },
+                                ],
+                            },
+                        ]}
+                        trailing={
+                            <div
+                                ref={setFactBoxToolbar}
+                                className="flex items-center gap-1"
+                            />
+                        }
+                    >
                         {izin(permissions)('create') && (
                             <ActionButton
                                 action="create"
@@ -300,33 +314,11 @@ export default function AsetListPage({
                         )}
                     </RecordActionBar>
                 }
-                filters={
-                    <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end sm:justify-between">
-                        <p className="text-muted-foreground text-sm">
-                            {visible.length} aset ditampilkan
-                            {selected.length
-                                ? `, ${selected.length} dicentang`
-                                : ''}
-                        </p>
-                        <div className="w-full sm:w-72">
-                            <FormControl>
-                                <Input
-                                    label="Cari"
-                                    type="search"
-                                    placeholder="Kode, nama, atau nomor seri"
-                                    value={search}
-                                    onChange={(event) =>
-                                        setSearch(event.target.value)
-                                    }
-                                />
-                            </FormControl>
-                        </div>
-                    </div>
-                }
             >
                 <RecordFactBox
+                    toolbarContainer={factBoxToolbar}
                     fillHeight
-                    className="px-5 pb-3"
+                    className="pt-3"
                     recordType="aset_tr_aset"
                     recordId={activeAsset?.id}
                     details={

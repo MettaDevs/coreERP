@@ -1,4 +1,8 @@
 import * as React from 'react';
+import {
+    documentLineLabel,
+    useDocumentLineCell,
+} from '../document-line-context';
 
 import { cn } from '../utils';
 import { useRecordEditActivation } from './record-edit-boundary';
@@ -15,7 +19,7 @@ function Input({
     className,
     type,
     id,
-    label,
+    label: providedLabel,
     placeholder,
     focusedPlaceholder,
     required,
@@ -24,6 +28,8 @@ function Input({
     onKeyDown,
     ...props
 }: InputProps) {
+    const cell = useDocumentLineCell();
+    const label = cell && cell.compact !== false ? undefined : providedLabel;
     const generatedId = React.useId();
     const inputId = id ?? (label ? generatedId : undefined);
     const activation = useRecordEditActivation();
@@ -38,6 +44,9 @@ function Input({
             id={inputId}
             type={type}
             data-slot="input"
+            data-document-control={
+                cell && cell.compact !== false ? '' : undefined
+            }
             required={required}
             placeholder={label ? (focusedPlaceholder ?? ' ') : placeholder}
             className={cn(
@@ -52,6 +61,13 @@ function Input({
                 className,
             )}
             {...props}
+            aria-invalid={
+                props['aria-invalid'] ?? (cell?.errorId ? true : undefined)
+            }
+            aria-describedby={props['aria-describedby'] ?? cell?.errorId}
+            aria-label={
+                props['aria-label'] ?? documentLineLabel(cell, providedLabel)
+            }
             onClick={(event) => {
                 onClick?.(event);
 

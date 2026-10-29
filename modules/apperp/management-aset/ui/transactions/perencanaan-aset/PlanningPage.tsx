@@ -1,4 +1,5 @@
 import { router, usePage } from '@inertiajs/react';
+import { ListPlus } from 'lucide-react';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useWorkDate } from '@/hooks/use-work-date';
@@ -19,6 +20,7 @@ import type {
     DataTableRowAction,
 } from '@apperp/ui/data-table';
 import { DatePicker, formatDateInput } from '@apperp/ui/date-picker';
+import { DocumentLines } from '@apperp/ui/document-lines';
 import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
@@ -36,6 +38,7 @@ import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
 import { useRecordTransition } from '@apperp/ui/use-record-transition';
 import { RecordLookup } from '../../_shared/RecordLookup';
 import { api, errorMessage, newIdempotencyKey } from '../../api';
+import { AssetTypePicker } from '../../master/AssetTypePicker';
 import { useMasterOptions } from '../../master/useMasterOptions';
 import { useRecordList } from '../../use-record-list';
 import { useRecordOptions } from '../../use-record-list';
@@ -44,6 +47,11 @@ import { RecordCardHeader, recordQueryUrl } from '../_shared/record-card';
 import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
 import { useRecordQueryTarget } from '../_shared/use-record-query-target';
 import { FundingSourceLookup } from './FundingSourceLookup';
+import { appendPlanningTypes, createPlanningLine } from './planning-lines';
+import type {
+    PlanningDetail as Detail,
+    PlanningDraftDetail as DraftDetail,
+} from './planning-lines';
 import { PlanningYearLookup } from './PlanningYearLookup';
 
 type Context = {
@@ -59,21 +67,6 @@ type OrganizationOption = {
     kode?: string | null;
     nama: string;
     display_label?: string;
-};
-type Detail = {
-    id?: string;
-    nama_aset?: string;
-    jenis_aset_kode?: string;
-    jenis_aset_nama?: string;
-    unit?: string;
-    jenis_aset_id: string;
-    satuan_id: string;
-    quantity: string;
-    requested_specification: string;
-    needed_on: string | null;
-    funding_source_id: string | null;
-    funding_source_name?: string | null;
-    estimated_unit_price: string | null;
 };
 type Plan = {
     id: string;
@@ -95,18 +88,7 @@ type Plan = {
     details?: Detail[];
 };
 
-type DraftDetail = Detail & { lineKey: string };
-
-const emptyDetail = (): DraftDetail => ({
-    lineKey: newIdempotencyKey(),
-    jenis_aset_id: '',
-    satuan_id: '',
-    quantity: '1',
-    requested_specification: '',
-    needed_on: null,
-    funding_source_id: null,
-    estimated_unit_price: null,
-});
+const emptyDetail = (): DraftDetail => createPlanningLine(newIdempotencyKey());
 
 // Tanggal dokumen memakai tanggal kerja; tahun dipilih dari master perusahaan.
 const emptyPlan = (
@@ -171,6 +153,8 @@ export default function PlanningPage({
     );
     const [viewing, setViewing] = useState<Plan | null>(null);
     const [selectedLines, setSelectedLines] = useState<string[]>([]);
+    const [selectedDraftLines, setSelectedDraftLines] = useState<string[]>([]);
+    const [pickingTypes, setPickingTypes] = useState(false);
     const [manualCode, setManualCode] = useState('');
     const [search, setSearch] = useState('');
     const [editSections, setEditSections] = useState(['general', 'lines']);
@@ -219,6 +203,7 @@ export default function PlanningPage({
     );
     const plans = list.items;
     const openCreate = async () => {
+        setSelectedDraftLines([]);
         editFeedback.clearSaveFeedback();
 
         setCardLoading(true);
@@ -321,6 +306,7 @@ export default function PlanningPage({
         onOpen: (id, signal) => openDetails(id, signal),
     });
     const openEdit = async (id: string) => {
+        setSelectedDraftLines([]);
         editFeedback.clearSaveFeedback();
 
         setCardLoading(true);
@@ -543,6 +529,7 @@ export default function PlanningPage({
     };
     const closePlan = () => {
         requestPlanTransition(() => {
+            setPickingTypes(false);
             setEditing(undefined);
             createCard?.onClose();
         });
@@ -773,7 +760,7 @@ export default function PlanningPage({
         {
             id: 'funding_source',
             header: 'Sumber dana',
-            width: 230,
+            width: 161,
             cell: (line) => line.funding_source_name ?? 'Belum diisi',
         },
         {
@@ -793,7 +780,9 @@ export default function PlanningPage({
         {
             id: 'asset_type',
             header: 'Jenis aset',
-            minWidth: 260,
+            width: 220,
+            minWidth: 160,
+            required: true,
             content: 'control',
             cell: ({ detail, index }) => (
                 <FormControl
@@ -822,7 +811,9 @@ export default function PlanningPage({
         {
             id: 'specification',
             header: 'Spesifikasi yang diminta',
-            minWidth: 300,
+            width: 280,
+            minWidth: 180,
+            required: true,
             content: 'control',
             cell: ({ detail, index }) => (
                 <FormControl
@@ -848,7 +839,8 @@ export default function PlanningPage({
         {
             id: 'quantity',
             header: 'Jumlah',
-            width: 150,
+            width: 100,
+            required: true,
             content: 'control',
             cell: ({ detail, index }) => (
                 <FormControl
@@ -875,7 +867,9 @@ export default function PlanningPage({
         {
             id: 'unit',
             header: 'Satuan',
-            minWidth: 210,
+            width: 150,
+            minWidth: 120,
+            required: true,
             content: 'control',
             cell: ({ detail, index }) => (
                 <FormControl
@@ -904,7 +898,8 @@ export default function PlanningPage({
         {
             id: 'needed_on',
             header: 'Tanggal kebutuhan',
-            width: 200,
+            width: 160,
+            required: true,
             content: 'control',
             cell: ({ detail, index }) => (
                 <FormControl
@@ -936,7 +931,9 @@ export default function PlanningPage({
         {
             id: 'funding_source',
             header: 'Sumber dana',
-            minWidth: 260,
+            width: 154,
+            minWidth: 112,
+            required: true,
             content: 'control',
             cell: ({ detail, index }) => (
                 <FormControl
@@ -966,7 +963,7 @@ export default function PlanningPage({
         {
             id: 'price',
             header: 'Perkiraan harga satuan',
-            width: 220,
+            width: 180,
             content: 'control',
             cell: ({ detail, index }) => (
                 <FormControl
@@ -1008,7 +1005,6 @@ export default function PlanningPage({
             id: 'actions',
             header: 'Tindakan',
             width: 100,
-            content: 'control',
             cell: ({ index }) =>
                 editing &&
                 editing.details.length > 1 && (
@@ -1246,13 +1242,15 @@ export default function PlanningPage({
                                                 permintaan pembelian.
                                             </p>
                                         )}
-                                        <DataTable
+                                        <DocumentLines
+                                            title="Rincian aset"
+                                            readOnly
+                                            disabled={saving || cardLoading}
                                             columns={viewColumns}
                                             data={viewing.details ?? []}
                                             getRowKey={(line) =>
                                                 line.id ?? line.jenis_aset_id
                                             }
-                                            scrollMode="inline"
                                             selection={
                                                 canRequest
                                                     ? {
@@ -1269,13 +1267,15 @@ export default function PlanningPage({
                                                     : undefined
                                             }
                                             emptyMessage="Perencanaan ini belum memiliki rincian aset."
+                                            footer={
+                                                <p className="text-right text-sm font-semibold">
+                                                    Total perkiraan{' '}
+                                                    {estimateSummary(
+                                                        viewing.details ?? [],
+                                                    )}
+                                                </p>
+                                            }
                                         />
-                                        <p className="mt-3 text-right text-sm font-semibold">
-                                            Total perkiraan{' '}
-                                            {estimateSummary(
-                                                viewing.details ?? [],
-                                            )}
-                                        </p>
                                     </CollapsibleSection>
                                 </CollapsibleSectionGroup>
                             )}
@@ -1686,30 +1686,95 @@ export default function PlanningPage({
                                         keepMounted
                                         summary={`${editing.details.length} baris - ${estimateSummary(editing.details)}`}
                                     >
-                                        <DataTable
+                                        <DocumentLines
+                                            title="Rincian aset"
                                             columns={editColumns}
                                             data={editRows}
                                             getRowKey={({ detail }) =>
                                                 detail.lineKey
                                             }
-                                            scrollMode="inline"
-                                            serverSort
-                                            onAddRow={() =>
-                                                setEditing({
-                                                    ...editing,
-                                                    details: [
-                                                        ...editing.details,
-                                                        emptyDetail(),
-                                                    ],
-                                                })
+                                            portalContainer={sheetContentRef}
+                                            disabled={saving || cardLoading}
+                                            selection={{
+                                                selectedKeys:
+                                                    selectedDraftLines.filter(
+                                                        (key) =>
+                                                            editing.details.some(
+                                                                (line) =>
+                                                                    line.lineKey ===
+                                                                    key,
+                                                            ),
+                                                    ),
+                                                onSelectedKeysChange: (keys) =>
+                                                    setSelectedDraftLines(
+                                                        keys.map(String),
+                                                    ),
+                                            }}
+                                            onDeleteRows={(rows) => {
+                                                const keys = new Set(
+                                                    rows.map(
+                                                        ({ detail }) =>
+                                                            detail.lineKey,
+                                                    ),
+                                                );
+                                                setEditing(
+                                                    (current) =>
+                                                        current && {
+                                                            ...current,
+                                                            details:
+                                                                current.details.filter(
+                                                                    (line) =>
+                                                                        !keys.has(
+                                                                            line.lineKey,
+                                                                        ),
+                                                                ),
+                                                        },
+                                                );
+                                                setSelectedDraftLines(
+                                                    (current) =>
+                                                        current.filter(
+                                                            (key) =>
+                                                                !keys.has(key),
+                                                        ),
+                                                );
+                                            }}
+                                            toolbar={
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    disabled={
+                                                        saving || cardLoading
+                                                    }
+                                                    onClick={() =>
+                                                        setPickingTypes(true)
+                                                    }
+                                                >
+                                                    <ListPlus aria-hidden="true" />
+                                                    Pilih jenis aset
+                                                </Button>
                                             }
-                                            addRowLabel="Tambah"
+                                            onAddRow={() =>
+                                                setEditing(
+                                                    (current) =>
+                                                        current && {
+                                                            ...current,
+                                                            details: [
+                                                                ...current.details,
+                                                                emptyDetail(),
+                                                            ],
+                                                        },
+                                                )
+                                            }
                                             emptyMessage="Belum ada rincian aset. Pilih Tambah untuk mengisi."
+                                            footer={
+                                                <p className="text-right text-sm font-semibold">
+                                                    Total perkiraan{' '}
+                                                    {estimateSummary(
+                                                        editing.details,
+                                                    )}
+                                                </p>
+                                            }
                                         />
-                                        <p className="mt-3 text-right text-sm font-semibold">
-                                            Total perkiraan{' '}
-                                            {estimateSummary(editing.details)}
-                                        </p>
                                     </CollapsibleSection>
                                 </CollapsibleSectionGroup>
                             </PageDialogBody>
@@ -1717,6 +1782,27 @@ export default function PlanningPage({
                     )}
                 </PageDialogContent>
             </PageDialog>
+            {pickingTypes && editing && (
+                <AssetTypePicker
+                    source={typeSource}
+                    disabled={saving || cardLoading}
+                    onClose={() => setPickingTypes(false)}
+                    onChoose={(records) => {
+                        setEditing(
+                            (current) =>
+                                current && {
+                                    ...current,
+                                    details: appendPlanningTypes(
+                                        current.details,
+                                        records,
+                                        emptyDetail,
+                                    ),
+                                },
+                        );
+                        setPickingTypes(false);
+                    }}
+                />
+            )}
         </>
     );
 }

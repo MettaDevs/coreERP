@@ -1,5 +1,10 @@
 import { Popover as PopoverPrimitive } from 'radix-ui';
 import * as React from 'react';
+import {
+    DocumentLineCellContext,
+    documentLinePortal,
+    useDocumentLineCell,
+} from '../document-line-context';
 
 import { cn } from '../utils';
 
@@ -18,6 +23,7 @@ function PopoverTrigger({
 function PopoverContent({
     className,
     portalContainer,
+    children,
     align = 'center',
     sideOffset = 4,
     ...props
@@ -26,8 +32,12 @@ function PopoverContent({
         typeof PopoverPrimitive.Portal
     >['container'];
 }) {
+    const cell = useDocumentLineCell();
+
     return (
-        <PopoverPrimitive.Portal container={portalContainer}>
+        <PopoverPrimitive.Portal
+            container={documentLinePortal(cell) ?? portalContainer}
+        >
             <PopoverPrimitive.Content
                 data-slot="popover-content"
                 align={align}
@@ -37,7 +47,11 @@ function PopoverContent({
                     className,
                 )}
                 {...props}
-            />
+            >
+                <DocumentLineCellContext.Provider value={null}>
+                    {children}
+                </DocumentLineCellContext.Provider>
+            </PopoverPrimitive.Content>
         </PopoverPrimitive.Portal>
     );
 }

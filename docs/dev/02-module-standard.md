@@ -69,75 +69,75 @@ publisher: apperp
 version: 1.0.0
 kind: business-app
 requires:
-  core: ^1.0
+    core: ^1.0
 dependsOn:
-  human-resources: ^1.0
+    human-resources: ^1.0
 api:
-  image: registry.apperp.local/apps/accounting-api:1.0.0
-  openapi: contracts/openapi.yaml
+    image: registry.apperp.local/apps/accounting-api:1.0.0
+    openapi: contracts/openapi.yaml
 ui:
-  image: registry.apperp.local/apps/accounting-ui:1.0.0
-  entry: /apps/accounting/
-  navigation:
-    rail:
-      - id: jurnal
-        label: Jurnal
-    sidebar:
-      jurnal:
-        - id: jurnal-umum
-          label: Jurnal umum
-          permission: accounting.jurnal.read
+    image: registry.apperp.local/apps/accounting-ui:1.0.0
+    entry: /apps/accounting/
+    navigation:
+        rail:
+            - id: jurnal
+              label: Jurnal
+        sidebar:
+            jurnal:
+                - id: jurnal-umum
+                  label: Jurnal umum
+                  permission: accounting.jurnal.read
 database:
-  logical_name: app_erp_accounting
-  migrations: database/migrations
+    logical_name: app_erp_accounting
+    migrations: database/migrations
 events:
-  asyncapi: contracts/asyncapi.yaml
+    asyncapi: contracts/asyncapi.yaml
 workflow_types:
-  - code: accounting.jurnal-verification
-    name: Verifikasi jurnal
-    decision_context_schema:
-      required: [document_id]
+    - code: accounting.jurnal-verification
+      name: Verifikasi jurnal
+      decision_context_schema:
+          required: [document_id]
 security:
-  data_policies:
-    - code: accounting.jurnal-responsibility
-      name: Akses jurnal menurut entitas legal
-      protected_permissions:
-        - accounting.jurnal.read
-        - accounting.jurnal.create
-  entry_points:
-    - code: accounting.jurnal.form
-      name: Layar jurnal
-      type: form
-    - code: accounting.jurnal.api
-      name: API jurnal
-      type: api
-  permissions:
-    - code: accounting.jurnal.read
-      name: Lihat jurnal
-      entry_point: accounting.jurnal.form
-      access: read
-    - code: accounting.jurnal.create
-      name: Buat jurnal
-      entry_point: accounting.jurnal.api
-      access: create
-  privileges:
-    - code: accounting.jurnal.maintain
-      name: Pelihara jurnal
-      permissions:
-        - accounting.jurnal.read
-        - accounting.jurnal.create
-  duties:
-    - code: accounting.jurnal.manage
-      name: Kelola jurnal
-      privileges:
-        - accounting.jurnal.maintain
+    data_policies:
+        - code: accounting.jurnal-responsibility
+          name: Akses jurnal menurut entitas legal
+          protected_permissions:
+              - accounting.jurnal.read
+              - accounting.jurnal.create
+    entry_points:
+        - code: accounting.jurnal.form
+          name: Layar jurnal
+          type: form
+        - code: accounting.jurnal.api
+          name: API jurnal
+          type: api
+    permissions:
+        - code: accounting.jurnal.read
+          name: Lihat jurnal
+          entry_point: accounting.jurnal.form
+          access: read
+        - code: accounting.jurnal.create
+          name: Buat jurnal
+          entry_point: accounting.jurnal.api
+          access: create
+    privileges:
+        - code: accounting.jurnal.maintain
+          name: Pelihara jurnal
+          permissions:
+              - accounting.jurnal.read
+              - accounting.jurnal.create
+    duties:
+        - code: accounting.jurnal.manage
+          name: Kelola jurnal
+          privileges:
+              - accounting.jurnal.maintain
 number_sequences:
-  references:
-    - code: accounting.jurnal
-      name: Nomor jurnal
-      default_prefix: JRNL
-      allowed_scopes:
-        - legal_entity
+    references:
+        - code: accounting.jurnal
+          name: Nomor jurnal
+          default_prefix: JRNL
+          allowed_scopes:
+              - legal_entity
 data_retention: archive
 ```
 
@@ -145,16 +145,16 @@ Manifest mendaftarkan metadata keamanan kanonik sampai duty. Security role, user
 
 ### Blok manifest dan apa yang dipicunya
 
-| Blok | Wajib? | Yang terjadi di Core setelah registrasi |
-| --- | --- | --- |
-| `api`, `ui`, `database`, `events` | Ya untuk app yang berjalan sebagai container sendiri | Katalog mengenal artifact, database logis, dan kontrak app. `database.logical_name` hanya wajib bagi app container: module berjalan di dalam runtime Core dan memakai database Core, jadi ia tidak punya nama database sendiri untuk disebutkan dan katalog menyimpannya sebagai kosong |
-| `ui.navigation` | Ya | Menu app muncul di shell Core. Item menu hanya boleh memakai permission `read` milik app yang sama |
-| `security.entry_points` / `permissions` / `privileges` / `duties` | Ya, keempatnya | Duty tersedia untuk disusun admin tenant menjadi security role |
-| `security.data_policies` | Hanya bila resource perlu dibatasi organisasi | Muncul sebagai batas data saat admin memberi role ke anggota |
-| `dependsOn` | Tidak, bila app berdiri sendiri | Dependency disimpan dengan rentang versi. Core menolak app yang belum ada, versi yang tidak cocok, dan cycle. Saat onboarding, prerequisite transitif ikut menjadi entitlement serta dipasang lebih dulu. |
-| `number_sequences.references` | Hanya bila app menerbitkan nomor | Reference muncul di layar **Nomor dokumen** Core (`settings/number-sequences`) untuk diaktifkan dan diatur admin tenant |
-| `workflow_types` | Hanya bila ada approval atau verifikasi | Tipe workflow tersedia untuk dikonfigurasi admin tenant |
-| `reports` | Tidak ditulis di manifest module | Laporan module masuk katalog Core dari kelas datasetnya lewat `ModuleReportProvider::catalog()` saat registrasi; manifest module yang masih memuat blok ini ditolak. Admin tenant mengatur layoutnya di **Layout laporan**, pengguna mencetak lewat dialog Shell. Lihat [dokumen cetak](23-document-rendering.md) |
+| Blok                                                              | Wajib?                                               | Yang terjadi di Core setelah registrasi                                                                                                                                                                                                                                                                           |
+| ----------------------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `api`, `ui`, `database`, `events`                                 | Ya untuk app yang berjalan sebagai container sendiri | Katalog mengenal artifact, database logis, dan kontrak app. `database.logical_name` hanya wajib bagi app container: module berjalan di dalam runtime Core dan memakai database Core, jadi ia tidak punya nama database sendiri untuk disebutkan dan katalog menyimpannya sebagai kosong                           |
+| `ui.navigation`                                                   | Ya                                                   | Menu app muncul di shell Core. Item menu hanya boleh memakai permission `read` milik app yang sama                                                                                                                                                                                                                |
+| `security.entry_points` / `permissions` / `privileges` / `duties` | Ya, keempatnya                                       | Duty tersedia untuk disusun admin tenant menjadi security role                                                                                                                                                                                                                                                    |
+| `security.data_policies`                                          | Hanya bila resource perlu dibatasi organisasi        | Muncul sebagai batas data saat admin memberi role ke anggota                                                                                                                                                                                                                                                      |
+| `dependsOn`                                                       | Tidak, bila app berdiri sendiri                      | Dependency disimpan dengan rentang versi. Core menolak app yang belum ada, versi yang tidak cocok, dan cycle. Saat onboarding, prerequisite transitif ikut menjadi entitlement serta dipasang lebih dulu.                                                                                                         |
+| `number_sequences.references`                                     | Hanya bila app menerbitkan nomor                     | Reference muncul di layar **Nomor dokumen** Core (`settings/number-sequences`) untuk diaktifkan dan diatur admin tenant                                                                                                                                                                                           |
+| `workflow_types`                                                  | Hanya bila ada approval atau verifikasi              | Tipe workflow tersedia untuk dikonfigurasi admin tenant                                                                                                                                                                                                                                                           |
+| `reports`                                                         | Tidak ditulis di manifest module                     | Laporan module masuk katalog Core dari kelas datasetnya lewat `ModuleReportProvider::catalog()` saat registrasi; manifest module yang masih memuat blok ini ditolak. Admin tenant mengatur layoutnya di **Layout laporan**, pengguna mencetak lewat dialog Shell. Lihat [dokumen cetak](23-document-rendering.md) |
 
 Module tidak menerbitkan nomornya sendiri. Setelah reference terdaftar dan admin mengaktifkannya, module meminta nomor lewat kontrak `NumberSequenceIssuer` di dalam proses yang sama. Addon pihak ketiga di luar runtime memakai API internal Core `POST /api/internal/v1/number-sequences/{reference}/issue` atau `/reserve`; `idempotency_key` wajib pada keduanya. Detailnya di [Number sequence](14-number-sequences.md).
 
@@ -220,12 +220,12 @@ Halaman ini menetapkan **aturannya**. Urutan mengerjakan beserta persiapan tekni
 
 Manifest wajib mendeklarasikan keempat lapis secara terpisah, mengikuti [role-based security Dynamics 365](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/sysadmin/role-based-security):
 
-| Lapis | Arti | Aturan kode |
-| --- | --- | --- |
+| Lapis       | Arti                                                                          | Aturan kode                    |
+| ----------- | ----------------------------------------------------------------------------- | ------------------------------ |
 | Entry point | Yang dilindungi: form, menu item, API/service operation, report, atau action. | `<app>.<resource>.<form\|api>` |
-| Permission | Pasangan entry point + access level. | `<app>.<resource>.<aksi>` |
-| Privilege | Satu tugas; kumpulan permission. | `<app>.<resource>.<tugas>` |
-| Duty | Bagian proses bisnis; kumpulan privilege. | `<app>.<resource>.<proses>` |
+| Permission  | Pasangan entry point + access level.                                          | `<app>.<resource>.<aksi>`      |
+| Privilege   | Satu tugas; kumpulan permission.                                              | `<app>.<resource>.<tugas>`     |
+| Duty        | Bagian proses bisnis; kumpulan privilege.                                     | `<app>.<resource>.<proses>`    |
 
 `type` entry point: `form`, `menu_item`, `api`, `report`, `action`.
 
@@ -317,12 +317,12 @@ Tabel lama yang lahir tanpa awalan diganti nama **satu kali**, saat module-nya d
 
 Bentuk yang dipakai sesudah awalan:
 
-| Bentuk | Dipakai untuk | Contoh |
-| --- | --- | --- |
-| `m_<resource>` | Master, reference, setup, konfigurasi, atau tabel relasi milik master yang bukan fakta transaksi mandiri. | `aset_m_group_aset`, `aset_m_jenis_aset_atribut` |
-| `tr_<transaction>` | Header atau fakta transaksi mandiri. | `aset_tr_penerimaan_aset` |
-| `tr_<transaction>_details` | Baris/detail yang selalu dimiliki satu header transaksi. Bentuk ini selalu jamak: `_details`, bukan `_detail`. | `aset_tr_perencanaan_aset_details` |
-| `tr_<aggregate>_<record>` | Catatan transaksi turunan yang bukan daftar baris header, misalnya nilai atribut, log, atau fakta operasional lain milik aggregate transaksi. | `aset_tr_aset_atribut` |
+| Bentuk                     | Dipakai untuk                                                                                                                                 | Contoh                                           |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `m_<resource>`             | Master, reference, setup, konfigurasi, atau tabel relasi milik master yang bukan fakta transaksi mandiri.                                     | `aset_m_group_aset`, `aset_m_jenis_aset_atribut` |
+| `tr_<transaction>`         | Header atau fakta transaksi mandiri.                                                                                                          | `aset_tr_penerimaan_aset`                        |
+| `tr_<transaction>_details` | Baris/detail yang selalu dimiliki satu header transaksi. Bentuk ini selalu jamak: `_details`, bukan `_detail`.                                | `aset_tr_perencanaan_aset_details`               |
+| `tr_<aggregate>_<record>`  | Catatan transaksi turunan yang bukan daftar baris header, misalnya nilai atribut, log, atau fakta operasional lain milik aggregate transaksi. | `aset_tr_aset_atribut`                           |
 
 `m_` bukan berarti setiap tabelnya adalah master yang mendapat menu, permission,
 atau Number Sequence sendiri. Tabel konfigurasi dan relasi—misalnya
@@ -352,11 +352,11 @@ final class Barang extends Model
 
 Trait itu melakukan tiga hal, dan ketiganya perlu:
 
-| Kejadian | Yang dilakukan |
-| --- | --- |
-| membaca | menyaring `tenant_id` ke tenant aktif; tanpa tenant aktif query **dibatalkan**, bukan dijalankan tanpa saringan |
-| menyimpan baris baru | mengisi `tenant_id` dari tenant aktif bila module tidak menuliskannya |
-| menyimpan dengan `tenant_id` berbeda | membatalkan penyimpanan |
+| Kejadian                             | Yang dilakukan                                                                                                  |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| membaca                              | menyaring `tenant_id` ke tenant aktif; tanpa tenant aktif query **dibatalkan**, bukan dijalankan tanpa saringan |
+| menyimpan baris baru                 | mengisi `tenant_id` dari tenant aktif bila module tidak menuliskannya                                           |
+| menyimpan dengan `tenant_id` berbeda | membatalkan penyimpanan                                                                                         |
 
 **Jangan menyaring `tenant_id` dengan tangan pada model yang sudah memakai trait ini.** Bukan karena
 berlebihan, tetapi karena query seperti itu tetap benar walau traitnya dicabut — sehingga penjaganya
@@ -549,14 +549,14 @@ $this->app->make(AttachmentRecordTypes::class)->register(new WorkerAttachments);
 
 Kelasnya memakai kontrak `AttachmentRecordType`:
 
-| Method | Isinya |
-| --- | --- |
-| `recordType()` | Nama tabel induk, misalnya `hr_workers`. Hanya tabel milik module itu sendiri. |
-| `moduleId()` | Id module. Core memasang konteks module ini sebelum bertanya, sama seperti rute module. |
-| `dataClass()` | Klasifikasi isi lampiran, mengikuti induknya. Lampiran pekerja `EndUserIdentifiableInformation`, dokumen aset `CustomerContent`. Disalin ke kolom `data_class` setiap lampiran. |
-| `canRead($tenantId, $recordId)` | Boleh membuka record itu: permission baca **dan** kebijakan organisasinya, persis seperti endpoint detailnya. Record yang tidak ada atau diarsipkan: `false`. |
-| `canChange($tenantId, $recordId)` | Boleh mengubah record itu, yang juga berarti boleh melampirkan dan mengarsipkan lampirannya. Resource tanpa permission ubah memakai permission `create`-nya. |
-| `hasLine($tenantId, $recordId, $lineNumber)` | Dokumen itu punya baris bernomor ini (`line_number` di tabel `_details`). Tabel tanpa baris menjawab `false`. |
+| Method                                       | Isinya                                                                                                                                                                          |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `recordType()`                               | Nama tabel induk, misalnya `hr_workers`. Hanya tabel milik module itu sendiri.                                                                                                  |
+| `moduleId()`                                 | Id module. Core memasang konteks module ini sebelum bertanya, sama seperti rute module.                                                                                         |
+| `dataClass()`                                | Klasifikasi isi lampiran, mengikuti induknya. Lampiran pekerja `EndUserIdentifiableInformation`, dokumen aset `CustomerContent`. Disalin ke kolom `data_class` setiap lampiran. |
+| `canRead($tenantId, $recordId)`              | Boleh membuka record itu: permission baca **dan** kebijakan organisasinya, persis seperti endpoint detailnya. Record yang tidak ada atau diarsipkan: `false`.                   |
+| `canChange($tenantId, $recordId)`            | Boleh mengubah record itu, yang juga berarti boleh melampirkan dan mengarsipkan lampirannya. Resource tanpa permission ubah memakai permission `create`-nya.                    |
+| `hasLine($tenantId, $recordId, $lineNumber)` | Dokumen itu punya baris bernomor ini (`line_number` di tabel `_details`). Tabel tanpa baris menjawab `false`.                                                                   |
 
 - **Hak mengikuti record induk.** Lampiran tidak punya permission sendiri. Jawaban module dibaca lewat
   `RequestContext` dan model module yang memakai `BelongsToTenant`, jadi `tenantId` tidak perlu ditulis
@@ -565,8 +565,8 @@ Kelasnya memakai kontrak `AttachmentRecordType`:
 - **Baris dokumen menempel ke dokumennya.** Lampiran pada baris dokumen didaftarkan pada tabel header
   dengan nomor baris, seperti `Line No.` di BC; tabel `_details` tidak didaftarkan sendiri.
 - **Rute milik Core**, dipanggil layar dengan sesi login: `GET` dan `POST
-  /api/v1/records/{tabel}/{id}/attachments`, `GET /api/v1/attachments/{id}/download`, dan `DELETE
-  /api/v1/attachments/{id}` dengan versi baris. Record yang tidak boleh dibuka dijawab 404, sama dengan
+/api/v1/records/{tabel}/{id}/attachments`, `GET /api/v1/attachments/{id}/download`, dan `DELETE
+/api/v1/attachments/{id}` dengan versi baris. Record yang tidak boleh dibuka dijawab 404, sama dengan
   record yang tidak ada; boleh dibuka tetapi tidak boleh diubah dijawab 403.
 - **Berkas di disk `coreerp.attachments.disk`** (bawaannya `s3`), dengan hash SHA-256 yang diperiksa
   setiap kali diunduh. Isi yang tidak cocok lagi tidak dikirim; kejadiannya dilaporkan. Batas unggah ada
@@ -691,10 +691,10 @@ ekstensi tanpa menyentuh datanya.
 
 Keduanya sering tertukar dan artinya berbeda:
 
-| Kolom | Arti | Muncul di daftar |
-| --- | --- | --- |
-| `aktif` | ada dan sah, tetapi sedang tidak dipakai untuk transaksi baru | ya, dengan penanda |
-| `deleted_at` | dianggap tidak ada oleh pengguna | tidak |
+| Kolom        | Arti                                                          | Muncul di daftar   |
+| ------------ | ------------------------------------------------------------- | ------------------ |
+| `aktif`      | ada dan sah, tetapi sedang tidak dipakai untuk transaksi baru | ya, dengan penanda |
+| `deleted_at` | dianggap tidak ada oleh pengguna                              | tidak              |
 
 Master yang tidak boleh dipakai lagi tetapi masih dirujuk transaksi lama memakai `aktif = false`,
 bukan `deleted_at`.
@@ -858,7 +858,7 @@ Pendengar dan daftar `flush` Octane ada di `apps/core/config/octane.php`. Carany
 lalu `CurrentApplication::set()` — dan memeriksa bahwa yang ditulis dari boot terbaca permintaan. Di
 atas server sungguhan, probe lintas tenant di skenario uji beban menjadi penjaganya: satu worker
 bergantian melayani banyak tenant, jadi data yang tertinggal langsung tercatat sebagai pelanggaran.
-Rujukan umumnya bagian *Dependency Injection and Octane* pada dokumentasi Laravel Octane.
+Rujukan umumnya bagian _Dependency Injection and Octane_ pada dokumentasi Laravel Octane.
 
 ### Cetakan module baru
 
@@ -897,16 +897,16 @@ di halaman Core-nya, dan modul memilihnya lewat kontrak di `App\Platform\Modules
 
 ## Contract dan dependency
 
-| Area | Aturan |
-| --- | --- |
-| API sync | REST/JSON di bawah `/api/v1`, lengkap dalam OpenAPI bila permukaannya dipanggil dari luar runtime. Rute module yang hanya dipanggil halamannya sendiri dijaga test module, bukan kontrak terbit. |
-| Event | Event dibuat melalui outbox setelah commit; payload dan channel ditulis dalam AsyncAPI. Antar module di satu runtime, ia berbentuk event Laravel yang dikirim di dalam proses — namanya, envelope-nya, dan aturan versinya tetap sama. |
-| UI | Halaman module ikut build shell dan dirender sebagai halaman Inertia. Shell menampilkan entry hanya bila entitlement aktif, catatan pemasangan module berstatus `installed`, dan user mempunyai permission entry point. Kontrol generik wajib memakai `@apperp/ui`. |
-| Auth | Semua endpoint memvalidasi `TenantContext`, entitlement, pemasangan module, permission, dan organization scope. Module membacanya dari middleware konteks module lewat kontrak `TenantContext` dan `RequestContext`. Security metadata mengikuti [identity dan access](09-identity-and-access.md). |
-| Data | Tidak ada akses ke data app lain. ID app lain hanya reference opaque. Master milik Foundation dibaca lewat kontrak; lihat [master bersama](#master-bersama-dan-modul-yang-berdiri-sendiri). |
-| Jobs | Idempotent, membawa `tenant_id`, memiliki retry/dead-letter policy. |
-| Observability | Log, trace, metric, dan event menyertakan tenant/app/correlation ID. |
-| Compatibility | `dependsOn` dengan versi tepat atau caret divalidasi saat katalog terdaftar; Core menolak cycle dan perubahan versi yang merusak dependent. `requires.core` belum divalidasi oleh Control Plane. |
+| Area          | Aturan                                                                                                                                                                                                                                                                                             |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API sync      | REST/JSON di bawah `/api/v1`, lengkap dalam OpenAPI bila permukaannya dipanggil dari luar runtime. Rute module yang hanya dipanggil halamannya sendiri dijaga test module, bukan kontrak terbit.                                                                                                   |
+| Event         | Event dibuat melalui outbox setelah commit; payload dan channel ditulis dalam AsyncAPI. Antar module di satu runtime, ia berbentuk event Laravel yang dikirim di dalam proses — namanya, envelope-nya, dan aturan versinya tetap sama.                                                             |
+| UI            | Halaman module ikut build shell dan dirender sebagai halaman Inertia. Shell menampilkan entry hanya bila entitlement aktif, catatan pemasangan module berstatus `installed`, dan user mempunyai permission entry point. Kontrol generik wajib memakai `@apperp/ui`.                                |
+| Auth          | Semua endpoint memvalidasi `TenantContext`, entitlement, pemasangan module, permission, dan organization scope. Module membacanya dari middleware konteks module lewat kontrak `TenantContext` dan `RequestContext`. Security metadata mengikuti [identity dan access](09-identity-and-access.md). |
+| Data          | Tidak ada akses ke data app lain. ID app lain hanya reference opaque. Master milik Foundation dibaca lewat kontrak; lihat [master bersama](#master-bersama-dan-modul-yang-berdiri-sendiri).                                                                                                        |
+| Jobs          | Idempotent, membawa `tenant_id`, memiliki retry/dead-letter policy.                                                                                                                                                                                                                                |
+| Observability | Log, trace, metric, dan event menyertakan tenant/app/correlation ID.                                                                                                                                                                                                                               |
+| Compatibility | `dependsOn` dengan versi tepat atau caret divalidasi saat katalog terdaftar; Core menolak cycle dan perubahan versi yang merusak dependent. `requires.core` belum divalidasi oleh Control Plane.                                                                                                   |
 
 Contract adalah batas integrasi, bukan shared domain model. Contract tetap dimiliki repository app penerbit. App consumer memakai versi contract yang dipublish dan menjalankan compatibility check di CI.
 
@@ -915,7 +915,7 @@ Contract adalah batas integrasi, bukan shared domain model. Contract tetap dimil
 Jam tidak pernah diambil dari perangkat pengguna. Layar module membaca dua nilai dari Core lewat
 `apps/core/resources/js/hooks/use-work-date.ts`:
 
-- `useWorkDate().date` adalah **tanggal kerja** pengguna, padanan *Work Date* di Business Central: nilai
+- `useWorkDate().date` adalah **tanggal kerja** pengguna, padanan _Work Date_ di Business Central: nilai
   awal field tanggal pada dokumen transaksi baru. Bawaannya hari ini, dan pengguna menggantinya di
   My Profile untuk sisa sesi. Contohnya tanggal penerimaan, mutasi, dan perencanaan aset.
 - `useToday()` adalah hari ini menurut zona waktu pengguna, dihitung server. Pakai untuk tanggal yang
@@ -948,6 +948,68 @@ Header halaman mengikuti pola ringkas Business Central: judul bar 14 px semibold
 
 Gunakan `ActionButton action="create"` untuk **Baru**, yaitu membuka kartu record baru; `action="add"` untuk **Tambah**, yaitu menambah baris rincian atau memasukkan record ke kelompok/dokumen. Baris penerimaan yang masih kosong tetap memakai Tambah. SDK menetapkan label, ikon, dan ukurannya.
 
+`RecordActionBar.groups` membawa definisi aksi yang sama untuk `mode="ribbon"`
+dan `mode="dropdown"`. Bawaannya ribbon: klik grup membuka baris aksi horizontal
+melayang, pin menempatkannya pada baris kedua yang mengambil ruang layout, dan
+unpin mengembalikannya menjadi baris melayang. Klik di luar atau Escape menutup
+baris melayang; Escape mengembalikan fokus ke tombol grup. Flyout tidak modal,
+sehingga tidak mengunci panel lain pada halaman.
+
+`search` menyediakan ikon kaca pembesar di kiri. Klik membuka input dan memindahkan
+fokus ke sana; kata pencarian yang sudah diisi tetap terlihat. Escape hanya melipat
+input kosong, tanpa membuang kata pencarian. Separator membatasi judul, pencarian,
+perintah, grup, dan kontrol kanan. `trailing` menampung aksi di ujung kanan.
+
+`preferenceKey` harus menyertakan pengguna dan halaman bila pemanggil ingin menyimpan
+pilihan sematan. Tanpa key, pilihan hanya berlaku selama komponen terbuka. Halaman
+Inventarisasi aset memakai tenant, pengguna, dan identitas halaman pada key tersebut.
+Cari serta Baru berada di kiri, Home memuat Cetak label dan Ekspor ke Excel, sedangkan
+expand dan buka/tutup FactBox berada paling kanan. Jumlah aset yang ditampilkan tidak
+mengambil satu baris tersendiri pada daftar.
+
+Kontrol FactBox dirender ke host toolbar lewat `toolbarContainer`; state panel,
+drag separator, dan isinya tetap dimiliki FactBox. Saat panel ditutup, daftar
+mengambil seluruh lebar. Pada layout daftar, tabel menempel ke separator dan
+ruang pemisah berada di sisi panel detail.
+
+`RecordActionBar.filter` menempatkan tombol filter di area kanan toolbar. Halaman
+memegang `open` beserta `onOpenChange`, dengan keadaan awal tertutup; menutup panel
+tidak menghapus filter yang telah diterapkan. `active` menandai bahwa filter masih
+berlaku. `controls` menunjuk ID panel SDK `FilterPane`, yang dipasang melalui
+`ListPageLayout.filterPanel`, bukan dirender sebagai baris di atas tabel.
+`filterSide` menentukan sisi panel; Vendor memakai kiri dengan FactBox tetap di
+kanan. Laporan yang sudah memakai panel kanan tetap memakai sisi kanan, dengan
+kerangka SDK yang sama. Header/tombol tutup panel tetap terlihat dan isinya
+menggulir sendiri. Membuka/menutup panel tidak membongkar state tabel.
+
+Isian dan query tetap dimiliki halaman beserta otorisasinya. Search Vendor memakai
+`useVendorListQuery`: ketikan nonkosong dijadwalkan setelah 250 ms, pengosongan dan
+perubahan filter langsung meminta hasil, dan Inertia membatalkan kunjungan lama
+serta mereset batch daftar. Respons query sendiri tidak menimpa ketikan yang lebih
+baru. Timer berhenti selama card dibuka dan dibersihkan saat halaman dilepas.
+250 ms adalah konvensi SDK CoreERP; nilainya belum dapat diverifikasi sebagai
+delay client BC. Enter boleh mempercepat submit, tetapi tidak lagi menjadi syarat.
+
+Bantuan judul memakai `titleHint` pada `RecordActionBar` dan `PageDialogContent`.
+SDK `ContextualTitle` menggarisbawahi judul ketika hover/focus, menunggu sekitar
+satu detik untuk bantuan hover, dan mempertahankan bantuan ketika judul diklik.
+Klik berikutnya menutupnya; Enter/Space menyediakan tindakan yang sama. Jangan
+menambahkan ikon bantuan kedua pada toolbar untuk penjelasan judul tersebut.
+
+Vendor Core memakai pola ini pada daftar dan card: filter perusahaan/status
+tertutup saat awal, impor CSV berada dalam Home sesuai izin, dan kedua kontrol
+FactBox berada di toolbar perintah card. Card membuat host kontrolnya sendiri
+pada baris Simpan/Batal atau toolbar baca, sehingga jalur pembukaan card tidak
+mengembalikan kontrol ke area isi panel. DataTable daftar di dalam `ListPageLayout`
+mewarisi header seamless; tabel isian `DocumentLines` tetap rapat. Header card
+compact berlaku pada semua pemakai `PageDialog`. Halaman lama dengan primitive
+`Table` atau wrapper lokal masih perlu ditinjau menurut fungsi layarnya sebelum
+dianggap mengikuti standar daftar ini.
+
+Urutan Baru lalu Delete hanya berlaku bila fitur mempunyai operasi dan izin
+Delete. Register aset saat ini tidak menyediakan endpoint Delete aset hasil
+penerimaan; penataan toolbar tidak menambahkan operasi bisnis tersebut.
+
 Simpan tetap eksplisit dan tersedia di kiri atas, diikuti Batal. Form kartu memakai `PageDialogToolbar` atau `DialogToolbar` sebelum body yang menggulir. Pertahankan kepemilikan form dan urutan DOM yang sama dengan urutan visual; memindahkan footer melalui CSS `order` atau portal dapat merusak urutan keyboard atau submit native. Pemilih dan dialog konfirmasi tetap mengikuti makna aksinya. Preferensi keluarga font pengguna tetap berlaku.
 
 `PageDialogContent` merender hierarki kartu SDK. Bar paling atas berisi Back dan nama fitur, diikuti ikon Ubah, Bagikan, Baru (+), Delete; sisi kanan memuat buka di tab baru, expand, dan Close. Setelah bar itu, tampil identitas record yang lebih besar, berupa kode/nomor dan nama. Navigasi utama, navigasi sekunder, dan isi berada di bawah identitas record. `title` wajib menamai fitur; `recordTitle` menamai record. Jangan mengganti salah satunya dengan yang lain atau menambahkan bar Back/judul fitur kedua di body. `mainNavigation` dan `secondaryNavigation` hanya menerima navigasi yang memang ada pada layar.
@@ -977,6 +1039,90 @@ Data acuan baca-saja dan versi yang sudah terbit tidak menjadi editable karena m
 Navigasi kategori, editor workflow, tabel dengan detail di bawah, dan drill-down banyak kolom memakai
 layout sesuai kebutuhannya; semuanya bukan master–detail dua panel.
 
+### Rincian dokumen dalam kartu
+
+Rincian yang diisi langsung di dalam kartu memakai `DocumentLines` dari
+`@apperp/ui/document-lines`. Komponen ini memakai mesin `DataTable` yang sama untuk
+kolom, scroll, pemilihan baris, dan aksi. Label visual serta tanda wajib berada pada
+header kolom; kontrol SDK di dalam sel memakai ukuran rapat dan tetap mempunyai
+nama aksesibel yang menyebut baris. Validasi dan pesan error tetap terlihat.
+Kolom gabungan yang memang memuat beberapa isian dapat memakai `cellMode: 'form'`.
+
+Pemanggil memegang draft, key baris yang stabil, validasi bisnis, dan penyimpanan.
+`onAddRow` menambah draft; baris kosong di bawah dapat diklik pada kolom tujuan.
+Enter pada input biasa berpindah ke kontrol berikutnya dan dapat menambah baris
+di akhir. Enter milik combobox, kalender, atau textarea tetap ditangani kontrolnya.
+`onDeleteRows` menyediakan penghapusan pilihan dari draft. `readOnly` menyembunyikan
+aksi penambahan/penghapusan; pemanggil tetap merender sel baca-saja dan boleh
+menyediakan pemilihan baris untuk tindakan bisnis lain.
+
+Mode fokus memindahkan host editor yang sama ke `PageDialog` penuh. Draft, state
+kontrol, pemilihan, serta lebar kolom tidak dibuat ulang. `footer` berada di luar
+bagian tabel yang menggulir. Menutup mode fokus mengembalikan editor ke kartu;
+ia tidak menyimpan atau membatalkan dokumen. Lookup memakai `portalContainer`
+overlay yang aktif, sedangkan kartu master yang dibuka dari lookup kembali memakai
+layout form biasa.
+
+Aksi memilih banyak record memakai daftar master dan aturan akses fitur yang sudah
+ada. SDK tidak menentukan default bisnis atau mengambil record sendiri. Acuan BC
+untuk pemisahan rincian ini adalah [ListPart](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/devenv-designing-listparts);
+perilaku mode fokus ditangani oleh SDK CoreERP.
+
+### Pesan kesalahan pada form
+
+`FormErrorSummary` dari `@apperp/ui/form-feedback` menerima satu `FormFeedback`
+atau daftar pesan. Beberapa kegagalan ditampilkan bertumpuk; pesan yang isinya sama
+tidak ditampilkan dua kali. Rincian validasi tetap berupa daftar per field, dengan
+navigasi ke isian bila pemanggil memberikan scope form atau handler fokus.
+`FormErrorHeader` Core dan `useSaveFeedback` Management Aset membawa hasil validasi
+klien serta kegagalan server bersama-sama, sehingga salah satunya tidak menutupi
+pesan yang lain.
+
+Setiap pesan dapat diringkas atau disembunyikan dengan X. Pesan yang disembunyikan
+menyisakan tombol untuk menampilkannya kembali. Keduanya hanya mengubah tampilan:
+validasi, pesan pada field, dan kegagalan penyimpanan tetap berlaku. Hasil kegagalan
+baru membuka rincian kembali. Detail teknis tetap memakai tindakan Salin detail
+bantuan, bukan ditampilkan langsung pada pesan bisnis.
+
+Padanan di source BC adalah page `Error Messages` (700), `Error Messages Part`
+(701), dan aksi Details pada `Error Message Handler`. Source AL tersebut
+menyediakan kumpulan pesan dan navigasi rinciannya; kontrol X dan ringkas di SDK
+CoreERP merupakan implementasi UI CoreERP.
+
+### Engine pencarian record
+
+Pencarian record ERP memakai `App\Platform\Modules\Contracts\RecordSearch`.
+Halaman/pemilik resource hanya menetapkan kolom dari allowlist server dan membatasi
+query menurut tenant, izin, serta organisasi. Parsing dan pencocokan tidak ditulis
+ulang pada controller atau halaman. `IncrementalList::query` memakai engine ini secara
+bawaan; endpoint dengan query sendiri memakai `RecordSearch::apply`. Resource berelasi
+yang membutuhkan kandidat dari beberapa tabel memakai strategi `applyCandidates`
+dengan scope yang tetap dibangun pemilik resource.
+
+Bagian query yang dipisah spasi menjadi syarat AND; setiap bagian boleh cocok pada
+field berbeda. Kata dalam bagian tak berkutip memakai pencocokan awalan dan boleh
+berurutan bebas. Frasa bertanda kutip harus berurutan dalam satu field. Kutip belum
+tertutup tetap ditoleransi selama mengetik. Query nonkosong yang tidak mempunyai kata
+tidak mengembalikan seluruh daftar. Case diabaikan dan Unicode memakai NFC; aksen
+serta salah ketik tidak diperbaiki. Batas umum query 200 karakter; resource boleh
+menetapkan batas lebih kecil.
+
+Kolom identifier dideklarasikan terpisah sebagai bagian dari allowlist pencarian;
+`IncrementalList` menerima `identifierSearchColumns`. Titik, hubung, dan spasi pada
+identifier tidak menghalangi pencarian nilai yang sama. Engine tidak menebak jenis
+kolom dari namanya. SQL tetap memakai parameter, sedangkan nama kolom dibungkus grammar
+database dari metadata server. Engine tidak membuat indeks pada saat request; pemilik
+resource menambahkan ekspresi indeks yang sesuai lewat migration.
+
+Data lokal yang memang sudah dimiliki browser memakai matcher SDK `matchesRecordSearch`
+dari `@apperp/ui/record-search`. Combobox, Select, InlineLookup lokal, dan Command memakai
+matcher bersama; hasil pencarian server tidak disaring ulang dengan substring di
+browser. Kedua implementasi memakai fixture perilaku bersama. `SEARCH_DEBOUNCE_MS`
+menetapkan konvensi ketikan 250 ms; transport, cancellation, dan scope tetap mengikuti
+sumber datanya. UI cukup menampilkan Cari, tanpa label atau pilihan mode tambahan.
+Filter field seperti tanggal, rentang, status, dan ekspresi `FieldFilterExpression`
+tetap merupakan mekanisme terpisah. Pencarian Control Plane berada pada runtime lain.
+
 ## Bantuan kontekstual pada halaman dan field
 
 UI app mengikuti pola **field description** Dynamics 365: setiap field dapat memiliki help text opsional, tetapi bantuan hanya ditulis untuk field yang rumit atau pemakaiannya tidak langsung jelas. Dynamics 365 juga menampilkan deskripsi saat pengguna mengarahkan pointer ke field dan tidak mengisi deskripsi pada semua halaman. Lihat [View and export field descriptions](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/get-started/view-export-field-descriptions).
@@ -993,14 +1139,14 @@ UI app mengikuti pola **field description** Dynamics 365: setiap field dapat mem
 
 Sebelum membuat layar pembuatan data, jawab dulu satu pertanyaan: dalam satu kali kunjungan, berapa banyak yang biasanya dibuat pengguna, dan seberapa banyak detail yang harus diisi per satuannya?
 
-| Yang biasa dibuat | Detail per satuan | Bentuk |
-| --- | --- | --- |
-| Banyak | Ringkas dan seragam | **Tabel**: satu baris satu data, sel dapat diisi langsung |
-| Satu | Ringkas | Card |
-| Banyak | Bercabang, banyak detail kecil | Card |
-| Satu | Bercabang | Card |
+| Yang biasa dibuat | Detail per satuan              | Bentuk                                                    |
+| ----------------- | ------------------------------ | --------------------------------------------------------- |
+| Banyak            | Ringkas dan seragam            | **Tabel**: satu baris satu data, sel dapat diisi langsung |
+| Satu              | Ringkas                        | Card                                                      |
+| Banyak            | Bercabang, banyak detail kecil | Card                                                      |
+| Satu              | Bercabang                      | Card                                                      |
 
-Tabel hanya dipakai bila kedua syarat terpenuhi bersamaan. Banyak tetapi detailnya bercabang tetap memakai card, karena tabel memaksa setiap field muat dalam satu sel dan yang tidak muat akan diam-diam dihilangkan. Sedikit tetapi ringkas juga tetap memakai card, karena tabel menambah beban belajar tanpa imbalan. Acuannya pola *Edit List* Business Central, bukan konsep baru.
+Tabel hanya dipakai bila kedua syarat terpenuhi bersamaan. Banyak tetapi detailnya bercabang tetap memakai card, karena tabel memaksa setiap field muat dalam satu sel dan yang tidak muat akan diam-diam dihilangkan. Sedikit tetapi ringkas juga tetap memakai card, karena tabel menambah beban belajar tanpa imbalan. Acuannya pola _Edit List_ Business Central, bukan konsep baru.
 
 Tiga aturan mengikat bentuk tabel:
 
@@ -1014,13 +1160,13 @@ Contoh yang sudah berjalan: kode undangan pada Control Plane. Satu baris berisi 
 
 Web Shell memiliki layout bersama agar pengguna tidak berpindah-pindah pola saat membuka app.
 
-| Area layar | Pemilik | Isi |
-| --- | --- | --- |
-| Pemilih aplikasi di header | Web Shell | Launcher module: hak pemakaian tenant dan izin user diperiksa; pemasangan dibuktikan oleh `core_module_installations` dengan status `installed`. |
-| Rail paling kiri | App aktif | Navigasi utama app, misalnya Dashboard, Organisasi, dan Akses. |
-| Header | Web Shell | Konteks kerja yang dipakai bersama, pencarian, notifikasi, preferensi tampilan, dan menu akun. |
-| Sidebar di kanan rail | Module aktif | Navigasi turunan dari pilihan pada rail, yang didaftarkan melalui `ui.navigation` pada manifest. |
-| Konten utama | App aktif | Halaman dan alur bisnis app aktif. |
+| Area layar                 | Pemilik      | Isi                                                                                                                                              |
+| -------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Pemilih aplikasi di header | Web Shell    | Launcher module: hak pemakaian tenant dan izin user diperiksa; pemasangan dibuktikan oleh `core_module_installations` dengan status `installed`. |
+| Rail paling kiri           | App aktif    | Navigasi utama app, misalnya Dashboard, Organisasi, dan Akses.                                                                                   |
+| Header                     | Web Shell    | Konteks kerja yang dipakai bersama, pencarian, notifikasi, preferensi tampilan, dan menu akun.                                                   |
+| Sidebar di kanan rail      | Module aktif | Navigasi turunan dari pilihan pada rail, yang didaftarkan melalui `ui.navigation` pada manifest.                                                 |
+| Konten utama               | App aktif    | Halaman dan alur bisnis app aktif.                                                                                                               |
 
 Contoh: saat user memilih `Akses` pada rail, sidebar dapat berisi `Anggota`, `Role`, dan `Undangan`. Pada Management Aset, rail memuat `Master data`; isi sidebarnya adalah daftar master pada blok `ui.navigation` di `modules/apperp/management-aset/app.yaml`. Setiap entry sidebar membawa `permission` untuk membaca layar tersebut, sehingga menu yang tidak boleh dibuka user tidak ikut tampil. Saat user berpindah module melalui header, kedua navigasi tersebut diganti oleh navigasi module aktif.
 
@@ -1059,12 +1205,22 @@ Shell menetapkan tinggi viewport dan mempertahankan header serta spanduk di luar
 Daftar operasional memakai `ListPageLayout` dari `@apperp/ui/list-page-layout`. Komponen ini memiliki slot header, filter, dan footer yang tidak ikut digulir, serta memberikan sisa tinggi kepada tabel. DataTable di dalamnya otomatis memakai mode `viewport`: satu container native menangani scroll vertikal dan horizontal, header kolom memakai `sticky`, dan scrollbar horizontal berada di bawah area yang terlihat. Pengguna tidak perlu menuju baris terakhir untuk menggeser kolom.
 
 ```tsx
-const list = useIncrementalList({ loadItems, query: search, getKey: (row) => row.id });
+const list = useIncrementalList({
+    loadItems,
+    query: search,
+    getKey: (row) => row.id,
+});
 
 <ListPageLayout header={actionBar} filters={filters}>
-    <DataTable columns={columns} data={list.items} getRowKey={(row) => row.id}
-        incremental={list} sort={list.sort} onSortChange={list.onSortChange} />
-</ListPageLayout>
+    <DataTable
+        columns={columns}
+        data={list.items}
+        getRowKey={(row) => row.id}
+        incremental={list}
+        sort={list.sort}
+        onSortChange={list.onSortChange}
+    />
+</ListPageLayout>;
 ```
 
 Kembalikan layout tersebut sebagai root halaman. Bila module masih memiliki pembungkus `main`, pembungkus itu meneruskan `h-full min-h-0` dan tidak membuat area scroll tambahan. Form/detail memakai scroll isi Shell; tabel kecil di dalam form atau dialog tetap `inline`. Dialog/Sheet ditempatkan sebagai saudara layout daftar, atau tabel di dalam overlay diberi `scrollMode="inline"` secara eksplisit. Card daftar yang sudah membatasi tinggi dapat memilih `scrollMode="viewport"` tanpa memakai layout baru.
@@ -1089,12 +1245,12 @@ Implementasi bersama berada di `packages/ui/src/components/list-page-layout.tsx`
 
 Lifecycle tidak dimodelkan sebagai satu status linear karena empat fakta mempunyai sumber kebenaran berbeda:
 
-| Fakta | Sumber kebenaran |
-| --- | --- |
-| Catalogued | App catalog/manifest mengenal produk dan contract-nya. |
-| Entitled | Tenant entitlement menyatakan hak komersial masih berlaku. |
-| Installed | Installation registry mencatat artifact dan migration berhasil pada placement/release. |
-| Ready | Placement/runtime health menyatakan release dapat diroute. |
+| Fakta      | Sumber kebenaran                                                                       |
+| ---------- | -------------------------------------------------------------------------------------- |
+| Catalogued | App catalog/manifest mengenal produk dan contract-nya.                                 |
+| Entitled   | Tenant entitlement menyatakan hak komersial masih berlaku.                             |
+| Installed  | Installation registry mencatat artifact dan migration berhasil pada placement/release. |
+| Ready      | Placement/runtime health menyatakan release dapat diroute.                             |
 
 Untuk module, ketiga perpindahan itu sudah ada dan dijalankan perintah artisan:
 `module:install`, `module:disable`, dan `module:uninstall`, masing-masing menerima id module dan id
@@ -1125,12 +1281,12 @@ aturan module di atas sudah berjalan di sana.
 
 ## Jenis app
 
-| Jenis | Pembuat | Tempatnya |
-| --- | --- | --- |
-| Module bisnis | Vendor | `modules/`, dibuka lisensi tenant yang membelinya |
-| Module penghubung | Vendor | `modules/`, menyambung dua module tanpa menyentuh tabel milik keduanya |
-| Module khusus | Vendor atau partner | `modules/`, dilisensikan hanya ke tenant tertentu |
-| Integrasi pelanggan | Pelanggan atau partner | Di luar CoreERP, hanya lewat API dan event |
+| Jenis               | Pembuat                | Tempatnya                                                              |
+| ------------------- | ---------------------- | ---------------------------------------------------------------------- |
+| Module bisnis       | Vendor                 | `modules/`, dibuka lisensi tenant yang membelinya                      |
+| Module penghubung   | Vendor                 | `modules/`, menyambung dua module tanpa menyentuh tabel milik keduanya |
+| Module khusus       | Vendor atau partner    | `modules/`, dilisensikan hanya ke tenant tertentu                      |
+| Integrasi pelanggan | Pelanggan atau partner | Di luar CoreERP, hanya lewat API dan event                             |
 
 Tidak ada jenis yang menjalankan kode buatan pelanggan di dalam runtime Core. Urutan memilih di antara
 keempatnya ada di [Kebutuhan khusus pelanggan tanpa fork](05-customization-and-addons.md).

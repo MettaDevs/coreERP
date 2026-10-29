@@ -1,6 +1,7 @@
 import { XIcon } from 'lucide-react';
 import { Dialog as DialogPrimitive } from 'radix-ui';
 import * as React from 'react';
+import { DocumentLineCellContext } from '../document-line-context';
 
 import { cn } from '../utils';
 import { Button } from './button';
@@ -199,7 +200,9 @@ function DialogSurface({
                 )}
                 {...props}
             >
-                {children}
+                <DocumentLineCellContext.Provider value={null}>
+                    {children}
+                </DocumentLineCellContext.Provider>
                 {showCloseButton && (
                     <DialogPrimitive.Close
                         data-slot="dialog-close"

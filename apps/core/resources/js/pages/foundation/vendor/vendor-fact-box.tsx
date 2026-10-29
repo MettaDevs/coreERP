@@ -55,6 +55,7 @@ export function VendorHint({
 
 function money(value: number | string, currency: string) {
     const amount = Number(value);
+
     try {
         return new Intl.NumberFormat('id-ID', {
             style: 'currency',
@@ -71,6 +72,8 @@ export function VendorContextPanel({
     company,
     children,
     draft = true,
+    toolbarContainer,
+    className = 'flex-1',
 }: {
     vendor: {
         id: string;
@@ -82,6 +85,8 @@ export function VendorContextPanel({
     company: string;
     children: ReactNode;
     draft?: boolean;
+    toolbarContainer?: HTMLElement | null;
+    className?: string;
 }) {
     const formatDateTime = useDateTimeFormat();
     const { workspace } = usePage<{ workspace: Workspace }>().props;
@@ -115,6 +120,7 @@ export function VendorContextPanel({
         if (!vendorId) {
             return;
         }
+
         const controller = new AbortController();
         apiJson<{ data: Activity }>(`/api/v1/vendors/${vendorId}/activity`, {
             signal: controller.signal,
@@ -154,7 +160,8 @@ export function VendorContextPanel({
     return (
         <FactBox
             fillHeight
-            className="flex-1"
+            className={className}
+            toolbarContainer={toolbarContainer}
             attachmentCount={attachmentCount}
             attachments={
                 vendor ? (

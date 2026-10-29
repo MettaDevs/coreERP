@@ -14,6 +14,7 @@ use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Identity\Models\User;
 use App\Platform\Integration\Models\IntegrationClient;
 use App\Platform\Modules\Contracts\InvalidPosting;
+use App\Platform\Modules\Contracts\RecordSearch;
 use App\Platform\Modules\Models\CoreApp;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Tenant\Models\TenantMembership;
@@ -57,14 +58,12 @@ final class FinancePostingMonitorController extends Controller
             'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
         ]);
         $keyword = trim((string) ($filter['q'] ?? ''));
-        $pattern = '%'.addcslashes($keyword, '\\%_').'%';
+
         $legalEntity = $this->legalEntities($tenant);
 
         $postings = FinancePosting::query()
             ->where('tenant_id', $tenant)
-            ->when($keyword !== '', fn ($query) => $query->where(fn ($inner) => $inner
-                ->where('posting_id', 'ilike', $pattern)
-                ->orWhere('source_number', 'ilike', $pattern)))
+            ->tap(fn ($query) => RecordSearch::apply($query, ['posting_id', 'source_number'], $keyword, ['posting_id', 'source_number']))
             ->when($filter['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
             ->when($filter['posting_type'] ?? null, fn ($query, $type) => $query->where('posting_type', $type))
             ->when($filter['legal_entity_id'] ?? null, fn ($query, $id) => $query->where('legal_entity_id', $id))

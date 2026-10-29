@@ -76,7 +76,7 @@ class WorkflowConfigurationTest extends TestCase
         $this->getJson('/api/v1/workflows')->assertOk()->assertJsonCount(53, 'data.workflows')->assertJsonMissingPath('data.workflows.data');
     }
 
-    public function test_workflow_list_filters_and_sort_use_the_latest_version_and_literal_search(): void
+    public function test_workflow_list_filters_and_sort_use_the_latest_version_and_word_search(): void
     {
         $tenantId = $this->owner->activeMembership()->tenant_id;
         $this->insertListWorkflow($tenantId, 'A % draft');
@@ -86,6 +86,8 @@ class WorkflowConfigurationTest extends TestCase
         DB::table('workflow_configuration_versions')->insert(['id' => (string) Str::ulid(), 'configuration_id' => $revised, 'version' => 2, 'status' => 'draft', 'created_at' => now(), 'updated_at' => now()]);
         $appName = DB::table('apps')->where('id', 'app-uji')->value('name');
         $this->actingAs($this->owner)->get('/settings/workflows?'.http_build_query(['q' => '%', 'app' => $appName]))->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->has('workflows.data', 0));
+        $this->get('/settings/workflows?'.http_build_query(['q' => 'dra a', 'app' => $appName]))->assertOk()
             ->assertInertia(fn (Assert $page) => $page->has('workflows.data', 1)->where('workflows.data.0.name', 'A % draft'));
         $this->get('/settings/workflows?status=inactive')->assertOk()->assertInertia(fn (Assert $page) => $page
             ->has('workflows.data', 1)->where('workflows.data.0.id', $inactive)->where('workflows.data.0.status', 'inactive'));

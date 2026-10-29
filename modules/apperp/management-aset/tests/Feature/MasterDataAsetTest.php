@@ -534,6 +534,17 @@ class MasterDataAsetTest extends TestCase
         $this->request('kondisi-aset', 'get', '/api/modules/management-aset/v1/kondisi-aset?aktif=false')->assertOk()->assertJsonCount(1, 'data');
     }
 
+    public function test_master_search_uses_shared_word_and_phrase_rules(): void
+    {
+        $this->createRecord('pabrikan-aset', ['nama' => 'Suryalaya Jaya Abadi'])->assertCreated();
+        $this->createRecord('pabrikan-aset', ['nama' => 'Pabrikan Lain'])->assertCreated();
+
+        foreach (['abadi surya' => 1, 'ryalaya' => 0, '"jaya abadi"' => 1, '"abadi jaya"' => 0] as $keyword => $expectedCount) {
+            $response = $this->request('pabrikan-aset', 'get', '/api/modules/management-aset/v1/pabrikan-aset?'.http_build_query(['q' => $keyword], '', '&', PHP_QUERY_RFC3986))->assertOk();
+            $this->assertCount($expectedCount, $response->json('data'), $keyword);
+        }
+    }
+
     public function test_pencarian_angka_nol_tetap_dipakai_sebagai_kata_kunci(): void
     {
         // Yang dijaga test ini: kata kunci "0" tidak diperlakukan sebagai kosong lalu dibuang.
@@ -550,7 +561,9 @@ class MasterDataAsetTest extends TestCase
             ->assertOk()
             ->assertJsonCount(0, 'data');
 
-        $ditemukan = $this->request('pabrikan-aset', 'get', '/api/modules/management-aset/v1/pabrikan-aset?q=Merek 0')
+        // Frasa membatasi kedua kata pada nama yang sama; tanpa kutip, angka nol
+        // juga sah cocok pada kode yang diterbitkan Core.
+        $ditemukan = $this->request('pabrikan-aset', 'get', '/api/modules/management-aset/v1/pabrikan-aset?q='.rawurlencode('"Merek 0"'))
             ->assertOk()
             ->json('data');
 

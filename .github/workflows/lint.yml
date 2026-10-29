@@ -80,6 +80,15 @@ jobs:
       - name: Check Browser Dialogs
         run: node ../../scripts/check-browser-dialogs.mjs --self-test && node ../../scripts/check-browser-dialogs.mjs
 
+      - name: Check Vite Watch Paths
+        run: node scripts/test-vite-watch-paths.mjs
+
+      - name: Check Shared Record Search
+        run: node ../../packages/ui/scripts/record-search.test.mjs
+
+      - name: Check Document Lines
+        run: node ../../packages/ui/scripts/document-lines.test.mjs && node ../../packages/ui/scripts/record-toolbar.test.mjs && node ../../modules/apperp/management-aset/ui/transactions/perencanaan-aset/planning-lines.test.mjs && node ../../modules/apperp/management-aset/ui/transactions/inventarisasi-aset/receipt-document-lines.test.mjs
+
       - name: Generate Application Key
         run: php artisan key:generate
 

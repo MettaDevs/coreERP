@@ -27,6 +27,7 @@ import {
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
 import { DatePicker } from '@apperp/ui/date-picker';
+import { DocumentLines } from '@apperp/ui/document-lines';
 import { FieldHint } from '@apperp/ui/field';
 import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { getFormValidationErrors } from '@apperp/ui/form-feedback';
@@ -39,6 +40,7 @@ import { Textarea } from '@apperp/ui/textarea';
 import EditShield from '../../_shared/EditShield';
 import { ApiError, api, errorMessage, newIdempotencyKey } from '../../api';
 import AssetConditionSelect from '../../master/AssetConditionSelect';
+import { AssetTypePicker } from '../../master/AssetTypePicker';
 import { defaultDepartmentOf } from '../../master/locationDefaults';
 import MasterLookup from '../../master/MasterLookup';
 import { useMasterOptions } from '../../master/useMasterOptions';
@@ -78,6 +80,10 @@ import {
     tanggalTampil,
 } from './penerimaan';
 import PurchaseRequestPicker from './PurchaseRequestPicker';
+import {
+    appendReceiptAssetTypes,
+    receiptInputTotal,
+} from './receipt-document-lines';
 import { appendRequestLines, requestLinePatch } from './receipt-request-lines';
 import ReceiptAttributes from './ReceiptAttributes';
 
@@ -280,6 +286,7 @@ export default function PenerimaanDetailPage({
         ),
     );
     const panelRef = useRef<HTMLDivElement>(null);
+    const [typePickerOpen, setTypePickerOpen] = useState(false);
     // Saldo awal aset lama (area 10): tanpa vendor dan PPN, dengan akumulasi per buku.
     const saldoAwal = record.cara_perolehan === 'saldo_awal';
     const bukuGroup = useBukuGroup(
@@ -520,43 +527,38 @@ export default function PenerimaanDetailPage({
             vendor_invoice_date: tanpaVendor
                 ? null
                 : record.vendor_invoice_date || null,
-            details: record.details
-                .filter((baris) => baris.nama && baris.group_aset_id)
-                .map((baris) => ({
-                    nama: baris.nama,
-                    group_aset_id: baris.group_aset_id,
-                    jenis_aset_id: baris.jenis_aset_id,
-                    kondisi_aset_id: baris.kondisi_aset_id || null,
-                    pabrikan_aset_id: baris.pabrikan_aset_id || null,
-                    model_aset_id: baris.model_aset_id || null,
-                    model_number: baris.model_number || null,
-                    jumlah: Number(baris.jumlah) || 0,
-                    // Teks, bukan Number: harga satuan boleh bertiga desimal dan tidak
-                    // boleh bergeser karena pembulatan float sebelum sampai ke server.
-                    nilai_per_unit: angka(baris.nilai_per_unit),
-                    ppn_per_unit: saldoAwal ? '0' : angka(baris.ppn_per_unit),
-                    residu_per_unit: Number(baris.residu_per_unit) || 0,
-                    akumulasi_per_unit: saldoAwal
-                        ? angka(baris.akumulasi_per_unit)
-                        : '0',
-                    periode_berjalan: saldoAwal
-                        ? Number(baris.periode_berjalan) || 0
-                        : 0,
-                    saldo_awal_buku: saldoAwal
-                        ? (baris.saldo_awal_buku ?? []).map((buku) => ({
-                              buku_id: buku.buku_id,
-                              akumulasi_per_unit: angka(
-                                  buku.akumulasi_per_unit,
-                              ),
-                              periode_berjalan:
-                                  Number(buku.periode_berjalan) || 0,
-                          }))
-                        : [],
-                    permintaan_pembelian_detail_id:
-                        baris.permintaan_pembelian_detail_id || null,
-                    atribut: baris.atribut ?? [],
-                    keterangan: baris.keterangan || null,
-                })),
+            details: record.details.map((baris) => ({
+                nama: baris.nama,
+                group_aset_id: baris.group_aset_id,
+                jenis_aset_id: baris.jenis_aset_id,
+                kondisi_aset_id: baris.kondisi_aset_id || null,
+                pabrikan_aset_id: baris.pabrikan_aset_id || null,
+                model_aset_id: baris.model_aset_id || null,
+                model_number: baris.model_number || null,
+                jumlah: Number(baris.jumlah) || 0,
+                // Teks, bukan Number: harga satuan boleh bertiga desimal dan tidak
+                // boleh bergeser karena pembulatan float sebelum sampai ke server.
+                nilai_per_unit: angka(baris.nilai_per_unit),
+                ppn_per_unit: saldoAwal ? '0' : angka(baris.ppn_per_unit),
+                residu_per_unit: Number(baris.residu_per_unit) || 0,
+                akumulasi_per_unit: saldoAwal
+                    ? angka(baris.akumulasi_per_unit)
+                    : '0',
+                periode_berjalan: saldoAwal
+                    ? Number(baris.periode_berjalan) || 0
+                    : 0,
+                saldo_awal_buku: saldoAwal
+                    ? (baris.saldo_awal_buku ?? []).map((buku) => ({
+                          buku_id: buku.buku_id,
+                          akumulasi_per_unit: angka(buku.akumulasi_per_unit),
+                          periode_berjalan: Number(buku.periode_berjalan) || 0,
+                      }))
+                    : [],
+                permintaan_pembelian_detail_id:
+                    baris.permintaan_pembelian_detail_id || null,
+                atribut: baris.atribut ?? [],
+                keterangan: baris.keterangan || null,
+            })),
         };
 
         try {
@@ -1505,6 +1507,7 @@ export default function PenerimaanDetailPage({
                                                       content: 'control',
                                                       id: 'column-1',
                                                       header: 'Permintaan asal',
+                                                      cellMode: 'form',
                                                       minWidth: 256,
                                                       cell: ({
                                                           baris,
@@ -1614,6 +1617,7 @@ export default function PenerimaanDetailPage({
                                             content: 'control',
                                             id: 'column-2',
                                             header: 'Nama barang',
+                                            required: true,
                                             minWidth: 208,
                                             cell: ({ baris, index }) => (
                                                 <>
@@ -1644,6 +1648,7 @@ export default function PenerimaanDetailPage({
                                             content: 'control',
                                             id: 'column-3',
                                             header: 'Group aset',
+                                            required: true,
                                             minWidth: 176,
                                             cell: ({ baris, index }) => (
                                                 <>
@@ -1666,6 +1671,7 @@ export default function PenerimaanDetailPage({
                                             content: 'control',
                                             id: 'column-4',
                                             header: 'Jenis aset',
+                                            required: true,
                                             minWidth: 176,
                                             cell: ({ baris, index }) => (
                                                 <>
@@ -1744,6 +1750,7 @@ export default function PenerimaanDetailPage({
                                             content: 'control',
                                             id: 'column-6',
                                             header: 'Jumlah',
+                                            required: true,
                                             width: 96,
                                             align: 'right',
                                             cell: ({ baris, index }) => (
@@ -1778,6 +1785,7 @@ export default function PenerimaanDetailPage({
                                             content: 'control',
                                             id: 'column-7',
                                             header: 'Nilai / unit',
+                                            required: true,
                                             minWidth: 160,
                                             align: 'right',
                                             cell: ({ baris, index }) => (
@@ -2030,11 +2038,139 @@ export default function PenerimaanDetailPage({
                                     ];
 
                                     return (
-                                        <DataTable
-                                            scrollMode="inline"
+                                        <DocumentLines
+                                            title="Barang yang diterima"
+                                            portalContainer={
+                                                portalContainer ?? panelRef
+                                            }
+                                            readOnly={mode === 'view'}
+                                            disabled={menyimpan}
                                             showRowNumbers={false}
                                             serverSort
                                             data={sdkRows}
+                                            onDeleteRows={
+                                                !readOnly
+                                                    ? (rows) => {
+                                                          const keys = new Set(
+                                                              rows.map(
+                                                                  ({ baris }) =>
+                                                                      baris.id ??
+                                                                      baris.clientKey,
+                                                              ),
+                                                          );
+                                                          setRecord(
+                                                              (previous) => ({
+                                                                  ...previous,
+                                                                  details:
+                                                                      previous.details.filter(
+                                                                          (
+                                                                              line,
+                                                                          ) =>
+                                                                              !keys.has(
+                                                                                  line.id ??
+                                                                                      line.clientKey,
+                                                                              ),
+                                                                      ),
+                                                              }),
+                                                          );
+                                                      }
+                                                    : undefined
+                                            }
+                                            toolbar={
+                                                !readOnly &&
+                                                !record.details.some(
+                                                    (line) =>
+                                                        line.permintaan_pembelian_detail_id,
+                                                ) ? (
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        disabled={menyimpan}
+                                                        onClick={() =>
+                                                            setTypePickerOpen(
+                                                                true,
+                                                            )
+                                                        }
+                                                    >
+                                                        Pilih jenis aset…
+                                                    </Button>
+                                                ) : undefined
+                                            }
+                                            footer={
+                                                <dl
+                                                    className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2"
+                                                    aria-label="Perkiraan dari isian baris sebelum pembulatan mata uang"
+                                                >
+                                                    <div className="flex justify-between gap-4">
+                                                        <dt>Jumlah aset</dt>
+                                                        <dd>{totalAset}</dd>
+                                                    </div>
+                                                    <div className="flex justify-between gap-4">
+                                                        <dt>Perkiraan nilai</dt>
+                                                        <dd>
+                                                            {
+                                                                record.currency_code
+                                                            }{' '}
+                                                            {receiptInputTotal(
+                                                                record.details,
+                                                                'nilai_per_unit',
+                                                            )}
+                                                        </dd>
+                                                    </div>
+                                                    {!saldoAwal && (
+                                                        <>
+                                                            <div className="flex justify-between gap-4">
+                                                                <dt>
+                                                                    Perkiraan
+                                                                    PPN
+                                                                </dt>
+                                                                <dd>
+                                                                    {
+                                                                        record.currency_code
+                                                                    }{' '}
+                                                                    {receiptInputTotal(
+                                                                        record.details,
+                                                                        'ppn_per_unit',
+                                                                    )}
+                                                                </dd>
+                                                            </div>
+                                                            <div className="flex justify-between gap-4 font-medium">
+                                                                <dt>
+                                                                    Perkiraan
+                                                                    termasuk PPN
+                                                                </dt>
+                                                                <dd>
+                                                                    {
+                                                                        record.currency_code
+                                                                    }{' '}
+                                                                    {receiptInputTotal(
+                                                                        record.details,
+                                                                        'nilai_per_unit',
+                                                                        true,
+                                                                    )}
+                                                                </dd>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                    {saldoAwal && (
+                                                        <div className="flex justify-between gap-4">
+                                                            <dt>
+                                                                Perkiraan
+                                                                akumulasi
+                                                            </dt>
+                                                            <dd>
+                                                                {
+                                                                    record.currency_code
+                                                                }{' '}
+                                                                {receiptInputTotal(
+                                                                    record.details,
+                                                                    'akumulasi_per_unit',
+                                                                )}
+                                                            </dd>
+                                                        </div>
+                                                    )}
+                                                </dl>
+                                            }
                                             columns={sdkColumns}
                                             getRowKey={({ baris, index }) =>
                                                 baris.id ??
@@ -2055,10 +2191,28 @@ export default function PenerimaanDetailPage({
                                                           )
                                                     : undefined
                                             }
-                                            addRowLabel="Tambah"
                                         />
                                     );
                                 })()}
+                                {typePickerOpen && !readOnly && (
+                                    <AssetTypePicker
+                                        source={jenis}
+                                        disabled={menyimpan}
+                                        onClose={() => setTypePickerOpen(false)}
+                                        onChoose={(types) => {
+                                            setRecord((previous) => ({
+                                                ...previous,
+                                                details:
+                                                    appendReceiptAssetTypes(
+                                                        previous.details,
+                                                        types,
+                                                        barisKosong,
+                                                    ),
+                                            }));
+                                            setTypePickerOpen(false);
+                                        }}
+                                    />
+                                )}
                             </div>
                         </CollapsibleSection>
 

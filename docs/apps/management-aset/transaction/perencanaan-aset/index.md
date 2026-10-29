@@ -113,6 +113,20 @@ Lihat catatan di [Dokumen siklus aset](/apps/management-aset/transaction/siklus-
 
 Sejauh mana rencana sudah diminta dan diterima dibaca di [Laporan pengadaan aset](/apps/management-aset/transaction/laporan/#laporan-pengadaan-aset): satu baris per baris rencana, dengan permintaan yang menunjuknya (`planning_detail_id`) dan penerimaan dari permintaan itu.
 
+## Editor rincian
+
+Rincian memakai `DocumentLines` SDK untuk isian rapat, pemilihan/penghapusan beberapa
+baris draft, dan mode fokus dengan total perkiraan di bawah tabel. Mode fokus memakai
+draft yang sama dan tidak menyimpan dokumen. Baris tetap memakai key klien yang stabil
+hingga mendapat ID tersimpan.
+
+Pemilih jenis aset bersama modul membaca master lewat daftar bertahap yang sama
+dengan lookup. Pilihan tetap dipertahankan saat pencarian berubah. Menambahkan
+pilihan mengganti baris kosong yang belum disentuh terlebih dahulu, lalu menambah
+baris baru; baris yang sudah diisi dipertahankan. Satu jenis boleh muncul lagi untuk
+spesifikasi berbeda. Pemilih hanya mengisi jenis aset; satuan, sumber dana, tanggal
+kebutuhan, dan estimasi tidak ditebak dari klasifikasi tersebut.
+
 ## Di mana kodenya
 
 | Berkas | Isinya |
@@ -120,6 +134,8 @@ Sejauh mana rencana sudah diminta dan diterima dibaca di [Laporan pengadaan aset
 | `src/Http/Controllers/transaksi/PerencanaanAset/PerencanaanAsetController.php` | Seluruh logika |
 | `src/Services/AssetUnitOfMeasureDirectory.php` | Satuan dari Core |
 | `ui/transactions/perencanaan-aset/PlanningPage.tsx` | Layar |
+| `ui/transactions/perencanaan-aset/planning-lines.ts` | Penyusunan baris dari pilihan jenis aset |
+| `ui/master/AssetTypePicker.tsx` | Pemilih banyak jenis aset untuk perencanaan dan penerimaan |
 
 ## Halaman terkait
 

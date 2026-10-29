@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Foundation\Vendor\ModuleServices;
 
 use App\Foundation\Vendor\Models\Vendor;
+use App\Foundation\Vendor\Support\VendorSearch;
 use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\VendorDirectory;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 
 /**
@@ -24,7 +25,7 @@ final class VendorDirectoryCore implements VendorDirectory
             ->get()->mapWithKeys(fn (Vendor $vendor) => [$vendor->id => self::row($vendor)])->all();
     }
 
-    public function addNames(\Illuminate\Database\Query\Builder $query, string $tenantId, array $fields): void
+    public function addNames(Builder $query, string $tenantId, array $fields): void
     {
         foreach ($fields as $alias => $column) {
             $query->selectSub(Vendor::query()->join('parties as directory_party', function ($join): void {
@@ -42,24 +43,25 @@ final class VendorDirectoryCore implements VendorDirectory
             ->where('vendors.status', Vendor::ACTIVE)->whereNull('list_party.deleted_at')
             ->select(['vendors.id', 'vendors.number', 'list_party.name', 'vendors.tax_number', 'vendors.status', 'vendors.legal_entity_id']);
 
-        return IncrementalList::query(Request::create('/lookup', 'GET', $input), $query->toBase(),
-            ['id' => 'id', 'number' => 'number', 'name' => 'name'], ['number', 'name'], 'number');
+        $request = Request::create('/lookup', 'GET', $input);
+        $filter = $request->validate(['q' => ['nullable', 'string', 'max:200']]);
+        VendorSearch::apply($query, $tenantId, (string) ($filter['q'] ?? ''));
+
+        return IncrementalList::query($request, $query->toBase(),
+            ['id' => 'id', 'number' => 'number', 'name' => 'name'], [], 'number');
     }
 
     public function active(string $tenantId, string $legalEntityId, string $search = '', int $limit = 20): array
     {
         $search = trim($search);
-        $pattern = '%'.addcslashes($search, '\\%_').'%';
 
         return array_values(Vendor::query()
             ->with('party:id,name')
             ->where('tenant_id', $tenantId)
             ->where('legal_entity_id', $legalEntityId)
             ->where('status', Vendor::ACTIVE)
-            ->when($search !== '', fn (Builder $query) => $query->where(fn (Builder $inner) => $inner
-                ->where('number', 'ilike', $pattern)
-                ->orWhereHas('party', fn (Builder $party) => $party->where('name', 'ilike', $pattern))))
-            ->orderBy('number')
+            ->tap(fn ($query) => VendorSearch::apply($query, $tenantId, $search))
+            ->orderBy('number')->orderBy('id')
             ->limit(max(1, min($limit, 100)))
             ->get()
             ->map(self::row(...))

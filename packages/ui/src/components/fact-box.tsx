@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
 import { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '../utils';
 import { Button } from './button';
 import { Card, CardContent, CardHeader } from './card';
@@ -31,6 +32,7 @@ export function FactBox({
     defaultOpen = true,
     className,
     fillHeight = false,
+    toolbarContainer,
 }: {
     children: ReactNode;
     details: ReactNode;
@@ -40,7 +42,10 @@ export function FactBox({
     className?: string;
     /** Daftar memakai seluruh tinggi Shell; tabel dan panel menggulir secara terpisah. */
     fillHeight?: boolean;
+    /** undefined mempertahankan kontrol lokal; null menunggu host toolbar tersedia. */
+    toolbarContainer?: HTMLElement | null;
 }) {
+    const externalToolbar = toolbarContainer !== undefined;
     const [open, setOpen] = useState(defaultOpen);
     const [tab, setTab] = useState('details');
     const [width, setWidth] = useState(DEFAULT_WIDTH);
@@ -73,6 +78,55 @@ export function FactBox({
         setWidth(Math.min(maxWidth, Math.max(MIN_WIDTH, nextWidth)));
     }
 
+    const controls = (
+        <div
+            className="flex items-center justify-end gap-1"
+            data-slot="fact-box-controls"
+        >
+            {open && (
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size={externalToolbar ? 'icon-sm' : 'icon'}
+                    className="hidden xl:inline-flex"
+                    disabled={maxWidth <= DEFAULT_WIDTH}
+                    aria-label={
+                        expanded
+                            ? 'Kembalikan lebar panel'
+                            : 'Perlebar panel detail dan lampiran'
+                    }
+                    title={
+                        expanded
+                            ? 'Kembalikan lebar panel'
+                            : 'Perlebar panel detail dan lampiran'
+                    }
+                    onClick={() => resize(expanded ? DEFAULT_WIDTH : maxWidth)}
+                >
+                    {expanded ? <Minimize2 /> : <Maximize2 />}
+                </Button>
+            )}
+            <CollapsibleTrigger asChild>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size={externalToolbar ? 'icon-sm' : 'icon'}
+                    aria-label={
+                        open
+                            ? 'Sembunyikan detail dan lampiran'
+                            : 'Tampilkan detail dan lampiran'
+                    }
+                    title={
+                        open
+                            ? 'Sembunyikan detail dan lampiran'
+                            : 'Tampilkan detail dan lampiran'
+                    }
+                >
+                    {open ? <PanelRightClose /> : <PanelRightOpen />}
+                </Button>
+            </CollapsibleTrigger>
+        </div>
+    );
+
     return (
         <Collapsible
             ref={layout}
@@ -84,10 +138,12 @@ export function FactBox({
                 'grid min-w-0 items-start gap-3',
                 open
                     ? 'xl:grid-cols-[minmax(0,1fr)_1px_minmax(0,var(--fact-box-width))]'
-                    : 'xl:grid-cols-[minmax(0,1fr)_2.5rem]',
+                    : externalToolbar
+                      ? 'xl:grid-cols-1'
+                      : 'xl:grid-cols-[minmax(0,1fr)_2.5rem]',
                 className,
                 fillHeight &&
-                    'h-full min-h-0 overflow-y-auto xl:items-stretch xl:overflow-hidden',
+                    'h-full min-h-0 overflow-y-auto xl:items-stretch xl:gap-x-0 xl:overflow-hidden',
             )}
         >
             <div
@@ -175,53 +231,14 @@ export function FactBox({
                 className={cn(
                     'min-w-0 xl:sticky xl:top-0',
                     fillHeight && 'min-h-0 xl:overflow-y-auto',
+                    fillHeight && open && 'xl:ps-3',
+                    externalToolbar && !open && 'hidden',
                 )}
             >
-                <div className="flex justify-end">
-                    {open && (
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="hidden xl:inline-flex"
-                            disabled={maxWidth <= DEFAULT_WIDTH}
-                            aria-label={
-                                expanded
-                                    ? 'Kembalikan lebar panel'
-                                    : 'Perlebar panel detail dan lampiran'
-                            }
-                            title={
-                                expanded
-                                    ? 'Kembalikan lebar panel'
-                                    : 'Perlebar panel detail dan lampiran'
-                            }
-                            onClick={() =>
-                                resize(expanded ? DEFAULT_WIDTH : maxWidth)
-                            }
-                        >
-                            {expanded ? <Minimize2 /> : <Maximize2 />}
-                        </Button>
-                    )}
-                    <CollapsibleTrigger asChild>
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-label={
-                                open
-                                    ? 'Sembunyikan detail dan lampiran'
-                                    : 'Tampilkan detail dan lampiran'
-                            }
-                            title={
-                                open
-                                    ? 'Sembunyikan detail dan lampiran'
-                                    : 'Tampilkan detail dan lampiran'
-                            }
-                        >
-                            {open ? <PanelRightClose /> : <PanelRightOpen />}
-                        </Button>
-                    </CollapsibleTrigger>
-                </div>
+                {externalToolbar
+                    ? toolbarContainer &&
+                      createPortal(controls, toolbarContainer)
+                    : controls}
                 <CollapsibleContent>
                     <Tabs value={tab} onValueChange={setTab}>
                         <Card>

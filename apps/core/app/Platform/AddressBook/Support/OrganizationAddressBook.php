@@ -11,6 +11,7 @@ use App\Platform\AddressBook\Models\Party;
 use App\Platform\AddressBook\Models\PartyLocation;
 use App\Platform\AddressBook\Models\PartyLocationPurpose;
 use App\Platform\AddressBook\Models\PostalAddress;
+use App\Platform\Modules\Contracts\RecordSearch;
 use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Organization\Models\OrganizationParty;
@@ -106,9 +107,15 @@ final class OrganizationAddressBook
             ->whereHas('postalAddress')
             ->when($partyId !== null, fn (Builder $query) => $query->whereDoesntHave('partyLinks', fn (Builder $links) => $links->where('party_id', $partyId)))
             ->with('postalAddress')
-            ->when($search !== '', fn (Builder $query) => $query->where(fn (Builder $match) => $match
-                ->where('name', 'ilike', '%'.addcslashes($search, '\\%_').'%')
-                ->orWhereHas('postalAddress', fn (Builder $address) => $address->where('formatted', 'ilike', '%'.addcslashes($search, '\\%_').'%'))))
+            ->when($search !== '', function (Builder $query) use ($tenantId, $search): void {
+                $candidates = Location::query()->where('locations.tenant_id', $tenantId)
+                    ->join('postal_addresses as search_address', fn ($join) => $join
+                        ->on('search_address.location_id', '=', 'locations.id')
+                        ->on('search_address.tenant_id', '=', 'locations.tenant_id'))
+                    ->select('locations.id');
+                RecordSearch::apply($candidates, ['locations.name', 'search_address.formatted'], $search);
+                $query->whereIn('locations.id', $candidates);
+            })
             ->orderBy('name')->orderBy('id')->cursorPaginate(40);
 
         return ['data' => array_values($locations->getCollection()->map(fn (Location $location): array => [

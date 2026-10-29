@@ -9,6 +9,7 @@ import {
     DropdownMenuRadioItem,
 } from '@apperp/ui/dropdown-menu';
 import { Input } from '@apperp/ui/input';
+import { matchesRecordSearch } from '@apperp/ui/record-search';
 import {
     ResizableHandle,
     ResizablePanel,
@@ -90,12 +91,8 @@ export function AnalysisDragSettings({
             (field): field is DatasetDescription['fields'][number] =>
                 field !== undefined,
         );
-    const visible = ordered.filter(
-        (field) =>
-            field.caption
-                .toLocaleLowerCase()
-                .includes(search.toLocaleLowerCase()) ||
-            field.key.toLocaleLowerCase().includes(search.toLocaleLowerCase()),
+    const visible = ordered.filter((field) =>
+        matchesRecordSearch(search, [field.caption, field.key]),
     );
     const reorder = (
         kind: 'columns' | 'groups' | 'measures',

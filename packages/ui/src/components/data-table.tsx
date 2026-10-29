@@ -9,6 +9,8 @@ import {
     Plus,
 } from 'lucide-react';
 import * as React from 'react';
+import { DocumentLineCellContext } from '../document-line-context';
+import type { DocumentLinePortal } from '../document-line-context';
 
 import { TableScrollContext } from '../table-scroll-context';
 import { cn } from '../utils';
@@ -39,6 +41,8 @@ type DataTableSort = { columnId: string; direction: SortDirection };
 type DataTableColumn<T> = {
     id: string;
     header: string;
+    required?: boolean;
+    cellMode?: 'form';
     description?: string;
     headerFilter?: React.ReactNode;
     filterActive?: boolean;
@@ -68,6 +72,8 @@ type DataTableSelection = {
 type UtilityWidths = { selection: number; rowNumbers: number; actions: number };
 
 type DataTableProps<T> = {
+    cellMode?: 'document' | 'form';
+    cellPortalContainer?: DocumentLinePortal;
     serverSort?: boolean;
     /** Urutan server tidak boleh diurutkan ulang hanya pada batch yang sudah dimuat. */
     incremental?: {
@@ -110,7 +116,8 @@ type DataTableProps<T> = {
     rowActivation?: 'double-click' | 'single-click';
     onRowClick?: (row: T) => void;
     /** Baris kosong di bawah untuk menambah data, seperti Edit List BC. */
-    onAddRow?: () => void;
+    onAddRow?: (columnId?: string) => void;
+    addRowMode?: 'action' | 'cells';
     addRowLabel?: string;
     /**
      * Urutan yang dipegang layar, bila layar perlu mengetahuinya, misalnya untuk mengekspor daftar dengan
@@ -168,6 +175,8 @@ function DataTableText({
 }
 
 function DataTable<T>({
+    cellMode = 'form',
+    cellPortalContainer,
     columns,
     renderRows,
     allowColumnFreeze = false,
@@ -190,6 +199,7 @@ function DataTable<T>({
     rowActivation = 'double-click',
     onRowClick,
     onAddRow,
+    addRowMode = 'action',
     addRowLabel = 'Tambah',
     sort: controlledSort,
     onSortChange,
@@ -210,6 +220,7 @@ function DataTable<T>({
             );
     const inheritedScrollMode = React.useContext(TableScrollContext);
     const scrollMode = requestedScrollMode ?? inheritedScrollMode;
+    const seamlessHeader = scrollMode === 'viewport' && cellMode !== 'document';
     const [internalSort, setSort] = React.useState<DataTableSort | null>(null);
     const sort = controlledSort === undefined ? internalSort : controlledSort;
     const [fixedSizing, setFixedSizing] = React.useState(false);
@@ -450,6 +461,7 @@ function DataTable<T>({
     const renderRow = (row: T, index: number) => (
         <TableRow
             key={getRowKey(row)}
+            data-row-key={String(getRowKey(row))}
             data-active={activeRowKey === getRowKey(row) ? '' : undefined}
             tabIndex={onRowClick ? 0 : undefined}
             onClick={
@@ -516,6 +528,7 @@ function DataTable<T>({
             {columns.map((column, columnIndex) => (
                 <React.Fragment key={column.id}>
                     <TableCell
+                        data-column-id={column.id}
                         ref={(cell) => {
                             if (cell) {
                                 cell.title = cell.textContent ?? '';
@@ -548,7 +561,24 @@ function DataTable<T>({
                                     : 'truncate',
                             )}
                         >
-                            <DataTableText>{column.cell(row)}</DataTableText>
+                            <DocumentLineCellContext.Provider
+                                value={
+                                    cellMode === 'document'
+                                        ? {
+                                              compact:
+                                                  column.cellMode !== 'form',
+                                              label: column.header,
+                                              rowNumber: index + 1,
+                                              portalContainer:
+                                                  cellPortalContainer,
+                                          }
+                                        : null
+                                }
+                            >
+                                <DataTableText>
+                                    {column.cell(row)}
+                                </DataTableText>
+                            </DocumentLineCellContext.Provider>
                         </div>
                     </TableCell>
                     {hasInlineActions && columnIndex === 0 && (
@@ -569,8 +599,12 @@ function DataTable<T>({
     return (
         <div
             ref={containerRef}
+            data-slot="data-table"
+            data-cell-mode={cellMode}
+            data-seamless-header={seamlessHeader ? '' : undefined}
             className={cn(
                 'bg-background relative overflow-hidden rounded-md border',
+                seamlessHeader && 'rounded-none border-0 bg-transparent',
                 scrollMode === 'viewport' &&
                     'flex h-full min-h-0 flex-1 flex-col',
                 className,
@@ -735,12 +769,30 @@ function DataTable<T>({
                                                 }
                                                 aria-label={`Sort by ${column.header}`}
                                             >
-                                                <span className="min-w-0 flex-1">
-                                                    <DataTableText
-                                                        multiline={wrapHeaders}
-                                                    >
-                                                        {column.header}
-                                                    </DataTableText>
+                                                <span
+                                                    className={cn(
+                                                        'min-w-0',
+                                                        !seamlessHeader &&
+                                                            'flex-1',
+                                                    )}
+                                                >
+                                                    <span className="inline-flex min-w-0 items-baseline gap-1">
+                                                        <DataTableText
+                                                            multiline={
+                                                                wrapHeaders
+                                                            }
+                                                        >
+                                                            {column.header}
+                                                        </DataTableText>
+                                                        {column.required && (
+                                                            <span
+                                                                className="text-destructive"
+                                                                aria-hidden="true"
+                                                            >
+                                                                *
+                                                            </span>
+                                                        )}
+                                                    </span>
                                                 </span>
                                                 <SortIcon
                                                     className={cn(
@@ -751,11 +803,21 @@ function DataTable<T>({
                                                 />
                                             </button>
                                         ) : (
-                                            <DataTableText
-                                                multiline={wrapHeaders}
-                                            >
-                                                {column.header}
-                                            </DataTableText>
+                                            <span className="inline-flex min-w-0 items-baseline gap-1">
+                                                <DataTableText
+                                                    multiline={wrapHeaders}
+                                                >
+                                                    {column.header}
+                                                </DataTableText>
+                                                {column.required && (
+                                                    <span
+                                                        className="text-destructive"
+                                                        aria-hidden="true"
+                                                    >
+                                                        *
+                                                    </span>
+                                                )}
+                                            </span>
                                         )}
                                         {(allowColumnFreeze ||
                                             showColumnMenu ||
@@ -1164,7 +1226,41 @@ function DataTable<T>({
                             </TableCell>
                         </TableRow>
                     )}
-                    {onAddRow && (
+                    {onAddRow && addRowMode === 'cells' && (
+                        <TableRow data-add-row className="hover:bg-accent/40">
+                            {selection && <TableCell />}
+                            {showRowNumbers && (
+                                <TableCell className="text-muted-foreground text-center">
+                                    +
+                                </TableCell>
+                            )}
+                            {columns.map((column, index) => (
+                                <React.Fragment key={column.id}>
+                                    <TableCell className="h-8 border-b p-0">
+                                        <button
+                                            type="button"
+                                            onClick={() => onAddRow(column.id)}
+                                            aria-label={`Tambah baris pada ${column.header}`}
+                                            className="text-muted-foreground focus-visible:ring-ring h-8 w-full px-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset"
+                                        >
+                                            {index === 0 ? (
+                                                addRowLabel
+                                            ) : (
+                                                <span aria-hidden="true">
+                                                    &nbsp;
+                                                </span>
+                                            )}
+                                        </button>
+                                    </TableCell>
+                                    {hasInlineActions && index === 0 && (
+                                        <TableCell />
+                                    )}
+                                </React.Fragment>
+                            ))}
+                            {hasTrailingActions && <TableCell />}
+                        </TableRow>
+                    )}
+                    {onAddRow && addRowMode === 'action' && (
                         // Baris kosong di bawah, seperti Edit List Business Central.
                         <TableRow className="hover:bg-accent/40">
                             <TableCell
@@ -1173,7 +1269,7 @@ function DataTable<T>({
                             >
                                 <button
                                     type="button"
-                                    onClick={onAddRow}
+                                    onClick={() => onAddRow()}
                                     className="text-muted-foreground hover:text-foreground focus-visible:ring-ring flex h-9 w-full items-center gap-2 px-3 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset"
                                 >
                                     <Plus className="size-3.5" />
@@ -1195,4 +1291,10 @@ function DataTable<T>({
 }
 
 export { DataTable, DataTableText };
-export type { DataTableColumn, DataTableRowAction, DataTableSort };
+export type {
+    DataTableColumn,
+    DataTableRowAction,
+    DataTableSort,
+    DataTableSelection,
+    DataTableProps,
+};

@@ -14,6 +14,8 @@ import {
     DialogDescription,
 } from '@apperp/ui/dialog';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@apperp/ui/field';
+import { FilterPane } from '@apperp/ui/filter-pane';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { InlineLookup } from '@apperp/ui/inline-lookup';
 import type { LookupLoader } from '@apperp/ui/inline-lookup';
 import { Input } from '@apperp/ui/input';
@@ -24,17 +26,18 @@ import { PageDialog, PageDialogContent } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Switch } from '@apperp/ui/switch';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
 import type { InfiniteScrollRef } from '@inertiajs/core';
-import { Head, router } from '@inertiajs/react';
-import { Search } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Head, router, usePage } from '@inertiajs/react';
+import { Upload } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, useId } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import { toast } from 'sonner';
 import { RecordListScroll } from '@/components/record-list-scroll';
-import { useRecordTransition } from '@apperp/ui/use-record-transition';
 import { useSaveFeedback } from '@/hooks/use-save-feedback';
 import { apiJson, CoreApiError, errorText } from '@/lib/core-api';
 import { loadLookupItems } from '@/lib/lookup-loader';
+import type { Auth } from '@/types';
 import type { BreadcrumbItem } from '@/types/navigation';
 import {
     OrganizationAddressesSection,
@@ -42,6 +45,7 @@ import {
     usePartyDraftDetails,
 } from '../../platform/organization/components/address-book-section';
 import SupplierImport from './supplier-import';
+import { useVendorListQuery } from './use-vendor-list-query';
 import { VendorContextPanel, VendorHint } from './vendor-fact-box';
 
 type PartyType = 'organization' | 'person';
@@ -99,48 +103,24 @@ const PARTY_TYPE_LABEL: Record<PartyType, string> = {
     person: 'Perorangan',
 };
 
+const vendorTitleHint =
+    'Akun vendor per perusahaan. Identitas, alamat, dan kontak memakai buku alamat bersama.';
+
 function Filters({
     filters,
     legalEntities,
-}: Pick<Props, 'filters' | 'legalEntities'>) {
-    const [q, setQ] = useState(filters.q);
-    const go = (next: Partial<Props['filters']>) =>
-        router.get(
-            '/settings/vendors',
-            { ...filters, q, ...next },
-            {
-                preserveState: true,
-                reset: ['vendors'],
-                preserveScroll: true,
-                replace: true,
-            },
-        );
-
+    onChange,
+}: Pick<Props, 'filters' | 'legalEntities'> & {
+    onChange: (next: Partial<Props['filters']>) => void;
+}) {
     return (
-        <form
-            noValidate
-            className="flex flex-col gap-3 sm:flex-row sm:items-end"
-            onSubmit={(event) => {
-                event.preventDefault();
-                go({ q });
-            }}
-        >
-            <div className="relative w-full sm:max-w-xs">
-                <Search className="absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
-                <Input
-                    aria-label="Cari nomor, nama, atau NPWP"
-                    placeholder="Cari nomor, nama, atau NPWP"
-                    className="pl-8"
-                    value={q}
-                    onChange={(event) => setQ(event.target.value)}
-                />
-            </div>
-            <div className="w-full sm:w-56">
+        <FormGrid columns={1}>
+            <FormControl className="w-full">
                 <NativeSelect
                     label="Perusahaan"
                     value={filters.legal_entity ?? ''}
                     onChange={(event) =>
-                        go({ legal_entity: event.target.value || null })
+                        onChange({ legal_entity: event.target.value || null })
                     }
                 >
                     <NativeSelectOption value="">
@@ -152,15 +132,18 @@ function Filters({
                         </NativeSelectOption>
                     ))}
                 </NativeSelect>
-            </div>
-            <div className="w-full sm:w-40">
+            </FormControl>
+            <FormControl className="w-full">
                 <NativeSelect
                     label="Status"
                     value={filters.status ?? ''}
                     onChange={(event) =>
-                        go({
-                            status: (event.target.value ||
-                                null) as Status | null,
+                        onChange({
+                            status:
+                                event.target.value === 'active' ||
+                                event.target.value === 'inactive'
+                                    ? event.target.value
+                                    : null,
                         })
                     }
                 >
@@ -172,11 +155,8 @@ function Filters({
                         Nonaktif
                     </NativeSelectOption>
                 </NativeSelect>
-            </div>
-            <Button type="submit" variant="outline">
-                Cari
-            </Button>
-        </form>
+            </FormControl>
+        </FormGrid>
     );
 }
 
@@ -231,6 +211,7 @@ function VendorCard({
 }: {
     vendor: Vendor | null;
     lockedLegalEntityId?: string;
+
     legalEntities: LegalEntity[];
     automaticNumbers: boolean;
     onClose: () => void;
@@ -244,6 +225,9 @@ function VendorCard({
     onBusyChange: (busy: boolean) => void;
     onDirtyChange: (dirty: boolean) => void;
 }) {
+    const [factBoxToolbar, setFactBoxToolbar] = useState<HTMLDivElement | null>(
+        null,
+    );
     // Satu kunci per form yang dibuka: klik ganda atau kiriman ulang tidak membuat vendor kedua.
     const [idempotencyKey] = useState(newKey);
     const [form, setForm] = useState<Form>(() => ({
@@ -529,7 +513,15 @@ function VendorCard({
 
     return (
         <div ref={saveScopeRef} className="flex h-full min-h-0 flex-col">
-            <RecordActionBar feedback={saveErrorSummary}>
+            <RecordActionBar
+                feedback={saveErrorSummary}
+                trailing={
+                    <div
+                        ref={setFactBoxToolbar}
+                        className="flex items-center gap-1"
+                    />
+                }
+            >
                 <ActionButton
                     action="save"
                     type="submit"
@@ -546,6 +538,7 @@ function VendorCard({
             </RecordActionBar>
             <VendorContextPanel
                 key={vendor?.id ?? 'new'}
+                toolbarContainer={factBoxToolbar}
                 vendor={vendor}
                 company={legalEntityName}
             >
@@ -1110,6 +1103,9 @@ function VendorReadCard({
     onClose: () => void;
     onEdit?: () => void;
 }) {
+    const [factBoxToolbar, setFactBoxToolbar] = useState<HTMLDivElement | null>(
+        null,
+    );
     const embedded = usePageDialogRecord({
         recordTitle: [vendor.number, vendor.name].filter(Boolean).join(' · '),
         onEdit,
@@ -1119,15 +1115,27 @@ function VendorReadCard({
 
     return (
         <div className="flex h-full min-h-0 flex-col">
-            {!embedded && (
-                <RecordActionBar>
-                    <Button variant="outline" onClick={onClose}>
-                        Kembali ke daftar
-                    </Button>
-                    {onEdit && <ActionButton action="edit" onClick={onEdit} />}
-                </RecordActionBar>
-            )}
+            <RecordActionBar
+                trailing={
+                    <div
+                        ref={setFactBoxToolbar}
+                        className="flex items-center gap-1"
+                    />
+                }
+            >
+                {!embedded && (
+                    <>
+                        <Button variant="outline" onClick={onClose}>
+                            Kembali ke daftar
+                        </Button>
+                        {onEdit && (
+                            <ActionButton action="edit" onClick={onEdit} />
+                        )}
+                    </>
+                )}
+            </RecordActionBar>
             <VendorContextPanel
+                toolbarContainer={factBoxToolbar}
                 key={vendor.id}
                 vendor={vendor}
                 company={company}
@@ -1243,7 +1251,12 @@ export function VendorCreateCard({
                     }
                 }}
             >
-                <PageDialogContent ref={portal} title="Vendor" busy={saving}>
+                <PageDialogContent
+                    ref={portal}
+                    title="Vendor"
+                    titleHint={vendorTitleHint}
+                    busy={saving}
+                >
                     {error && (
                         <div
                             role="alert"
@@ -1303,6 +1316,12 @@ export default function Vendors({
     canReadAddressBook,
     canManageAddressBook,
 }: Props) {
+    const { auth } = usePage<{ auth: Auth }>().props;
+    const [factBoxToolbar, setFactBoxToolbar] = useState<HTMLDivElement | null>(
+        null,
+    );
+    const [filtersOpen, setFiltersOpen] = useState(false);
+    const filterPanelId = useId();
     const [editing, setEditing] = useState<Vendor | null | undefined>(
         !initialVendor && initialParty && canManage ? null : undefined,
     );
@@ -1317,6 +1336,10 @@ export default function Vendors({
     const selectedVendor =
         vendors.data.find((vendor) => vendor.id === selectedVendorId) ?? null;
     const [viewing, setViewing] = useState<Vendor | null>(initialVendor);
+    const { query, onQueryChange, applyFilters } = useVendorListQuery(
+        filters,
+        editing !== undefined || viewing !== null,
+    );
     const [vendorSaving, setVendorSaving] = useState(false);
     const [vendorDirty, setVendorDirty] = useState(false);
     const transition = useRecordTransition(vendorDirty, vendorSaving);
@@ -1413,59 +1436,97 @@ export default function Vendors({
     return (
         <>
             <Head title="Vendor" />
-            <VendorContextPanel
-                vendor={selectedVendor}
-                company={
-                    selectedVendor
-                        ? legalEntityName(selectedVendor.legal_entity_id)
-                        : '—'
-                }
-                draft={false}
-            >
-                <ListPageLayout
-                    header={
-                        <RecordActionBar>
-                            <div className="flex items-center gap-2">
-                                <h1 className="text-sm font-semibold">
-                                    Vendor
-                                </h1>
-                                <VendorHint label="vendor">
-                                    Akun vendor per perusahaan. Identitas,
-                                    alamat, dan kontak memakai buku alamat
-                                    bersama.
-                                </VendorHint>
+            <ListPageLayout
+                filterPanel={
+                    filtersOpen ? (
+                        <FilterPane
+                            id={filterPanelId}
+                            title="Filter vendor"
+                            description="Hasil diperbarui otomatis saat filter diubah."
+                            side="left"
+                            onClose={() => setFiltersOpen(false)}
+                        >
+                            <div className="p-4">
+                                <Filters
+                                    filters={filters}
+                                    legalEntities={legalEntities}
+                                    onChange={applyFilters}
+                                />
                             </div>
-                            {canManage && (
-                                <div className="flex gap-2">
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => setImporting(true)}
-                                    >
-                                        Impor vendor CSV
-                                    </Button>
-                                    <ActionButton
-                                        action="create"
-                                        disabled={legalEntities.length === 0}
-                                        onClick={startNew}
-                                    />
-                                </div>
-                            )}
-                        </RecordActionBar>
-                    }
-                    filters={
-                        <div className="px-4 pb-4">
-                            <Filters
-                                key={JSON.stringify(filters)}
-                                filters={filters}
-                                legalEntities={legalEntities}
+                        </FilterPane>
+                    ) : null
+                }
+                header={
+                    <RecordActionBar
+                        title="Vendor"
+                        titleHint={vendorTitleHint}
+                        search={{
+                            value: query,
+                            onValueChange: onQueryChange,
+                            onSubmit: () => applyFilters({}),
+                            label: 'Cari vendor',
+                            placeholder: 'Cari nomor, nama, atau NPWP',
+                            maxLength: 100,
+                        }}
+                        filter={{
+                            open: filtersOpen,
+                            onOpenChange: setFiltersOpen,
+                            active: Boolean(
+                                filters.legal_entity || filters.status,
+                            ),
+                            controls: filterPanelId,
+                        }}
+                        preferenceKey={
+                            auth.membership
+                                ? `core.vendors:${auth.membership.tenant_id}:${auth.user.id}`
+                                : undefined
+                        }
+                        groups={
+                            canManage
+                                ? [
+                                      {
+                                          id: 'home',
+                                          label: 'Home',
+                                          actions: [
+                                              {
+                                                  id: 'import',
+                                                  label: 'Impor vendor CSV',
+                                                  icon: <Upload />,
+                                                  onSelect: () =>
+                                                      setImporting(true),
+                                              },
+                                          ],
+                                      },
+                                  ]
+                                : undefined
+                        }
+                        trailing={
+                            <div
+                                ref={setFactBoxToolbar}
+                                className="flex items-center gap-1"
                             />
-                        </div>
+                        }
+                    >
+                        {canManage && (
+                            <ActionButton
+                                action="create"
+                                disabled={legalEntities.length === 0}
+                                onClick={startNew}
+                            />
+                        )}
+                    </RecordActionBar>
+                }
+            >
+                <VendorContextPanel
+                    vendor={selectedVendor}
+                    company={
+                        selectedVendor
+                            ? legalEntityName(selectedVendor.legal_entity_id)
+                            : '—'
                     }
-                    footer={
-                        <p className="p-3 text-sm text-muted-foreground">
-                            {vendors.data.length} data dimuat
-                        </p>
-                    }
+                    draft={false}
+                    toolbarContainer={factBoxToolbar}
+                    className="flex-1 pt-3"
                 >
                     <RecordListScroll
                         listRef={listRef}
@@ -1591,8 +1652,8 @@ export default function Vendors({
                             ]}
                         />
                     </RecordListScroll>
-                </ListPageLayout>
-            </VendorContextPanel>
+                </VendorContextPanel>
+            </ListPageLayout>
             {editing !== undefined && (
                 <PageDialog
                     open
@@ -1611,6 +1672,7 @@ export default function Vendors({
                             }
                         }}
                         title="Vendor"
+                        titleHint={vendorTitleHint}
                         onNew={canManage ? startNew : undefined}
                         busy={vendorSaving}
                         navigation={editing ? navigation : undefined}
@@ -1654,6 +1716,7 @@ export default function Vendors({
                     <PageDialogContent
                         aria-describedby={undefined}
                         title="Vendor"
+                        titleHint={vendorTitleHint}
                         onNew={canManage ? startNew : undefined}
                         busy={vendorSaving}
                         navigation={navigation}
