@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Platform\Modules\Contracts;
 
 use Closure;
+use Illuminate\Contracts\Database\Query\Expression;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Grammar;
 use Illuminate\Database\Query\Builder;
@@ -42,10 +43,14 @@ final class RecordSearch
     {
         preg_match_all('/[\p{L}\p{N}]+/u', self::normalize($text), $matches);
 
-        return array_values($matches[0]);
+        return $matches[0];
     }
 
-    /** @param list<string> $searchColumns @param list<string> $identifierColumns */
+    /**
+     * @param EloquentBuilder<*>|Builder $query
+     * @param  list<string>  $searchColumns
+     * @param  list<string>  $identifierColumns
+     */
     public static function apply(EloquentBuilder|Builder $query, array $searchColumns, string $keyword, array $identifierColumns = []): void
     {
         if ($searchColumns === []) {
@@ -53,15 +58,16 @@ final class RecordSearch
         }
         $identifierColumns = array_values(array_intersect($identifierColumns, $searchColumns));
 
-        self::compose($query, $keyword, function (Builder $terms, array $term) use ($searchColumns, $identifierColumns): void {
+        self::compose($query, $keyword, function (Builder $terms, string $text, bool $phrase) use ($searchColumns, $identifierColumns): void {
+            $term = ['text' => $text, 'phrase' => $phrase];
             $terms->where(function (Builder $fields) use ($searchColumns, $identifierColumns, $term): void {
                 foreach ($searchColumns as $column) {
                     $fields->orWhere(fn (Builder $field) => self::matchTerm($field, $column, $term, in_array($column, $identifierColumns, true)));
                 }
             });
-        }, $identifierColumns === [] ? null : function (Builder $fields, array $term) use ($identifierColumns): void {
+        }, $identifierColumns === [] ? null : function (Builder $fields, string $text, bool $phrase) use ($identifierColumns): void {
             foreach ($identifierColumns as $column) {
-                $fields->orWhere(fn (Builder $field) => self::matchTerm($field, $column, $term, true));
+                $fields->orWhere(fn (Builder $field) => self::matchTerm($field, $column, ['text' => $text, 'phrase' => $phrase], true));
             }
         });
     }
@@ -69,14 +75,15 @@ final class RecordSearch
     /**
      * Kandidat relasi tetap dibangun pemilik resource agar indeks sumber dapat dipakai.
      *
+     * @param EloquentBuilder<*>|Builder $query
      * @param  Closure(array{phrase: bool, text: string}): Builder  $candidates
      * @param  ?Closure(array{phrase: bool, text: string}): Builder  $identifierCandidates
      */
     public static function applyCandidates(EloquentBuilder|Builder $query, string $keyword, Closure $candidates, ?Closure $identifierCandidates = null, string $identity = 'id'): void
     {
         self::compose($query, $keyword,
-            fn (Builder $terms, array $term) => $terms->whereIn($identity, $candidates($term)),
-            $identifierCandidates === null ? null : fn (Builder $fields, array $term) => $fields->whereIn($identity, $identifierCandidates($term)),
+            fn (Builder $terms, string $text, bool $phrase) => $terms->whereIn($identity, $candidates(['text' => $text, 'phrase' => $phrase])),
+            $identifierCandidates === null ? null : fn (Builder $fields, string $text, bool $phrase) => $fields->whereIn($identity, $identifierCandidates(['text' => $text, 'phrase' => $phrase])),
         );
     }
 
@@ -97,26 +104,26 @@ final class RecordSearch
             if ($identifier && $compact !== self::normalize($term['text']) && count(self::words($compact)) === 1) {
                 $prefix = '('.$prefix.') | ('.self::prefixQuery($compact).')';
             }
-            $query->whereRaw($vector." @@ to_tsquery('simple'::regconfig, ?)", [$prefix]);
+            $query->whereRaw(self::expression(fn (Grammar $grammar) => $vector." @@ to_tsquery('simple'::regconfig, ?)"), [$prefix]);
 
             return;
         }
 
         $phrase = implode(' ', $words);
         if (! $identifier) {
-            $query->whereRaw($vector." @@ phraseto_tsquery('simple'::regconfig, ?)", [$phrase]);
+            $query->whereRaw(self::expression(fn (Grammar $grammar) => $vector." @@ phraseto_tsquery('simple'::regconfig, ?)"), [$phrase]);
 
             return;
         }
         $query->where(function (Builder $match) use ($column, $vector, $phrase, $term): void {
             $match->where(function (Builder $field) use ($column, $vector, $phrase): void {
-                $field->whereRaw($vector." @@ phraseto_tsquery('simple'::regconfig, ?)", [$phrase])
-                    ->whereRaw(self::vectorExpression($field->getGrammar(), $column)." @@ phraseto_tsquery('simple'::regconfig, ?)", [$phrase]);
+                $field->whereRaw(self::expression(fn (Grammar $grammar) => $vector." @@ phraseto_tsquery('simple'::regconfig, ?)"), [$phrase])
+                    ->whereRaw(self::expression(fn (Grammar $grammar) => self::vectorExpression($grammar, $column)." @@ phraseto_tsquery('simple'::regconfig, ?)"), [$phrase]);
             });
             $compact = self::compactIdentifier($term['text']);
             $match->orWhere(function (Builder $field) use ($column, $vector, $compact): void {
-                $field->whereRaw($vector." @@ plainto_tsquery('simple'::regconfig, ?)", [$compact])
-                    ->whereRaw('lower('.self::compactExpression($field->getGrammar(), $column).') = ?', [$compact]);
+                $field->whereRaw(self::expression(fn (Grammar $grammar) => $vector." @@ plainto_tsquery('simple'::regconfig, ?)"), [$compact])
+                    ->whereRaw(self::expression(fn (Grammar $grammar) => 'lower('.self::compactExpression($grammar, $column).') = ?'), [$compact]);
             });
         });
     }
@@ -142,7 +149,11 @@ final class RecordSearch
         return implode(' & ', array_map(static fn (string $word): string => "'{$word}':*", self::words($text)));
     }
 
-    /** @param Closure(Builder, array{phrase: bool, text: string}): mixed $termMatcher @param ?Closure(Builder, array{phrase: bool, text: string}): mixed $identifierMatcher */
+    /**
+     * @param EloquentBuilder<*>|Builder $query
+     * @param  Closure(Builder, string, bool): mixed  $termMatcher
+     * @param  ?Closure(Builder, string, bool): mixed  $identifierMatcher
+     */
     private static function compose(EloquentBuilder|Builder $query, string $keyword, Closure $termMatcher, ?Closure $identifierMatcher): void
     {
         $terms = self::terms($keyword);
@@ -160,11 +171,11 @@ final class RecordSearch
         $builder->where(function (Builder $match) use ($terms, $termMatcher, $identifierMatcher, $wholeIdentifier, $compact): void {
             $match->where(function (Builder $all) use ($terms, $termMatcher): void {
                 foreach ($terms as $term) {
-                    $termMatcher($all, $term);
+                    $termMatcher($all, $term['text'], $term['phrase']);
                 }
             });
             if ($wholeIdentifier && $identifierMatcher !== null) {
-                $match->orWhere(fn (Builder $identifiers) => $identifierMatcher($identifiers, ['phrase' => false, 'text' => $compact]));
+                $match->orWhere(fn (Builder $identifiers) => $identifierMatcher($identifiers, $compact, false));
             }
         });
     }
@@ -187,5 +198,19 @@ final class RecordSearch
     private static function compactExpression(Grammar $grammar, string $column): string
     {
         return 'regexp_replace('.self::textExpression($grammar, $column).", '[[:space:].\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff-]+', '', 'g')";
+    }
+
+    /** @param Closure(Grammar): string $compile SQL dari grammar dan metadata server; nilai tetap memakai binding. */
+    private static function expression(Closure $compile): Expression
+    {
+        return new class($compile) implements Expression
+        {
+            public function __construct(private readonly Closure $compile) {}
+
+            public function getValue(Grammar $grammar): string
+            {
+                return ($this->compile)($grammar);
+            }
+        };
     }
 }

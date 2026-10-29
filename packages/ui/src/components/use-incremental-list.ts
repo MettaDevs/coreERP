@@ -1,6 +1,6 @@
 import * as React from 'react';
 import type { DataTableSort } from './data-table';
-import { SEARCH_DEBOUNCE_MS } from './record-search';
+import { SEARCH_DEBOUNCE_MS } from './record-search.js';
 
 export type ListBatch<T> = { items: T[]; nextCursor: string | null };
 export type ListRequest = {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Foundation\Vendor\Support;
 
+use App\Foundation\Vendor\Models\Vendor;
 use App\Platform\Modules\Contracts\RecordSearch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 /** Resource hanya menetapkan sumber kandidat dan scope; aturan pencocokan milik engine Core. */
 final class VendorSearch
 {
+    /** @param Builder<Vendor> $vendors */
     public static function apply(Builder $vendors, string $tenantId, string $query): void
     {
         if (trim(RecordSearch::normalize($query)) === '') {
