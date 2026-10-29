@@ -22,7 +22,6 @@ import { useRecordTransition } from '@apperp/ui/use-record-transition';
 import { Head } from '@inertiajs/react';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
-import { FormErrorHeader } from '@/components/form-error-header';
 import { useSaveFeedback } from '@/hooks/use-save-feedback';
 import { apiJson, apiRequest } from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
@@ -86,245 +85,227 @@ export function PaymentMethodCard({
         description: record?.description ?? '',
         active: record?.active ?? true,
     };
-
-    const [values, setValues] = useState(initial);
+    const [draft, setDraft] = useState(initial);
+    const [creationKey] = useState(() => crypto.randomUUID());
     const [saving, setSaving] = useState(false);
-    const isNew = !record;
-
-    const dirty =
-        values.code !== initial.code ||
-        values.name !== initial.name ||
-        values.description !== initial.description ||
-        values.active !== initial.active;
-
-    const transition = useRecordTransition(dirty, saving);
-    const feedback = useSaveFeedback(
-        record ? `payment-method-${record.id}` : 'payment-method-new',
+    const { scopeRef, summary, clear, report } = useSaveFeedback(
+        record?.id ?? 'new',
     );
+    const transition = useRecordTransition(
+        JSON.stringify(initial) !== JSON.stringify(draft),
+        saving,
+    );
+    const close = () => transition.request(onClose);
 
-    const handleSave = async (event: React.FormEvent) => {
-        event.preventDefault();
-        feedback.clear();
-
-        if (values.code.trim() === '') {
-            feedback.setFieldError(
-                'code',
-                'Kode metode pembayaran wajib diisi.',
-            );
-
-            return;
-        }
-
-        if (values.name.trim() === '') {
-            feedback.setFieldError(
-                'name',
-                'Nama metode pembayaran wajib diisi.',
-            );
-
-            return;
-        }
-
+    async function save() {
         setSaving(true);
+        clear();
 
         try {
-            const payload = {
-                code: values.code.trim(),
-                name: values.name.trim(),
-                description:
-                    values.description.trim() === ''
-                        ? null
-                        : values.description.trim(),
-                active: values.active,
-            };
-
-            const url = record
-                ? `/api/v1/payment-methods/${record.id}`
-                : '/api/v1/payment-methods';
-            const method = record ? 'PATCH' : 'POST';
-
-            const headers: Record<string, string> = {};
-
-            if (record) {
-                headers['If-Match'] = `W/"${record.version}"`;
-            } else {
-                headers['Idempotency-Key'] = crypto.randomUUID();
-            }
-
-            const response = await apiRequest(url, {
-                method,
-                headers,
-                body: JSON.stringify(payload),
-            });
-
-            if (!response.ok) {
-                const data = await response.json().catch(() => null);
-
-                if (response.status === 422 && data?.errors) {
-                    feedback.setErrors(data.errors);
-
-                    return;
-                }
-
-                if (response.status === 409) {
-                    feedback.setConflict(
-                        'Metode pembayaran telah diubah oleh pengguna lain. Silakan muat ulang.',
-                    );
-
-                    return;
-                }
-
-                throw new Error(
-                    data?.message || 'Gagal menyimpan metode pembayaran.',
-                );
-            }
-
-            const result = (await response.json()) as {
-                data: PaymentMethodRecord;
-            };
-            toast.success(
-                isNew
-                    ? 'Metode pembayaran berhasil ditambahkan.'
-                    : 'Metode pembayaran berhasil diperbarui.',
+            const result = await apiJson<{ data: PaymentMethodRecord }>(
+                record
+                    ? `/api/v1/payment-methods/${record.id}`
+                    : '/api/v1/payment-methods',
+                {
+                    method: record ? 'PATCH' : 'POST',
+                    headers: record
+                        ? { 'If-Match': `W/"${record.version}"` }
+                        : { 'Idempotency-Key': creationKey },
+                    body: JSON.stringify(
+                        record
+                            ? {
+                                  code: draft.code,
+                                  name: draft.name,
+                                  description: draft.description,
+                                  active: draft.active,
+                                  version: record.version,
+                              }
+                            : {
+                                  code: draft.code,
+                                  name: draft.name,
+                                  description: draft.description,
+                                  active: draft.active,
+                              },
+                    ),
+                },
             );
             onSaved(result.data);
+            toast.success('Metode pembayaran disimpan.');
         } catch (error) {
-            feedback.setGeneralError(
-                error instanceof Error
-                    ? error.message
-                    : 'Gagal menyimpan metode pembayaran.',
-            );
+            report(error, 'Metode pembayaran belum dapat disimpan.');
         } finally {
             setSaving(false);
         }
-    };
+    }
 
     return (
-        <PageDialog
-            open
-            onOpenChange={(nextOpen) => {
-                if (!nextOpen) {
-                    transition.requestTransition(onClose);
-                }
-            }}
-        >
-            <PageDialogContent>
-                <form
-                    noValidate
-                    onSubmit={handleSave}
-                    className="flex h-full flex-col"
+        <>
+            {transition.confirmation}
+            <PageDialog
+                open
+                onOpenChange={(open) => {
+                    if (!open) {
+                        close();
+                    }
+                }}
+            >
+                <PageDialogContent
+                    title="Metode pembayaran"
+                    recordTitle={record?.name ?? 'Baru'}
+                    editing={canManage}
+                    busy={saving}
                 >
-                    <PageDialogToolbar
-                        title={
-                            isNew
-                                ? 'Metode pembayaran baru'
-                                : `Metode pembayaran: ${record.code}`
-                        }
-                        onClose={() => transition.requestTransition(onClose)}
-                        action={
-                            canManage ? (
+                    <form
+                        noValidate
+                        ref={scopeRef}
+                        className="flex min-h-0 flex-1 flex-col"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+
+                            if (canManage && !saving) {
+                                void save();
+                            }
+                        }}
+                    >
+                        <PageDialogToolbar>
+                            {canManage && (
                                 <ActionButton
                                     action="save"
                                     type="submit"
-                                    disabled={saving}
+                                    pending={saving}
                                 />
-                            ) : null
-                        }
-                    />
-                    <PageDialogBody>
-                        <FormErrorHeader feedback={feedback} />
-                        <FormGrid className="space-y-4 pt-2">
-                            <FormControl
-                                id="payment-method-code"
-                                label="Kode"
-                                required
-                                error={feedback.fieldErrors.code}
-                            >
-                                <Input
-                                    id="payment-method-code"
-                                    name="code"
-                                    value={values.code}
-                                    onChange={(e) =>
-                                        setValues((v) => ({
-                                            ...v,
-                                            code: e.target.value,
-                                        }))
-                                    }
-                                    disabled={!canManage || saving || !isNew}
-                                    placeholder="Contoh: TRANSFER"
-                                />
-                            </FormControl>
-
-                            <FormControl
-                                id="payment-method-name"
-                                label="Nama metode pembayaran"
-                                required
-                                error={feedback.fieldErrors.name}
-                            >
-                                <Input
-                                    id="payment-method-name"
-                                    name="name"
-                                    value={values.name}
-                                    onChange={(e) =>
-                                        setValues((v) => ({
-                                            ...v,
-                                            name: e.target.value,
-                                        }))
-                                    }
-                                    disabled={!canManage || saving}
-                                    placeholder="Contoh: Transfer Bank"
-                                />
-                            </FormControl>
-
-                            <FormControl
-                                id="payment-method-description"
-                                label="Keterangan"
-                                error={feedback.fieldErrors.description}
-                            >
-                                <Textarea
-                                    id="payment-method-description"
-                                    name="description"
-                                    value={values.description}
-                                    onChange={(e) =>
-                                        setValues((v) => ({
-                                            ...v,
-                                            description: e.target.value,
-                                        }))
-                                    }
-                                    disabled={!canManage || saving}
-                                    placeholder="Catatan tambahan mengenai metode pembayaran"
-                                    rows={3}
-                                />
-                            </FormControl>
-
-                            <div className="flex items-center justify-between rounded-lg border p-3">
-                                <div className="space-y-0.5">
-                                    <FieldLabel htmlFor="payment-method-active">
-                                        Status aktif
-                                    </FieldLabel>
-                                    <p className="text-xs text-muted-foreground">
-                                        Metode pembayaran aktif dapat dipilih
-                                        pada transaksi dokumen.
-                                    </p>
-                                </div>
-                                <Switch
-                                    id="payment-method-active"
-                                    checked={values.active}
-                                    onCheckedChange={(checked) =>
-                                        setValues((v) => ({
-                                            ...v,
-                                            active: checked,
-                                        }))
-                                    }
-                                    disabled={!canManage || saving}
-                                />
-                            </div>
-                        </FormGrid>
-                    </PageDialogBody>
-                </form>
-            </PageDialogContent>
-        </PageDialog>
+                            )}
+                            <ActionButton
+                                action="cancel"
+                                onClick={close}
+                                disabled={saving}
+                            />
+                        </PageDialogToolbar>
+                        {summary}
+                        <PageDialogBody inert={saving}>
+                            <FormGrid>
+                                <FormControl data-error-field="code">
+                                    <Input
+                                        label="Kode"
+                                        required
+                                        value={draft.code}
+                                        maxLength={50}
+                                        readOnly={!canManage || Boolean(record)}
+                                        onChange={(event) =>
+                                            setDraft({
+                                                ...draft,
+                                                code: event.target.value,
+                                            })
+                                        }
+                                        placeholder="Contoh: TRANSFER"
+                                    />
+                                </FormControl>
+                                <FormControl data-error-field="name">
+                                    <Input
+                                        label="Nama metode pembayaran"
+                                        required
+                                        value={draft.name}
+                                        maxLength={250}
+                                        readOnly={!canManage}
+                                        onChange={(event) =>
+                                            setDraft({
+                                                ...draft,
+                                                name: event.target.value,
+                                            })
+                                        }
+                                        placeholder="Contoh: Transfer Bank"
+                                    />
+                                </FormControl>
+                                <FormControl data-error-field="description">
+                                    <Textarea
+                                        label="Keterangan"
+                                        value={draft.description}
+                                        maxLength={2000}
+                                        readOnly={!canManage}
+                                        onChange={(event) =>
+                                            setDraft({
+                                                ...draft,
+                                                description: event.target.value,
+                                            })
+                                        }
+                                        placeholder="Catatan tambahan mengenai metode pembayaran"
+                                    />
+                                </FormControl>
+                                <FormControl data-error-field="active">
+                                    {canManage ? (
+                                        <>
+                                            <FieldLabel htmlFor="payment-method-active">
+                                                Aktif
+                                            </FieldLabel>
+                                            <Switch
+                                                id="payment-method-active"
+                                                checked={draft.active}
+                                                onCheckedChange={(active) =>
+                                                    setDraft({
+                                                        ...draft,
+                                                        active,
+                                                    })
+                                                }
+                                            />
+                                        </>
+                                    ) : (
+                                        <Input
+                                            label="Status"
+                                            readOnly
+                                            value={
+                                                draft.active
+                                                    ? 'Aktif'
+                                                    : 'Nonaktif'
+                                            }
+                                        />
+                                    )}
+                                </FormControl>
+                            </FormGrid>
+                        </PageDialogBody>
+                    </form>
+                </PageDialogContent>
+            </PageDialog>
+        </>
     );
 }
+
+const columns: DataTableColumn<PaymentMethodRecord>[] = [
+    {
+        id: 'code',
+        header: 'Kode',
+        width: 140,
+        cell: (record) => (
+            <span className="font-mono text-xs font-medium">{record.code}</span>
+        ),
+        sortValue: (record) => record.code,
+    },
+    {
+        id: 'name',
+        header: 'Nama metode pembayaran',
+        minWidth: 280,
+        cell: (record) => (
+            <div className="space-y-0.5">
+                <span className="text-sm font-medium">{record.name}</span>
+                {record.description && (
+                    <p className="line-clamp-1 text-xs text-muted-foreground">
+                        {record.description}
+                    </p>
+                )}
+            </div>
+        ),
+        sortValue: (record) => record.name,
+    },
+    {
+        id: 'active',
+        header: 'Status',
+        width: 120,
+        cell: (record) => (
+            <Badge variant={record.active ? 'default' : 'secondary'}>
+                {record.active ? 'Aktif' : 'Nonaktif'}
+            </Badge>
+        ),
+    },
+];
 
 export default function PaymentMethodsPage({
     canManage = false,
@@ -336,126 +317,80 @@ export default function PaymentMethodsPage({
         null,
     );
     const [deleting, setDeleting] = useState(false);
-    const { confirm } = useConfirmation();
+    const listFeedback = useSaveFeedback('payment-method-list');
+    const { confirm, confirmation } = useConfirmation();
 
-    const fetcher = useCallback(
-        async ({ cursor, search, sort, signal }: ListRequest) => {
-            const params = new URLSearchParams();
+    const loadItems = useCallback(
+        async ({ query, cursor, sort, signal }: ListRequest) => {
+            const params = new URLSearchParams({ q: query });
 
             if (cursor) {
                 params.set('cursor', cursor);
             }
 
-            if (search) {
-                params.set('q', search);
-            }
-
             if (sort) {
-                params.set('sort', sort.column);
+                params.set('sort', sort.columnId);
                 params.set('direction', sort.direction);
             }
 
-            return apiJson<{
+            const result = await apiJson<{
                 data: PaymentMethodRecord[];
                 next_cursor: string | null;
-            }>(`/api/v1/payment-methods?${params.toString()}`, { signal });
+            }>(`/api/v1/payment-methods?${params}`, { signal });
+
+            return { items: result.data, nextCursor: result.next_cursor };
         },
         [],
     );
 
-    const list = useIncrementalList<PaymentMethodRecord>({
-        fetcher,
-        search: query,
-        defaultSort: { column: 'code', direction: 'asc' },
+    const list = useIncrementalList({
+        loadItems,
+        query,
+        getKey: (record) => record.id,
     });
 
-    const archive = async (record: PaymentMethodRecord) => {
-        const agreed = await confirm({
-            title: 'Arsipkan metode pembayaran',
-            message: `Apakah Anda yakin ingin mengarsipkan metode pembayaran "${record.name}" (${record.code})?`,
-            confirmLabel: 'Delete',
-            destructive: true,
-        });
-
-        if (!agreed) {
+    async function archive(record: PaymentMethodRecord) {
+        if (
+            !(await confirm({
+                title: `Delete metode pembayaran ${record.name}?`,
+                description:
+                    'Referensi pada dokumen lama tetap disimpan. Metode pembayaran ini tidak lagi muncul pada pilihan baru.',
+                confirmLabel: 'Delete',
+                destructive: true,
+            }))
+        ) {
             return;
         }
 
         setDeleting(true);
+        listFeedback.clear();
 
         try {
-            const response = await apiRequest(
-                `/api/v1/payment-methods/${record.id}`,
-                {
-                    method: 'DELETE',
-                    headers: { 'If-Match': `W/"${record.version}"` },
-                },
-            );
-
-            if (!response.ok) {
-                const data = await response.json().catch(() => null);
-
-                throw new Error(
-                    data?.message || 'Gagal mengarsipkan metode pembayaran.',
-                );
-            }
-
-            toast.success('Metode pembayaran berhasil diarsipkan.');
+            await apiRequest(`/api/v1/payment-methods/${record.id}`, {
+                method: 'DELETE',
+                headers: { 'If-Match': `W/"${record.version}"` },
+            });
             list.reload();
         } catch (error) {
-            toast.error(
-                error instanceof Error
-                    ? error.message
-                    : 'Gagal mengarsipkan metode pembayaran.',
+            listFeedback.report(
+                error,
+                'Metode pembayaran belum dapat dihapus.',
             );
         } finally {
             setDeleting(false);
         }
-    };
-
-    const columns: DataTableColumn<PaymentMethodRecord>[] = [
-        {
-            id: 'code',
-            header: 'Kode',
-            width: 140,
-            cell: (item) => (
-                <span className="font-mono text-xs font-medium">
-                    {item.code}
-                </span>
-            ),
-        },
-        {
-            id: 'name',
-            header: 'Nama metode pembayaran',
-            cell: (item) => (
-                <div className="space-y-0.5">
-                    <span className="text-sm font-medium">{item.name}</span>
-                    {item.description && (
-                        <p className="line-clamp-1 text-xs text-muted-foreground">
-                            {item.description}
-                        </p>
-                    )}
-                </div>
-            ),
-        },
-        {
-            id: 'active',
-            header: 'Status',
-            width: 120,
-            cell: (item) => (
-                <Badge variant={item.active ? 'success' : 'secondary'}>
-                    {item.active ? 'Aktif' : 'Nonaktif'}
-                </Badge>
-            ),
-        },
-    ];
+    }
 
     return (
         <>
-            <Head title="Metode Pembayaran" />
+            <Head title="Metode pembayaran" />
+            {confirmation}
             <ListPageLayout
                 header={
-                    <RecordActionBar title="Metode Pembayaran">
+                    <RecordActionBar
+                        title="Metode pembayaran"
+                        feedback={listFeedback.summary}
+                    >
                         {canManage && (
                             <ActionButton
                                 action="create"
@@ -514,24 +449,9 @@ export default function PaymentMethodsPage({
                         }
                     }}
                     emptyMessage={
-                        list.error ? (
-                            <div className="flex flex-col items-center justify-center space-y-2 p-6">
-                                <p className="text-sm text-destructive">
-                                    Gagal memuat metode pembayaran: {list.error}
-                                </p>
-                                <button
-                                    type="button"
-                                    onClick={() => list.reload()}
-                                    className="text-xs text-primary hover:underline"
-                                >
-                                    Coba lagi
-                                </button>
-                            </div>
-                        ) : query ? (
-                            'Tidak ada metode pembayaran yang cocok.'
-                        ) : (
-                            'Belum ada metode pembayaran.'
-                        )
+                        query
+                            ? 'Tidak ada metode pembayaran yang cocok.'
+                            : 'Belum ada metode pembayaran.'
                     }
                 />
             </ListPageLayout>
