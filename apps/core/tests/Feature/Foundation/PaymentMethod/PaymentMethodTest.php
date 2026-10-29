@@ -3,6 +3,7 @@
 namespace Tests\Feature\Foundation\PaymentMethod;
 
 use App\Foundation\PaymentMethod\Models\PaymentMethod;
+use App\Platform\ControlPlane\Models\Client;
 use App\Platform\Identity\Models\User;
 use App\Platform\Modules\Contracts\PaymentMethodDirectory;
 use App\Platform\Tenant\Models\Tenant;
@@ -179,5 +180,13 @@ class PaymentMethodTest extends TestCase
             'name' => $name,
             'active' => true,
         ]);
+    }
+
+    private function createTenant(): Tenant
+    {
+        $slug = 'payment-'.Str::lower(Str::random(10));
+        $client = Client::create(['legal_name' => 'Klien uji', 'slug' => $slug, 'status' => 'active']);
+
+        return Tenant::create(['client_id' => $client->id, 'name' => 'Tenant uji', 'slug' => $slug, 'status' => 'active']);
     }
 }

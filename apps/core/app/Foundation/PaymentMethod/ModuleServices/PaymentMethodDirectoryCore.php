@@ -69,16 +69,22 @@ final class PaymentMethodDirectoryCore implements PaymentMethodDirectory
 
     public function active(string $tenantId): array
     {
-        return PaymentMethod::query()
+        $records = PaymentMethod::query()
             ->where('tenant_id', $tenantId)
             ->where('active', true)
             ->orderBy('code')
-            ->get(['id', 'code', 'name'])
-            ->map(fn (PaymentMethod $record): array => [
+            ->get(['id', 'code', 'name']);
+
+        $result = [];
+
+        foreach ($records as $record) {
+            $result[] = [
                 'id' => $record->id,
                 'code' => $record->code,
                 'name' => $record->name,
-            ])
-            ->all();
+            ];
+        }
+
+        return $result;
     }
 }
