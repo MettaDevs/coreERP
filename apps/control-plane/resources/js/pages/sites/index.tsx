@@ -1,5 +1,13 @@
 import { Button } from '@apperp/ui/button';
 import {
+    Card,
+    CardHeader,
+    CardTitle,
+    CardContent,
+    CardFooter,
+} from '@apperp/ui/card';
+import { DataTable } from '@apperp/ui/data-table';
+import {
     Empty,
     EmptyContent,
     EmptyDescription,
@@ -9,13 +17,9 @@ import {
 } from '@apperp/ui/empty';
 import { Input } from '@apperp/ui/input';
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
+    assertListBatch,
+    useIncrementalList,
+} from '@apperp/ui/use-incremental-list';
 import { Head, Link, usePoll } from '@inertiajs/react';
 import {
     ArrowUpCircle,
@@ -26,7 +30,7 @@ import {
     Search,
     Server,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { ReactNode } from 'react';
 import { InstallStateBadge } from '@/components/badges';
 import CopyButton from '@/components/copy-button';
@@ -36,7 +40,6 @@ import type { InstallProgress } from '@/lib/install-progress';
 import { newerRelease } from '@/lib/release';
 import { daysUntil, relativeTime } from '@/lib/time';
 import AddServerDialog from '@/pages/sites/add-server-dialog';
-import type { Candidate } from '@/pages/sites/add-server-dialog';
 
 type SiteRow = {
     id: string;
@@ -66,57 +69,6 @@ const LICENSE_WARNING_DAYS = 7;
 /** Selang muat ulang parsial daftar. Laporan agen datang tiap menit; lebih rapat dari ini tidak menambah apa pun. */
 const POLL_MS = 30_000;
 
-const WAITING_STATES = [
-    'no_command',
-    'awaiting_command',
-    'awaiting_release',
-    'connected',
-    'installing',
-];
-
-function licenseUrgent(row: SiteRow): boolean {
-    // Lisensi permanen tidak pernah mendesak: ia tidak punya tanggal yang dapat mendekat.
-    if (row.licensePerpetual) {
-        return false;
-    }
-
-    const days = daysUntil(row.licenseValidUntil);
-
-    return (
-        row.progress.state !== 'revoked' &&
-        days !== null &&
-        days <= LICENSE_WARNING_DAYS
-    );
-}
-
-/**
- * Satu aturan penggolongan untuk kartu ringkasan dan penyaring, supaya angka di kartu selalu sama dengan
- * jumlah baris yang tampil ketika kartunya ditekan.
- */
-function matches(row: SiteRow, filter: Filter): boolean {
-    const state = row.progress.state;
-
-    switch (filter) {
-        case 'all':
-            return state !== 'revoked';
-        case 'attention':
-            return (
-                state === 'failed' || state === 'stale' || licenseUrgent(row)
-            );
-        case 'running':
-            return state === 'ready';
-        case 'waiting':
-            return WAITING_STATES.includes(state);
-        case 'outdated':
-            return (
-                (state === 'ready' || state === 'stale') &&
-                newerRelease(row.reportedRelease, row.newestRelease) !== null
-            );
-        case 'revoked':
-            return state === 'revoked';
-    }
-}
-
 function StatCard({
     label,
     value,
@@ -135,12 +87,11 @@ function StatCard({
     onClick: () => void;
 }) {
     const tones = {
-        slate: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
-        emerald:
-            'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200',
-        red: 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-200',
-        amber: 'bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-200',
-        sky: 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-200',
+        slate: 'bg-muted text-muted-foreground  ',
+        emerald: 'bg-success/10 text-success  ',
+        red: 'bg-destructive/10 text-destructive  ',
+        amber: 'bg-warning/10 text-warning  ',
+        sky: 'bg-primary/10 text-primary  ',
     };
 
     return (
@@ -149,7 +100,7 @@ function StatCard({
             onClick={onClick}
             aria-pressed={active}
             className={`flex items-start gap-3 rounded-lg border bg-background p-4 text-start transition-colors outline-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring/50 ${
-                active ? 'border-sky-600 ring-1 ring-sky-600' : ''
+                active ? 'border-primary/30 ring-1 ring-ring' : ''
             }`}
         >
             <span
@@ -158,7 +109,7 @@ function StatCard({
                 {icon}
             </span>
             <span className="min-w-0">
-                <span className="block text-2xl leading-none font-semibold tabular-nums">
+                <span className="block text-lg leading-none font-semibold tabular-nums">
                     {value}
                 </span>
                 <span className="mt-1 block text-sm font-medium">{label}</span>
@@ -195,9 +146,9 @@ function LicenseCell({ row }: { row: SiteRow }) {
     const days = daysUntil(row.licenseValidUntil) ?? 0;
     const tone =
         days < 0
-            ? 'text-red-700 dark:text-red-300'
+            ? 'text-destructive '
             : days <= LICENSE_WARNING_DAYS
-              ? 'text-amber-700 dark:text-amber-300'
+              ? 'text-warning '
               : '';
 
     return (
@@ -215,7 +166,7 @@ function LicenseCell({ row }: { row: SiteRow }) {
     );
 }
 
-function EmptyFleet({ candidates }: { candidates: Candidate[] }) {
+function EmptyFleet({ hasCandidates }: { hasCandidates: boolean }) {
     return (
         <Empty className="border bg-background">
             <EmptyHeader>
@@ -239,7 +190,7 @@ function EmptyFleet({ candidates }: { candidates: Candidate[] }) {
                     <li>Buat perintah pasang dan jalankan di VPS itu.</li>
                 </ol>
                 <div className="flex flex-wrap justify-center gap-2">
-                    <AddServerDialog candidates={candidates} />
+                    <AddServerDialog hasCandidates={hasCandidates} />
                     <Button asChild variant="outline">
                         <Link href="/lingkungan">Ke Lingkungan</Link>
                     </Button>
@@ -259,46 +210,101 @@ function EmptyFleet({ candidates }: { candidates: Candidate[] }) {
  * Daftarnya dimuat ulang sebagian setiap tiga puluh detik, supaya "terakhir terlihat" dan keadaan
  * pemasangan tidak basi selama halamannya dibiarkan terbuka.
  */
-export default function Index({
-    sites,
-    candidates,
-}: {
-    sites: SiteRow[];
-    candidates: Candidate[];
-}) {
+export default function Index({ hasCandidates }: { hasCandidates: boolean }) {
     const [filter, setFilter] = useState<Filter>('all');
     const [query, setQuery] = useState('');
 
-    usePoll(POLL_MS, { only: ['sites', 'candidates'] });
+    const [summary, setSummary] = useState<Record<Filter, number> | null>(null);
+    const counts = summary ?? {
+        all: 0,
+        attention: 0,
+        running: 0,
+        waiting: 0,
+        outdated: 0,
+        revoked: 0,
+    };
+    const loadItems = useCallback(
+        async ({
+            query: search,
+            cursor,
+            signal,
+        }: {
+            query: string;
+            cursor: string | null;
+            signal: AbortSignal;
+        }) => {
+            const params = new URLSearchParams({ search, filter });
 
-    const counts = useMemo(() => {
-        const count = (which: Filter) =>
-            sites.filter((row) => matches(row, which)).length;
+            if (cursor) {
+                params.set('cursor', cursor);
+            }
 
-        return {
-            all: count('all'),
-            attention: count('attention'),
-            running: count('running'),
-            waiting: count('waiting'),
-            outdated: count('outdated'),
-            revoked: count('revoked'),
-        };
-    }, [sites]);
+            const response = await fetch(`/situs?${params}`, {
+                signal,
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json' },
+            });
 
-    const needle = query.trim().toLowerCase();
-    const shown = sites.filter(
-        (row) =>
-            matches(row, filter) &&
-            (needle === '' ||
-                [
-                    row.name,
-                    row.tenant,
-                    row.environment?.name,
-                    row.serverAddress,
-                    row.appUrl,
-                    row.lastSeenIp,
-                ].some((value) => value?.toLowerCase().includes(needle))),
+            if (!response.ok) {
+                throw new Error(
+                    'Daftar server belum dapat dimuat. Periksa koneksi lalu coba lagi.',
+                );
+            }
+
+            const body: unknown = await response.json();
+
+            if (
+                !body ||
+                typeof body !== 'object' ||
+                !('data' in body) ||
+                !('next_cursor' in body) ||
+                !('counts' in body)
+            ) {
+                throw new Error(
+                    'Jawaban daftar server tidak lengkap. Muat ulang daftar.',
+                );
+            }
+
+            const nextCounts = body.counts;
+
+            if (
+                !nextCounts ||
+                typeof nextCounts !== 'object' ||
+                ![
+                    'all',
+                    'attention',
+                    'running',
+                    'waiting',
+                    'outdated',
+                    'revoked',
+                ].every(
+                    (key) =>
+                        key in nextCounts &&
+                        typeof Reflect.get(nextCounts, key) === 'number',
+                )
+            ) {
+                throw new Error(
+                    'Ringkasan server belum dapat dibaca. Muat ulang daftar.',
+                );
+            }
+
+            const batch = { items: body.data, nextCursor: body.next_cursor };
+            assertListBatch<SiteRow>(batch);
+
+            if (!signal.aborted) {
+                setSummary(nextCounts as Record<Filter, number>);
+            }
+
+            return batch;
+        },
+        [filter],
     );
+    const list = useIncrementalList<SiteRow>({
+        loadItems,
+        query,
+        getKey: (row) => row.id,
+    });
+    usePoll(POLL_MS, { only: ['hasCandidates'], onSuccess: list.reload });
 
     function toggle(which: Filter) {
         setFilter((current) => (current === which ? 'all' : which));
@@ -307,15 +313,19 @@ export default function Index({
     return (
         <Shell
             title="Server klien"
-            description="Setiap VPS milik klien yang dikelola dari sini lewat agen: alamatnya, keadaan pemasangan, rilis yang berjalan, dan masa lisensinya."
+            description="Pantau server milik klien, selesaikan pemasangan, dan tindak lanjuti server yang perlu perhatian."
             actions={
-                sites.length > 0 && <AddServerDialog candidates={candidates} />
+                counts.all + counts.revoked > 0 && (
+                    <AddServerDialog hasCandidates={hasCandidates} />
+                )
             }
         >
             <Head title="Server klien" />
 
-            {sites.length === 0 ? (
-                <EmptyFleet candidates={candidates} />
+            {summary !== null &&
+            counts.all + counts.revoked === 0 &&
+            !list.error ? (
+                <EmptyFleet hasCandidates={hasCandidates} />
             ) : (
                 <>
                     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -333,7 +343,7 @@ export default function Index({
                             onClick={() => setFilter('all')}
                         />
                         <StatCard
-                            label="Jalan"
+                            label="Terhubung"
                             value={counts.running}
                             hint="Terpasang dan melapor"
                             icon={<CircleCheck className="size-4" />}
@@ -365,242 +375,300 @@ export default function Index({
                         />
                     </div>
 
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div
-                            role="group"
-                            aria-label="Saring server"
-                            className="flex flex-wrap gap-1 rounded-lg border bg-background p-1"
-                        >
-                            {(
-                                [
-                                    ['all', 'Semua', counts.all],
-                                    [
-                                        'attention',
-                                        'Perlu perhatian',
-                                        counts.attention,
-                                    ],
-                                    ['running', 'Jalan', counts.running],
-                                    ['waiting', 'Menunggu', counts.waiting],
-                                    [
-                                        'outdated',
-                                        'Perlu pembaruan',
-                                        counts.outdated,
-                                    ],
-                                    ['revoked', 'Dicabut', counts.revoked],
-                                ] as [Filter, string, number][]
-                            ).map(([key, label, total]) => (
-                                <button
-                                    key={key}
-                                    type="button"
-                                    aria-pressed={filter === key}
-                                    onClick={() => setFilter(key)}
-                                    className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-                                        filter === key
-                                            ? 'bg-sky-600 text-white'
-                                            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                                    }`}
+                    <Card className="min-w-0">
+                        <CardHeader>
+                            <CardTitle>Daftar server</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {' '}
+                            <div className="flex flex-col gap-3">
+                                <div className="relative w-full sm:w-72">
+                                    <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                                    <Input
+                                        type="search"
+                                        aria-label="Cari server"
+                                        placeholder="Cari nama, tenant, atau alamat"
+                                        value={query}
+                                        onChange={(e) =>
+                                            setQuery(e.target.value)
+                                        }
+                                        className="ps-9"
+                                    />
+                                </div>
+                                <div
+                                    role="group"
+                                    aria-label="Saring server"
+                                    className="flex flex-wrap gap-1"
                                 >
-                                    {label}
-                                    <span
-                                        className={`ms-1.5 tabular-nums ${filter === key ? 'text-white/80' : 'text-muted-foreground'}`}
-                                    >
-                                        {total}
-                                    </span>
-                                </button>
-                            ))}
-                        </div>
-                        <div className="relative w-full sm:w-72">
-                            <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                                type="search"
-                                aria-label="Cari server"
-                                placeholder="Cari nama, tenant, atau alamat"
-                                value={query}
-                                onChange={(e) => setQuery(e.target.value)}
-                                className="ps-9"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="overflow-x-auto rounded-lg border bg-background">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Server</TableHead>
-                                    <TableHead>Keadaan</TableHead>
-                                    <TableHead>Rilis</TableHead>
-                                    <TableHead>Lisensi</TableHead>
-                                    <TableHead>Terakhir terlihat</TableHead>
-                                    <TableHead>
-                                        <span className="sr-only">Rincian</span>
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {shown.length === 0 && (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={6}
-                                            className="py-10 text-center text-sm text-muted-foreground"
+                                    {(
+                                        [
+                                            ['all', 'Semua', counts.all],
+                                            [
+                                                'attention',
+                                                'Perlu perhatian',
+                                                counts.attention,
+                                            ],
+                                            [
+                                                'running',
+                                                'Terhubung',
+                                                counts.running,
+                                            ],
+                                            [
+                                                'waiting',
+                                                'Menunggu',
+                                                counts.waiting,
+                                            ],
+                                            [
+                                                'outdated',
+                                                'Perlu pembaruan',
+                                                counts.outdated,
+                                            ],
+                                            [
+                                                'revoked',
+                                                'Dicabut',
+                                                counts.revoked,
+                                            ],
+                                        ] as [Filter, string, number][]
+                                    ).map(([key, label, total]) => (
+                                        <button
+                                            key={key}
+                                            type="button"
+                                            aria-pressed={filter === key}
+                                            onClick={() => setFilter(key)}
+                                            className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+                                                filter === key
+                                                    ? 'bg-primary text-primary-foreground'
+                                                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                                            }`}
                                         >
-                                            Tidak ada server yang cocok dengan
-                                            penyaring ini.
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                                {shown.map((row) => {
-                                    const detail = progressDetail(row.progress);
-                                    const newer = newerRelease(
-                                        row.reportedRelease,
-                                        row.newestRelease,
-                                    );
-                                    const seen = relativeTime(row.lastSeenIso);
-
-                                    return (
-                                        <TableRow key={row.id}>
-                                            {/*
-                                                Sel tabel bawaan tidak membungkus teks. Nama dan keadaan dibiarkan
-                                                membungkus supaya daftar muat di layar laptop tanpa gulir ke samping;
-                                                alamat tetap satu baris.
-
-                                                Tenant tidak punya kolom sendiri: nama server lahir sebagai
-                                                "<tenant> — Produksi", jadi kolom tenant hanya mengulangnya. Ia
-                                                tetap tertulis di bawah nama, bersama tautan lingkungannya, untuk
-                                                situs lama yang namanya bebas.
-                                            */}
-                                            <TableCell className="min-w-[15rem] align-top whitespace-normal">
-                                                <Link
-                                                    href={`/situs/${row.id}`}
-                                                    className="font-medium hover:underline hover:underline-offset-4"
-                                                >
-                                                    {row.name}
-                                                </Link>
-                                                {row.serverAddress ? (
-                                                    <span className="mt-0.5 flex items-center gap-1">
-                                                        <span className="font-mono text-xs text-muted-foreground">
-                                                            {row.serverAddress}
-                                                        </span>
-                                                        <CopyButton
-                                                            text={
-                                                                row.serverAddress
-                                                            }
-                                                            label="Salin alamat server"
-                                                            iconOnly
-                                                        />
-                                                    </span>
-                                                ) : (
-                                                    <Link
-                                                        href={`/situs/${row.id}#setelan`}
-                                                        className="mt-0.5 block text-xs text-amber-700 hover:underline dark:text-amber-300"
-                                                    >
-                                                        Alamat server belum
-                                                        dicatat
-                                                    </Link>
-                                                )}
-                                                {row.appUrl && (
-                                                    <a
-                                                        href={row.appUrl}
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        className="mt-0.5 block font-mono text-xs break-all text-muted-foreground hover:underline"
-                                                    >
-                                                        {row.appUrl.replace(
-                                                            /^https?:\/\//,
-                                                            '',
-                                                        )}
-                                                    </a>
-                                                )}
-                                                {row.dns.state ===
-                                                    'outdated' && (
-                                                    <span className="mt-0.5 block text-xs text-amber-700 dark:text-amber-300">
-                                                        DNS belum mengikuti
-                                                        alamat server
-                                                    </span>
-                                                )}
-                                                <span className="mt-0.5 block text-xs text-muted-foreground">
-                                                    {row.tenant} ·{' '}
-                                                    {row.environment ? (
-                                                        <Link
-                                                            href={`/lingkungan/${row.environment.id}`}
-                                                            className="underline-offset-4 hover:underline"
-                                                        >
-                                                            lingkungan{' '}
-                                                            {
-                                                                row.environment
-                                                                    .name
-                                                            }
-                                                        </Link>
-                                                    ) : (
-                                                        'tanpa lingkungan'
-                                                    )}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell className="max-w-[12rem] align-top whitespace-normal">
-                                                <InstallStateBadge
-                                                    state={row.progress.state}
-                                                />
-                                                {detail && (
-                                                    <p className="mt-1 text-xs text-muted-foreground">
-                                                        {detail}
-                                                    </p>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="align-top">
-                                                <span className="font-mono text-sm">
-                                                    {row.reportedRelease ?? '—'}
-                                                </span>
-                                                {newer && (
-                                                    <span className="mt-1 flex items-center gap-1 text-xs text-amber-700 dark:text-amber-300">
-                                                        <ArrowUpCircle className="size-3.5" />
-                                                        {newer} tersedia
-                                                    </span>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="align-top">
-                                                <LicenseCell row={row} />
-                                            </TableCell>
-                                            <TableCell className="align-top text-sm">
-                                                {seen ? (
-                                                    <span
-                                                        title={
-                                                            row.lastSeenAt ??
-                                                            undefined
-                                                        }
-                                                    >
-                                                        {seen}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-muted-foreground">
-                                                        Belum pernah
-                                                    </span>
-                                                )}
-                                                {row.lastSeenIp && (
-                                                    <span className="block font-mono text-xs text-muted-foreground">
-                                                        dari {row.lastSeenIp}
-                                                    </span>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="w-0 text-end align-top">
-                                                <Button
-                                                    asChild
-                                                    size="icon-sm"
-                                                    variant="ghost"
-                                                >
+                                            {label}
+                                            <span
+                                                className={`ms-1.5 tabular-nums ${filter === key ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}
+                                            >
+                                                {total}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </CardContent>
+                        <div className="h-[min(40rem,65vh)] min-h-64 border-y">
+                            <DataTable
+                                scrollMode="viewport"
+                                data={list.items}
+                                incremental={list}
+                                getRowKey={(row) => row.id}
+                                showRowNumbers={false}
+                                emptyMessage="Tidak ada server yang cocok dengan penyaring ini."
+                                columns={[
+                                    {
+                                        id: 'name',
+                                        header: 'Server',
+                                        minWidth: 240,
+                                        cell: (row) => {
+                                            return (
+                                                <div className="whitespace-normal">
                                                     <Link
                                                         href={`/situs/${row.id}`}
-                                                        aria-label={`Rincian ${row.name}`}
-                                                        title="Rincian"
+                                                        className="font-medium hover:underline hover:underline-offset-4"
                                                     >
-                                                        <ChevronRight />
+                                                        {row.name}
                                                     </Link>
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })}
-                            </TableBody>
-                        </Table>
-                    </div>
+                                                    {row.serverAddress ? (
+                                                        <span className="mt-0.5 flex items-center gap-1">
+                                                            <span className="font-mono text-xs text-muted-foreground">
+                                                                {
+                                                                    row.serverAddress
+                                                                }
+                                                            </span>
+                                                            <CopyButton
+                                                                text={
+                                                                    row.serverAddress
+                                                                }
+                                                                label="Salin alamat server"
+                                                                iconOnly
+                                                            />
+                                                        </span>
+                                                    ) : (
+                                                        <Link
+                                                            href={`/situs/${row.id}#setelan`}
+                                                            className="mt-0.5 block text-xs text-warning hover:underline"
+                                                        >
+                                                            Alamat server belum
+                                                            dicatat
+                                                        </Link>
+                                                    )}
+                                                    {row.appUrl && (
+                                                        <a
+                                                            href={row.appUrl}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="mt-0.5 block font-mono text-xs break-all text-muted-foreground hover:underline"
+                                                        >
+                                                            {row.appUrl.replace(
+                                                                /^https?:\/\//,
+                                                                '',
+                                                            )}
+                                                        </a>
+                                                    )}
+                                                    {row.dns.state ===
+                                                        'outdated' && (
+                                                        <span className="mt-0.5 block text-xs text-warning">
+                                                            DNS belum mengikuti
+                                                            alamat server
+                                                        </span>
+                                                    )}
+                                                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                                                        {row.tenant} ·{' '}
+                                                        {row.environment ? (
+                                                            <Link
+                                                                href={`/lingkungan/${row.environment.id}`}
+                                                                className="underline-offset-4 hover:underline"
+                                                            >
+                                                                lingkungan{' '}
+                                                                {
+                                                                    row
+                                                                        .environment
+                                                                        .name
+                                                                }
+                                                            </Link>
+                                                        ) : (
+                                                            'tanpa lingkungan'
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            );
+                                        },
+                                    },
+                                    {
+                                        id: 'progress',
+                                        header: 'Keadaan',
+                                        minWidth: 180,
+                                        cell: (row) => {
+                                            const detail = progressDetail(
+                                                row.progress,
+                                            );
+
+                                            return (
+                                                <div className="whitespace-normal">
+                                                    <InstallStateBadge
+                                                        state={
+                                                            row.progress.state
+                                                        }
+                                                    />
+                                                    {detail && (
+                                                        <p className="mt-1 text-xs text-muted-foreground">
+                                                            {detail}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            );
+                                        },
+                                    },
+                                    {
+                                        id: 'release',
+                                        header: 'Rilis',
+                                        minWidth: 120,
+                                        cell: (row) => {
+                                            const newer = newerRelease(
+                                                row.reportedRelease,
+                                                row.newestRelease,
+                                            );
+
+                                            return (
+                                                <div className="whitespace-normal">
+                                                    <span className="font-mono text-sm">
+                                                        {row.reportedRelease ??
+                                                            '—'}
+                                                    </span>
+                                                    {newer && (
+                                                        <span className="mt-1 flex items-center gap-1 text-xs text-warning">
+                                                            <ArrowUpCircle className="size-3.5" />
+                                                            {newer} tersedia
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            );
+                                        },
+                                    },
+                                    {
+                                        id: 'license',
+                                        header: 'Lisensi',
+                                        minWidth: 150,
+                                        cell: (row) => {
+                                            return (
+                                                <div className="whitespace-normal">
+                                                    <LicenseCell row={row} />
+                                                </div>
+                                            );
+                                        },
+                                    },
+                                    {
+                                        id: 'lastSeen',
+                                        header: 'Terakhir terlihat',
+                                        minWidth: 160,
+                                        cell: (row) => {
+                                            const seen = relativeTime(
+                                                row.lastSeenIso,
+                                            );
+
+                                            return (
+                                                <div className="whitespace-normal">
+                                                    {seen ? (
+                                                        <span
+                                                            title={
+                                                                row.lastSeenAt ??
+                                                                undefined
+                                                            }
+                                                        >
+                                                            {seen}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-muted-foreground">
+                                                            Belum pernah
+                                                        </span>
+                                                    )}
+                                                    {row.lastSeenIp && (
+                                                        <span className="block font-mono text-xs text-muted-foreground">
+                                                            dari{' '}
+                                                            {row.lastSeenIp}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            );
+                                        },
+                                    },
+                                    {
+                                        id: 'details',
+                                        header: 'Rincian',
+                                        minWidth: 60,
+                                        cell: (row) => {
+                                            return (
+                                                <div className="whitespace-normal">
+                                                    <Button
+                                                        asChild
+                                                        size="icon-sm"
+                                                        variant="ghost"
+                                                    >
+                                                        <Link
+                                                            href={`/situs/${row.id}`}
+                                                            aria-label={`Rincian ${row.name}`}
+                                                            title="Rincian"
+                                                        >
+                                                            <ChevronRight />
+                                                        </Link>
+                                                    </Button>
+                                                </div>
+                                            );
+                                        },
+                                    },
+                                ]}
+                            />
+                        </div>
+                        <CardFooter className="text-xs text-muted-foreground">
+                            Laporan diperbarui otomatis setiap 30 detik.
+                        </CardFooter>
+                    </Card>
                 </>
             )}
         </Shell>

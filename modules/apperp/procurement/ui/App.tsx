@@ -1,12 +1,11 @@
-import { lazy, Suspense } from 'react';
-import { Card, CardContent } from '@apperp/ui/card';
+import { lazy } from 'react';
 import { PlaceholderPage } from './_shared/PlaceholderPage';
 
-export type PropsModul = {
+export type ModulePageProps = {
     view: string;
     segments: string[];
     permissions: string[];
-    konteks: {
+    context: {
         legal_entity_id: string | null;
         org_unit_id: string | null;
         user_id: string;
@@ -18,121 +17,135 @@ export type PropsModul = {
  * Menjaga ukuran bundle tetap terpisah dan efisien saat menu dibuka.
  */
 // Dashboard
-const RingkasanDashboardPage = lazy(
-    () => import('./dashboard/RingkasanDashboardPage'),
+const ProcurementOverviewPage = lazy(
+    () => import('./dashboard/ProcurementOverviewPage'),
 );
 
-// 10 Master Data (Sesuai Dokumentasi Aplikasi Procurement)
+// 10 Master Data
 const VendorPage = lazy(() => import('./master/VendorPage'));
-const PrakualifikasiPage = lazy(() => import('./master/PrakualifikasiPage'));
-const KualifikasiPage = lazy(() => import('./master/KualifikasiPage'));
-const HargaPerkiraanPage = lazy(() => import('./master/HargaPerkiraanPage'));
-const KategoriPengadaanPage = lazy(
-    () => import('./master/KategoriPengadaanPage'),
+const VendorPrequalificationPage = lazy(
+    () => import('./master/VendorPrequalificationPage'),
 );
-const JenisVendorPage = lazy(() => import('./master/JenisVendorPage'));
-const MetodePembayaranPage = lazy(
-    () => import('./master/MetodePembayaranPage'),
+const VendorQualificationPage = lazy(
+    () => import('./master/VendorQualificationPage'),
 );
-const TerminPembayaranPage = lazy(
-    () => import('./master/TerminPembayaranPage'),
+const OwnerEstimatePage = lazy(() => import('./master/OwnerEstimatePage'));
+const ProcurementCategoryPage = lazy(
+    () => import('./master/ProcurementCategoryPage'),
 );
-const ItemJasaPage = lazy(() => import('./master/ItemJasaPage'));
-const ItemSubkontPage = lazy(() => import('./master/ItemSubkontPage'));
+const VendorTypePage = lazy(() => import('./master/VendorTypePage'));
+const PaymentMethodPage = lazy(() => import('./master/PaymentMethodPage'));
+const PaymentTermPage = lazy(() => import('./master/PaymentTermPage'));
+const ServiceItemPage = lazy(() => import('./master/ServiceItemPage'));
+const SubcontractItemPage = lazy(() => import('./master/SubcontractItemPage'));
 
 // Manajemen Pengadaan (Transaksi)
-const PermintaanPembelianPage = lazy(
-    () => import('./transactions/PermintaanPembelianPage'),
+const PurchaseRequisitionPage = lazy(
+    () => import('./transactions/PurchaseRequisitionPage'),
 );
-const PermintaanPenawaranPage = lazy(
-    () => import('./transactions/PermintaanPenawaranPage'),
+const RequestForQuotationPage = lazy(
+    () => import('./transactions/RequestForQuotationPage'),
 );
-const PesananPembelianPage = lazy(
-    () => import('./transactions/PesananPembelianPage'),
+const PurchaseOrderPage = lazy(
+    () => import('./transactions/PurchaseOrderPage'),
 );
-const PenerimaanBarangPage = lazy(
-    () => import('./transactions/PenerimaanBarangPage'),
+const ProductReceiptPage = lazy(
+    () => import('./transactions/ProductReceiptPage'),
 );
 
 // Laporan
-const LaporanPengadaanPage = lazy(
-    () => import('./laporan/LaporanPengadaanPage'),
+const ProcurementReportPage = lazy(
+    () => import('./reports/ProcurementReportPage'),
 );
 
-function LoadingState() {
-    return (
-        <div className="p-6">
-            <Card>
-                <CardContent className="py-12 text-center">
-                    <p className="text-muted-foreground text-sm">
-                        Memuat antarmuka pengadaan...
-                    </p>
-                </CardContent>
-            </Card>
-        </div>
-    );
-}
+export default function App({
+    view,
+    segments,
+    permissions,
+    context,
+}: ModulePageProps) {
+    switch (view) {
+        // Dashboard
+        case 'ringkasan-pengadaan':
+            return <ProcurementOverviewPage />;
 
-export default function App({ view, segments, permissions }: PropsModul) {
-    const pageProps = { view, segments, permissions };
+        // 10 Master Data
+        case 'vendor':
+            return (
+                <VendorPage
+                    view={view}
+                    segments={segments}
+                    permissions={permissions}
+                    context={context}
+                />
+            );
+        case 'prakualifikasi':
+            return (
+                <VendorPrequalificationPage
+                    view={view}
+                    segments={segments}
+                    permissions={permissions}
+                    context={context}
+                />
+            );
+        case 'kualifikasi':
+            return (
+                <VendorQualificationPage
+                    view={view}
+                    segments={segments}
+                    permissions={permissions}
+                    context={context}
+                />
+            );
+        case 'harga-perkiraan':
+            return (
+                <OwnerEstimatePage
+                    view={view}
+                    segments={segments}
+                    permissions={permissions}
+                    context={context}
+                />
+            );
+        case 'kategori-pengadaan':
+            return (
+                <ProcurementCategoryPage
+                    view={view}
+                    segments={segments}
+                    permissions={permissions}
+                    context={context}
+                />
+            );
+        case 'jenis-vendor':
+            return <VendorTypePage />;
+        case 'metode-pembayaran':
+            return <PaymentMethodPage />;
+        case 'termin-pembayaran':
+            return <PaymentTermPage />;
+        case 'item-jasa':
+            return <ServiceItemPage />;
+        case 'item-subkont':
+            return <SubcontractItemPage />;
 
-    return (
-        <Suspense fallback={<LoadingState />}>
-            {(() => {
-                switch (view) {
-                    // Dashboard
-                    case 'ringkasan-pengadaan':
-                        return <RingkasanDashboardPage {...pageProps} />;
+        // Manajemen Pengadaan (Transaksi)
+        case 'permintaan-pembelian':
+            return <PurchaseRequisitionPage />;
+        case 'permintaan-penawaran':
+            return <RequestForQuotationPage />;
+        case 'pesanan-pembelian':
+            return <PurchaseOrderPage />;
+        case 'penerimaan-barang':
+            return <ProductReceiptPage />;
 
-                    // 10 Master Data
-                    case 'vendor':
-                        return <VendorPage {...pageProps} />;
-                    case 'prakualifikasi':
-                        return <PrakualifikasiPage {...pageProps} />;
-                    case 'kualifikasi':
-                        return <KualifikasiPage {...pageProps} />;
-                    case 'harga-perkiraan':
-                        return <HargaPerkiraanPage {...pageProps} />;
-                    case 'kategori-pengadaan':
-                        return <KategoriPengadaanPage {...pageProps} />;
-                    case 'jenis-vendor':
-                        return <JenisVendorPage {...pageProps} />;
-                    case 'metode-pembayaran':
-                        return <MetodePembayaranPage {...pageProps} />;
-                    case 'termin-pembayaran':
-                        return <TerminPembayaranPage {...pageProps} />;
-                    case 'item-jasa':
-                        return <ItemJasaPage {...pageProps} />;
-                    case 'item-subkont':
-                        return <ItemSubkontPage {...pageProps} />;
+        // Laporan
+        case 'laporan-pengadaan':
+            return <ProcurementReportPage />;
 
-                    // Manajemen Pengadaan (Transaksi)
-                    case 'permintaan-pembelian':
-                        return <PermintaanPembelianPage {...pageProps} />;
-                    case 'permintaan-penawaran':
-                        return <PermintaanPenawaranPage {...pageProps} />;
-                    case 'pesanan-pembelian':
-                        return <PesananPembelianPage {...pageProps} />;
-                    case 'penerimaan-barang':
-                        return <PenerimaanBarangPage {...pageProps} />;
-
-                    // Laporan
-                    case 'laporan-pengadaan':
-                        return <LaporanPengadaanPage {...pageProps} />;
-
-                    default:
-                        return (
-                            <PlaceholderPage
-                                title="Pengadaan"
-                                description="Modul Pengadaan Barang dan Jasa"
-                                category="Umum"
-                                view={view}
-                                segments={segments}
-                                permissions={permissions}
-                            />
-                        );
-                }
-            })()}
-        </Suspense>
-    );
+        default:
+            return (
+                <PlaceholderPage
+                    title="Pengadaan"
+                    description="Modul Pengadaan Barang dan Jasa"
+                />
+            );
+    }
 }

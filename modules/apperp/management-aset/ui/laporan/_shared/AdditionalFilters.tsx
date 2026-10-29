@@ -1,11 +1,22 @@
-import { Plus, X } from 'lucide-react';
+import { Plus, RotateCcw, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Button } from '@apperp/ui/button';
+import {
+    CollapsibleSection,
+    CollapsibleSectionGroup,
+} from '@apperp/ui/collapsible-section';
 import { Field, FieldDescription } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { MultiSelect } from '@apperp/ui/multi-select';
 import { Select } from '@apperp/ui/select';
+import type {
+    ReportFilterDefinition,
+    ReportFilterProfile,
+    ReportFilterSection,
+} from './reportFilterProfiles';
 import { MasterFilter } from './ReportFilters';
+import { reservedReportFields, showReportControl } from './reportFilterState';
 import { additionalKey, filled, getReportDataItems } from './reportOptions';
 import type {
     DataItemField,
@@ -50,7 +61,7 @@ function ExpressionInput({
     };
 
     return (
-        <Field className="w-full sm:w-56">
+        <Field className="w-full">
             <Input
                 label={field.caption}
                 value={draft}
@@ -98,7 +109,7 @@ function FieldControl({
             field.type === 'boolean' ? BOOLEAN_ITEMS : (field.options ?? []);
 
         return (
-            <Field className="w-full sm:w-56">
+            <Field className="w-full">
                 <MultiSelect
                     label={field.caption}
                     items={items}
@@ -124,9 +135,17 @@ function FieldControl({
 function DataItemFilters({
     item,
     state,
+    excludedFields,
+    section,
+    renderControl,
+    catalogError,
 }: {
     item: ReportDataItem;
     state: AdditionalFilterState;
+    excludedFields: Set<string>;
+    section: ReportFilterSection;
+    renderControl: (filter: ReportFilterDefinition) => ReactNode;
+    catalogError: string;
 }) {
     const [added, setAdded] = useState<string[]>([]);
     const byKey = useMemo(
@@ -135,7 +154,7 @@ function DataItemFilters({
     );
     // Kolom bawaan laporan, kolom yang sudah terisi (opsi terakhir, preset), lalu kolom yang baru ditambahkan.
     const shown = useMemo(() => {
-        const keys = [...item.default_fields];
+        const keys = [...(section.defaultFields ?? item.default_fields)];
 
         for (const field of item.fields) {
             if (filled(state.filters[additionalKey(item.key, field.key)])) {
@@ -145,11 +164,34 @@ function DataItemFilters({
 
         keys.push(...added);
 
-        return [...new Set(keys)].filter((key) => byKey.has(key));
-    }, [item, state.filters, added, byKey]);
+        return [...new Set(keys)].filter(
+            (key) =>
+                byKey.has(key) &&
+                (!excludedFields.has(key) ||
+                    filled(state.filters[additionalKey(item.key, key)])),
+        );
+    }, [
+        item,
+        section.defaultFields,
+        state.filters,
+        added,
+        byKey,
+        excludedFields,
+    ]);
     const remaining = item.fields
-        .filter((field) => !shown.includes(field.key))
+        .filter(
+            (field) =>
+                !shown.includes(field.key) && !excludedFields.has(field.key),
+        )
         .map((field) => ({ value: field.key, label: field.caption }));
+    const controls = section.filters.filter((filter) =>
+        showReportControl(filter, state.filters, section),
+    );
+    const hasActiveFilter =
+        section.filters.some((filter) => filled(state.filters[filter.key])) ||
+        item.fields.some((field) =>
+            filled(state.filters[additionalKey(item.key, field.key)]),
+        );
 
     const remove = (key: string) => {
         setAdded((prev) => prev.filter((entry) => entry !== key));
@@ -157,29 +199,60 @@ function DataItemFilters({
     };
 
     return (
-        <div className="flex flex-col gap-2">
-            <p className="text-sm font-medium">Filter: {item.caption}</p>
-            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start">
+        <CollapsibleSection
+            value={section.key}
+            title={`Filter: ${section.caption}`}
+        >
+            <div className="flex flex-col gap-3">
+                {catalogError && section.dataItem && (
+                    <FieldDescription role="alert">
+                        {catalogError}
+                    </FieldDescription>
+                )}
+                {hasActiveFilter && (
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="self-start"
+                        onClick={() => {
+                            section.filters.forEach((filter) =>
+                                state.update(filter.key, ''),
+                            );
+                            item.fields.forEach((field) =>
+                                state.update(
+                                    additionalKey(item.key, field.key),
+                                    '',
+                                ),
+                            );
+                        }}
+                    >
+                        <RotateCcw aria-hidden="true" />
+                        Bersihkan filter
+                    </Button>
+                )}
                 {shown.map((key) => {
                     const field = byKey.get(key)!;
                     const isDefault = item.default_fields.includes(key);
 
                     return (
                         <div key={key} className="flex items-start gap-1">
-                            <FieldControl
-                                field={field}
-                                value={
-                                    state.filters[
-                                        additionalKey(item.key, field.key)
-                                    ]
-                                }
-                                onChange={(next) =>
-                                    state.update(
-                                        additionalKey(item.key, field.key),
-                                        next,
-                                    )
-                                }
-                            />
+                            <div className="min-w-0 flex-1">
+                                <FieldControl
+                                    field={field}
+                                    value={
+                                        state.filters[
+                                            additionalKey(item.key, field.key)
+                                        ]
+                                    }
+                                    onChange={(next) =>
+                                        state.update(
+                                            additionalKey(item.key, field.key),
+                                            next,
+                                        )
+                                    }
+                                />
+                            </div>
                             {!isDefault && (
                                 <Button
                                     type="button"
@@ -195,11 +268,12 @@ function DataItemFilters({
                         </div>
                     );
                 })}
+                {controls.map(renderControl)}
                 {remaining.length > 0 && (
-                    <div className="flex w-full items-center gap-1 sm:w-56">
+                    <div className="flex w-full items-center gap-1">
                         <Plus className="text-muted-foreground size-4 shrink-0" />
                         <Select
-                            label="Tambah filter"
+                            label="Filter..."
                             items={remaining}
                             value={null}
                             onValueChange={(next) =>
@@ -211,40 +285,90 @@ function DataItemFilters({
                     </div>
                 )}
             </div>
-        </div>
+        </CollapsibleSection>
     );
 }
 
 /**
- * Filter tambahan pengguna pada kolom tabel data item laporan (K-30), padanan "+ Filter" di request page
- * Business Central. Setiap data item — misalnya dokumen dan barisnya — punya bagiannya sendiri. Kolom
- * bawaan dari laporan langsung tampil; kolom lain ditambahkan pengguna. Laporan tanpa data item tidak
- * menampilkan apa pun.
+ * Filter per data item (K-30), mengikuti request page Business Central. Setiap bagian punya kolom
+ * bawaan, tindakan untuk membersihkan filter, dan pemilih Filter... untuk kolom lainnya.
  */
-export function AdditionalFilters({ state }: { state: AdditionalFilterState }) {
-    const [items, setItems] = useState<ReportDataItem[]>([]);
+export function AdditionalFilters({
+    state,
+    profile,
+    renderControl,
+}: {
+    state: AdditionalFilterState;
+    profile: ReportFilterProfile;
+    renderControl: (filter: ReportFilterDefinition) => ReactNode;
+}) {
+    const [catalog, setCatalog] = useState<{
+        reportCode: string;
+        items: ReportDataItem[];
+        error: string;
+    } | null>(null);
+    const items = catalog?.reportCode === state.reportCode ? catalog.items : [];
+    const catalogError =
+        catalog?.reportCode === state.reportCode ? catalog.error : '';
 
     useEffect(() => {
         let cancelled = false;
 
         getReportDataItems(state.reportCode)
-            .then((next) => !cancelled && setItems(next))
-            .catch(() => undefined);
+            .then(
+                (next) =>
+                    !cancelled &&
+                    setCatalog({
+                        reportCode: state.reportCode,
+                        items: next,
+                        error: '',
+                    }),
+            )
+            .catch(
+                () =>
+                    !cancelled &&
+                    setCatalog({
+                        reportCode: state.reportCode,
+                        items: [],
+                        error: 'Daftar filter tambahan tidak dapat dimuat. Coba buka kembali laporan.',
+                    }),
+            );
 
         return () => {
             cancelled = true;
         };
     }, [state.reportCode]);
 
-    if (items.length === 0) {
+    if (profile.sections.length === 0) {
         return null;
     }
 
     return (
-        <div className="flex flex-col gap-3 border-t pt-3">
-            {items.map((item) => (
-                <DataItemFilters key={item.key} item={item} state={state} />
+        <CollapsibleSectionGroup
+            defaultValue={profile.sections.map((section) => section.key)}
+        >
+            {profile.sections.map((section) => (
+                <DataItemFilters
+                    key={section.key}
+                    item={
+                        items.find((item) => item.key === section.dataItem) ?? {
+                            key: section.dataItem ?? section.key,
+                            caption: section.caption,
+                            fields: [],
+                            default_fields: [],
+                        }
+                    }
+                    state={state}
+                    section={section}
+                    excludedFields={reservedReportFields(
+                        profile,
+                        state.filters,
+                        section.dataItem ?? '',
+                    )}
+                    renderControl={renderControl}
+                    catalogError={catalogError}
+                />
             ))}
-        </div>
+        </CollapsibleSectionGroup>
     );
 }

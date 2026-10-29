@@ -7,6 +7,7 @@ use App\Platform\Modules\Contracts\DataClass;
 use App\Platform\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
@@ -17,7 +18,7 @@ use Illuminate\Support\Carbon;
  * satuan untuk tampilan, sedangkan `unit_id` yang menunjuk satuan milik Core.
  *
  * `line_number`, `min_value`, dan `max_value` di-cast desimal, jadi Eloquent memulangkannya
- * sebagai string dan bukan float. Tabelnya tanpa soft delete, jadi tanpa `deleted_at`.
+ * sebagai string dan bukan float. Baris yang dilepas diarsipkan agar referensi checklist lama tetap ada.
  *
  * @property string $id
  * @property string $tenant_id
@@ -41,6 +42,9 @@ class MaintenanceChecklistTemplateLine extends Model
 {
     use BelongsToTenant;
     use HasUlids;
+    use SoftDeletes;
+
+    protected $hidden = ['deleted_at'];
 
     /** @var array<string, DataClass> */
     public const COLUMN_CLASSIFICATION = [

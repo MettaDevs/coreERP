@@ -33,6 +33,9 @@ export type DraftSectionKey =
 type DraftField = FieldConfig & { persist?: boolean };
 type Row = { key: string; values: Record<string, FieldValue> };
 export type DraftMasterDetailsValue = Partial<Record<DraftSectionKey, Row[]>>;
+export type MasterDetailsPayload = Partial<
+    Record<DraftSectionKey, Record<string, unknown>>
+>;
 type Section = {
     key: DraftSectionKey;
     title: string;

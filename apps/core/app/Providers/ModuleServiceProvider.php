@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Platform\Modules\Support\CoreMigrateCommand;
 use App\Platform\Modules\Support\CoreServices;
 use App\Platform\Modules\Support\ModuleRegistry;
 use App\Platform\Modules\Support\ModulesBeingMoved;
+use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Database\Console\Migrations\MigrateCommand;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -28,6 +32,11 @@ final class ModuleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->extend(MigrateCommand::class, static fn (MigrateCommand $command, Application $app): CoreMigrateCommand => new CoreMigrateCommand(
+            $app->make('migrator'),
+            $app->make(Dispatcher::class),
+        ));
+
         // Permukaan Core yang boleh dipanggil module. Daftarnya ada di CoreServices, dan
         // menambah barisnya adalah keputusan arsitektur, bukan kenyamanan.
         CoreServices::register($this->app);

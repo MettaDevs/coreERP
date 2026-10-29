@@ -10,29 +10,50 @@ use ControlPlane\Models\Site;
 use ControlPlane\Models\Tenant;
 use ControlPlane\Sites\InstallProgress;
 use ControlPlane\Sites\SiteOperations;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Pagination\Cursor;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 
 /**
  * Semua lingkungan yang dikenal sistem, satu tabel.
  *
- * Belum ada penyaring maupun halaman. Keduanya menunggu jumlahnya cukup banyak untuk membuat satu
- * layar tidak terbaca lagi — menambahkannya sekarang berarti menebak bentuk penyaring yang belum
- * ada seorang pun yang membutuhkannya.
+ * Daftar dibaca dalam batch terbatas, bukan seluruh registry pada setiap pembukaan halaman.
  *
  * Produksi di server klien membawa keadaan pemasangannya (`serverClient`), dihitung `InstallProgress`
  * yang sama dengan panel di halaman rinciannya — satu kata di dua layar, bukan dua tafsiran.
  */
 class Index extends Controller
 {
-    public function __invoke(SiteOperations $operations): InertiaResponse
+    public function __invoke(Request $request, SiteOperations $operations): InertiaResponse|JsonResponse
     {
-        $rows = Environment::query()
+        if (! $request->wantsJson()) {
+            return Inertia::render('environments/index', [
+                'hasTenants' => Tenant::query()->exists(),
+                'kinds' => Environment::KINDS,
+            ]);
+        }
+
+        $input = $request->validate(['search' => ['nullable', 'string', 'max:150'], 'cursor' => ['nullable', 'string', 'max:2048']]);
+        $cursor = isset($input['cursor']) ? Cursor::fromEncoded($input['cursor']) : null;
+        if (isset($input['cursor']) && ($cursor === null
+            || ! is_string($cursor->toArray()['id'] ?? null)
+            || ! is_string($cursor->toArray()['tenant_id'] ?? null))) {
+            throw ValidationException::withMessages(['cursor' => 'Posisi daftar tidak valid. Muat ulang daftar.']);
+        }
+
+        $query = Environment::query()
             ->with('tenant:id,name,slug')
-            ->whereNull('deleted_at')
-            ->orderBy('tenant_id')
-            ->orderByDesc('created_at')
-            ->get();
+            ->whereNull('deleted_at');
+        if (($search = trim($input['search'] ?? '')) !== '') {
+            $pattern = '%'.mb_strtolower($search).'%';
+            $query->where(fn ($query) => $query->whereRaw('LOWER(name) LIKE ?', [$pattern])
+                ->orWhereHas('tenant', fn ($query) => $query->whereRaw('LOWER(name) LIKE ?', [$pattern])));
+        }
+        $batch = $query->orderBy('tenant_id')->orderByDesc('id')->cursorPaginate(50, ['*'], 'cursor', $cursor);
+        $rows = $batch->getCollection();
 
         $onClientServer = $rows->filter(fn (Environment $e): bool => $e->runsOnClientServer());
         $sites = Site::query()
@@ -40,9 +61,7 @@ class Index extends Controller
             ->get()
             ->keyBy('environment_id');
 
-        foreach ($sites as $site) {
-            $operations->expireStale($site);
-        }
+        $operations->expireStaleForSites($sites);
 
         $progress = InstallProgress::forSites($sites->all());
 
@@ -62,10 +81,9 @@ class Index extends Controller
             })
             ->all();
 
-        return Inertia::render('environments/index', [
-            'environments' => $environments,
-            'tenant' => Tenant::options(),
-            'kinds' => Environment::KINDS,
+        return response()->json([
+            'data' => $environments,
+            'next_cursor' => $batch->nextCursor()?->encode(),
         ]);
     }
 }

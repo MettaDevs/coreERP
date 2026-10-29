@@ -273,10 +273,13 @@ screen, so ship it with the parity test.
   server syntax errors (`filters.<column>`, `time_range.range`) show under the field, which is why
   `CoreApiError` carries `field`.
 - Widget text is plain text: never render it as HTML or Markdown.
-- The repo has no JavaScript unit-test runner. Prove screens with types, lint, build, and the rebuilt
-  runtime (`D:\Kerja\erp-dev\start.ps1 -Build`); a preview with a throwaway database is acceptable when the
-  shared runtime belongs to another session. The browser pane may not paint reliably: a headless Chrome over
-  CDP was used for interaction and screenshots, and the server page test
+- The repo has no JavaScript unit-test runner. Prove screens with types and lint; run a frontend build when
+  dependencies, build configuration, or production output changed. With HotReload active, source changes
+  appear in the existing runtime without rebuilding containers or reloading the page.
+  If a user/developer reports stale HMR, inspect the watcher and source mount, then use the smallest needed
+  restart/build. A preview with a throwaway database is acceptable when the shared runtime belongs to another
+  session. The browser pane may not paint reliably: a headless Chrome over CDP was used for interaction and
+  screenshots, and the server page test
   (`WalkingSkeletonTest::test_page_offers_the_readable_datasets_and_ignores_the_query_string`) covers the props.
 
 ## Outside CoreERP (phase 2, plan only — no code yet)

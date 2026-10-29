@@ -1,11 +1,12 @@
-import { toast } from 'sonner';
+import { createSaveFeedback } from '@apperp/ui/form-feedback';
+import type { FormFeedback } from '@apperp/ui/form-feedback';
 
 /**
  * Klien JSON Shell ke API Core di bawah `/api/v1`, memakai sesi yang sama dengan halaman
  * Inertia. Permintaan yang mengubah data membawa token CSRF dari cookie `XSRF-TOKEN`,
  * seperti yang dilakukan axios. Kegagalan menjadi `CoreApiError` dengan pesan pertama
- * dari validasi Laravel, atau pesan `{ error: { code, message } }`, supaya toast dapat
- * menampilkannya apa adanya.
+ * dari validasi Laravel, atau pesan `{ error: { code, message } }`. Ringkasan form
+ * memakai status, kode, dan seluruh error field melalui `saveErrorFeedback`.
  *
  * Endpoint yang mengubah record meminta versi yang dibuka pengguna (field `version` atau
  * header `If-Match`). Versi basi dijawab 409 berkode `stale_version`.
@@ -163,27 +164,28 @@ export const apiJson = async <T>(
 ): Promise<T> => (await apiRequest(path, init)).json() as Promise<T>;
 
 export function errorText(caught: unknown, fallback: string): string {
-    return caught instanceof Error && caught.message
-        ? caught.message
-        : fallback;
-}
-
-/**
- * Toast untuk kegagalan menyimpan. Versi basi mendapat tombol muat ulang penuh: isian form
- * harus kembali ke data terbaru supaya pengguna melihat perubahan orang lain lebih dulu.
- */
-export function toastSaveError(caught: unknown, fallback: string): void {
-    if (caught instanceof CoreApiError && caught.code === 'stale_version') {
-        toast.error(caught.message, {
-            duration: Infinity,
-            action: {
-                label: 'Muat ulang',
-                onClick: () => window.location.reload(),
-            },
-        });
-
-        return;
+    if (caught instanceof CoreApiError) {
+        return caught.status >= 500
+            ? `${fallback} Terjadi gangguan sistem. Hubungi pengelola aplikasi.`
+            : caught.message || fallback;
     }
 
-    toast.error(errorText(caught, fallback));
+    return fallback;
+}
+
+export function saveErrorFeedback(
+    caught: unknown,
+    operation: string,
+): FormFeedback {
+    return createSaveFeedback({
+        operation,
+        message: caught instanceof CoreApiError ? caught.message : operation,
+        ...(caught instanceof CoreApiError
+            ? {
+                  status: caught.status,
+                  code: caught.code,
+                  errors: caught.errors,
+              }
+            : {}),
+    });
 }

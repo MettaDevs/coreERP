@@ -54,19 +54,41 @@ class SiteScreensTest extends SiteTestCase
         $new = $this->site(['tenant_id' => $tenant, 'name' => 'PT Klinik Baru — Produksi', 'environment_id' => $environment->id, 'edition' => Site::SINGLE_IMAGE_EDITION]);
         $legacy = $this->enrolledSite(0, ['name' => 'Server Lama', 'reported_release' => '0.3.0', 'last_seen_at' => now()]);
 
-        $this->actingAs($this->operator())->get('/situs')
+        $this->actingAs($this->operator())->getJson('/situs')
             ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->component('sites/index')
-                ->missing('tenants')
-                ->has('sites', 2)
-                ->where('sites.0.id', $new->id)
-                ->where('sites.0.environment.id', $environment->id)
-                ->where('sites.0.progress.state', 'no_command')
-                ->where('sites.1.id', $legacy->id)
-                ->where('sites.1.environment', null)
-                ->where('sites.1.progress.state', 'ready')
-                ->where('sites.1.progress.reportedRelease', '0.3.0'));
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.id', $new->id)
+            ->assertJsonPath('data.0.environment.id', $environment->id)
+            ->assertJsonPath('data.0.progress.state', 'no_command')
+            ->assertJsonPath('data.1.id', $legacy->id)
+            ->assertJsonPath('data.1.environment', null)
+            ->assertJsonPath('data.1.progress.state', 'ready')
+            ->assertJsonPath('data.1.progress.reportedRelease', '0.3.0');
+    }
+
+    public function test_site_batches_keep_summary_counts_and_filters_beyond_the_first_batch(): void
+    {
+        $operator = $this->operator();
+        for ($index = 0; $index < 51; $index++) {
+            $this->site(['name' => 'Batch server']);
+        }
+        $late = $this->enrolledSite(0, ['name' => 'ZZ Late ready', 'last_seen_at' => now()]);
+        $revoked = $this->site(['name' => 'Revoked']);
+        $revoked->forceFill(['revoked_at' => now()])->save();
+
+        $first = $this->actingAs($operator)->getJson('/situs')->assertOk()
+            ->assertJsonCount(50, 'data')->assertJsonPath('counts.all', 52)
+            ->assertJsonPath('counts.waiting', 51)->assertJsonPath('counts.running', 1)->assertJsonPath('counts.revoked', 1);
+        $cursor = $first->json('next_cursor');
+        $this->assertIsString($cursor);
+        $second = $this->getJson('/situs?'.http_build_query(['cursor' => $cursor]))
+            ->assertOk()->assertJsonCount(2, 'data')->assertJsonPath('next_cursor', null)->assertJsonPath('counts.all', 52);
+        $this->assertCount(52, array_unique([...array_column($first->json('data'), 'id'), ...array_column($second->json('data'), 'id')]));
+        $this->getJson('/situs?filter=running')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $late->id);
+        $this->getJson('/situs?filter=revoked')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $revoked->id);
+        $this->getJson('/situs?search=Late')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $late->id);
+        $this->getJson('/situs?filter=unknown')->assertUnprocessable()->assertJsonValidationErrors('filter');
+        $this->getJson('/situs?cursor=invalid')->assertUnprocessable()->assertJsonValidationErrors('cursor');
     }
 
     /**
@@ -88,16 +110,15 @@ class SiteScreensTest extends SiteTestCase
         ]);
         $site->forceFill(['last_seen_ip' => '36.72.1.9', 'license_issued_at' => now(), 'license_valid_until' => now()->addDays(5)->toDateString()])->save();
 
-        $this->actingAs($this->operator())->get('/situs')
-            ->assertInertia(fn ($page) => $page
-                ->where('sites.0.serverAddress', '103.122.2.72')
-                ->where('sites.0.lastSeenIp', '36.72.1.9')
-                ->where('sites.0.reportedRelease', '0.3.0')
+        $this->actingAs($this->operator())->getJson('/situs')
+            ->assertJsonPath('data.0.serverAddress', '103.122.2.72')
+            ->assertJsonPath('data.0.lastSeenIp', '36.72.1.9')
+            ->assertJsonPath('data.0.reportedRelease', '0.3.0')
                 // Dibandingkan sebagai angka dan per edisi: `0.10.0` di atas `0.3.0`, dan `9.9.9` milik edisi lain.
-                ->where('sites.0.newestRelease', '0.10.0')
-                ->where('sites.0.licenseValidUntil', now()->addDays(5)->toDateString())
-                ->where('sites.0.licenseSuspended', false)
-                ->where('sites.0.lastSeenIso', fn (string $iso): bool => str_contains($iso, 'T')));
+            ->assertJsonPath('data.0.newestRelease', '0.10.0')
+            ->assertJsonPath('data.0.licenseValidUntil', now()->addDays(5)->toDateString())
+            ->assertJsonPath('data.0.licenseSuspended', false)
+            ->assertJsonPath('data.0.lastSeenIso', fn (string $iso): bool => str_contains($iso, 'T'));
     }
 
     /**
@@ -119,11 +140,10 @@ class SiteScreensTest extends SiteTestCase
             'created_at' => now(), 'updated_at' => now(),
         ]);
 
-        $this->actingAs($this->operator())->get('/situs')
-            ->assertInertia(fn ($page) => $page
-                ->has('candidates', 1)
-                ->where('candidates.0.id', $free->id)
-                ->where('candidates.0.tenant', 'PT Belum Punya Server'));
+        $this->actingAs($this->operator())->getJson('/situs?lookup=candidates')
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $free->id)
+            ->assertJsonPath('data.0.tenant', 'PT Belum Punya Server');
     }
 
     /**
@@ -167,7 +187,8 @@ class SiteScreensTest extends SiteTestCase
         $site = $this->enrolledSite();
         $operator = $this->operator();
 
-        $this->actingAs($operator)->get('/situs')->assertOk()->assertInertia(fn ($page) => $page->component('sites/index')->has('sites', 1));
+        $this->actingAs($operator)->get('/situs')->assertOk()->assertInertia(fn ($page) => $page->component('sites/index')->missing('sites')->where('hasCandidates', false));
+        $this->getJson('/situs')->assertOk()->assertJsonCount(1, 'data');
         $this->actingAs($operator)->get("/situs/{$site->id}")->assertOk()->assertInertia(fn ($page) => $page->component('sites/show')->where('site.id', $site->id));
     }
 

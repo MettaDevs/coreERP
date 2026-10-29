@@ -3,17 +3,19 @@ import type { SetStateAction } from 'react';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
 
-import { DialogToolbar } from '@apperp/ui/dialog';
 import {
     Field,
     FieldDescription,
     FieldError,
     FieldLabel,
 } from '@apperp/ui/field';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
+import RecordLookup from '../_shared/RecordLookup';
 import { api, errorMessage } from '../api';
+import type { ApiValidationErrors } from '../api';
 import {
     monthsPerPeriod,
     serviceLifeMonths,
@@ -31,6 +33,24 @@ export type GroupBookRow = {
     depreciate: boolean;
     round_off_depreciation: string;
 };
+export function groupBookRowsPayload(rows: GroupBookRow[]) {
+    return rows.map((row) => ({
+        buku_id: row.buku_id,
+        depreciation_profile_id: row.depreciation_profile_id || null,
+        alternative_profile_id: row.alternative_profile_id || null,
+        useful_life_periods:
+            row.useful_life_periods === ''
+                ? null
+                : Number(row.useful_life_periods),
+        convention: row.convention || null,
+        depreciate: row.depreciate,
+        round_off_depreciation:
+            row.round_off_depreciation === ''
+                ? null
+                : Number(row.round_off_depreciation),
+    }));
+}
+
 type Row = GroupBookRow;
 type Draft = {
     rows: Row[];
@@ -42,14 +62,14 @@ type Props = { canEdit: boolean } & (
     | {
           draft: Draft;
           groupId?: never;
-          version?: never;
-          onVersionChange?: never;
+          onChange?: never;
+          validationErrors?: never;
       }
     | {
           draft?: never;
           groupId: string;
-          version: number;
-          onVersionChange: (version: number) => void;
+          onChange: (rows: GroupBookRow[]) => void;
+          validationErrors?: ApiValidationErrors;
       }
 );
 
@@ -90,8 +110,8 @@ const emptyRow = (bukuId: string): Row => ({
 export default function GroupBookMatrix({
     groupId,
     canEdit,
-    version,
-    onVersionChange,
+    onChange,
+    validationErrors,
     draft,
 }: Props) {
     const [storedRows, setStoredRows] = useState<Row[]>([]);
@@ -105,12 +125,14 @@ export default function GroupBookMatrix({
                 typeof update === 'function' ? update(rows) : update,
             );
         } else {
-            setStoredRows(update);
+            const next = typeof update === 'function' ? update(rows) : update;
+            setStoredRows(next);
+            onChange?.(next);
         }
     };
     const [error, setError] = useState('');
-    const [saving, setSaving] = useState(false);
-    const [saved, setSaved] = useState(false);
+    const fieldError = (field: string) =>
+        validationErrors?.[`details.books.${field}`]?.join(' ');
     const containerRef = useRef<HTMLDivElement>(null);
     const profiles = useMasterOptions(
         'profil-penyusutan',
@@ -208,68 +230,6 @@ export default function GroupBookMatrix({
                         ?.depreciation_profile_id),
         );
 
-    async function save() {
-        if (draft) {
-            return;
-        }
-
-        if (
-            rows.some(
-                (row) =>
-                    row.useful_life_periods !== '' &&
-                    (!Number.isInteger(Number(row.useful_life_periods)) ||
-                        Number(row.useful_life_periods) < 1 ||
-                        !profileFor(row)),
-            )
-        ) {
-            setError(
-                'Masa manfaat harus sesuai frekuensi metode yang dipakai. Periksa tahun dan bulan pada baris buku.',
-            );
-
-            return;
-        }
-
-        setSaving(true);
-        setError('');
-        setSaved(false);
-
-        try {
-            // Kiriman memuat daftar penuh; baris yang dihapus dari layar ikut diarsipkan.
-            const result = await api<{ version: number }>(
-                `/group-aset/${groupId}/buku-penyusutan`,
-                {
-                    method: 'PUT',
-                    body: JSON.stringify({
-                        version,
-                        rows: rows.map((row) => ({
-                            buku_id: row.buku_id,
-                            depreciation_profile_id:
-                                row.depreciation_profile_id || null,
-                            alternative_profile_id:
-                                row.alternative_profile_id || null,
-                            useful_life_periods:
-                                row.useful_life_periods === ''
-                                    ? null
-                                    : Number(row.useful_life_periods),
-                            convention: row.convention || null,
-                            depreciate: row.depreciate,
-                            round_off_depreciation:
-                                row.round_off_depreciation === ''
-                                    ? null
-                                    : Number(row.round_off_depreciation),
-                        })),
-                    }),
-                },
-            );
-            onVersionChange(result.version);
-            setSaved(true);
-        } catch (caught) {
-            setError(errorMessage(caught, 'Matriks belum dapat disimpan.'));
-        } finally {
-            setSaving(false);
-        }
-    }
-
     if (!staging && loadedGroupId !== groupId) {
         return error ? (
             <div role="alert" className="space-y-2">
@@ -302,17 +262,6 @@ export default function GroupBookMatrix({
             }}
             className={staging ? 'space-y-4' : 'space-y-4 border-t px-5 py-4'}
         >
-            {canEdit && !staging && (
-                <DialogToolbar className="px-0">
-                    <ActionButton
-                        action="save"
-                        type="button"
-                        disabled={saving}
-                        onClick={() => void save()}
-                        pending={saving}
-                    />
-                </DialogToolbar>
-            )}
             {!staging && (
                 <div>
                     <p className="font-semibold">Buku dan Metode Penyusutan</p>
@@ -360,35 +309,44 @@ export default function GroupBookMatrix({
                             )}
                         </div>
                         <FieldError>
-                            {draft?.errors?.[index]?.join(' ')}
+                            {draft?.errors?.[index]?.join(' ') ||
+                                Object.entries(validationErrors ?? {})
+                                    .filter(([field]) =>
+                                        field.startsWith(
+                                            `details.books.rows.${index}.`,
+                                        ),
+                                    )
+                                    .flatMap(([, messages]) => messages)
+                                    .join(' ')}
                         </FieldError>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                            <Field>
-                                <Select
-                                    {...profiles.selectProps}
+                        <FormGrid>
+                            <FormControl
+                                hint={
+                                    <>
+                                        {profiles.error ||
+                                            'Kosong berarti memakai metode utama pada Buku penyusutan. Server akan memeriksa masa manfaat, metode, frekuensi, dan tanggal berlakunya sebelum aset ditempatkan.'}
+                                    </>
+                                }
+                                data-error-field={`details.books.rows.${index}.depreciation_profile_id`}
+                                error={fieldError(
+                                    `rows.${index}.depreciation_profile_id`,
+                                )}
+                            >
+                                <RecordLookup
+                                    source={profiles}
                                     label="Metode utama untuk group ini"
-                                    items={profiles.options.map(optionLabel)}
-                                    value={
-                                        profiles.options
-                                            .filter(
-                                                (item) =>
-                                                    item.id ===
-                                                    row.depreciation_profile_id,
-                                            )
-                                            .map(optionLabel)[0]
-                                    }
+                                    items={profiles.options.map((item) => ({
+                                        value: item.id,
+                                        label: optionLabel(item),
+                                    }))}
+                                    value={row.depreciation_profile_id || ''}
                                     placeholder="Ikuti metode utama buku"
                                     searchPlaceholder="Cari metode penyusutan"
-                                    emptyMessage="Metode Penyusutan tidak ditemukan."
+
                                     ariaLabel="Pilih metode utama untuk group ini"
                                     portalContainer={containerRef}
                                     onValueChange={(item) => {
-                                        const id =
-                                            profiles.options.find(
-                                                (option) =>
-                                                    optionLabel(option) ===
-                                                    item,
-                                            )?.id ?? '';
+                                        const id = item ?? '';
                                         const nextProfile = profileFor({
                                             ...row,
                                             depreciation_profile_id: id,
@@ -411,49 +369,47 @@ export default function GroupBookMatrix({
                                         });
                                     }}
                                 />
-                                <FieldDescription>
-                                    {profiles.error ||
-                                        'Kosong berarti memakai metode utama pada Buku penyusutan. Server akan memeriksa masa manfaat, metode, frekuensi, dan tanggal berlakunya sebelum aset ditempatkan.'}
-                                </FieldDescription>
-                            </Field>
-                            <Field>
-                                <Select
-                                    {...profiles.selectProps}
+                            </FormControl>
+                            <FormControl
+                                hint={
+                                    <>
+                                        Dipakai begitu saldo menurun
+                                        menghasilkan angka lebih kecil daripada
+                                        garis lurus sisa umur, agar aset tetap
+                                        habis di akhir masa manfaat.
+                                    </>
+                                }
+                                data-error-field={`details.books.rows.${index}.alternative_profile_id`}
+                                error={fieldError(
+                                    `rows.${index}.alternative_profile_id`,
+                                )}
+                            >
+                                <RecordLookup
+                                    source={profiles}
                                     label="Metode pengganti (opsional)"
-                                    items={profiles.options.map(optionLabel)}
-                                    value={
-                                        profiles.options
-                                            .filter(
-                                                (item) =>
-                                                    item.id ===
-                                                    row.alternative_profile_id,
-                                            )
-                                            .map(optionLabel)[0]
-                                    }
+                                    items={profiles.options.map((item) => ({
+                                        value: item.id,
+                                        label: optionLabel(item),
+                                    }))}
+                                    value={row.alternative_profile_id || ''}
                                     placeholder="Tanpa pengganti"
                                     searchPlaceholder="Cari metode pengganti"
-                                    emptyMessage="Metode Penyusutan tidak ditemukan."
+
                                     ariaLabel="Pilih metode pengganti"
                                     portalContainer={containerRef}
                                     onValueChange={(item) =>
                                         patch(index, {
-                                            alternative_profile_id:
-                                                profiles.options.find(
-                                                    (option) =>
-                                                        optionLabel(option) ===
-                                                        item,
-                                                )?.id ?? '',
+                                            alternative_profile_id: item ?? '',
                                         })
                                     }
                                 />
-                                <FieldDescription>
-                                    Dipakai begitu saldo menurun menghasilkan
-                                    angka lebih kecil daripada garis lurus sisa
-                                    umur, agar aset tetap habis di akhir masa
-                                    manfaat.
-                                </FieldDescription>
-                            </Field>
-                            <div className="space-y-3">
+                            </FormControl>
+                            <FormControl
+                                data-error-field={`details.books.rows.${index}.useful_life_periods`}
+                                error={fieldError(
+                                    `rows.${index}.useful_life_periods`,
+                                )}
+                            >
                                 <Field orientation="horizontal">
                                     <Switch
                                         id={`custom-life-${row.buku_id}`}
@@ -496,8 +452,17 @@ export default function GroupBookMatrix({
                                         }
                                     />
                                 )}
-                            </div>
-                            <Field>
+                            </FormControl>
+                            <FormControl
+                                hint={
+                                    <>
+                                        Dihitung dari tanggal aset mulai
+                                        digunakan.
+                                    </>
+                                }
+                                data-error-field={`details.books.rows.${index}.value`}
+                                error={fieldError(`rows.${index}.value`)}
+                            >
                                 <Select
                                     label="Perlakuan periode pertama"
                                     items={CONVENTIONS.map(
@@ -523,11 +488,19 @@ export default function GroupBookMatrix({
                                         })
                                     }
                                 />
-                                <FieldDescription>
-                                    Dihitung dari tanggal aset mulai digunakan.
-                                </FieldDescription>
-                            </Field>
-                            <Field>
+                            </FormControl>
+                            <FormControl
+                                hint={
+                                    <>
+                                        Kosong mengikuti Book. Periode terakhir
+                                        tidak dibulatkan.
+                                    </>
+                                }
+                                data-error-field={`details.books.rows.${index}.round_off_depreciation`}
+                                error={fieldError(
+                                    `rows.${index}.round_off_depreciation`,
+                                )}
+                            >
                                 <Input
                                     id={`round-off-${row.buku_id}`}
                                     label="Kelipatan pembulatan penyusutan"
@@ -542,12 +515,13 @@ export default function GroupBookMatrix({
                                                 event.target.value,
                                         })
                                     }
+                                    aria-invalid={
+                                        !!fieldError(
+                                            `rows.${index}.round_off_depreciation`,
+                                        )
+                                    }
                                 />
-                                <FieldDescription>
-                                    Kosong mengikuti Book. Periode terakhir
-                                    tidak dibulatkan.
-                                </FieldDescription>
-                            </Field>
+                            </FormControl>
                             <Field orientation="horizontal">
                                 <Switch
                                     id={`depreciate-${row.buku_id}`}
@@ -563,31 +537,33 @@ export default function GroupBookMatrix({
                                     Hitung penyusutan
                                 </FieldLabel>
                             </Field>
-                        </div>
+                        </FormGrid>
                     </div>
                 );
             })}
 
-            {canEdit && unused.length > 0 && (
+            {canEdit && (
                 <div className="sm:w-72">
-                    <Select
-                        items={unused.map(
-                            (book) => `${book.kode} — ${book.nama}`,
+                    <RecordLookup
+                        source={bookSource}
+                        filterKey={JSON.stringify(
+                            rows.map((row) => row.buku_id).sort(),
                         )}
+                        filterRecord={(book) =>
+                            !rows.some((row) => row.buku_id === book.id)
+                        }
+                        items={unused.map((book) => ({
+                            value: book.id,
+                            label: `${book.kode} — ${book.nama}`,
+                        }))}
                         placeholder="Pilih buku penyusutan"
                         searchPlaceholder="Cari buku"
                         emptyMessage="Buku tidak ditemukan."
                         ariaLabel="Pilih buku penyusutan"
                         portalContainer={containerRef}
-                        onValueChange={(item) => {
-                            const book = unused.find(
-                                (candidate) =>
-                                    `${candidate.kode} — ${candidate.nama}` ===
-                                    item,
-                            );
-
-                            if (book) {
-                                setRows([...rows, emptyRow(book.id)]);
+                        onValueChange={(id) => {
+                            if (id && !rows.some((row) => row.buku_id === id)) {
+                                setRows([...rows, emptyRow(id)]);
                             }
                         }}
                     />
@@ -595,12 +571,10 @@ export default function GroupBookMatrix({
             )}
 
             {error && <p className="text-destructive text-sm">{error}</p>}
-            <FieldError>{draft?.error?.join(' ')}</FieldError>
-            {saved && (
-                <p className="text-muted-foreground text-sm">
-                    Matriks tersimpan.
-                </p>
-            )}
+            <FieldError>
+                {draft?.error?.join(' ') ||
+                    validationErrors?.['details.books.rows']?.join(' ')}
+            </FieldError>
         </div>
     );
 }

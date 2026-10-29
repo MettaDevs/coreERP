@@ -13,12 +13,14 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
+import { FormControl } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { PageDialog, PageDialogContent } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Switch } from '@apperp/ui/switch';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
 import { requestPrint } from '../../print';
 import { useRecordList } from '../../use-record-list';
 import type { RecordCardState } from '../_shared/record-card';
@@ -41,20 +43,22 @@ export default function WorkOrderListPage({
     const [card, setCard] = useState<RecordCardState>(null);
     const [cardBusy, setCardBusy] = useState(false);
     const [cardDirty, setCardDirty] = useState(false);
-    const discardChanges = () =>
-        !cardDirty || window.confirm('Buang perubahan yang belum disimpan?');
+    const {
+        request: requestChangesTransition,
+        confirmation: changesTransitionConfirmation,
+    } = useRecordTransition(cardDirty, cardBusy);
     const openNewCard = () => {
-        if (!cardBusy && discardChanges()) {
+        requestChangesTransition(() => {
             setCardDirty(false);
             setCard({ mode: 'create' });
-        }
+        });
     };
     const closeCard = () => {
-        if (!cardBusy && discardChanges()) {
+        requestChangesTransition(() => {
             setCard(null);
             setCardDirty(false);
             workOrderList.reload();
-        }
+        });
     };
     const [cardRevision, setCardRevision] = useState(0);
     const cardContentRef = useRef<HTMLDivElement>(null);
@@ -232,6 +236,7 @@ export default function WorkOrderListPage({
 
     return (
         <>
+            {changesTransitionConfirmation}
             <ListPageLayout
                 header={
                     <RecordActionBar title="Work order">
@@ -335,16 +340,18 @@ export default function WorkOrderListPage({
                                     ditampilkan
                                 </p>
                             </div>
-                            <Input
-                                className="w-full sm:w-80"
-                                type="search"
-                                placeholder="Cari kode, jenis, atau keterangan"
-                                aria-label="Cari work order"
-                                value={search}
-                                onChange={(event) =>
-                                    setSearch(event.target.value)
-                                }
-                            />
+                            <FormControl>
+                                <Input
+                                    className="w-full sm:w-80"
+                                    type="search"
+                                    placeholder="Cari kode, jenis, atau keterangan"
+                                    aria-label="Cari work order"
+                                    value={search}
+                                    onChange={(event) =>
+                                        setSearch(event.target.value)
+                                    }
+                                />
+                            </FormControl>
                         </div>
                         <DataTable
                             className="min-h-0 flex-1"
@@ -416,14 +423,14 @@ export default function WorkOrderListPage({
                                 jobList.reload();
                             }}
                             onRequestView={(id) => {
-                                if (!cardBusy && discardChanges()) {
+                                requestChangesTransition(() => {
                                     setCard({ mode: 'view', id });
-                                }
+                                });
                             }}
                             onRequestEdit={(id) => {
-                                if (!cardBusy && discardChanges()) {
+                                requestChangesTransition(() => {
                                     setCard({ mode: 'edit', id });
-                                }
+                                });
                             }}
                             onDirtyChange={setCardDirty}
                         />

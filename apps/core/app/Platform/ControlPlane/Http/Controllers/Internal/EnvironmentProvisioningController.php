@@ -93,10 +93,13 @@ final class EnvironmentProvisioningController extends Controller
             ], 422);
         }
 
+        $modules = $this->installedModules($environment, $connections);
+
         return response()->json([
             'status' => $environment->status,
             'database' => $environment->database_name,
-            'modules' => $this->installedModules($environment, $connections),
+            'modules' => $modules['items'],
+            'modules_error' => $modules['error'],
             'output' => $output,
         ]);
     }
@@ -157,7 +160,7 @@ final class EnvironmentProvisioningController extends Controller
      * menukar keberhasilan itu dengan 500 karena satu daftar tambahan tidak terbaca berarti operator
      * mengira penyiapannya gagal, lalu menjalankannya lagi.
      *
-     * @return list<array{id: string, version: string, status: string, seeded: bool}>
+     * @return array{items: list<array{id: string, version: string, status: string, seeded: bool}>, error: ?string}
      */
     private function installedModules(Environment $environment, EnvironmentConnection $connections): array
     {
@@ -169,8 +172,10 @@ final class EnvironmentProvisioningController extends Controller
                 ->where('tenant_id', $environment->tenant_id)
                 ->orderBy('module_id')
                 ->get(['module_id', 'version', 'status', 'seeded_at']);
-        } catch (Throwable) {
-            return [];
+        } catch (Throwable $failure) {
+            report($failure);
+
+            return ['items' => [], 'error' => 'Penyiapan selesai, tetapi daftar aplikasi belum dapat dibaca. Muat ulang rincian lingkungan untuk mencoba lagi.'];
         }
 
         $result = [];
@@ -184,6 +189,6 @@ final class EnvironmentProvisioningController extends Controller
             ];
         }
 
-        return $result;
+        return ['items' => $result, 'error' => null];
     }
 }

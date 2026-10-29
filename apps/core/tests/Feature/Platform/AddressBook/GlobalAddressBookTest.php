@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Platform\AddressBook;
 
+use App\Platform\AddressBook\Models\AddressBook;
 use App\Platform\AddressBook\Models\Party;
 use App\Platform\Geography\Models\AddressHierarchy\District;
 use App\Platform\Geography\Models\AddressHierarchy\Province;
@@ -9,6 +10,7 @@ use App\Platform\Geography\Models\AddressHierarchy\Regency;
 use App\Platform\Geography\Models\AddressHierarchy\Village;
 use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Actions\RegisterBusiness;
+use App\Platform\Tenant\Models\TenantMembership;
 use Database\Seeders\AppCatalogSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -46,7 +48,7 @@ class GlobalAddressBookTest extends TestCase
                 ->where('filters.q', 'directory')
                 ->has('parties.data')
                 ->has('partyTypes')
-                ->has('addressBooks')
+                ->missing('addressBooks')
                 ->has('referenceValues')
                 ->has('relationshipTypes'));
     }
@@ -71,6 +73,56 @@ class GlobalAddressBookTest extends TestCase
         ])->assertConflict();
         $current = Party::query()->findOrFail($party['id']);
         $this->deleteJson('/api/v1/parties/'.$party['id'], ['version' => $current->version])->assertUnprocessable();
+    }
+
+    public function test_book_catalog_uses_bounded_searchable_batches_and_resolves_selected_filter_only(): void
+    {
+        $tenant = $this->owner->activeMembership()->tenant_id;
+        $books = collect(range(1, 45))->map(fn (int $number) => AddressBook::create(['tenant_id' => $tenant, 'name' => sprintf('Book %03d', $number)]));
+        $first = $this->getJson('/api/v1/address-books')->assertOk()->assertJsonCount(40, 'data');
+        $second = $this->getJson('/api/v1/address-books?cursor='.urlencode($first->json('next_cursor')))
+            ->assertOk()->assertJsonCount(5, 'data')->assertJsonPath('next_cursor', null);
+        $this->assertCount(45, array_unique([...array_column($first->json('data'), 'id'), ...array_column($second->json('data'), 'id')]));
+        $this->getJson('/api/v1/address-books?q=Book%20045')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $books->last()->id);
+        $this->getJson('/api/v1/address-books?per_page=100000')->assertUnprocessable()->assertJsonValidationErrors('per_page');
+        $this->getJson('/api/v1/address-books?q[]=invalid')->assertUnprocessable()->assertJsonValidationErrors('q');
+        $this->get('/settings/global-address-book?address_book='.$books->last()->id)->assertInertia(fn (AssertableInertia $page) => $page
+            ->missing('addressBooks')->where('selectedAddressBook.id', $books->last()->id)->where('selectedAddressBook.name', 'Book 045'));
+        $this->getJson('/api/v1/parties/metadata')->assertOk()->assertJsonMissingPath('data.addressBooks');
+    }
+
+    public function test_book_lookup_cannot_read_another_tenant_or_bypass_permission(): void
+    {
+        $other = $this->owner('other-book-owner@example.test');
+        $book = AddressBook::create(['tenant_id' => $other->activeMembership()->tenant_id, 'name' => 'Foreign book']);
+        $this->actingAs($this->owner)->getJson('/api/v1/address-books?q=Foreign')->assertOk()->assertJsonCount(0, 'data');
+        $this->get('/settings/global-address-book?address_book='.$book->id)->assertInertia(fn (AssertableInertia $page) => $page->where('selectedAddressBook', null));
+        $reader = User::factory()->create();
+        TenantMembership::create(['tenant_id' => $this->owner->activeMembership()->tenant_id, 'user_id' => $reader->id, 'status' => 'active']);
+        $this->actingAs($reader)->getJson('/api/v1/address-books')->assertForbidden();
+    }
+
+    public function test_linked_archived_book_labels_and_ids_survive_unrelated_party_changes(): void
+    {
+        $tenant = $this->owner->activeMembership()->tenant_id;
+        $book = AddressBook::create(['tenant_id' => $tenant, 'name' => 'Linked archived book']);
+        $party = $this->createParty(['address_book_ids' => [$book->id]])->assertCreated()->json('data');
+        $book->delete();
+        $this->getJson('/api/v1/parties/'.$party['id'])->assertOk()
+            ->assertJsonPath('data.address_book_ids.0', $book->id)->assertJsonPath('data.address_books.0.name', 'Linked archived book');
+        $this->getJson('/api/v1/address-books?q=Linked')->assertOk()->assertJsonCount(0, 'data');
+        $this->patchJson('/api/v1/parties/'.$party['id'], [
+            'name' => 'Changed party', 'type' => $party['type'], 'status' => 'active', 'version' => $party['version'], 'address_book_ids' => [$book->id],
+        ])->assertOk();
+        $this->assertDatabaseHas('party_address_books', ['party_id' => $party['id'], 'address_book_id' => $book->id, 'deleted_at' => null]);
+        $this->createParty(['address_book_ids' => [$book->id]])->assertUnprocessable()->assertJsonValidationErrors('address_book_ids');
+        $unlinked = AddressBook::create(['tenant_id' => $tenant, 'name' => 'Unlinked archived book']);
+        $unlinked->delete();
+        $current = $this->getJson('/api/v1/parties/'.$party['id'])->json('data');
+        $this->patchJson('/api/v1/parties/'.$party['id'], [
+            'name' => $current['name'], 'type' => $current['type'], 'status' => 'active', 'version' => $current['version'], 'address_book_ids' => [$book->id, $unlinked->id],
+        ])->assertUnprocessable()->assertJsonValidationErrors('address_book_ids');
+        $this->assertDatabaseMissing('party_address_books', ['party_id' => $party['id'], 'address_book_id' => $unlinked->id]);
     }
 
     public function test_directory_and_vendor_creation_use_separate_retry_namespaces(): void

@@ -26,6 +26,7 @@ final class AssetProcurementReportLayout extends BuiltinLayoutBuilder
         ['No.', 'nomor', 6],
         ['No. rencana', 'no_rencana', 16],
         ['Tanggal rencana', 'tanggal_rencana', 13],
+        ['Tanggal kebutuhan', 'tanggal_kebutuhan', 13],
         ['Tahun anggaran', 'tahun_anggaran', 10],
         ['Sumber dana', 'sumber_dana', 16],
         ['Item aset', 'item_aset', 26],
@@ -65,6 +66,7 @@ final class AssetProcurementReportLayout extends BuiltinLayoutBuilder
             'A6' => 'Dari', 'B6' => '${filter_dari}', 'C6' => 'Sampai', 'D6' => '${filter_sampai}', 'E6' => 'Dicetak', 'F6' => '${dicetak_pada}',
             'A7' => 'Jenis aset', 'B7' => '${filter_jenis}', 'C7' => 'Unit organisasi', 'D7' => '${filter_unit}', 'E7' => 'Status', 'F7' => '${filter_status}',
             'A8' => 'Jumlah baris', 'B8' => '${jumlah_baris}', 'C8' => 'Filter tambahan', 'D8' => '${filter_tambahan}',
+            'A9' => 'Rencana belum diestimasi', 'B9' => '${jumlah_baris_belum_diestimasi}',
         ] as $cell => $value) {
             $sheet->setCellValue($cell, $value);
         }
@@ -84,11 +86,11 @@ final class AssetProcurementReportLayout extends BuiltinLayoutBuilder
         // Spesifikasi dan daftar nomor dokumen bisa panjang; dibungkus supaya terbaca tanpa melebarkan kolom.
         $sheet->getStyle("A11:{$last}11")->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
 
-        // Total di bawah kolom nilai rencana (J) dan nilai diterima (S).
+        // Total di bawah kolom nilai rencana dan nilai diterima.
         $sheet->setCellValue('A13', 'Total');
-        $sheet->mergeCells('A13:I13');
-        $sheet->setCellValue('J13', '${total_nilai_rencana}');
-        $sheet->setCellValue('S13', '${total_nilai_diterima}');
+        $sheet->mergeCells('A13:J13');
+        $sheet->setCellValue('K13', '${total_nilai_rencana}');
+        $sheet->setCellValue('T13', '${total_nilai_diterima}');
         $total = $sheet->getStyle("A13:{$last}13");
         $total->getFont()->setBold(true);
         $total->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('F2F2F2');

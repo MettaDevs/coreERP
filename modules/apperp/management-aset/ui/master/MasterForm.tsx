@@ -1,16 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { FormEvent, ReactNode } from 'react';
-import { useRecordTransition } from '@/hooks/use-record-transition';
+import type { FormEvent } from 'react';
 import { ActionButton } from '@apperp/ui/action-button';
 
-import {
-    Field,
-    FieldDescription,
-    FieldError,
-    FieldGroup,
-    FieldLabel,
-    FieldTitle,
-} from '@apperp/ui/field';
+import { Field, FieldLabel, FieldTitle } from '@apperp/ui/field';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
+import { FormErrorSummary, createSaveFeedback } from '@apperp/ui/form-feedback';
+import type { FormFeedback } from '@apperp/ui/form-feedback';
 import { Input } from '@apperp/ui/input';
 import type { PageDialogNavigation } from '@apperp/ui/page-dialog';
 import {
@@ -21,17 +16,22 @@ import {
 } from '@apperp/ui/page-dialog';
 import { Switch } from '@apperp/ui/switch';
 import { Textarea } from '@apperp/ui/textarea';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
 import type { ApiValidationErrors } from '../api';
-import { api, ApiError, errorMessage, newIdempotencyKey } from '../api';
+import { api, ApiError, saveErrorFeedback, newIdempotencyKey } from '../api';
 import {
     RecordCardHeader,
     recordQueryUrl,
 } from '../transactions/_shared/record-card';
-import type { DraftMasterDetailsValue } from './DraftMasterDetails';
+import type {
+    DraftMasterDetailsValue,
+    MasterDetailsPayload,
+} from './DraftMasterDetails';
 import DraftMasterDetails, { draftMasterPayload } from './DraftMasterDetails';
 import DynamicField from './DynamicField';
 import type { FieldValue } from './fields';
 import { isVisible, payloadValue, valueFrom } from './fields';
+import GroupBookMatrix, { groupBookRowsPayload } from './GroupBookMatrix';
 import LokasiAsetFields from './LokasiAsetFields';
 import type {
     MasterConfig,
@@ -43,6 +43,7 @@ import { parentIdOf, parentSummaryOf } from './masters';
 import MasterSelect from './MasterSelect';
 import { changeProfileField } from './serviceLife';
 import ServiceLifeFields from './ServiceLifeFields';
+import TipeAtributNilai from './TipeAtributNilai';
 import { useNumberPolicy } from './useNumberPolicy';
 
 type FormValue = { nama: string; keterangan: string; aktif: boolean };
@@ -52,7 +53,6 @@ export default function MasterForm({
     value,
     onClose,
     onSaved,
-    extraSection,
     onNew,
     onDelete,
     navigation,
@@ -60,15 +60,15 @@ export default function MasterForm({
     onDirtyChange,
     canStageDetails,
     permissions,
+    initialParentIds = {},
 }: {
     config: MasterConfig;
+    initialParentIds?: Record<string, string>;
     canStageDetails: boolean;
     permissions: Permission[];
     value: MasterRecord | null;
     onClose: () => void;
-    onSaved: (record: MasterRecord, created: boolean) => void;
-    /** Bagian tambahan di bawah field, misalnya matriks yang disunting di dalam form ini. */
-    extraSection?: ReactNode;
+    onSaved: (record: MasterRecord, created: boolean) => void | Promise<void>;
     onNew?: () => void;
     onDelete?: () => void;
     navigation?: PageDialogNavigation;
@@ -85,7 +85,9 @@ export default function MasterForm({
         Object.fromEntries(
             parents.map((parent) => [
                 parent.field,
-                value ? parentIdOf(value, parent) : '',
+                value
+                    ? parentIdOf(value, parent)
+                    : (initialParentIds[parent.field] ?? ''),
             ]),
         ),
     );
@@ -109,18 +111,34 @@ export default function MasterForm({
     const [draftDetails, setDraftDetails] = useState<DraftMasterDetailsValue>(
         {},
     );
+    const [stagedDetails, setStagedDetails] = useState<MasterDetailsPayload>(
+        {},
+    );
     const [detailErrors, setDetailErrors] = useState<ApiValidationErrors>({});
     const [initialSnapshot] = useState(() =>
         JSON.stringify({ form, parentIds, extra, manualCode }),
     );
     const dirty =
+        Object.keys(stagedDetails).length > 0 ||
         JSON.stringify({ form, parentIds, extra, manualCode }) !==
             initialSnapshot ||
         Object.values(draftDetails).some((rows) => rows && rows.length > 0);
-    const [error, setError] = useState('');
+    function stageDetails(next: MasterDetailsPayload) {
+        setStagedDetails((current) => ({ ...current, ...next }));
+    }
+    const [feedback, setFeedback] = useState<FormFeedback | null>(null);
     const [saving, setSaving] = useState(false);
     const creationKey = useRef(newIdempotencyKey());
     const contentRef = useRef<HTMLDivElement>(null);
+    const setError = (message: string) =>
+        setFeedback(
+            message
+                ? createSaveFeedback({
+                      operation: 'Data belum dapat disimpan.',
+                      message,
+                  })
+                : null,
+        );
     const transition = useRecordTransition(dirty, saving);
     useEffect(() => {
         onBusyChange?.(saving);
@@ -159,6 +177,15 @@ export default function MasterForm({
         setDetailErrors({});
 
         try {
+            const applicableDetails = { ...stagedDetails };
+
+            if (
+                config.resource === 'tipe-atribut' &&
+                extra.data_type !== 'string'
+            ) {
+                delete applicableDetails.values;
+            }
+
             const saved = await api<{ data: MasterRecord }>(
                 `/${config.resource}${value ? `/${value.id}` : ''}`,
                 {
@@ -182,6 +209,9 @@ export default function MasterForm({
                                   ),
                               }
                             : {}),
+                        ...(value && Object.keys(applicableDetails).length > 0
+                            ? { details: applicableDetails }
+                            : {}),
                         nama: form.nama,
                         keterangan: form.keterangan,
                         aktif: form.aktif,
@@ -204,13 +234,15 @@ export default function MasterForm({
                     }),
                 },
             );
-            onSaved(saved.data, !value);
+            await onSaved(saved.data, !value);
         } catch (caught) {
             if (caught instanceof ApiError) {
                 setDetailErrors(caught.validationErrors);
             }
 
-            setError(errorMessage(caught, 'Data belum dapat disimpan.'));
+            setFeedback(
+                saveErrorFeedback(caught, 'Data belum dapat disimpan.'),
+            );
         } finally {
             setSaving(false);
         }
@@ -218,9 +250,14 @@ export default function MasterForm({
 
     function parentField(parent: MasterParentConfig) {
         return (
-            <Field key={parent.field}>
+            <FormControl
+                key={parent.field}
+                data-error-field={parent.field}
+                error={detailErrors[parent.field]?.[0]}
+            >
                 <MasterSelect
                     resource={parent.resource}
+                    disabled={!value && Boolean(initialParentIds[parent.field])}
                     label={parent.label}
                     required={parent.required !== false}
                     value={parentIds[parent.field] ?? ''}
@@ -236,7 +273,7 @@ export default function MasterForm({
                         }))
                     }
                 />
-            </Field>
+            </FormControl>
         );
     }
 
@@ -270,6 +307,7 @@ export default function MasterForm({
                         onDelete={value ? onDelete : undefined}
                     />
                     <form
+                        noValidate
                         className="flex min-h-0 flex-1 flex-col"
                         onSubmit={submit}
                     >
@@ -287,15 +325,30 @@ export default function MasterForm({
                                 onClick={() => transition.request(onClose)}
                             />
                         </PageDialogToolbar>
+                        <FormErrorSummary
+                            feedback={feedback}
+                            scopeRef={contentRef}
+                        />
                         <PageDialogBody
+                            inert={saving || undefined}
+                            aria-busy={saving}
                             className="space-y-4"
                             scroll-region="true"
                         >
-                            <FieldGroup className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                <Field
+                            <FormGrid>
+                                <FormControl
+                                    data-error-field="kode"
                                     data-disabled={
                                         Boolean(value) || !allowManual
                                     }
+                                    hint={
+                                        !value && allowManual
+                                            ? allowAutomatic
+                                                ? 'Isi kode sendiri, atau kosongkan untuk membuatnya otomatis.'
+                                                : 'Isi kode yang mudah dikenali.'
+                                            : undefined
+                                    }
+                                    error={numberPolicyError}
                                 >
                                     <Input
                                         id="code"
@@ -320,21 +373,12 @@ export default function MasterForm({
                                             setManualCode(event.target.value)
                                         }
                                     />
-                                    {!value && allowManual && (
-                                        <FieldDescription>
-                                            {allowAutomatic
-                                                ? 'Isi kode sendiri, atau kosongkan untuk membuatnya otomatis.'
-                                                : 'Isi kode yang mudah dikenali.'}
-                                        </FieldDescription>
-                                    )}
-                                    {numberPolicyError && (
-                                        <FieldError>
-                                            {numberPolicyError}
-                                        </FieldError>
-                                    )}
-                                </Field>
+                                </FormControl>
 
-                                <Field>
+                                <FormControl
+                                    data-error-field="nama"
+                                    error={detailErrors.nama?.[0]}
+                                >
                                     <Input
                                         id="name"
                                         label={config.namaLabel}
@@ -349,7 +393,7 @@ export default function MasterForm({
                                             })
                                         }
                                     />
-                                </Field>
+                                </FormControl>
                                 {/* Induk dirender sejajar: tidak ada yang menyaring pilihan yang lain. */}
                                 {parents.map(parentField)}
                                 {isAsetLocation && (
@@ -368,7 +412,15 @@ export default function MasterForm({
                                     />
                                 )}
                                 {isAsetLocation && (
-                                    <Field>
+                                    <FormControl
+                                        hint={
+                                            <>
+                                                Pengaturan ini menunggu Finance.
+                                                Lokasi fisik tetap dapat
+                                                disimpan tanpa pengaturan ini.
+                                            </>
+                                        }
+                                    >
                                         <FieldTitle>
                                             Dimensi keuangan
                                         </FieldTitle>
@@ -380,12 +432,7 @@ export default function MasterForm({
                                                 Belum tersedia
                                             </p>
                                         </div>
-                                        <FieldDescription>
-                                            Pengaturan ini menunggu Finance.
-                                            Lokasi fisik tetap dapat disimpan
-                                            tanpa pengaturan ini.
-                                        </FieldDescription>
-                                    </Field>
+                                    </FormControl>
                                 )}
                                 {extraFields
                                     .filter(
@@ -411,9 +458,10 @@ export default function MasterForm({
                                             />
                                         ) : value?.data_type_locked &&
                                           field.name === 'data_type' ? (
-                                            <Field
+                                            <FormControl
                                                 key={field.name}
                                                 data-disabled="true"
+                                                hint="Tipe data terkunci karena atribut ini sudah pernah diisi pada aset. Buat komponen atribut aset baru bila bentuk datanya berbeda."
                                             >
                                                 <Input
                                                     label="Tipe data"
@@ -432,17 +480,15 @@ export default function MasterForm({
                                                     }
                                                     disabled
                                                 />
-                                                <FieldDescription>
-                                                    Tipe data terkunci karena
-                                                    atribut ini sudah pernah
-                                                    diisi pada aset. Buat
-                                                    komponen atribut aset baru
-                                                    bila bentuk datanya berbeda.
-                                                </FieldDescription>
-                                            </Field>
+                                            </FormControl>
                                         ) : (
                                             <DynamicField
                                                 key={field.name}
+                                                error={
+                                                    detailErrors[
+                                                        field.name
+                                                    ]?.[0]
+                                                }
                                                 config={field}
                                                 value={extra[field.name]}
                                                 onChange={(next) =>
@@ -465,12 +511,10 @@ export default function MasterForm({
                                             />
                                         ),
                                     )}
-                                <Field>
-                                    <FieldLabel htmlFor="description">
-                                        Keterangan
-                                    </FieldLabel>
+                                <FormControl>
                                     <Textarea
                                         id="description"
+                                        label="Keterangan"
                                         rows={4}
                                         maxLength={2000}
                                         value={form.keterangan}
@@ -481,21 +525,25 @@ export default function MasterForm({
                                             })
                                         }
                                     />
-                                </Field>
-                                <Field orientation="horizontal">
-                                    <Switch
-                                        id="active"
-                                        checked={form.aktif}
-                                        onCheckedChange={(checked) =>
-                                            setForm({ ...form, aktif: checked })
-                                        }
-                                    />
-                                    <FieldLabel htmlFor="active">
-                                        Data aktif dan dapat dipilih
-                                    </FieldLabel>
-                                </Field>
-                                {error && <FieldError>{error}</FieldError>}
-                            </FieldGroup>
+                                </FormControl>
+                                <FormControl>
+                                    <Field orientation="horizontal">
+                                        <Switch
+                                            id="active"
+                                            checked={form.aktif}
+                                            onCheckedChange={(checked) =>
+                                                setForm({
+                                                    ...form,
+                                                    aktif: checked,
+                                                })
+                                            }
+                                        />
+                                        <FieldLabel htmlFor="active">
+                                            Data aktif dan dapat dipilih
+                                        </FieldLabel>
+                                    </Field>
+                                </FormControl>
+                            </FormGrid>
                             {!value && (
                                 <DraftMasterDetails
                                     resource={config.resource}
@@ -508,7 +556,32 @@ export default function MasterForm({
                                     portalContainer={contentRef}
                                 />
                             )}
-                            {extraSection}
+                            {value && config.resource === 'group-aset' && (
+                                <GroupBookMatrix
+                                    groupId={value.id}
+                                    canEdit={canStageDetails}
+                                    onChange={(rows) =>
+                                        stageDetails({
+                                            books: {
+                                                rows: groupBookRowsPayload(
+                                                    rows,
+                                                ),
+                                            },
+                                        })
+                                    }
+                                    validationErrors={detailErrors}
+                                />
+                            )}
+                            {value && config.resource === 'tipe-atribut' && (
+                                <div hidden={extra.data_type !== 'string'}>
+                                    <TipeAtributNilai
+                                        tipeAtributId={value.id}
+                                        canEdit={canStageDetails}
+                                        onChange={stageDetails}
+                                        validationErrors={detailErrors}
+                                    />
+                                </div>
+                            )}
                         </PageDialogBody>
                     </form>
                 </PageDialogContent>

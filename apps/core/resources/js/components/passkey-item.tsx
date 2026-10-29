@@ -12,19 +12,37 @@ import {
 } from '@apperp/ui/dialog';
 import { KeyRound, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { FormErrorHeader } from '@/components/form-error-header';
 import type { Passkey } from '@/types/auth';
+
+export type PasskeyDeleteCallbacks = {
+    onError: (errors: Record<string, string>) => void;
+    onSuccess: () => void;
+    onFinish: () => void;
+};
 
 type Props = {
     passkey: Passkey;
-    onDelete: (id: number, onError: () => void) => void;
+    onDelete: (id: number, callbacks: PasskeyDeleteCallbacks) => void;
 };
 
 export default function PasskeyItem({ passkey, onDelete }: Props) {
     const [isDeleting, setIsDeleting] = useState(false);
+    const [open, setOpen] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const handleDelete = () => {
         setIsDeleting(true);
-        onDelete(passkey.id, () => setIsDeleting(false));
+        setError(null);
+        onDelete(passkey.id, {
+            onError: (errors) =>
+                setError(
+                    Object.values(errors).join(' ') ||
+                        'Passkey belum dapat dihapus.',
+                ),
+            onSuccess: () => setOpen(false),
+            onFinish: () => setIsDeleting(false),
+        });
     };
 
     return (
@@ -58,7 +76,18 @@ export default function PasskeyItem({ passkey, onDelete }: Props) {
                 </div>
             </div>
 
-            <Dialog>
+            <Dialog
+                open={open}
+                onOpenChange={(next) => {
+                    if (!isDeleting) {
+                        setOpen(next);
+
+                        if (next) {
+                            setError(null);
+                        }
+                    }
+                }}
+            >
                 <DialogTrigger asChild>
                     <Button
                         variant="ghost"
@@ -71,22 +100,28 @@ export default function PasskeyItem({ passkey, onDelete }: Props) {
                 </DialogTrigger>
                 <DialogContent size="compact">
                     <DialogHeader>
-                        <DialogTitle>Remove passkey</DialogTitle>
+                        <DialogTitle>Delete passkey ini?</DialogTitle>
                         <DialogDescription>
-                            Are you sure you want to remove the "{passkey.name}"
-                            passkey? You will no longer be able to use it to
-                            sign in.
+                            Passkey "{passkey.name}" tidak dapat dipakai lagi
+                            untuk masuk setelah dihapus.
                         </DialogDescription>
                     </DialogHeader>
+                    <FormErrorHeader
+                        message={error}
+                        operation="Passkey belum dihapus"
+                    />
                     <DialogFooter>
                         <DialogAction
                             variant="destructive"
-                            onClick={handleDelete}
+                            onClick={(event) => {
+                                event.preventDefault();
+                                handleDelete();
+                            }}
                             disabled={isDeleting}
                         >
-                            {isDeleting ? 'Removing...' : 'Remove passkey'}
+                            {isDeleting ? 'Menghapus...' : 'Delete'}
                         </DialogAction>
-                        <DialogCancel>Cancel</DialogCancel>
+                        <DialogCancel disabled={isDeleting}>Batal</DialogCancel>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

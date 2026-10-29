@@ -402,3 +402,93 @@
         description: Hanya work order draf atau yang sudah dibatalkan yang dapat diarsipkan
       '428':
         $ref: '#/components/responses/VersionRequired'
+
+/api/v1/pemeliharaan-aset/{id}/execution:
+  parameters:
+  - $ref: '#/components/parameters/RecordId'
+  put:
+    tags:
+    - Pemeliharaan aset
+    operationId: saveWorkOrderExecutionBatch
+    summary: Menyimpan seluruh hasil pekerjaan dan checklist sekaligus secara atomik. Checklist hanya boleh diubah
+      saat dikerjakan; hasil pekerjaan juga boleh diubah saat selesai.
+    parameters:
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+            - jobs
+            properties:
+              version:
+                $ref: '#/components/schemas/VersionField'
+              jobs:
+                type: array
+                minItems: 1
+                maxItems: 200
+                items:
+                  type: object
+                  properties:
+                    aktual_jam:
+                      type: number
+                      minimum: 0
+                      maximum: 999999.99
+                      nullable: true
+                    sebab_kerusakan_id:
+                      allOf:
+                      - $ref: '#/components/schemas/Ulid'
+                      nullable: true
+                    tindakan_perbaikan_id:
+                      allOf:
+                      - $ref: '#/components/schemas/Ulid'
+                      nullable: true
+                    sebab_kerusakan_keterangan:
+                      type: string
+                      maxLength: 1000
+                      nullable: true
+                      description: Wajib bila sebab kerusakan yang dipilih meminta keterangan.
+                    tindakan_perbaikan_keterangan:
+                      type: string
+                      maxLength: 1000
+                      nullable: true
+                      description: Wajib bila tindakan perbaikan yang dipilih meminta keterangan.
+                    id:
+                      $ref: '#/components/schemas/Ulid'
+                    checklist:
+                      type: array
+                      maxItems: 200
+                      items:
+                        type: object
+                        required:
+                        - id
+                        properties:
+                          id:
+                            $ref: '#/components/schemas/Ulid'
+                          nilai:
+                            type: string
+                            maxLength: 255
+                            nullable: true
+                          tidak_berlaku:
+                            type: boolean
+                          catatan_teknisi:
+                            type: string
+                            maxLength: 2000
+                            nullable: true
+                  required:
+                  - id
+    responses:
+      '200':
+        description: Seluruh perubahan tersimpan; data memuat work order dengan version terbaru.
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
+      '409':
+        $ref: '#/components/responses/StaleVersion'
+      '422':
+        description: Status, baris pekerjaan, atau checklist tidak sah; seluruh perubahan dibatalkan.
+      '428':
+        $ref: '#/components/responses/VersionRequired'

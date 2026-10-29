@@ -136,11 +136,7 @@ class PenyaringanTenantTest extends TestCase
             return;
         }
 
-        Artisan::call('migrate', [
-            '--path' => dirname(__DIR__, 2).'/database/migrations',
-            '--realpath' => true,
-            '--force' => true,
-        ]);
+        Artisan::call('module:migrate', ['module' => 'change-me']);
     }
 
     private function seedContoh(string $tenantId, string $kode, string $nama): void

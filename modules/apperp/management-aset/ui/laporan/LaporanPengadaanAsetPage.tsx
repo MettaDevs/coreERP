@@ -1,15 +1,6 @@
 import { useMemo } from 'react';
 import { Badge } from '@apperp/ui/badge';
 import type { DataTableColumn } from '@apperp/ui/data-table';
-import { Field } from '@apperp/ui/field';
-import { MultiSelect } from '@apperp/ui/multi-select';
-import { ReportFilterBar } from './_shared/ReportFilterBar';
-import type { MultiFilterProps } from './_shared/ReportFilters';
-import {
-    AssetTypeFilter,
-    DateFilter,
-    OrganizationUnitFilter,
-} from './_shared/ReportFilters';
 import { ReportPageLayout } from './_shared/ReportPageLayout';
 import { useReportData } from './_shared/useReportData';
 
@@ -45,48 +36,13 @@ export type ProcurementReportRow = {
 const teks = (value: unknown) =>
     value === null || value === undefined || value === '' ? '—' : String(value);
 
-/** Tahap pengadaan; nilainya kode yang dikenal server. */
-const STATUS_ITEMS = [
-    { value: 'belum_diminta', label: 'Belum diminta' },
-    { value: 'belum_diterima', label: 'Belum diterima' },
-    { value: 'diterima_sebagian', label: 'Diterima sebagian' },
-    { value: 'diterima_penuh', label: 'Diterima penuh' },
-];
-
-function StatusFilter({ value, onChange }: MultiFilterProps) {
-    return (
-        <Field className="w-full sm:w-56">
-            <MultiSelect
-                label="Status"
-                items={STATUS_ITEMS}
-                value={value}
-                onValueChange={onChange}
-                searchPlaceholder="Cari status"
-                emptyMessage="Status tidak ditemukan."
-            />
-        </Field>
-    );
-}
-
 const mono = (value: unknown) => (
     <span className="font-mono text-xs">{teks(value)}</span>
 );
 
 export default function LaporanPengadaanAsetPage() {
-    const {
-        bindFilter,
-        bindMultiFilter,
-        filters,
-        presets,
-        additional,
-        hasActiveFilters,
-        resetFilters,
-        rows,
-        fields,
-        loading,
-        error,
-        refetch,
-    } = useReportData<ProcurementReportRow>('laporan-pengadaan-aset');
+    const { filterState, rows, fields, loading, error, refetch } =
+        useReportData<ProcurementReportRow>('laporan-pengadaan-aset');
 
     const columns: DataTableColumn<ProcurementReportRow>[] = useMemo(
         () => [
@@ -193,28 +149,8 @@ export default function LaporanPengadaanAsetPage() {
         <ReportPageLayout<ProcurementReportRow>
             title="Laporan pengadaan aset"
             description="Mengikuti pengadaan dari rencana, permintaan pembelian, sampai penerimaan: berapa yang direncanakan, diminta, dan sudah diterima per barang, beserta sisanya."
-            reportCode="laporan-pengadaan-aset"
-            filters={filters}
-            filterBar={
-                <ReportFilterBar
-                    canReset={hasActiveFilters}
-                    onReset={resetFilters}
-                    presets={presets}
-                    additional={additional}
-                    dates={{ from: 'dari', to: 'sampai' }}
-                >
-                    <DateFilter label="Dari tanggal" {...bindFilter('dari')} />
-                    <DateFilter
-                        label="Sampai tanggal"
-                        {...bindFilter('sampai')}
-                    />
-                    <AssetTypeFilter {...bindMultiFilter('jenis_aset_id')} />
-                    <OrganizationUnitFilter
-                        {...bindMultiFilter('org_unit_id')}
-                    />
-                    <StatusFilter {...bindMultiFilter('status')} />
-                </ReportFilterBar>
-            }
+            filterState={filterState}
+
             columns={columns}
             rows={rows}
             loading={loading}

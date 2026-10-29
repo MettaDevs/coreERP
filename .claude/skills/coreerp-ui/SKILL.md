@@ -25,6 +25,18 @@ Use `@apperp/ui@0.6.2` as the single source for generic UI. Inspect its componen
 - Intent `save` dan `add` wajib menyebut `type="submit"` untuk submit native atau `type="button"` untuk handler klik. Intent lain selalu tombol biasa; Batal tidak boleh menjadi submit. Type SDK menegakkan pilihan ini agar pemindahan toolbar tidak diam-diam mengubah perilaku form.
 - Judul bar halaman dan nama fitur pada header kartu memakai 14 px semibold, teks operasional 14 px, header kolom tabel 12 px regular, dan FastTab 18 px semibold dengan padding rapat. Tombol perintah default setinggi 28 px; perangkat pointer kasar mendapat target 44 px. Perintah biasa berikon dan berlabel; aksi ikon pada header kartu memakai nama aksesibel serta keterangan hover/focus. Fokus keyboard tetap terlihat, dan preferensi keluarga font pengguna dipertahankan.
 
+### Satu susunan kontrol form
+
+- Gunakan `FormControl` dari `@apperp/ui/form-control` untuk setiap input, tanggal, textarea, atau pilihan dalam grid form, termasuk field tanpa bantuan. SDK menyediakan kolom bantuan tetap agar tepi dan tinggi kontrol sejajar. Jangan menyusun grid ikon bantuan atau mengubah tinggi kontrol per halaman.
+- Susun field dua kolom dengan `FormGrid` dari `@apperp/ui/form-control`: jarak antar-field dan ruang floating label ditetapkan SDK, sama pada setiap FastTab. Jangan mencampur `gap-3`, `gap-4`, atau padding tambahan per bagian untuk susunan form yang sama. Gunakan `columns={1}` untuk form satu kolom; jangan kembali ke `FieldGroup` dengan jarak berbeda.
+- `DynamicField` wajib memakai `FormControl` pada semua jenis kontrol, termasuk atribut tambahan tanpa bantuan. Slot bantuan tetap disediakan agar panjang input sama dengan field statis; jangan mengembalikan kontrol polos ketika `help` kosong.
+- Bantuan opsional masuk melalui `hint`; validasi masuk melalui `error` dan tetap terlihat. Jangan menjadikan pesan error sebagai hint. Informasi yang wajib dibaca sebelum tindakan tetap berupa peringatan/konfirmasi yang terlihat.
+- Referensi record memakai `InlineLookup` atau adapter `MasterLookup`; `Select` hanya untuk pilihan tetap seperti enum. `+ Baru` memerlukan form pembuat asli, izin, dan konteks yang sah. Pada Management Aset, `RecordLookup`/`MasterSelect` memakai sumber server yang sama dengan form pembuat; pilihan banyak memakai `RecordMultiLookup`. Bawa dan kunci induk dari konteks lookup saat membuat varian. Filter lokal wajib meneruskan batch yang habis tersaring, membatalkan respons scope lama, dan memakai `filterKey` saat kriterianya berubah. Jalankan `node scripts/check-asset-form-controls.mjs` untuk menolak tanggal native, susunan FieldGroup lama, serta Select referensi yang terlewat.
+- Aksi pemilih banyak barang hanya muncul bila ada lebih dari satu rincian yang masih dapat ditambahkan. Jangan menampilkan teks/tombol nonaktif tanpa tindakan yang berguna; pilihan tunggal tetap lewat lookup utama.
+- Lampiran induk baru memakai `DraftRecordAttachments`: pilihan berkas tetap lokal dan ikut Simpan utama secara atomik. Baca batas per berkas, jumlah, dan ukuran gabungan dari server; jangan memakai induk sementara atau memaksa Simpan dulu. Pertahankan pilihan ketika gagal. Penerusan ke record hasil mengikuti `RecordDocuments` dan pola aliran dokumen pada standar module, tanpa menggandakan isi berkas.
+- Tanggal dan waktu lokal memakai `DateTimePicker` SDK; tanggal kalender memakai `DatePicker` SDK: placeholder `dd/mm/yyyy` muncul ketika field kosong difokuskan, ketikan delapan digit diformat otomatis, dan tanggal sah diteruskan dalam ISO. Jangan memakai kalender native browser atau formatter tanggal per halaman.
+- Setelah menambah komponen SDK, build paket sebelum mengganti import pemakai. Periksa respons modul pada Vite yang aktif; keberhasilan build terpisah tidak membuktikan resolver server development sudah mengenali ekspor baru.
+
 ## Boundaries
 
 ### Daftar dan pilihan dimuat bertahap saat scroll
@@ -36,7 +48,7 @@ Keputusan pemilik produk: semua daftar record, DataTable, list, pemilih lengkap,
 - Gunakan urutan stabil dengan pembeda ID, tangani nilai NULL dan angka dengan benar, batalkan request basi saat pencarian/filter/scope berubah, cegah fetch bersamaan dan duplikasi, hentikan pada akhir hasil, serta sediakan error/retry dan akses keyboard. Perubahan scope membatalkan hasil lama.
 - `IncrementalList` di Core menyediakan batas batch dan cursor untuk query yang sudah diberi scope. Mapping kolom milik resource; jangan menganggap label UI sebagai nama kolom SQL. Jangan menghitung total seluruh hasil untuk sekadar membuka daftar.
 - Enum pendek dan rincian draft yang memang sudah dimiliki form tetap lokal; ini bukan alasan mengambil semua record database untuk pilihan. Export, agregat laporan, dan pilih-semua lintas hasil harus punya operasi server sendiri, tidak bergantung pada batch yang telah dilihat.
-- Uji pencarian record di luar batch pertama, pergantian filter/sort cepat, urutan dengan nilai sama/NULL, akhir daftar, kegagalan batch lanjutan, serta isolasi tenant/scope. Build saja belum cukup: ikuti verifikasi runtime UI di AGENTS.md.
+- Uji pencarian record di luar batch pertama, pergantian filter/sort cepat, urutan dengan nilai sama/NULL, akhir daftar, kegagalan batch lanjutan, serta isolasi tenant/scope. Untuk source UI saat HotReload aktif, tidak perlu rebuild container atau reload halaman; ikuti fallback di AGENTS.md hanya bila user/developer melaporkan HMR tidak memperbarui layar.
 
 Dasar: [Business Central: Making pages load faster](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/performance/performance-users#making-pages-load-faster). Lazy loading data berbeda dari virtualisasi baris; virtualisasi saja tidak mengurangi jumlah data yang diambil server.
 
@@ -125,13 +137,13 @@ Saat menambah atau mengubah lookup, putuskan bentuk field dan kemampuan tiap aks
 ## Build a screen
 
 1. Import `@apperp/ui/styles.css` after Tailwind and add `@source '../node_modules/@apperp/ui/dist'`.
-2. Compose `Field`, `FieldLabel`, `FieldDescription`, and `FieldError`. Every field may carry optional contextual help, but only complex or non-obvious fields need it. Keep field-specific help with the field, behind `@apperp/ui/field`'s `FieldHint`.
+2. Compose form inputs with `FormControl` and the labeled SDK control. Pass optional help through `hint` and visible validation through `error`. Keep `Field` for primitive groups such as checkboxes; it is not a replacement for the shared control layout.
    - `FieldHint`'s `children` is a small dedicated icon placed beside the control, not the control itself. Wrapping the control was tried and reverted: it fires the tooltip every time the pointer merely passes over the field on its way to actually clicking it, which reads as noisy rather than helpful. A separate icon never overlaps the area the user interacts with.
-   - Tempatkan ikon hint tepat setelah label atau tepi kontrol yang terlihat, dengan gap kecil (`gap-1`/`gap-2`). Jika kontrol membatasi lebar internalnya, jangan menaruh hint setelah wrapper `w-full`/`flex-1` atau memakai `justify-between`: ikon akan terpisah jauh dari field. Gunakan slot hint milik komponen; `InlineLookup` menyediakan prop `hint`. Periksa jarak terhadap kontrol sebenarnya pada layar lebar dan sempit, bukan terhadap batas wrapper.
+   - `FormControl` memiliki slot bantuan tetap di tepi kontrol, termasuk ketika `hint` kosong. Jangan membuat wrapper grid/flex sendiri untuk menempatkan ikon. Prop `hint` pada `InlineLookup` dipakai untuk lookup mandiri di luar susunan form ini.
    - Pada form, `InlineLookup` memakai label di dalam field seperti Input/Select/Textarea dan mengisi lebar kolom form yang diberikan pemanggil. Jangan memasang label kiri atau batas `max-w-*` internal yang menyisakan area kosong besar pada kolom. Jika suatu layar memang perlu field ringkas, pemanggil yang menentukan lebar kolomnya; komponen tetap mengisi ruang itu. Lebar popup tabel boleh berbeda dari lebar field.
    - Hover opens the hint after roughly one second and closes when the pointer leaves; clicking the icon toggles a persistent open state, and clicking it again closes it. Because the trigger is a real button, the same toggle is reachable by keyboard for free (Tab to it, then Enter/Space) — no separate wiring needed.
    - `FieldLegend`'s `hint` prop uses the same `FieldHint` underneath for a section title rather than a field control.
-   - Use visible `FieldDescription` when the user needs the guidance before continuing, and always for load or validation failures — a failed reference lookup is a real problem, not a hint, and must never be hidden behind hover.
+   - Use visible `FieldDescription` when guidance must be read before continuing. Load and validation failures go through the visible `error` slot; never hide a failed lookup or invalid value behind hover.
    - Keep required and error text visible. For record forms, render the generated code first, then the name, then classifications and dependent selections in their business sequence. A required dependency does not belong above the record identity just because it is required.
    - For every new master, reference, or configuration record that has an `aktif`/active flag, initialize it to active (`true`) in the create form and keep the server-side create fallback active as well. A newly saved record must be immediately available in active lookups; the user must not save it and then perform a second status action just to make it usable. Editing an existing inactive record must preserve its current state unless the user explicitly changes it.
    - A transaction document that uses a lifecycle such as `draft`, `submitted`, `scheduled`, or `completed` is not an `aktif` flag. Create it in the module's valid initial lifecycle state and do not force it to an artificial “active” state; the no-second-click rule applies to the record's usable initial state, not to skipping workflow controls.
@@ -173,7 +185,7 @@ Two mistakes shipped a page with a doubled header and no way to reach it. Both a
 
 Modules share the Shell's React tree, theme, and fonts; they do not create an iframe, a second React root, or a `coreerp.ready`/`coreerp.context` handshake. Import public `@apperp/ui` subpaths and inherit the Shell stylesheet.
 
-`packages/ui` is an npm workspace in this repository. Core and Control Plane use `"@apperp/ui": "*"`; the root lockfile resolves the workspace. Run the existing `ui:build` script before consumer type-check/build. Local runtime builds use `erp-dev/start.ps1 -Build`, which builds the SDK and consumers inside Docker. Do not introduce a vendored tarball or import package source from another repository.
+`packages/ui` is an npm workspace in this repository. Core and Control Plane use `"@apperp/ui": "*"`; the root lockfile resolves the workspace. Run the existing `ui:build` script before consumer type-check/build when SDK source changes. Local runtime builds use `erp-dev/start.ps1 -Build` when HotReload is inactive or a Docker image/dependency change requires it; ordinary source edits are served by active HotReload. Do not introduce a vendored tarball or import package source from another repository.
 
 ## Native page and table scrolling
 
@@ -183,6 +195,10 @@ Modules share the Shell's React tree, theme, and fonts; they do not create an if
 - Form/detail content scrolls within the Shell content area. Small embedded tables use `scrollMode="inline"`; place Dialog/Sheet components outside the list layout, or explicitly select inline mode for a table inside an overlay.
 - Native containers carry `scroll-region` so Inertia manages navigation scroll positions. Listen to the actual scroll owner instead of `window.scrollY` for header state. Do not duplicate/synchronize scrollbars with JavaScript or require Shift+wheel to reach columns.
 
+## Pesan error untuk pengguna
+
+Saat menulis pesan kegagalan, tombol pemulihan, atau ringkasan error form, baca [pedoman pesan error](references/error-feedback.md). Bedakan penyebab yang diketahui, hasil penyimpanan yang pasti atau belum diketahui, dan tindakan yang benar-benar tersedia. Pola header form dan field telah disetujui pemilik produk; contoh ada di `/ui-playground#form-errors`, tetapi penerapan tiap halaman tetap harus dibuktikan. Salin detail bantuan cukup memberi status singkat tanpa popup. Pemulihan koneksi terputus berada di luar cakupan SDK.
+
 ## Checks
 
 For failed saves or processing actions, a 5xx must produce a visible message that remains until corrected
@@ -190,4 +206,4 @@ or dismissed, using the action's everyday wording. A brief toast or a successful
 does not satisfy user feedback. Preserve unsaved inputs and keep technical details in server reports.
 Use the existing shared API error handler; see `docs/dev/28-pelaporan-kesalahan.md`, "Kegagalan yang terlihat oleh pengguna".
 
-Run package build, type-check, export smoke, consumer builds, and local Docker health checks. Verify light/dark appearance and keyboard/focus behavior in the running Shell. For every changed dialog, open it in the running app: its title and required decision text must be visible in the modal itself, not hidden behind a hover/click hint.
+Run relevant type-check, lint, and export checks. Build the SDK or consumer only when SDK source, dependencies, or build configuration changed. With HotReload active, source changes appear without rebuilding the container or manually reloading the page. Only investigate the runtime update path after a user/developer reports that HMR is stale; respect a request for the user to do the visual review. When runtime inspection is needed, verify light/dark appearance, keyboard/focus behavior, and that a changed dialog shows its title and required decision text in the modal itself.

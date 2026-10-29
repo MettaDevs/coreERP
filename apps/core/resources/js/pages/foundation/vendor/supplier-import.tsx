@@ -6,11 +6,13 @@ import {
     CardHeader,
     CardTitle,
 } from '@apperp/ui/card';
+import { FieldError } from '@apperp/ui/field';
 import { Input } from '@apperp/ui/input';
 import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
 import { router } from '@inertiajs/react';
 import { useState } from 'react';
-import { apiJson, errorText } from '@/lib/core-api';
+import { FormErrorHeader } from '@/components/form-error-header';
+import { apiJson, CoreApiError, errorText } from '@/lib/core-api';
 
 type Report = {
     status: string;
@@ -29,6 +31,9 @@ export default function SupplierImport({
     const [report, setReport] = useState<Report | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>(
+        {},
+    );
     async function run(apply: boolean) {
         if (!file || !entity || busy) {
             return;
@@ -36,6 +41,7 @@ export default function SupplierImport({
 
         setBusy(true);
         setError('');
+        setFieldErrors({});
 
         try {
             const body = new FormData();
@@ -52,6 +58,10 @@ export default function SupplierImport({
                 router.reload({ only: ['vendors'] });
             }
         } catch (caught) {
+            if (caught instanceof CoreApiError) {
+                setFieldErrors(caught.errors);
+            }
+
             setReport(null);
             setError(errorText(caught, 'Impor supplier gagal.'));
         } finally {
@@ -63,6 +73,15 @@ export default function SupplierImport({
         <Card>
             <CardHeader>
                 <CardTitle>Impor Supplier BO</CardTitle>
+                <FormErrorHeader
+                    message={
+                        report?.status === 'rejected'
+                            ? `Berkas ditolak. ${report.rejected.join(' ')}`
+                            : error
+                    }
+                    errors={fieldErrors}
+                    operation="Impor supplier belum berhasil"
+                />
                 <CardDescription>
                     Unduh Supplier (CSV) dari Setup Finance Feed BO. Setelah
                     impor, sinkronkan vendor di BO lalu petakan ke supplier
@@ -72,8 +91,13 @@ export default function SupplierImport({
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                    <div className="w-full sm:w-64">
+                    <div
+                        className="w-full sm:w-64"
+                        data-error-field={'legal_entity_id'}
+                    >
                         <NativeSelect
+                            data-error-field="legal_entity_id"
+                            aria-invalid={!!fieldErrors.legal_entity_id}
                             label="Perusahaan tujuan"
                             value={entity}
                             disabled={busy}
@@ -94,12 +118,20 @@ export default function SupplierImport({
                                 </NativeSelectOption>
                             ))}
                         </NativeSelect>
+                        <FieldError>
+                            {fieldErrors.legal_entity_id?.join(' ')}
+                        </FieldError>
                     </div>
-                    <div className="w-full sm:max-w-sm">
+                    <div
+                        className="w-full sm:max-w-sm"
+                        data-error-field={'file'}
+                    >
                         <label htmlFor="supplier-csv" className="text-sm">
                             Berkas supplier BO
                         </label>
                         <Input
+                            data-error-field="file"
+                            aria-invalid={!!fieldErrors.file}
                             id="supplier-csv"
                             type="file"
                             accept=".csv,.txt"
@@ -109,6 +141,7 @@ export default function SupplierImport({
                                 setReport(null);
                             }}
                         />
+                        <FieldError>{fieldErrors.file?.join(' ')}</FieldError>
                     </div>
                     <Button
                         variant="outline"

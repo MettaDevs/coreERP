@@ -313,6 +313,7 @@ class SsoLoginTest extends TestCase
             ->assertRedirect('/settings/security');
 
         $this->assertSame(['subjek-lain'], ExternalIdentity::query()->pluck('subject')->all());
+        $this->assertNotNull(ExternalIdentity::withTrashed()->where('user_id', $user->id)->sole()->deleted_at);
     }
 
     public function test_the_security_page_offers_connecting_only_at_an_address_that_uses_sso(): void
@@ -603,6 +604,22 @@ class SsoLoginTest extends TestCase
     }
 
     /** Logout token dilarang memuat nonce — yang memuatnya bisa berupa ID token curian yang dikirim ulang. */
+    public function test_logout_token_replay_is_refused(): void
+    {
+        $token = $this->logoutToken('subjek-uji');
+        $this->post('http://contoh.co.id/sso/backchannel-logout', ['logout_token' => $token])->assertOk();
+        $this->post('http://contoh.co.id/sso/backchannel-logout', ['logout_token' => $token])->assertStatus(400);
+    }
+
+    public function test_logout_tokens_require_fresh_timestamps_and_unique_id(): void
+    {
+        foreach ([['iat' => null], ['jti' => null], ['exp' => null], ['iat' => time() - 301], ['iat' => time() + 120]] as $claims) {
+            $this->post('http://contoh.co.id/sso/backchannel-logout', [
+                'logout_token' => $this->logoutToken('subjek-uji', $claims),
+            ])->assertStatus(400);
+        }
+    }
+
     public function test_a_backchannel_token_with_a_nonce_is_refused(): void
     {
         $this->post('http://contoh.co.id/sso/backchannel-logout', [
@@ -705,11 +722,12 @@ class SsoLoginTest extends TestCase
             'aud' => self::CLIENT_ID,
             'sub' => $subject,
             'iat' => time(),
-            'jti' => 'jti-uji',
+            'exp' => time() + 300,
+            'jti' => bin2hex(random_bytes(16)),
             'events' => ['http://schemas.openid.net/event/backchannel-logout' => (object) []],
         ], $overrides);
 
-        return JWT::encode($claims, $this->privateKey, 'RS256', 'kunci-uji');
+        return JWT::encode(array_filter($claims, static fn (mixed $value): bool => $value !== null), $this->privateKey, 'RS256', 'kunci-uji');
     }
 
     /** @return array{0: string, 1: array<string, mixed>} kunci privat PEM, dan JWKS berisi pasangan publiknya */

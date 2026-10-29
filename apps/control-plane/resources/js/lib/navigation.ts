@@ -13,6 +13,7 @@ export type NavItem = { href: string; title: string };
  * setiap hari.
  */
 export const navigation: NavItem[] = [
+    { href: '/produk/tenant', title: 'Tenant produk' },
     { href: '/tenant', title: 'Tenant' },
     { href: '/lingkungan', title: 'Lingkungan' },
     { href: '/pembaruan', title: 'Pembaruan' },

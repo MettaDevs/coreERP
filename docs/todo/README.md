@@ -38,6 +38,7 @@ dengan halamannya sendiri di sidebar.
 | [06-app-management-aset.md](general/06-app-management-aset.md) | App #1 terhadap D365 Asset Management dan Fixed assets | 43 |
 | [07-app-procurement.md](general/07-app-procurement.md) | App #2 terhadap D365 Procurement and sourcing | 35 |
 | [08-peta-app.md](general/08-peta-app.md) | App apa saja yang perlu dibuat, isinya, dan urutannya | — |
+| [09-audit-pola-review.md](general/09-audit-pola-review.md) | Audit pola cacat review pada source aktif dan status perbaikannya | — |
 | [99-sudah-dikerjakan.md](general/99-sudah-dikerjakan.md) | Yang sudah diperbaiki dan diverifikasi, supaya tidak dikerjakan dua kali | — |
 
 ## Legenda status

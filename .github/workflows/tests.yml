@@ -36,7 +36,7 @@ concurrency:
 
 jobs:
   ci:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     # Tanpa batas ini, job yang menggantung berjalan sampai batas bawaan GitHub — enam jam —
     # dan repo ini ada di paket gratis, jadi jam itu diambil dari kuota yang sama yang dipakai
@@ -148,6 +148,15 @@ jobs:
       # `cache: npm` menyimpan unduhan npm antar run. Lockfile-nya ada di akar repo, bukan
       # di folder app, jadi jalurnya disebut eksplisit — tanpa itu cache tidak pernah kena
       # dan langkah ini tetap mengunduh semuanya sambil terlihat seolah sudah di-cache.
+      # Client harus seversi dengan server test agar format dump/restore tidak mengikuti image runner terbaru.
+      - name: Select PostgreSQL 16 clients
+        run: |
+          test -x /usr/lib/postgresql/16/bin/pg_dump
+          test -x /usr/lib/postgresql/16/bin/pg_restore
+          echo "/usr/lib/postgresql/16/bin" >> "$GITHUB_PATH"
+          /usr/lib/postgresql/16/bin/pg_dump --version
+          /usr/lib/postgresql/16/bin/pg_restore --version
+
       - name: Setup Node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
