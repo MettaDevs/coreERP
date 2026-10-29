@@ -208,6 +208,17 @@ arrangement only — it never appears in a table name, permission code, event na
 
 Before adding any master, decide its owner:
 
+- **Test availability without the first module.** If a customer does not buy Procurement
+  (or the module proposing the feature), can another module that needs this master or
+  shared capability still work? If not, route the ownership decision to Core immediately:
+  business masters belong in Foundation; domain-neutral engines belong in Platform.
+  Do not make the other module require buying/installing the first module, copy its master,
+  or call its private tables/API. When these rules and the business meaning already settle
+  ownership, recommend the Core move directly instead of asking the owner to choose the
+  same rule again. Ask only about genuinely unresolved meaning or scope.
+- An external consumer of a module's process facts does not by itself turn those facts
+  into shared masters. Separate an optional integration from a prerequisite another module
+  genuinely needs when installed alone. Cite the consumer/domain evidence for the decision.
 - It belongs in **Foundation** when it is used, or certainly will be used, by two or more modules; or
   it identifies a party or legal entity; or its Business Central / Dynamics 365 equivalent lives in the
   shared layer. Otherwise it belongs to its module. Never create a shared master inside the first

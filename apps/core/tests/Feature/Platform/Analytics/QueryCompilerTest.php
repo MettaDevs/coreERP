@@ -71,11 +71,7 @@ class QueryCompilerTest extends TestCase
         parent::setUp();
 
         // Tabel module contoh dibuat test-nya sendiri, seperti penjaga batas lain.
-        Artisan::call('migrate', [
-            '--path' => dirname(__DIR__, 3).'/Fixtures/modules/apperp/contoh-a/database/migrations',
-            '--realpath' => true,
-            '--force' => true,
-        ]);
+        Artisan::call('module:migrate', ['module' => 'contoh-a']);
 
         $this->tenantA = $this->tenant('Tenant penjualan A');
         $this->tenantB = $this->tenant('Tenant penjualan B');

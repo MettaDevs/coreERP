@@ -1,13 +1,13 @@
 import { RotateCcw } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Button } from '@apperp/ui/button';
-import { AdditionalFilters } from './AdditionalFilters';
+import { FieldDescription } from '@apperp/ui/field';
+import type { ReportDateParameters } from './reportOptions';
 import { ReportPresets } from './ReportPresets';
-import type { ReportDateParameters } from './ReportPresets';
-import type { AdditionalFilterState, ReportPresetState } from './useReportData';
+import type { ReportPresetState } from './useReportData';
 
 export type ReportFilterBarProps = {
-    /** Filter milik laporan, disusun halamannya dari komponen di `ReportFilters`. */
+    /** Opsi dan bagian filter yang disusun engine berdasarkan profil laporan. */
     children: ReactNode;
     /** Tombol atur ulang hanya tampil bila ada filter yang terisi. */
     canReset: boolean;
@@ -16,16 +16,14 @@ export type ReportFilterBarProps = {
     presets?: ReportPresetState;
     /** Parameter tanggal laporan, supaya preset dapat menyimpan "bulan ini" alih-alih tanggal tetap. */
     dates?: ReportDateParameters;
-    /** Filter tambahan pada kolom data item laporan (K-30); tampil di bawah filter laporan. */
-    additional?: AdditionalFilterState;
+    notice?: string;
 };
 
 /**
- * Baris filter sebuah laporan.
+ * Susunan filter vertikal pada panel samping laporan.
  *
- * Komponen ini hanya wadah: letak, jarak, preset, dan tombol atur ulang. Filter apa yang tampil
- * ditentukan halaman laporannya sendiri, jadi laporan yang butuh filter baru cukup
- * menambahkannya di halamannya tanpa mengubah berkas ini.
+ * Engine mengisi bagian Opsi. Filter data item mengikuti bagian tersendiri di request page
+ * Business Central; opsi yang sudah ada tidak ditawarkan lagi sebagai filter kolom.
  */
 export function ReportFilterBar({
     children,
@@ -33,30 +31,31 @@ export function ReportFilterBar({
     onReset,
     presets,
     dates,
-    additional,
+    notice,
 }: ReportFilterBarProps) {
     return (
-        <div className="flex flex-col gap-3 border-b px-5 py-3">
+        <div className="flex flex-col gap-4 p-4">
+            {canReset && (
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={onReset}
+                    className="self-start"
+                >
+                    <RotateCcw aria-hidden="true" />
+                    Atur ulang filter
+                </Button>
+            )}
             {presets && (
-                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                <div className="flex flex-col items-start gap-3 border-b pb-4">
                     <ReportPresets state={presets} dates={dates} />
                 </div>
             )}
-            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-                {children}
-                {canReset && (
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={onReset}
-                        className="sm:ms-auto"
-                    >
-                        <RotateCcw />
-                        Atur ulang
-                    </Button>
-                )}
-            </div>
-            {additional && <AdditionalFilters state={additional} />}
+            {notice && (
+                <FieldDescription role="status">{notice}</FieldDescription>
+            )}
+            {children}
         </div>
     );
 }

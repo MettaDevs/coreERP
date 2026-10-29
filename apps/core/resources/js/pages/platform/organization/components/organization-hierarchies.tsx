@@ -63,6 +63,8 @@ import {
 } from '@xyflow/react';
 import { Check, Network, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { FormErrorHeader } from '@/components/form-error-header';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import { useToday } from '@/hooks/use-work-date';
 import { apiJson, errorText } from '@/lib/core-api';
 import { OrganizationLookup } from './organization-lookup';
@@ -76,6 +78,9 @@ import type {
     Version,
 } from './organization-types';
 function CreateHierarchyDialog({ purposes }: Pick<Props, 'purposes'>) {
+    const { wrap: wrapFormRequest, summary: formRequestSummary } =
+        useInertiaFeedback();
+
     const [open, setOpen] = useState(false);
     const contentRef = useRef<HTMLDivElement>(null);
     const today = useToday();
@@ -109,15 +114,19 @@ function CreateHierarchyDialog({ purposes }: Pick<Props, 'purposes'>) {
                 }
             >
                 <form
+                    noValidate
                     className="flex min-h-0 flex-1 flex-col"
                     onSubmit={(event) => {
                         event.preventDefault();
-                        form.post('/settings/organization/hierarchies', {
-                            onSuccess: () => {
-                                form.reset();
-                                setOpen(false);
-                            },
-                        });
+                        form.post(
+                            '/settings/organization/hierarchies',
+                            wrapFormRequest({
+                                onSuccess: () => {
+                                    form.reset();
+                                    setOpen(false);
+                                },
+                            }),
+                        );
                     }}
                 >
                     <PageDialogToolbar>
@@ -130,9 +139,17 @@ function CreateHierarchyDialog({ purposes }: Pick<Props, 'purposes'>) {
                             <ActionButton action="cancel" type="button" />
                         </DialogClose>
                     </PageDialogToolbar>
+                    <>
+                        {formRequestSummary}
+                        <FormErrorHeader errors={form.errors} />
+                    </>
+
                     <DialogBody className="space-y-4">
                         <FieldGroup>
-                            <Field data-invalid={Boolean(form.errors.name)}>
+                            <Field
+                                data-invalid={Boolean(form.errors.name)}
+                                data-error-field={'name'}
+                            >
                                 <Input
                                     label="Nama hierarki"
                                     required
@@ -181,6 +198,7 @@ function CreateHierarchyDialog({ purposes }: Pick<Props, 'purposes'>) {
                                     data-invalid={Boolean(
                                         form.errors.root_organization_id,
                                     )}
+                                    data-error-field={'root_organization_id'}
                                 >
                                     <OrganizationLookup
                                         label="Organisasi paling atas"
@@ -201,6 +219,7 @@ function CreateHierarchyDialog({ purposes }: Pick<Props, 'purposes'>) {
                                     data-invalid={Boolean(
                                         form.errors.effective_from,
                                     )}
+                                    data-error-field={'effective_from'}
                                 >
                                     <Input
                                         label="Berlaku mulai"
@@ -237,6 +256,9 @@ function DraftActions({
     version: Version;
     rowVersion: number;
 }) {
+    const { wrap: wrapFormRequest, summary: formRequestSummary } =
+        useInertiaFeedback();
+
     const form = useForm({
         organization_id: '',
         parent_organization_id: version.nodes[0]?.organization.id ?? '',
@@ -244,21 +266,30 @@ function DraftActions({
 
     return (
         <form
+            noValidate
             className="flex flex-col gap-3 rounded-xl border border-border/80 bg-card p-4 shadow-2xs"
             onSubmit={(event) => {
                 event.preventDefault();
                 form.transform((data) => ({ ...data, version: rowVersion }));
                 form.post(
                     `/settings/organization/hierarchy-versions/${version.id}/placements`,
-                    {
+                    wrapFormRequest({
                         preserveScroll: true,
                         onSuccess: () => form.setData('organization_id', ''),
-                    },
+                    }),
                 );
             }}
         >
+            <>
+                {formRequestSummary}
+                <FormErrorHeader errors={form.errors} />
+            </>
+
             <div className="grid gap-3 md:grid-cols-2">
-                <Field data-invalid={Boolean(form.errors.organization_id)}>
+                <Field
+                    data-invalid={Boolean(form.errors.organization_id)}
+                    data-error-field={'organization_id'}
+                >
                     <OrganizationLookup
                         label="Organisasi yang ditambahkan"
                         value={form.data.organization_id}
@@ -271,6 +302,7 @@ function DraftActions({
                 </Field>
                 <Field
                     data-invalid={Boolean(form.errors.parent_organization_id)}
+                    data-error-field={'parent_organization_id'}
                 >
                     <Select
                         label="Berada di bawah"
@@ -310,7 +342,7 @@ function DraftActions({
                             form.transform(() => ({ version: rowVersion }));
                             form.post(
                                 `/settings/organization/hierarchy-versions/${version.id}/publish`,
-                                { preserveScroll: true },
+                                wrapFormRequest({ preserveScroll: true }),
                             );
                         }}
                     >
@@ -565,11 +597,21 @@ function RemovePlacementAction({
     rowVersion: number;
     node: HierarchyNode;
 }) {
+    const { wrap: wrapFormRequest, summary: formRequestSummary } =
+        useInertiaFeedback();
+
     const [open, setOpen] = useState(false);
     const form = useForm({});
 
     return (
-        <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialog
+            open={open}
+            onOpenChange={(next) => {
+                if (!form.processing) {
+                    setOpen(next);
+                }
+            }}
+        >
             <AlertDialogTrigger asChild>
                 <Button type="button" variant="outline" size="sm">
                     <Trash2 />
@@ -585,6 +627,13 @@ function RemovePlacementAction({
                         benar.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
+                <>
+                    {formRequestSummary}
+                    <FormErrorHeader
+                        errors={form.errors}
+                        operation="Penempatan belum dibatalkan"
+                    />
+                </>
                 <AlertDialogFooter>
                     <AlertDialogCancel disabled={form.processing}>
                         Kembali
@@ -597,10 +646,10 @@ function RemovePlacementAction({
                             form.transform(() => ({ version: rowVersion }));
                             form.delete(
                                 `/settings/organization/hierarchy-versions/${version.id}/placements/${node.id}`,
-                                {
+                                wrapFormRequest({
                                     preserveScroll: true,
                                     onSuccess: () => setOpen(false),
-                                },
+                                }),
                             );
                         }}
                     >
@@ -619,6 +668,9 @@ function CreateVersionDraftAction({
     version: Version;
     rowVersion: number;
 }) {
+    const { wrap: wrapFormRequest, summary: formRequestSummary } =
+        useInertiaFeedback();
+
     const today = useToday();
     const form = useForm({
         effective_from: today,
@@ -647,6 +699,7 @@ function CreateVersionDraftAction({
                 }
             >
                 <form
+                    noValidate
                     className="flex min-h-0 flex-1 flex-col"
                     onSubmit={(event) => {
                         event.preventDefault();
@@ -656,7 +709,9 @@ function CreateVersionDraftAction({
                         }));
                         form.post(
                             `/settings/organization/hierarchy-versions/${version.id}/drafts`,
-                            { onSuccess: () => setOpen(false) },
+                            wrapFormRequest({
+                                onSuccess: () => setOpen(false),
+                            }),
                         );
                     }}
                 >
@@ -670,12 +725,18 @@ function CreateVersionDraftAction({
                             <ActionButton action="cancel" type="button" />
                         </DialogClose>
                     </PageDialogToolbar>
+                    <>
+                        {formRequestSummary}
+                        <FormErrorHeader errors={form.errors} />
+                    </>
+
                     <DialogBody className="space-y-4">
                         <FieldGroup>
                             <Field
                                 data-invalid={Boolean(
                                     form.errors.effective_from,
                                 )}
+                                data-error-field={'effective_from'}
                             >
                                 <Input
                                     label="Berlaku mulai"

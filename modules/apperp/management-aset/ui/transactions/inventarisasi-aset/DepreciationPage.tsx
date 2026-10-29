@@ -10,13 +10,15 @@ import {
     CardHeader,
     CardTitle,
 } from '@apperp/ui/card';
+import { DatePicker } from '@apperp/ui/date-picker';
 import {
     Empty,
     EmptyDescription,
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
-import { Field } from '@apperp/ui/field';
+
+import { FormControl } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import {
     Sheet,
@@ -25,7 +27,9 @@ import {
     SheetHeader,
     SheetTitle,
 } from '@apperp/ui/sheet';
-import { api, errorMessage } from '../../api';
+import { useConfirmation } from '@apperp/ui/use-confirmation';
+import { ApiError, api, errorMessage } from '../../api';
+import { useSaveFeedback } from '../../use-save-feedback';
 import { CancellationAction } from '../_shared/CancellationAction';
 import { DepreciationPostingSheet } from './DepreciationPostingSheet';
 import type { BukuPost } from './DepreciationPostingSheet';
@@ -118,6 +122,9 @@ export default function DepreciationPage({
     canPost: boolean;
     context: Context;
 }) {
+    const { confirm: confirmAction, confirmation: actionConfirmation } =
+        useConfirmation();
+
     const [books, setBooks] = useState<Book[]>([]);
     const [periods, setPeriods] = useState<Period[]>([]);
     const [error, setError] = useState('');
@@ -126,6 +133,28 @@ export default function DepreciationPage({
     const [bulkResult, setBulkResult] = useState('');
     const [postOpen, setPostOpen] = useState(false);
     const [saving, setSaving] = useState(false);
+    const {
+        scopeRef: pageScopeRef,
+        feedbackSummary: pageFeedback,
+        reportSaveError: reportPageError,
+        clearSaveFeedback: clearPageFeedback,
+    } = useSaveFeedback();
+    const {
+        scopeRef: proposalScopeRef,
+        feedbackSummary: proposalFeedback,
+        reportSaveError: reportProposalError,
+        clearSaveFeedback: clearProposalFeedback,
+    } = useSaveFeedback(undefined, selected?.id);
+    const {
+        scopeRef: bulkScopeRef,
+        feedbackSummary: bulkFeedback,
+        reportSaveError: reportBulkError,
+        clearSaveFeedback: clearBulkFeedback,
+    } = useSaveFeedback(undefined, bulkOpen ? 'bulk' : null);
+    const [proposalErrors, setProposalErrors] = useState<
+        Record<string, string[]>
+    >({});
+    const [bulkErrors, setBulkErrors] = useState<Record<string, string[]>>({});
     // Effect adalah satu-satunya pemilik pengambilan data. Pemuatan ulang setelah
     // proposal, finalisasi, atau koreksi dinyatakan dengan menaikkan penanda ini.
     const [versiMuat, setVersiMuat] = useState(0);
@@ -170,6 +199,9 @@ export default function DepreciationPage({
     const muatUlang = () => setVersiMuat((versi) => versi + 1);
     const opsiPost = pilihanPost(periods);
     const propose = async (form: HTMLFormElement) => {
+        clearProposalFeedback();
+        setProposalErrors({});
+
         if (!selected) {
             return;
         }
@@ -190,8 +222,13 @@ export default function DepreciationPage({
             setSelected(null);
             muatUlang();
         } catch (caught) {
-            setError(
-                errorMessage(caught, 'Proposal penyusutan belum dapat dibuat.'),
+            if (caught instanceof ApiError) {
+                setProposalErrors(caught.validationErrors);
+            }
+
+            reportProposalError(
+                caught,
+                'Proposal penyusutan belum dapat dibuat.',
             );
         } finally {
             setSaving(false);
@@ -203,6 +240,8 @@ export default function DepreciationPage({
      * sekadar berhasil atau gagal.
      */
     const proposeBulk = async (form: HTMLFormElement) => {
+        clearBulkFeedback();
+        setBulkErrors({});
         const data = new FormData(form);
         setSaving(true);
         setBulkResult('');
@@ -223,18 +262,26 @@ export default function DepreciationPage({
             setBulkOpen(false);
             muatUlang();
         } catch (caught) {
-            setError(
-                errorMessage(caught, 'Proposal massal belum dapat dijalankan.'),
-            );
+            if (caught instanceof ApiError) {
+                setBulkErrors(caught.validationErrors);
+            }
+
+            reportBulkError(caught, 'Proposal massal belum dapat dijalankan.');
         } finally {
             setSaving(false);
         }
     };
     const finalize = async (period: Period) => {
+        clearPageFeedback();
+
         if (
-            !window.confirm(
-                `Post penyusutan ${period.aset_code} untuk periode ini ke buku aset? Koreksi berikutnya memakai pembalikan.`,
-            )
+            !(await confirmAction({
+                title: `Post penyusutan ${period.aset_code} untuk periode ini ke buku aset? Koreksi berikutnya memakai pembalikan.`,
+                description:
+                    'Posting akan dicatat pada buku aset. Koreksi setelah posting memakai pembalikan.',
+                confirmLabel: 'Post penyusutan',
+                destructive: false,
+            }))
         ) {
             return;
         }
@@ -245,17 +292,18 @@ export default function DepreciationPage({
             });
             muatUlang();
         } catch (caught) {
-            setError(
-                errorMessage(caught, 'Penyusutan belum dapat difinalisasi.'),
-            );
+            reportPageError(caught, 'Penyusutan belum dapat difinalisasi.');
         }
     };
 
     return (
-        <div className="space-y-4">
+        <div ref={pageScopeRef} className="space-y-4">
+            {actionConfirmation}
+
             <Card className="rounded-none border-x-0 shadow-none">
                 <CardHeader className="border-b">
                     <CardTitle>Buku aset aktif</CardTitle>
+                    {pageFeedback}
                     <CardDescription>
                         Hitung usulan, periksa nilainya, lalu post ke buku aset.
                         Jurnal untuk Finance dapat disiapkan terpisah.
@@ -443,13 +491,17 @@ export default function DepreciationPage({
             {bulkOpen && (
                 <Sheet
                     open
-                    onOpenChange={(open) => !open && setBulkOpen(false)}
+                    onOpenChange={(open) =>
+                        !open && !saving && setBulkOpen(false)
+                    }
                 >
-                    <SheetContent side="right">
+                    <SheetContent ref={bulkScopeRef} side="right">
                         <SheetHeader>
                             <SheetTitle>Hitung usulan penyusutan</SheetTitle>
                         </SheetHeader>
+                        {bulkFeedback}
                         <form
+                            noValidate
                             className="space-y-4 p-5"
                             onSubmit={(event) => {
                                 event.preventDefault();
@@ -464,26 +516,37 @@ export default function DepreciationPage({
                                 ikut karena angka pemakaiannya berbeda tiap
                                 aset.
                             </p>
-                            <Field>
-                                <Input
+                            <FormControl
+                                error={
+                                    bulkFeedback
+                                        ? bulkErrors.period_starts_on?.[0]
+                                        : undefined
+                                }
+                            >
+                                <DatePicker
                                     name="period_starts_on"
                                     label="Periode mulai"
-                                    type="date"
                                     required
                                 />
-                            </Field>
-                            <Field>
-                                <Input
+                            </FormControl>
+                            <FormControl
+                                error={
+                                    bulkFeedback
+                                        ? bulkErrors.period_ends_on?.[0]
+                                        : undefined
+                                }
+                            >
+                                <DatePicker
                                     name="period_ends_on"
                                     label="Periode selesai"
-                                    type="date"
                                     required
                                 />
-                            </Field>
+                            </FormControl>
                             <SheetFooter>
                                 <ActionButton
                                     action="cancel"
                                     type="button"
+                                    disabled={saving}
                                     onClick={() => setBulkOpen(false)}
                                 />
                                 <Button type="submit" disabled={saving}>
@@ -495,14 +558,21 @@ export default function DepreciationPage({
                 </Sheet>
             )}
             {selected && (
-                <Sheet open onOpenChange={(open) => !open && setSelected(null)}>
-                    <SheetContent side="right">
+                <Sheet
+                    open
+                    onOpenChange={(open) =>
+                        !open && !saving && setSelected(null)
+                    }
+                >
+                    <SheetContent ref={proposalScopeRef} side="right">
                         <SheetHeader>
                             <SheetTitle>
                                 Hitung usulan penyusutan aset
                             </SheetTitle>
                         </SheetHeader>
+                        {proposalFeedback}
                         <form
+                            noValidate
                             className="space-y-4 p-5"
                             onSubmit={(event) => {
                                 event.preventDefault();
@@ -513,24 +583,41 @@ export default function DepreciationPage({
                                 {selected.aset_code} · {selected.book_code} ·{' '}
                                 {selected.profile_name}
                             </p>
-                            <Field>
-                                <Input
+                            <FormControl
+                                error={
+                                    proposalFeedback
+                                        ? proposalErrors.period_starts_on?.[0]
+                                        : undefined
+                                }
+                            >
+                                <DatePicker
                                     name="period_starts_on"
                                     label="Periode mulai"
-                                    type="date"
                                     required
                                 />
-                            </Field>
-                            <Field>
-                                <Input
+                            </FormControl>
+                            <FormControl
+                                error={
+                                    proposalFeedback
+                                        ? proposalErrors.period_ends_on?.[0]
+                                        : undefined
+                                }
+                            >
+                                <DatePicker
                                     name="period_ends_on"
                                     label="Periode selesai"
-                                    type="date"
                                     required
                                 />
-                            </Field>
+                            </FormControl>
                             {selected.method === 'consumption' && (
-                                <Field>
+                                <FormControl
+                                    error={
+                                        proposalFeedback
+                                            ? proposalErrors
+                                                  .consumption_amount?.[0]
+                                            : undefined
+                                    }
+                                >
                                     <Input
                                         name="consumption_amount"
                                         label="Nilai penyusutan dari pemakaian"
@@ -539,12 +626,13 @@ export default function DepreciationPage({
                                         step="0.01"
                                         required
                                     />
-                                </Field>
+                                </FormControl>
                             )}
                             <SheetFooter>
                                 <ActionButton
                                     action="cancel"
                                     type="button"
+                                    disabled={saving}
                                     onClick={() => setSelected(null)}
                                 />
                                 <Button type="submit" disabled={saving}>

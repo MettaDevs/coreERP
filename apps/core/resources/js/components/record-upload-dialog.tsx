@@ -1,4 +1,3 @@
-import { Alert, AlertDescription } from '@apperp/ui/alert';
 import { Button } from '@apperp/ui/button';
 import {
     Dialog,
@@ -11,9 +10,10 @@ import {
 } from '@apperp/ui/dialog';
 import { Progress } from '@apperp/ui/progress';
 import { Upload } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { apiUpload } from '@/lib/core-api';
+import { FormErrorHeader } from '@/components/form-error-header';
+import { apiUpload, CoreApiError } from '@/lib/core-api';
 import { attachmentError, fileExtension, fileSize } from '@/lib/record-files';
 import type { Attachment } from '@/lib/record-files';
 
@@ -40,6 +40,10 @@ export function RecordUploadDialog({
     const [stopping, setStopping] = useState(false);
     const [dragging, setDragging] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>(
+        {},
+    );
+    const fileErrorId = `${useId()}-file-error`;
     const input = useRef<HTMLInputElement>(null);
     const active = useRef<AbortController | null>(null);
     const stop = useRef(false);
@@ -68,6 +72,7 @@ export function RecordUploadDialog({
         }
 
         setError(null);
+        setFieldErrors({});
         const invalid = selected.find(
             (file) =>
                 !limits.extensions.includes(fileExtension(file.name)) ||
@@ -75,9 +80,9 @@ export function RecordUploadDialog({
         );
 
         if (invalid) {
-            setError(
-                `${invalid.name}: pilih ${limits.extensions.join(', ').toUpperCase()} dengan ukuran maksimal ${fileSize(limits.max_kb * 1024)} per berkas.`,
-            );
+            const message = `${invalid.name}: pilih ${limits.extensions.join(', ').toUpperCase()} dengan ukuran maksimal ${fileSize(limits.max_kb * 1024)} per berkas.`;
+            setError(message);
+            setFieldErrors({ file: [message] });
 
             return;
         }
@@ -125,6 +130,10 @@ export function RecordUploadDialog({
             onOpenChange(false);
         } catch (caught) {
             if (!controller.signal.aborted) {
+                if (caught instanceof CoreApiError && caught.status < 500) {
+                    setFieldErrors(caught.errors);
+                }
+
                 setError(
                     `${uploaded} dari ${selected.length} berkas sudah tersimpan. ${attachmentError(caught, 'Berkas berikutnya belum dapat diunggah.')} Muat ulang daftar sebelum mencoba lagi.`,
                 );
@@ -145,6 +154,7 @@ export function RecordUploadDialog({
 
         setFiles([]);
         setError(null);
+        setFieldErrors({});
         setDragging(false);
         onOpenChange(false);
     }
@@ -168,12 +178,13 @@ export function RecordUploadDialog({
                         {fileSize(limits.max_kb * 1024)} per berkas
                     </DialogDescription>
                 </DialogHeader>
+                <FormErrorHeader
+                    message={error}
+                    errors={fieldErrors}
+                    operation="Berkas belum dapat diunggah"
+                />
+
                 <DialogBody>
-                    {error && (
-                        <Alert variant="destructive">
-                            <AlertDescription>{error}</AlertDescription>
-                        </Alert>
-                    )}
                     {busy ? (
                         <div
                             className="space-y-3"
@@ -215,6 +226,11 @@ export function RecordUploadDialog({
                                 }}
                             />
                             <Button
+                                data-error-field="file"
+                                aria-invalid={!!fieldErrors.file}
+                                aria-describedby={
+                                    fieldErrors.file ? fileErrorId : undefined
+                                }
                                 type="button"
                                 variant="outline"
                                 className={`h-auto w-full flex-col gap-3 border-dashed p-8 whitespace-normal ${dragging ? 'bg-accent' : ''}`}
@@ -250,6 +266,15 @@ export function RecordUploadDialog({
                                 <Upload />
                                 Seret berkas ke sini, atau klik untuk memilih
                             </Button>
+                            {fieldErrors.file && (
+                                <p
+                                    id={fileErrorId}
+                                    role="alert"
+                                    className="text-sm text-destructive"
+                                >
+                                    {fieldErrors.file.join(' ')}
+                                </p>
+                            )}
                         </>
                     )}
                     {files.length > 0 && (

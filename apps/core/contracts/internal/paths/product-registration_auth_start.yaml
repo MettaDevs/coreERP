@@ -1,0 +1,40 @@
+post:
+  tags:
+  - Product registration
+  operationId: internal.productRegistration.start
+  summary: Mulai login SSO terikat peramban
+  security:
+  - productRegistrationGateway: []
+  responses:
+    '200':
+      description: Permintaan berhasil.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+            - authorization_url
+            properties:
+              authorization_url:
+                type: string
+                format: uri
+    '401':
+      description: Sesi atau kredensial bridge tidak berlaku.
+    '422':
+      description: Isian belum sesuai atau verifikasi belum selesai.
+    '429':
+      description: Batas permintaan tercapai.
+    '503':
+      description: Penyedia atau konfigurasi belum tersedia.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+          - browser_challenge
+          properties:
+            browser_challenge:
+              type: string
+              pattern: ^[a-f0-9]{64}$

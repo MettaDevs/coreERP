@@ -1,0 +1,5 @@
+type: apiKey
+in: header
+name: X-Registration-Session
+description: Token opaque sesi customer yang disimpan pada cookie HttpOnly oleh landing.
+  Bukan kredensial operator.

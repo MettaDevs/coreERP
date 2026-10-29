@@ -347,7 +347,7 @@ final class ProvisionIndonesiaStarterData
     private function ensureChecklistValues(string $tenantId, string $variableId, array $items): void
     {
         foreach ($items as $item) {
-            $exists = MaintenanceChecklistVariableValue::query()->where([
+            $exists = MaintenanceChecklistVariableValue::withTrashed()->where([
                 'variable_id' => $variableId, 'line_number' => $item['line_number'],
             ])->exists();
             if ($exists) {
@@ -367,7 +367,7 @@ final class ProvisionIndonesiaStarterData
     private function ensureChecklistTemplateLines(string $tenantId, string $templateId, array $items, array $variables = []): void
     {
         foreach ($items as $item) {
-            $exists = MaintenanceChecklistTemplateLine::query()->where([
+            $exists = MaintenanceChecklistTemplateLine::withTrashed()->where([
                 'template_id' => $templateId, 'line_number' => $item['line_number'],
             ])->exists();
             if ($exists) {

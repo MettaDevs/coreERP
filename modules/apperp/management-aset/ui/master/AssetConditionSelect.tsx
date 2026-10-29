@@ -1,6 +1,8 @@
 import type { RefObject } from 'react';
-import { Select } from '@apperp/ui/select';
-import { optionLabel, useMasterOptions } from './useMasterOptions';
+import { api } from '../api';
+import { useSaveFeedback } from '../use-save-feedback';
+import MasterLookup from './MasterLookup';
+import { useMasterOptions } from './useMasterOptions';
 
 export default function AssetConditionSelect({
     assetTypeId,
@@ -9,6 +11,7 @@ export default function AssetConditionSelect({
     onChange,
     portalContainer,
     label,
+    permissions = [],
 }: {
     assetTypeId?: string;
     assetId?: string;
@@ -16,36 +19,73 @@ export default function AssetConditionSelect({
     onChange: (value: string) => void;
     portalContainer?: RefObject<HTMLDivElement | null>;
     label: string;
+    permissions?: string[];
 }) {
+    const { scopeRef, feedbackSummary, reportSaveError, clearSaveFeedback } =
+        useSaveFeedback(undefined, assetId ?? assetTypeId);
     const query = assetId
         ? `aset_id=${assetId}`
         : `jenis_aset_id=${assetTypeId ?? ''}`;
-    const { options, error, selectProps } = useMasterOptions(
-        'kondisi-aset',
-        query,
-        value,
-    );
-    const selected = options.find((item) => item.id === value);
+    const source = useMasterOptions('kondisi-aset', query, value);
 
     return (
-        <div>
-            <Select
-                {...selectProps}
-                items={options.map(optionLabel)}
-                value={selected ? optionLabel(selected) : null}
+        <div ref={scopeRef}>
+            {feedbackSummary}
+            <MasterLookup
+                source={source}
+                label={label}
+                value={value}
+                onValueChange={onChange}
                 placeholder="Tidak dicatat"
-                searchPlaceholder="Cari kondisi"
-                emptyMessage="Kondisi tidak ditemukan."
-                ariaLabel={label}
+                disabled={false}
                 portalContainer={portalContainer}
-                onValueChange={(item) =>
-                    onChange(
-                        options.find((option) => optionLabel(option) === item)
-                            ?.id ?? '',
-                    )
-                }
+                permissions={permissions}
+                allowCreate={Boolean(
+                    assetTypeId &&
+                    permissions.includes('management-aset.jenis-aset.read') &&
+                    permissions.includes('management-aset.jenis-aset.update') &&
+                    permissions.includes('management-aset.kondisi-aset.read'),
+                )}
+                onCreated={async (record) => {
+                    clearSaveFeedback();
+
+                    if (!assetTypeId) {
+                        return;
+                    }
+
+                    try {
+                        const current = await api<{
+                            data: { selected: { id: string }[] };
+                            version: number;
+                        }>(`/jenis-aset/${assetTypeId}/conditions`);
+                        const ids = current.data.selected.map(
+                            (item) => item.id,
+                        );
+
+                        if (ids.length === 0 || ids.includes(record.id)) {
+                            return;
+                        }
+
+                        await api(`/jenis-aset/${assetTypeId}/conditions`, {
+                            method: 'PUT',
+                            body: JSON.stringify({
+                                version: current.version,
+                                condition_ids: [...ids, record.id],
+                            }),
+                        });
+                    } catch (caught) {
+                        reportSaveError(
+                            caught,
+                            'Kondisi belum dapat dikaitkan ke jenis aset.',
+                        );
+                    }
+                }}
             />
-            {error && <p className="text-destructive text-sm">{error}</p>}
+            {source.error && (
+                <p role="alert" className="text-destructive text-sm">
+                    {source.error}
+                </p>
+            )}
         </div>
     );
 }

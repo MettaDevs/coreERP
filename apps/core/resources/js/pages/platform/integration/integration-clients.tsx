@@ -75,12 +75,8 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import Heading from '@/components/heading';
 import { useDateTimeFormat } from '@/hooks/use-date-time';
-import {
-    apiJson,
-    CoreApiError,
-    errorText,
-    toastSaveError,
-} from '@/lib/core-api';
+import { useSaveFeedback } from '@/hooks/use-save-feedback';
+import { apiJson, CoreApiError } from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
 
 type Mode = 'pull' | 'push';
@@ -164,6 +160,12 @@ function ClientSheet({
     onClose: () => void;
     onSecrets: (secrets: Secrets) => void;
 }) {
+    const {
+        report: saveReport,
+        clear: saveClear,
+        summary: saveSummary,
+        scopeRef: saveScopeRef,
+    } = useSaveFeedback<HTMLDivElement>(client?.id ?? 'new');
     const [form, setForm] = useState<Form>(toForm(client));
     const [errors, setErrors] = useState<Record<string, string[]>>({});
     const [saving, setSaving] = useState(false);
@@ -178,6 +180,8 @@ function ClientSheet({
     const save = async () => {
         setSaving(true);
         setErrors({});
+
+        saveClear();
 
         try {
             const result = await apiJson<{
@@ -216,7 +220,7 @@ function ClientSheet({
                 setErrors(caught.errors);
             }
 
-            toastSaveError(caught, 'Klien integrasi belum disimpan.');
+            saveReport(caught, 'Klien integrasi belum disimpan.');
         } finally {
             setSaving(false);
         }
@@ -257,9 +261,13 @@ function ClientSheet({
                         onClick={onClose}
                     />
                 </PageDialogToolbar>
-                <PageDialogBody>
+                {saveSummary}
+                <PageDialogBody ref={saveScopeRef}>
                     <FieldGroup>
-                        <Field data-invalid={Boolean(error('name'))}>
+                        <Field
+                            data-error-field="name"
+                            data-invalid={Boolean(error('name'))}
+                        >
                             <Input
                                 label="Nama"
                                 required
@@ -272,7 +280,10 @@ function ClientSheet({
                             />
                             <FieldError>{error('name')}</FieldError>
                         </Field>
-                        <Field data-invalid={Boolean(error('delivery_mode'))}>
+                        <Field
+                            data-error-field="delivery_mode"
+                            data-invalid={Boolean(error('delivery_mode'))}
+                        >
                             <NativeSelect
                                 label="Mode pengiriman"
                                 value={form.delivery_mode}
@@ -299,7 +310,10 @@ function ClientSheet({
                             </FieldDescription>
                         </Field>
                         {form.delivery_mode === 'push' && (
-                            <Field data-invalid={Boolean(error('push_url'))}>
+                            <Field
+                                data-error-field="push_url"
+                                data-invalid={Boolean(error('push_url'))}
+                            >
                                 <Input
                                     label="URL tujuan"
                                     required
@@ -366,7 +380,10 @@ function ClientSheet({
                                 {error('posting_type_prefixes')}
                             </FieldError>
                         </Field>
-                        <Field data-invalid={Boolean(error('allowed_ips'))}>
+                        <Field
+                            data-error-field="allowed_ips"
+                            data-invalid={Boolean(error('allowed_ips'))}
+                        >
                             <Textarea
                                 label="Alamat IP yang diizinkan"
                                 rows={3}
@@ -492,6 +509,12 @@ export default function IntegrationClients({
     canManage,
 }: Props) {
     const formatDateTime = useDateTimeFormat();
+    const {
+        report: saveReport,
+        clear: saveClear,
+        summary: saveSummary,
+        scopeRef: saveScopeRef,
+    } = useSaveFeedback<HTMLDivElement>();
     const [editing, setEditing] = useState<Client | 'new' | null>(null);
     const [secrets, setSecrets] = useState<Secrets | null>(null);
     const [revoking, setRevoking] = useState<Client | null>(null);
@@ -502,6 +525,8 @@ export default function IntegrationClients({
         title: string,
         success: string,
     ) => {
+        saveClear();
+
         try {
             const result = await apiJson<{
                 token?: string;
@@ -523,11 +548,13 @@ export default function IntegrationClients({
                 toast.success(success);
             }
         } catch (caught) {
-            toastSaveError(caught, 'Tindakan belum berhasil.');
+            saveReport(caught, 'Tindakan belum berhasil.');
         }
     };
 
     const testPush = async (client: Client) => {
+        saveClear();
+
         try {
             const result = await apiJson<{
                 data: { ok: boolean; message: string };
@@ -539,10 +566,13 @@ export default function IntegrationClients({
                 toast.success(result.data.message);
             } else {
                 // Sebab kegagalan perlu dibaca dan disalin ke tim aplikasi finance.
-                toast.error(result.data.message, { duration: 10_000 });
+                saveReport(
+                    new CoreApiError(result.data.message, 422),
+                    'Kirim uji belum berhasil.',
+                );
             }
         } catch (caught) {
-            toast.error(errorText(caught, 'Kirim uji belum berhasil.'));
+            saveReport(caught, 'Kirim uji belum berhasil.');
         }
     };
 
@@ -554,6 +584,7 @@ export default function IntegrationClients({
                     title="Klien integrasi"
                     description="Atur koneksi dan izin akses untuk sistem di luar CoreERP."
                 />
+                <div ref={saveScopeRef}>{saveSummary}</div>
                 <Card>
                     <CardHeader>
                         <CardTitle>Klien terdaftar</CardTitle>

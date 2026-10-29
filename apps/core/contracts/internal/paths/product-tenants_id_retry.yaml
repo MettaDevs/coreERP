@@ -1,0 +1,40 @@
+post:
+  tags:
+  - Pusat admin
+  operationId: internal.productTenants.retry
+  summary: Lanjutkan penyiapan yang gagal
+  security:
+  - controlPlaneToken: []
+  responses:
+    '202':
+      description: Permintaan diterima.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ManagedProductTenant'
+    '401':
+      description: Token pusat admin salah.
+    '404':
+      description: Tenant atau operator tidak ditemukan.
+    '409':
+      description: Permintaan bertentangan dengan keadaan saat ini.
+    '422':
+      description: Isian belum sesuai.
+  parameters:
+  - name: id
+    in: path
+    required: true
+    schema:
+      type: string
+      format: uuid
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+          - requested_by
+          properties:
+            requested_by:
+              type: integer

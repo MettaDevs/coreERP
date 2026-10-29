@@ -12,6 +12,7 @@ use ControlPlane\Models\SiteEnrollmentToken;
 use ControlPlane\Models\SiteOperation;
 use ControlPlane\Sites\SiteDns;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\PendingCommand;
@@ -255,6 +256,52 @@ final class SiteDnsTest extends SiteTestCase
         $site->refresh();
         $this->assertNotNull($site->revoked_at);
         $this->assertNotNull($site->dns_record_id);
+    }
+
+    public function test_revocation_cleanup_can_be_retried_without_duplicate_revoke_audit(): void
+    {
+        [$environment, $site] = $this->installable('103.122.2.72');
+        $operator = $this->operator();
+        $this->actingAs($operator)->post("/lingkungan/{$environment->id}/perintah-pasang")->assertSessionHasNoErrors();
+        $this->cloudflare->failWith = 503;
+        $this->actingAs($operator)->post("/situs/{$site->id}/cabut")->assertSessionHasNoErrors();
+        $this->assertNotNull($site->refresh()->dns_record_id);
+        $this->cloudflare->failWith = null;
+        $this->actingAs($operator)->post("/situs/{$site->id}/cabut")->assertSessionHasNoErrors();
+        $this->assertNull($site->refresh()->dns_record_id);
+        $this->assertSame([], $this->cloudflare->named($this->hostOf($environment)));
+        $this->assertSame(1, OperatorAuditEvent::query()->where('action', 'site.revoked')->count());
+    }
+
+    public function test_dns_metadata_rolls_back_when_its_audit_cannot_be_written(): void
+    {
+        [, $site] = $this->installable('103.122.2.72');
+        $request = Request::create('/situs/'.$site->id, 'POST');
+        $operator = $this->operator();
+        $request->setUserResolver(fn () => $operator);
+        DB::statement("ALTER TABLE operator_audit_events ADD CONSTRAINT reject_dns_audit CHECK (action <> 'site.dns.written')");
+        try {
+            app(SiteDns::class)->ensure($request, $site);
+            $this->fail('Expected audit persistence to fail.');
+        } catch (QueryException) {
+            $this->assertNull($site->refresh()->dns_record_id);
+        }
+    }
+
+    public function test_dns_removal_metadata_rolls_back_when_its_audit_cannot_be_written(): void
+    {
+        [$environment, $site] = $this->installable('103.122.2.72');
+        $operator = $this->operator();
+        $this->actingAs($operator)->post("/lingkungan/{$environment->id}/perintah-pasang")->assertSessionHasNoErrors();
+        $request = Request::create('/situs/'.$site->id, 'POST');
+        $request->setUserResolver(fn () => $operator);
+        DB::statement("ALTER TABLE operator_audit_events ADD CONSTRAINT reject_dns_audit CHECK (action <> 'site.dns.deleted')");
+        try {
+            app(SiteDns::class)->remove($request, $site->refresh());
+            $this->fail('Expected audit persistence to fail.');
+        } catch (QueryException) {
+            $this->assertNotNull($site->refresh()->dns_record_id);
+        }
     }
 
     // ------------------------------------------------------------------ token dan pengaturan

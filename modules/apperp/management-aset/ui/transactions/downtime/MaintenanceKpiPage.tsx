@@ -3,15 +3,17 @@ import { toast } from 'sonner';
 import { useToday } from '@/hooks/use-work-date';
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
+import { DatePicker } from '@apperp/ui/date-picker';
 import {
     Empty,
     EmptyDescription,
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
-import { Input } from '@apperp/ui/input';
+import { FormControl } from '@apperp/ui/form-control';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
+import { RecordLookup } from '../../_shared/RecordLookup';
 import { api, errorMessage } from '../../api';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import type { KpiFigures, KpiRow } from './downtime';
@@ -174,63 +176,75 @@ export default function MaintenanceKpiPage() {
             <RecordActionBar title="KPI pemeliharaan" />
             <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
                 <div className="w-full sm:w-44">
-                    <Input
-                        label="Dari"
-                        type="date"
-                        value={from}
-                        onChange={(event) => setFrom(event.target.value)}
-                    />
+                    <FormControl>
+                        <DatePicker
+                            label="Dari"
+
+                            value={from}
+                            onValueChange={(value) => setFrom(value)}
+                        />
+                    </FormControl>
                 </div>
                 <div className="w-full sm:w-44">
-                    <Input
-                        label="Sampai"
-                        type="date"
-                        value={until}
-                        onChange={(event) => setUntil(event.target.value)}
-                    />
+                    <FormControl>
+                        <DatePicker
+                            label="Sampai"
+
+                            value={until}
+                            onValueChange={(value) => setUntil(value)}
+                        />
+                    </FormControl>
                 </div>
                 <div className="w-full sm:w-48">
-                    <Select
-                        label="Kelompokkan"
-                        items={GROUPINGS}
-                        value={grouping}
-                        ariaLabel="Kelompokkan KPI"
-                        onValueChange={(value) => setGrouping(value ?? 'aset')}
-                    />
+                    <FormControl>
+                        <Select
+                            label="Kelompokkan"
+                            items={GROUPINGS}
+                            value={grouping}
+                            ariaLabel="Kelompokkan KPI"
+                            onValueChange={(value) =>
+                                setGrouping(value ?? 'aset')
+                            }
+                        />
+                    </FormControl>
                 </div>
                 <div className="w-full sm:w-56">
-                    <Select
-                        {...types.selectProps}
-                        label="Jenis aset"
-                        items={[
-                            { value: '', label: 'Semua jenis' },
-                            ...types.options.map((option) => ({
-                                value: option.id,
-                                label: optionLabel(option),
-                            })),
-                        ]}
-                        value={type || null}
-                        placeholder="Semua jenis"
-                        ariaLabel="Saring jenis aset"
-                        onValueChange={(value) => setType(value ?? '')}
-                    />
+                    <FormControl>
+                        <RecordLookup
+                            source={types}
+                            label="Jenis aset"
+                            items={[
+                                { value: '', label: 'Semua jenis' },
+                                ...types.options.map((option) => ({
+                                    value: option.id,
+                                    label: optionLabel(option),
+                                })),
+                            ]}
+                            value={type || null}
+                            placeholder="Semua jenis"
+                            ariaLabel="Saring jenis aset"
+                            onValueChange={(value) => setType(value ?? '')}
+                        />
+                    </FormControl>
                 </div>
                 <div className="w-full sm:w-56">
-                    <Select
-                        {...locations.selectProps}
-                        label="Lokasi"
-                        items={[
-                            { value: '', label: 'Semua lokasi' },
-                            ...locations.options.map((option) => ({
-                                value: option.id,
-                                label: optionLabel(option),
-                            })),
-                        ]}
-                        value={location || null}
-                        placeholder="Semua lokasi"
-                        ariaLabel="Saring lokasi"
-                        onValueChange={(value) => setLocation(value ?? '')}
-                    />
+                    <FormControl>
+                        <RecordLookup
+                            source={locations}
+                            label="Lokasi"
+                            items={[
+                                { value: '', label: 'Semua lokasi' },
+                                ...locations.options.map((option) => ({
+                                    value: option.id,
+                                    label: optionLabel(option),
+                                })),
+                            ]}
+                            value={location || null}
+                            placeholder="Semua lokasi"
+                            ariaLabel="Saring lokasi"
+                            onValueChange={(value) => setLocation(value ?? '')}
+                        />
+                    </FormControl>
                 </div>
             </div>
 

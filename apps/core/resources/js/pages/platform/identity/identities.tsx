@@ -110,7 +110,11 @@ export default function Identities({ identities, filters }: Props) {
                 />
                 <Card>
                     <CardContent className="flex flex-col gap-4">
-                        <form onSubmit={submit} className="relative max-w-md">
+                        <form
+                            noValidate
+                            onSubmit={submit}
+                            className="relative max-w-md"
+                        >
                             <Input
                                 label="Cari identity"
                                 value={search}

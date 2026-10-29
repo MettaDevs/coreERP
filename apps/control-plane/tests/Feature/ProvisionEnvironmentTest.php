@@ -147,6 +147,9 @@ class ProvisionEnvironmentTest extends TestCase
     {
         Http::fake([self::BASE_URL.'/api/internal/v1/fleet' => Http::response([
             'platform_release' => '0.8.1',
+            'platform_fingerprint' => 'schema-test',
+            'counts' => ['current' => 0, 'behind' => 0, 'failed' => 0, 'unknown' => 0],
+            'environments' => [],
         ])]);
 
         $environment = $this->environment('active', 'production');
@@ -306,5 +309,13 @@ class ProvisionEnvironmentTest extends TestCase
         ]);
 
         return User::query()->findOrFail($id);
+    }
+
+    public function test_a_module_read_failure_does_not_claim_the_tenant_bought_no_apps(): void
+    {
+        $environment = $this->environment('provisioning');
+        Http::fake(['*' => Http::response(['status' => 'active', 'database' => 'audit_db', 'modules' => [], 'modules_error' => 'Daftar aplikasi belum dapat dibaca.'])]);
+        $this->actingAs($this->operator())->post('/lingkungan/'.$environment->id.'/siapkan')
+            ->assertSessionHas('message', fn (string $message): bool => str_contains($message, 'belum dapat dibaca'));
     }
 }

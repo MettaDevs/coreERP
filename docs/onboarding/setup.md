@@ -98,7 +98,7 @@ memisahkan datanya adalah awalan nama tabel.
 
 **Migration atau seed dari host memakai database yang salah.** `php artisan migrate`, `db:seed`, dan `tinker` yang dijalankan dari host bisa menunjuk database berbeda dari yang dipakai UI lokal. Untuk data yang harus terlihat di `http://localhost:8000`, jalankan lewat container `core-app`, atau pakai `.\start.ps1 -Build`. Verifikasi hasilnya dengan query dari container, bukan dari host.
 
-**UI tidak berubah walaupun build lulus.** `npm run build` saja tidak cukup. Container runtime harus dibuat ulang lewat `.\start.ps1 -Build`, lalu layarnya dibuka untuk memastikan artifact baru benar-benar tampil. Type-check lulus bukan bukti perubahan UI sudah tayang.
+**UI belum berubah saat HotReload aktif.** Perubahan source seharusnya diterapkan otomatis tanpa rebuild container atau reload halaman. Jika user/developer melaporkan layar masih menampilkan source lama, periksa Vite dan mount source terlebih dahulu; lakukan restart atau `.\start.ps1 -Build` hanya bila memang diperlukan. Jika HotReload tidak aktif, jalankan `.\start.ps1 -Build` untuk memperbarui runtime.
 
 **Menu lama masih muncul setelah mengubah `app.yaml`.** Rebuild UI tidak mendaftarkan ulang manifest. Jalankan `app:register-manifest <id module>` lewat container `core-app`, verifikasi kolom `apps.navigation` di database runtime, lalu reload shell Core.
 

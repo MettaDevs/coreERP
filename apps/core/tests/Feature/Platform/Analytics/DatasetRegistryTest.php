@@ -204,11 +204,7 @@ class DatasetRegistryTest extends TestCase
     private function migrateFixture(): void
     {
         // Tabel module contoh dibuat test-nya sendiri, seperti penjaga batas lain (`TenantScopeBoundaryTest`).
-        Artisan::call('migrate', [
-            '--path' => dirname(__DIR__, 3).'/Fixtures/modules/apperp/contoh-a/database/migrations',
-            '--realpath' => true,
-            '--force' => true,
-        ]);
+        Artisan::call('module:migrate', ['module' => 'contoh-a']);
     }
 
     private function install(string $tenantId, string $moduleId, string $status): void

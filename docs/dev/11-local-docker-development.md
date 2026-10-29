@@ -49,8 +49,13 @@ stack ini.
 ```powershell
 cd <workspace>\erp-docker-start-dev
 .\start.ps1         # pertama kali dan penggunaan harian
-.\start.ps1 -Build  # setelah Dockerfile atau source berubah
+.\start.ps1 -Build  # saat Dockerfile/dependency image berubah atau HotReload tidak aktif
 ```
+
+Pada runtime harian dengan HotReload aktif, perubahan source UI dilayani oleh Vite dan perubahan PHP
+dibaca pada permintaan berikutnya. Jangan membangun ulang container atau memuat ulang halaman setelah
+setiap perubahan. Jika user/developer melaporkan perubahan tidak terlihat, periksa proses Vite dan mount
+source sebelum memilih restart atau build yang diperlukan.
 
 Script menjalankan migration, seed Core, registrasi manifest tiap module terpilih, migration
 module, health check, lalu mencatat release lokal sebagai siap.

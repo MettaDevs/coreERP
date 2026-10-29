@@ -117,11 +117,7 @@ final class RowVersion
      */
     public static function claimIfExists(EloquentBuilder|Builder $query, int $expected): bool
     {
-        if (DB::transactionLevel() === 0) {
-            throw new LogicException('RowVersion::claimIfExists() harus dipanggil di dalam transaksi.');
-        }
-
-        DB::select('select pg_advisory_xact_lock(hashtextextended(?, 0))', [$query->toRawSql()]);
+        self::lockCreation($query);
 
         if ((clone $query)->exists()) {
             self::claim($query, $expected);
@@ -134,6 +130,23 @@ final class RowVersion
         }
 
         return false;
+    }
+
+    /**
+     * Urutkan pembuatan pada slot query yang sama tanpa menaikkan versi record yang sudah ada.
+     * Pemanggil memakai query model yang sudah tersaring tenant dan key, di dalam transaksi penulisnya.
+     *
+     * @template TModel of Model
+     *
+     * @param  EloquentBuilder<TModel>|Builder  $query
+     */
+    public static function lockCreation(EloquentBuilder|Builder $query): void
+    {
+        if (DB::transactionLevel() === 0) {
+            throw new LogicException('RowVersion::lockCreation() harus dipanggil di dalam transaksi.');
+        }
+
+        DB::select('select pg_advisory_xact_lock(hashtextextended(?, 0))', [$query->toRawSql()]);
     }
 
     /** ETag lemah untuk sebuah versi, bentuk yang juga dipakai BC: `W/"12"`. */
