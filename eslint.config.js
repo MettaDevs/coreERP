@@ -50,6 +50,18 @@ export default [
             },
         },
         rules: {
+            'no-alert': 'error',
+            'no-restricted-properties': [
+                'error',
+                ...['window', 'globalThis', 'self'].flatMap((object) =>
+                    ['alert', 'confirm', 'prompt'].map((property) => ({
+                        object,
+                        property,
+                        message:
+                            'Gunakan dialog SDK melalui @apperp/ui/use-confirmation atau Dialog SDK; dialog bawaan browser dilarang.',
+                    })),
+                ),
+            ],
             'react/react-in-jsx-scope': 'off',
             'react/prop-types': 'off',
             'react/no-unescaped-entities': 'off',
@@ -107,7 +119,11 @@ export default [
             '@stylistic': stylistic,
         },
         rules: {
-            '@stylistic/brace-style': ['error', '1tbs', { allowSingleLine: false }],
+            '@stylistic/brace-style': [
+                'error',
+                '1tbs',
+                { allowSingleLine: false },
+            ],
             '@stylistic/padding-line-between-statements': [
                 'error',
                 ...paddingAroundControl,
@@ -146,7 +162,26 @@ export default [
             'no-restricted-syntax': [
                 'error',
                 {
-                    selector: 'CatchClause ReturnStatement > Literal[raw="null"]',
+                    selector:
+                        "CallExpression[callee.type='MemberExpression'][callee.property.name='reportValidity']",
+                    message:
+                        'Tampilkan validasi melalui header dan field SDK, bukan reportValidity() browser.',
+                },
+                {
+                    selector:
+                        'JSXOpeningElement[name.name=/^(form|Form)$/]:not(:has(JSXAttribute[name.name="noValidate"]))',
+                    message:
+                        'Form harus memakai noValidate dan menampilkan validasi di header serta field SDK.',
+                },
+                {
+                    selector:
+                        "AssignmentExpression[left.type='MemberExpression'][left.property.name='returnValue']",
+                    message:
+                        'Jangan memicu popup keluar halaman bawaan browser; gunakan konfirmasi SDK untuk navigasi aplikasi.',
+                },
+                {
+                    selector:
+                        'CatchClause ReturnStatement > Literal[raw="null"]',
                     message:
                         '`catch` yang memulangkan null: pemanggil tidak bisa membedakannya dari "memang tidak ada". Lempar ulang, atau pulangkan bentuk yang menyatakan kegagalan.',
                 },
@@ -301,7 +336,11 @@ export default [
         },
         rules: {
             curly: ['error', 'all'],
-            '@stylistic/brace-style': ['error', '1tbs', { allowSingleLine: false }],
+            '@stylistic/brace-style': [
+                'error',
+                '1tbs',
+                { allowSingleLine: false },
+            ],
         },
     },
 ];

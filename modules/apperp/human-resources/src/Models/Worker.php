@@ -45,7 +45,7 @@ class Worker extends Model
 
     protected $table = 'hr_workers';
 
-    protected $fillable = ['tenant_id', 'creation_key', 'personnel_number', 'name', 'email', 'core_membership_id'];
+    protected $fillable = ['tenant_id', 'creation_key', 'creation_payload_hash', 'personnel_number', 'name', 'email', 'core_membership_id'];
 
     /**
      * `deleted_at` tidak ikut ke jawaban endpoint.
@@ -58,7 +58,7 @@ class Worker extends Model
      *
      * @var list<string>
      */
-    protected $hidden = ['deleted_at'];
+    protected $hidden = ['deleted_at', 'creation_payload_hash'];
 
     /** @return HasMany<WorkerPositionAssignment, $this> */
     public function assignments(): HasMany

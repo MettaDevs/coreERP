@@ -9,8 +9,10 @@ use App\Platform\Attachments\Http\Middleware\ResolveAttachmentContext;
 use App\Platform\Attachments\Models\DocumentAttachment;
 use App\Platform\Attachments\Models\DocumentNote;
 use App\Platform\Attachments\Support\AttachmentContentMismatch;
+use App\Platform\Attachments\Support\CoreAttachmentStorage;
 use App\Platform\Identity\Models\User;
 use App\Platform\Modules\Contracts\AttachmentRecordType;
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\JsonResponse;
@@ -25,7 +27,6 @@ use RuntimeException;
 use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use Throwable;
 
 /**
  * Lampiran dokumen (gap 7, K-09): unggah, daftar, unduh, dan arsip lampiran satu record.
@@ -125,20 +126,28 @@ final class AttachmentController extends Controller
         $type = $this->recordType($request);
         $this->requireReadable($type, $tenantId, $recordId);
 
-        $attachments = DocumentAttachment::query()
+        $query = DocumentAttachment::query()
             ->where('tenant_id', $tenantId)
             ->where('record_type', $type->recordType())
             ->where('record_id', $recordId)
-            ->where('kind', 'document')
-            ->orderByRaw('line_number nulls first')
-            ->orderBy('created_at')
-            ->orderBy('id')
-            ->get();
+            ->where('kind', 'document');
+        $total = (clone $query)->count();
+        $batch = IncrementalList::query(
+            $request,
+            $query->select('document_attachments.*')->selectRaw('COALESCE(line_number, -1) AS attachment_order')->toBase(),
+            ['order' => 'attachment_order'],
+            ['file_name'],
+            'order',
+            numericColumns: ['attachment_order'],
+        );
+        $attachments = DocumentAttachment::hydrate($batch['data']->map(fn (object $row): array => (array) $row)->all());
         $names = $this->userNames($attachments);
 
         return response()->json([
             'data' => $attachments->map(fn (DocumentAttachment $attachment): array => $this->present($attachment, $names))->values(),
+            'next_cursor' => $batch['next_cursor'],
             'meta' => [
+                'total' => $total,
                 'can_change' => $type->canChange($tenantId, $recordId),
                 'max_kb' => $this->maxKb(),
                 'extensions' => $this->extensions(),
@@ -176,7 +185,7 @@ final class AttachmentController extends Controller
 
         /** @var UploadedFile $file */
         $file = $data['file'];
-        $attachment = $this->save($tenantId, $type, $recordId, $lineNumber, $file);
+        $attachment = app(CoreAttachmentStorage::class)->save($tenantId, $type, $recordId, $lineNumber, $file);
 
         return response()->json(['data' => $this->present($attachment, $this->userNames(collect([$attachment])))], 201);
     }
@@ -227,7 +236,7 @@ final class AttachmentController extends Controller
         ]);
         /** @var UploadedFile $file */
         $file = $request->file('file');
-        $picture = $this->save($tenantId, $type, $recordId, null, $file, 'picture');
+        $picture = app(CoreAttachmentStorage::class)->save($tenantId, $type, $recordId, null, $file, 'picture');
 
         return response()->json(['data' => $this->present($picture, $this->userNames(collect([$picture])))], 201);
     }
@@ -280,59 +289,6 @@ final class AttachmentController extends Controller
         });
 
         return response()->json(status: 204);
-    }
-
-    /**
-     * Berkas ditulis lebih dulu, baru barisnya. Baris yang gagal disimpan membuang berkasnya lagi, supaya tidak
-     * ada berkas tanpa baris; yang dibuang berkas yang belum pernah menjadi lampiran siapa pun.
-     */
-    private function save(string $tenantId, AttachmentRecordType $type, string $recordId, ?int $lineNumber, UploadedFile $file, string $kind = 'document'): DocumentAttachment
-    {
-        $id = (string) Str::ulid();
-        $path = 'attachments/'.$tenantId.'/'.$id;
-        $source = (string) $file->getRealPath();
-        $hash = hash_file('sha256', $source);
-        $stream = fopen($source, 'rb');
-        if ($hash === false || $stream === false) {
-            throw new RuntimeException('Berkas unggahan tidak dapat dibaca.');
-        }
-
-        $disk = $this->disk();
-        $written = $disk->writeStream($path, $stream);
-        if (is_resource($stream)) {
-            fclose($stream);
-        }
-        if (! $written) {
-            throw new RuntimeException('Berkas lampiran gagal disimpan ke penyimpanan.');
-        }
-
-        try {
-            $attachment = DB::transaction(function () use ($id, $tenantId, $type, $recordId, $lineNumber, $file, $path, $hash, $kind): DocumentAttachment {
-                $attachment = new DocumentAttachment;
-                $attachment->forceFill([
-                    'id' => $id,
-                    'tenant_id' => $tenantId,
-                    'record_type' => $type->recordType(),
-                    'record_id' => $recordId,
-                    'line_number' => $lineNumber,
-                    'file_name' => $this->fileName($file->getClientOriginalName()),
-                    'mime_type' => Str::limit((string) $file->getMimeType(), 150, ''),
-                    'size_bytes' => (int) $file->getSize(),
-                    'storage_path' => $path,
-                    'content_hash' => $hash,
-                    'data_class' => $type->dataClass()->value,
-                    'kind' => $kind,
-                ])->save();
-
-                return $attachment;
-            });
-        } catch (Throwable $exception) {
-            $disk->delete($path);
-
-            throw $exception;
-        }
-
-        return $attachment->refresh();
     }
 
     /**
@@ -433,14 +389,6 @@ final class AttachmentController extends Controller
             'created_by_name' => $userId === null ? null : ($names[$userId] ?? null),
             'created_at' => $attachment->created_at?->toIso8601String(),
         ];
-    }
-
-    /** Nama berkas tanpa folder dan karakter kendali, dipotong ke panjang kolomnya. */
-    private function fileName(string $clientName): string
-    {
-        $name = trim((string) preg_replace('/[\x00-\x1F\x7F]/u', '', basename(str_replace('\\', '/', $clientName))));
-
-        return Str::limit($name === '' ? 'lampiran' : $name, 250, '');
     }
 
     /** Nama cadangan untuk peramban lama: hanya ASCII, tanpa `/`, `\`, dan `%`. */

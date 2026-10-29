@@ -152,12 +152,8 @@ export const emptyWorkOrder = (): EditableWorkOrder => ({
     details: [emptyJob()],
 });
 
-// Select memilih berdasarkan label, jadi id dibolak-balik ke nama di dua tempat ini.
 export const labelDari = (option?: Option) =>
     option ? `${option.kode} · ${option.nama}` : null;
-export const idDari = (options: Option[], label: string | null) =>
-    options.find((option) => `${option.kode} · ${option.nama}` === label)?.id ??
-    '';
 
 export const izin = (permissions: string[]) => (action: string) =>
     permissions.includes(`management-aset.pemeliharaan-aset.${action}`);

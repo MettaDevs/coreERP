@@ -2,12 +2,15 @@
 
 namespace Modules\Apperp\HumanResources\Http\Controllers;
 
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\RowVersion;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\HumanResources\Models\Job;
@@ -38,9 +41,7 @@ final class HumanResourcesController extends Controller
     {
         $this->requirePermission($request, 'positions', 'read');
 
-        return response()->json([
-            'data' => $core->operatingUnits($this->tenantId($request)),
-        ]);
+        return response()->json($core->operatingUnits($this->tenantId($request), $request->query()));
     }
 
     /**
@@ -58,19 +59,22 @@ final class HumanResourcesController extends Controller
         ]);
         $tenantId = $this->tenantId($request);
 
-        $members = isset($query['email'])
-            ? $core->membersWithEmail($tenantId, $query['email'])
-            : $core->members($tenantId, $query['q'] ?? '');
+        $input = [...$request->query(), ...$query];
+        if (isset($query['email'])) {
+            unset($input['q']);
+        }
+        $batch = $core->members($tenantId, $input);
+        $members = $batch['data'];
         $linked = Worker::query()
             ->whereIn('core_membership_id', array_column($members, 'membership_id'))
             ->pluck('id', 'core_membership_id');
 
-        return response()->json([
-            'data' => array_map(fn (array $member): array => [
-                ...$member,
-                'linked_worker_id' => $linked[$member['membership_id']] ?? null,
-            ], $members),
-        ]);
+        $batch['data'] = array_map(fn (array $member): array => [
+            ...$member,
+            'linked_worker_id' => $linked[$member['membership_id']] ?? null,
+        ], $members);
+
+        return response()->json($batch);
     }
 
     /**
@@ -81,18 +85,21 @@ final class HumanResourcesController extends Controller
     {
         $this->requirePermission($request, 'workers', 'read');
 
-        $workers = $this->visibleWorkers($request)->orderBy('name')->get();
+        $batch = IncrementalList::query($request, $this->visibleWorkers($request)->toBase(), [
+            'id' => 'id', 'personnel_number' => 'personnel_number', 'name' => 'name', 'email' => 'email',
+        ], ['personnel_number', 'name', 'email'], 'name');
+        $workers = Worker::hydrate($batch['data']->map(fn ($row): array => (array) $row)->all());
         $accounts = $core->membersById(
             $this->tenantId($request),
             array_values($workers->pluck('core_membership_id')->filter()->map(fn (mixed $id): string => (string) $id)->unique()->all()),
         );
 
-        return response()->json([
-            'data' => $workers->map(fn (Worker $worker): array => [
-                ...$worker->toArray(),
-                'account' => $accounts[(string) $worker->core_membership_id] ?? null,
-            ])->all(),
+        $batch['data'] = $workers->map(fn (Worker $worker): array => [
+            ...$worker->toArray(),
+            'account' => $accounts[(string) $worker->core_membership_id] ?? null,
         ]);
+
+        return response()->json($batch);
     }
 
     /**
@@ -132,7 +139,12 @@ final class HumanResourcesController extends Controller
     {
         $this->requirePermission($request, 'jobs', 'read');
 
-        return response()->json(['data' => Job::query()->orderBy('name')->get()]);
+        $batch = IncrementalList::query($request, Job::query()->toBase(), [
+            'id' => 'id', 'code' => 'code', 'name' => 'name',
+        ], ['code', 'name'], 'name');
+        $batch['data'] = Job::hydrate($batch['data']->map(fn ($row): array => (array) $row)->all());
+
+        return response()->json($batch);
     }
 
     public function positions(Request $request): JsonResponse
@@ -146,7 +158,12 @@ final class HumanResourcesController extends Controller
             $query->whereIn('operating_unit_id', $unitKerja);
         }
 
-        return response()->json(['data' => $query->get()]);
+        $batch = IncrementalList::query($request, $query->toBase(), [
+            'id' => 'id', 'code' => 'code', 'name' => 'name', 'valid_from' => 'valid_from',
+        ], ['code', 'name'], 'name');
+        $batch['data'] = Position::hydrate($batch['data']->map(fn ($row): array => (array) $row)->all());
+
+        return response()->json($batch);
     }
 
     public function assignments(Request $request): JsonResponse
@@ -167,7 +184,12 @@ final class HumanResourcesController extends Controller
             })
             ->orderByDesc('valid_from');
 
-        return response()->json(['data' => $query->get()]);
+        $batch = IncrementalList::query($request, $query->toBase(), [
+            'id' => 'id', 'valid_from' => 'valid_from', 'valid_until' => 'valid_until',
+        ], [], 'valid_from', defaultDirection: 'desc');
+        $batch['data'] = WorkerPositionAssignment::hydrate($batch['data']->map(fn ($row): array => (array) $row)->all());
+
+        return response()->json($batch);
     }
 
     public function storeWorker(Request $request, HrNumberSequenceIssuer $numbers, HrOrganizationDirectory $core): JsonResponse
@@ -185,24 +207,27 @@ final class HumanResourcesController extends Controller
         }
         abort_if(! $this->hasTenantWideScope($request), 403, 'Pekerja tanpa posisi hanya dapat dibuat oleh pengguna dengan akses seluruh organisasi.');
 
+        $data = ['email' => null, 'core_membership_id' => null, ...$data];
         $idempotencyKey = $this->idempotencyKey($request);
-        $existing = Worker::query()->where('creation_key', $idempotencyKey)->first();
+        $hash = $this->creationHash($data);
 
-        if ($existing) {
-            return response()->json(['data' => $existing]);
-        }
+        return $this->saveAccountLink(function () use ($core, $numbers, $tenantId, $data, $idempotencyKey, $hash): JsonResponse {
+            $creation = Worker::withTrashed()->where('creation_key', $idempotencyKey);
+            RowVersion::lockCreation($creation);
+            if ($existing = $creation->first()) {
+                return $this->replayCreation($existing, $hash);
+            }
+            if ($data['core_membership_id'] !== null) {
+                $this->assertAccountLinkable($core, $tenantId, $data['core_membership_id'], null);
+            }
+            $worker = Worker::query()->create([
+                'creation_key' => $idempotencyKey, 'creation_payload_hash' => $hash,
+                'personnel_number' => $numbers->issue('human-resources.pekerja', $tenantId, 'worker:'.$idempotencyKey),
+                ...$data,
+            ]);
 
-        if ($data['core_membership_id'] ?? null) {
-            $this->assertAccountLinkable($core, $tenantId, $data['core_membership_id'], null);
-        }
-
-        $worker = $this->saveAccountLink(fn (): Worker => Worker::query()->create([
-            'creation_key' => $idempotencyKey,
-            'personnel_number' => $numbers->issue('human-resources.pekerja', $tenantId, 'worker:'.$idempotencyKey),
-            ...$data,
-        ]));
-
-        return response()->json(['data' => $worker], 201);
+            return response()->json(['data' => $worker], 201);
+        });
     }
 
     public function storeJob(Request $request, HrNumberSequenceIssuer $numbers): JsonResponse
@@ -213,21 +238,24 @@ final class HumanResourcesController extends Controller
             'name' => ['required', 'string', 'max:150'],
             'description' => ['nullable', 'string', 'max:2000'],
         ]);
+        $data = ['description' => null, ...$data];
         $idempotencyKey = $this->idempotencyKey($request);
+        $hash = $this->creationHash($data);
 
-        $existing = Job::query()->where('creation_key', $idempotencyKey)->first();
+        return DB::transaction(function () use ($numbers, $tenantId, $data, $idempotencyKey, $hash): JsonResponse {
+            $creation = Job::withTrashed()->where('creation_key', $idempotencyKey);
+            RowVersion::lockCreation($creation);
+            if ($existing = $creation->first()) {
+                return $this->replayCreation($existing, $hash);
+            }
+            $job = Job::query()->create([
+                'creation_key' => $idempotencyKey, 'creation_payload_hash' => $hash,
+                'code' => $numbers->issue('human-resources.jabatan', $tenantId, 'job:'.$idempotencyKey),
+                ...$data,
+            ]);
 
-        if ($existing) {
-            return response()->json(['data' => $existing]);
-        }
-
-        $job = DB::transaction(fn (): Job => Job::query()->create([
-            'creation_key' => $idempotencyKey,
-            'code' => $numbers->issue('human-resources.jabatan', $tenantId, 'job:'.$idempotencyKey),
-            ...$data,
-        ]));
-
-        return response()->json(['data' => $job], 201);
+            return response()->json(['data' => $job], 201);
+        });
     }
 
     public function storePosition(Request $request, HrNumberSequenceIssuer $numbers): JsonResponse
@@ -245,21 +273,28 @@ final class HumanResourcesController extends Controller
         abort_unless(Job::query()->whereKey($data['job_id'])->exists(), 422, 'Jabatan tidak tersedia.');
         $this->requireOperatingUnit($request, $data['operating_unit_id']);
 
+        $data = ['valid_until' => null, ...$data];
+        $data['valid_from'] = Carbon::parse($data['valid_from'])->toDateString();
+        $data['valid_until'] = $data['valid_until'] === null ? null : Carbon::parse($data['valid_until'])->toDateString();
         $idempotencyKey = $this->idempotencyKey($request);
+        $hash = $this->creationHash($data);
 
-        $existing = Position::query()->where('creation_key', $idempotencyKey)->first();
+        return DB::transaction(function () use ($request, $numbers, $tenantId, $data, $idempotencyKey, $hash): JsonResponse {
+            $creation = Position::withTrashed()->where('creation_key', $idempotencyKey);
+            RowVersion::lockCreation($creation);
+            if ($existing = $creation->first()) {
+                $this->requireOperatingUnit($request, $existing->operating_unit_id);
 
-        if ($existing) {
-            return response()->json(['data' => $existing]);
-        }
+                return $this->replayCreation($existing, $hash);
+            }
+            $position = Position::query()->create([
+                'creation_key' => $idempotencyKey, 'creation_payload_hash' => $hash,
+                'code' => $numbers->issue('human-resources.posisi', $tenantId, 'position:'.$idempotencyKey),
+                ...$data,
+            ]);
 
-        $position = DB::transaction(fn (): Position => Position::query()->create([
-            'creation_key' => $idempotencyKey,
-            'code' => $numbers->issue('human-resources.posisi', $tenantId, 'position:'.$idempotencyKey),
-            ...$data,
-        ]));
-
-        return response()->json(['data' => $position], 201);
+            return response()->json(['data' => $position], 201);
+        });
     }
 
     public function storeAssignment(Request $request): JsonResponse
@@ -273,19 +308,21 @@ final class HumanResourcesController extends Controller
             'is_primary' => ['required', 'boolean'],
         ]);
 
-        $worker = Worker::query()->whereKey($data['worker_id'])->first();
-        $position = Position::query()->whereKey($data['position_id'])->first();
-        abort_unless($worker && $position, 422, 'Pekerja atau posisi tidak tersedia.');
-        $this->requireOperatingUnit($request, $position->operating_unit_id);
+        $assignment = DB::transaction(function () use ($request, $data): WorkerPositionAssignment {
+            $worker = Worker::query()->whereKey($data['worker_id'])->sharedLock()->first();
+            $position = Position::query()->whereKey($data['position_id'])->lockForUpdate()->first();
+            abort_unless($worker && $position, 422, 'Pekerja atau posisi tidak tersedia.');
+            $this->requireOperatingUnit($request, $position->operating_unit_id);
 
-        $positionIsFilled = WorkerPositionAssignment::query()
-            ->where('position_id', $data['position_id'])
-            ->where('valid_from', '<=', $data['valid_until'] ?? '9999-12-31')
-            ->where(fn (Builder $query) => $query->whereNull('valid_until')->orWhere('valid_until', '>=', $data['valid_from']))
-            ->exists();
-        abort_if($positionIsFilled, 422, 'Posisi sudah terisi pada periode tersebut.');
+            $positionIsFilled = WorkerPositionAssignment::query()
+                ->where('position_id', $data['position_id'])
+                ->where('valid_from', '<=', $data['valid_until'] ?? '9999-12-31')
+                ->where(fn (Builder $query) => $query->whereNull('valid_until')->orWhere('valid_until', '>=', $data['valid_from']))
+                ->exists();
+            abort_if($positionIsFilled, 422, 'Posisi sudah terisi pada periode tersebut.');
 
-        $assignment = WorkerPositionAssignment::query()->create($data);
+            return WorkerPositionAssignment::query()->create($data);
+        });
 
         // **Yang hilang di sini, dan kenapa ia tidak diganti diam-diam.**
         //
@@ -393,6 +430,24 @@ final class HumanResourcesController extends Controller
     {
         $permission = "human-resources.{$resource}.{$action}";
         abort_unless(in_array($permission, $request->attributes->get('coreerp.permissions', []), true), 403);
+    }
+
+    /** @param array<string, mixed> $data */
+    private function creationHash(array $data): string
+    {
+        ksort($data);
+
+        return hash('sha256', json_encode($data, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION));
+    }
+
+    private function replayCreation(Model $record, string $hash): JsonResponse
+    {
+        $stored = $record->getAttribute('creation_payload_hash');
+        if ($record->getAttribute('deleted_at') !== null || ! is_string($stored) || ! hash_equals($stored, $hash)) {
+            return response()->json(['error' => ['code' => 'idempotency_conflict', 'message' => 'Kunci permintaan ini sudah digunakan. Muat daftar dan periksa data yang sudah tersimpan.']], 409);
+        }
+
+        return response()->json(['data' => $record], 200, ['Idempotent-Replayed' => 'true']);
     }
 
     private function idempotencyKey(Request $request): string

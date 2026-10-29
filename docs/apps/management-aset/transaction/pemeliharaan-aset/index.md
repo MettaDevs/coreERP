@@ -101,6 +101,7 @@ erDiagram
 | `POST /api/modules/management-aset/v1/pemeliharaan-aset/{id}/status` | Memindahkan status (misal `draft` $\rightarrow$ `dijadwalkan`) |
 | `GET /api/modules/management-aset/v1/pemeliharaan-aset/{id}/jobs/{jobId}/checklist` | Membaca daftar checklist pada satu baris pekerjaan |
 | `PUT /api/modules/management-aset/v1/pemeliharaan-aset/{id}/jobs/{jobId}/checklist` | Mengisi dan menyimpan jawaban checklist |
+| `PUT /api/modules/management-aset/v1/pemeliharaan-aset/{id}/execution` | Menyimpan hasil pelaksanaan dan checklist dari seluruh baris yang diubah dalam satu transaksi |
 | `PATCH /api/modules/management-aset/v1/pemeliharaan-aset/{id}/jobs/{jobId}/execution` | Menyimpan hasil pelaksanaan (sebab kerusakan & tindakan) |
 | `POST /api/modules/management-aset/v1/pemeliharaan-aset/{id}/jobs/{jobId}/checklist/dari-template` | Mengisi checklist dari template yang dipilih |
 
@@ -194,6 +195,8 @@ Content-Type: application/json
 ---
 
 ## Layar dan Navigasi
+
+Hasil pelaksanaan dan jawaban checklist ditampung sebagai draft work order. Bagian pekerjaan dan drawer checklist tidak memiliki Simpan sendiri; toolbar utama mengirim baris yang diubah ke endpoint `execution` dalam satu transaksi dengan satu klaim versi dokumen. Menutup drawer atau berpindah pekerjaan mempertahankan draft. Batal mengembalikan data yang sudah tersimpan, dan kegagalan request mempertahankan isian. Perintah perpindahan status ditahan selama masih ada draft agar tidak melewati Simpan utama.
 
 Daftar dan rincian adalah dua halaman dengan alamat hash masing-masing:
 

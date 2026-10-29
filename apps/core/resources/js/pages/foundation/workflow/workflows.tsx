@@ -1,32 +1,47 @@
 import { ActionButton } from '@apperp/ui/action-button';
+
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@apperp/ui/alert-dialog';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@apperp/ui/card';
-import { Field, FieldError } from '@apperp/ui/field';
+import { DataTable } from '@apperp/ui/data-table';
+import type {
+    DataTableColumn,
+    DataTableRowAction,
+} from '@apperp/ui/data-table';
+import { Field, FieldLabel } from '@apperp/ui/field';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
+import { InlineLookup } from '@apperp/ui/inline-lookup';
 import { Input } from '@apperp/ui/input';
-import { NativeSelect } from '@apperp/ui/native-select';
+import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import {
     PageDialog,
+    PageDialogBody,
+    PageDialogClose,
     PageDialogContent,
     PageDialogToolbar,
-    PageDialogBody,
 } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
+import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { Check, Pencil, Power, Search, Settings2 } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { FormErrorHeader } from '@/components/form-error-header';
 import {
-    Check,
-    GitBranch,
-    Power,
-    Workflow as WorkflowIcon,
-} from 'lucide-react';
-import { useState } from 'react';
+    RecordListScroll,
+    useRecordListSort,
+} from '@/components/record-list-scroll';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 
 type WorkflowType = {
     id: string;
@@ -47,8 +62,6 @@ type Workflow = {
     scope: 'tenant' | 'legal_entity';
     legal_entity_id: string | null;
 };
-// Bentuknya sengaja tidak menyebut satu pun nama parameter. Daftarnya datang dari registry
-// di sisi Core, jadi parameter baru muncul di layar tanpa menyentuh berkas ini.
 type WorkflowParameter = {
     code: string;
     tipe: 'boolean';
@@ -56,13 +69,125 @@ type WorkflowParameter = {
     penjelasan: string;
     value: boolean;
 };
+type Filters = {
+    q: string;
+    status: Workflow['status'] | null;
+    app: string | null;
+    sort: string;
+    direction: 'asc' | 'desc';
+};
 type Props = {
     canManage: boolean;
     parameters: WorkflowParameter[];
     workflowTypes: WorkflowType[];
     legalEntities: LegalEntity[];
-    workflows: Workflow[];
+    workflows: { data: Workflow[]; next_page_url: string | null };
+    filters: Filters;
+    workflowApps: string[];
 };
+const statusLabel = { draft: 'Draf', active: 'Aktif', inactive: 'Nonaktif' };
+
+function WorkflowFilters({
+    filters,
+    apps,
+}: {
+    filters: Filters;
+    apps: string[];
+}) {
+    const [query, setQuery] = useState(filters.q);
+    const { url } = usePage();
+    const queryParams = new URL(url, 'http://localhost').searchParams;
+    const go = (next: Partial<Filters>) =>
+        router.get(
+            '/settings/workflows',
+            {
+                ...filters,
+                sort: queryParams.get('sort') ?? filters.sort,
+                direction: queryParams.get('direction') ?? filters.direction,
+                q: query,
+                ...next,
+            },
+            {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+                reset: ['workflows'],
+            },
+        );
+    const appOptions = [
+        { id: '', name: 'Semua aplikasi' },
+        ...apps.map((name) => ({ id: name, name })),
+    ];
+
+    return (
+        <form
+            noValidate
+            className="flex flex-wrap items-end gap-3 px-4 pb-3"
+            onSubmit={(event) => {
+                event.preventDefault();
+                go({ q: query });
+            }}
+        >
+            <FormControl className="min-w-56 flex-1">
+                <Input
+                    label="Cari workflow atau proses"
+                    type="search"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                />
+            </FormControl>
+            <FormControl className="w-full sm:w-56">
+                <InlineLookup
+                    label="Aplikasi"
+                    items={appOptions}
+                    value={
+                        appOptions.find(
+                            (item) => item.id === (filters.app ?? ''),
+                        ) ?? null
+                    }
+                    getItemValue={(item) => item.id}
+                    getItemLabel={(item) => item.name}
+                    columns={[
+                        {
+                            id: 'name',
+                            header: 'Aplikasi',
+                            cell: (item) => item.name,
+                        },
+                    ]}
+                    onValueChange={(item) => go({ app: item.id || null })}
+                    showDetails={false}
+                    showFullList={false}
+                />
+            </FormControl>
+            <FormControl className="w-full sm:w-44">
+                <Select
+                    label="Status"
+                    items={[
+                        { value: '', label: 'Semua status' },
+                        ...Object.entries(statusLabel).map(
+                            ([value, label]) => ({ value, label }),
+                        ),
+                    ]}
+                    value={filters.status ?? ''}
+                    onValueChange={(value) =>
+                        go({
+                            status:
+                                value === 'draft' ||
+                                value === 'active' ||
+                                value === 'inactive'
+                                    ? value
+                                    : null,
+                        })
+                    }
+                />
+            </FormControl>
+            <Button type="submit" variant="ghost">
+                <Search aria-hidden="true" />
+                Cari
+            </Button>
+        </form>
+    );
+}
 
 export default function Workflows({
     canManage,
@@ -70,423 +195,551 @@ export default function Workflows({
     workflowTypes,
     legalEntities,
     workflows,
+    filters,
+    workflowApps,
 }: Props) {
+    const { wrap: wrapCreateFormRequest, summary: createFormRequestSummary } =
+        useInertiaFeedback();
+    const { wrap: wrapToggleFormRequest, summary: toggleFormRequestSummary } =
+        useInertiaFeedback();
+    const {
+        wrap: wrapParameterFormRequest,
+        summary: parameterFormRequestSummary,
+    } = useInertiaFeedback();
+
     const [createOpen, setCreateOpen] = useState(false);
+    const [settingsOpen, setSettingsOpen] = useState(false);
+    const [changing, setChanging] = useState<Workflow | null>(null);
+    const [parameterStatus, setParameterStatus] = useState('');
+    const [pendingParameter, setPendingParameter] = useState<{
+        code: string;
+        value: boolean;
+    } | null>(null);
+    const createPortal = useRef<HTMLDivElement>(null);
     const createForm = useForm({
-        workflow_type_id: workflowTypes[0]?.id ?? '',
+        workflow_type_id: '',
         name: '',
         legal_entity_id: '',
     });
-    const toggleForm = useForm({});
-    const parameterForm = useForm<{ code: string; value: boolean }>({
-        code: '',
-        value: false,
-    });
-
+    const createTransition = useRecordTransition(
+        createForm.isDirty,
+        createForm.processing,
+    );
+    const toggleForm = useForm({ version: 0 });
+    const parameterForm = useForm({ code: '', value: false });
+    const sort = useRecordListSort('workflows');
     const selectedType = workflowTypes.find(
         (type) => type.id === createForm.data.workflow_type_id,
     );
-    const needsLegalEntity = selectedType?.scope !== 'tenant';
+    const needsLegalEntity = selectedType?.scope === 'legal_entity';
+    const openWorkflow = (workflow: Workflow) =>
+        router.visit(`/settings/workflows/${workflow.id}/edit`);
+    const actions: DataTableRowAction[] = [
+        { id: 'open', label: 'Buka alur', icon: <Pencil /> },
+        { id: 'activate', label: 'Aktifkan', icon: <Check /> },
+        { id: 'deactivate', label: 'Nonaktifkan', icon: <Power /> },
+    ];
+    const columns: DataTableColumn<Workflow>[] = [
+        {
+            id: 'name',
+            header: 'Nama workflow',
+            cell: (workflow) => workflow.name,
+            sortValue: (workflow) => workflow.name,
+            minWidth: 220,
+        },
+        {
+            id: 'app_name',
+            header: 'Aplikasi',
+            cell: (workflow) => workflow.app_name,
+            sortValue: (workflow) => workflow.app_name,
+            width: 180,
+        },
+        {
+            id: 'type_name',
+            header: 'Proses',
+            cell: (workflow) => workflow.type_name,
+            sortValue: (workflow) => workflow.type_name,
+            minWidth: 240,
+        },
+        {
+            id: 'company',
+            header: 'Perusahaan',
+            cell: (workflow) =>
+                workflow.scope === 'tenant'
+                    ? 'Berlaku umum'
+                    : (legalEntities.find(
+                          (entity) => entity.id === workflow.legal_entity_id,
+                      )?.name ?? 'Perusahaan tidak tersedia'),
+            width: 220,
+        },
+        {
+            id: 'status',
+            header: 'Status',
+            cell: (workflow) => (
+                <Badge
+                    variant={
+                        workflow.status === 'active' ? 'secondary' : 'outline'
+                    }
+                >
+                    {statusLabel[workflow.status]}
+                </Badge>
+            ),
+            sortValue: (workflow) => workflow.status,
+            width: 110,
+        },
+    ];
 
     return (
         <>
             <Head title="Workflow" />
-            <main className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 p-6">
-                <RecordActionBar title="Workflow">
-                    {canManage && (
-                        <ActionButton
-                            action="create"
-                            type="button"
-                            disabled={workflowTypes.length === 0}
-                            onClick={() => setCreateOpen(true)}
-                        />
-                    )}
-                </RecordActionBar>
-
-                {createOpen && (
-                    <PageDialog
-                        open
-                        onOpenChange={(open) => {
-                            if (!open && !createForm.processing) {
-                                setCreateOpen(false);
+            <ListPageLayout
+                header={
+                    <>
+                        <RecordActionBar title="Workflow">
+                            {canManage && (
+                                <ActionButton
+                                    action="create"
+                                    onClick={() => {
+                                        createForm.reset();
+                                        createForm.clearErrors();
+                                        setCreateOpen(true);
+                                    }}
+                                    disabled={workflowTypes.length === 0}
+                                />
+                            )}
+                            {parameters.length > 0 && (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="command"
+                                    onClick={() => setSettingsOpen(true)}
+                                >
+                                    <Settings2 aria-hidden="true" />
+                                    Pengaturan
+                                </Button>
+                            )}
+                        </RecordActionBar>
+                    </>
+                }
+                filters={
+                    <WorkflowFilters
+                        key={JSON.stringify([
+                            filters.q,
+                            filters.status,
+                            filters.app,
+                        ])}
+                        filters={filters}
+                        apps={workflowApps}
+                    />
+                }
+                footer={
+                    <p className="px-4 py-2 text-sm text-muted-foreground">
+                        {workflows.data.length} workflow ditampilkan
+                    </p>
+                }
+            >
+                <RecordListScroll
+                    data="workflows"
+                    className="flex min-h-0 flex-1 flex-col"
+                >
+                    <DataTable
+                        {...sort}
+                        data={workflows.data}
+                        columns={columns}
+                        getRowKey={(workflow) => workflow.id}
+                        getRowLabel={(workflow) => workflow.name}
+                        actions={actions}
+                        getRowActions={(workflow) =>
+                            actions.filter(
+                                (action) =>
+                                    action.id === 'open' ||
+                                    (canManage &&
+                                        ((action.id === 'activate' &&
+                                            workflow.status === 'inactive') ||
+                                            (action.id === 'deactivate' &&
+                                                workflow.status === 'active'))),
+                            )
+                        }
+                        onRowAction={(action, workflow) => {
+                            if (action === 'open') {
+                                openWorkflow(workflow);
+                            } else if (canManage && !toggleForm.processing) {
+                                toggleForm.clearErrors();
+                                setChanging(workflow);
                             }
                         }}
+                        onRowClick={openWorkflow}
+                        emptyMessage={
+                            filters.q || filters.app || filters.status
+                                ? 'Tidak ada workflow yang sesuai dengan filter.'
+                                : canManage && workflowTypes.length > 0
+                                  ? 'Belum ada workflow. Pilih Baru untuk mulai menyusun alur.'
+                                  : 'Belum ada workflow yang dapat ditampilkan.'
+                        }
+                    />
+                </RecordListScroll>
+            </ListPageLayout>
+
+            <PageDialog
+                open={createOpen}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        createTransition.request(() => setCreateOpen(false));
+                    }
+                }}
+            >
+                <PageDialogContent
+                    ref={createPortal}
+                    title="Workflow"
+                    recordTitle={createForm.data.name.trim() || 'Baru'}
+                    editing
+                    busy={createForm.processing}
+                >
+                    <form
+                        noValidate
+                        className="contents"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+
+                            if (!canManage) {
+                                return;
+                            }
+
+                            createForm.post(
+                                '/settings/workflows',
+                                wrapCreateFormRequest({
+                                    onSuccess: () => {
+                                        setCreateOpen(false);
+                                        createForm.reset();
+                                    },
+                                }),
+                            );
+                        }}
                     >
-                        <PageDialogContent
-                            onEscapeKeyDown={(event) => {
-                                if (createForm.processing) {
-                                    event.preventDefault();
+                        <PageDialogToolbar>
+                            <ActionButton
+                                action="save"
+                                type="submit"
+                                pending={createForm.processing}
+                                disabled={
+                                    !canManage ||
+                                    !selectedType ||
+                                    !createForm.data.name.trim() ||
+                                    (needsLegalEntity &&
+                                        !createForm.data.legal_entity_id)
                                 }
-                            }}
-                            title="Workflow"
-                            recordTitle={
-                                createForm.data.name.trim() || 'Workflow baru'
-                            }
-                            editing
-                            busy={createForm.processing}
-                            description={
-                                'Workflow baru dimulai sebagai draf. Setelah\n                                    disimpan, susun alurnya di canvas.'
-                            }
-                        >
-                            <form
-                                className="flex min-h-0 flex-1 flex-col"
-                                onSubmit={(event) => {
-                                    event.preventDefault();
-                                    createForm.post('/settings/workflows', {
-                                        onSuccess: () => {
-                                            createForm.reset('name');
-                                            setCreateOpen(false);
-                                        },
-                                    });
-                                }}
-                            >
-                                <PageDialogToolbar>
-                                    <ActionButton
-                                        action="save"
-                                        pending={createForm.processing}
-                                        type="submit"
-                                        disabled={
-                                            !canManage ||
-                                            createForm.processing ||
-                                            createForm.data.name.trim() ===
-                                                '' ||
-                                            (needsLegalEntity &&
-                                                createForm.data
-                                                    .legal_entity_id === '')
-                                        }
-                                        className="shrink-0 px-5 text-xs font-medium shadow-xs"
-                                    />
-                                    <ActionButton
-                                        action="cancel"
-                                        type="button"
-                                        disabled={createForm.processing}
-                                        onClick={() => setCreateOpen(false)}
-                                    />
-                                </PageDialogToolbar>
-                                <PageDialogBody>
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        <Field>
-                                            <NativeSelect
-                                                label="Proses Aplikasi"
-                                                value={
-                                                    createForm.data
-                                                        .workflow_type_id
-                                                }
-                                                disabled={!canManage}
-                                                onChange={(event) =>
-                                                    createForm.setData(
-                                                        'workflow_type_id',
-                                                        event.target.value,
-                                                    )
-                                                }
-                                            >
-                                                {workflowTypes.map((type) => (
-                                                    <option
-                                                        key={type.id}
-                                                        value={type.id}
-                                                    >
-                                                        {type.app_name} —{' '}
-                                                        {type.name}
-                                                    </option>
-                                                ))}
-                                            </NativeSelect>
-                                            <FieldError>
-                                                {
-                                                    createForm.errors
-                                                        .workflow_type_id
-                                                }
-                                            </FieldError>
-                                        </Field>
-                                        <Field>
-                                            <Input
-                                                label="Nama Workflow"
-                                                value={createForm.data.name}
-                                                disabled={!canManage}
-                                                onChange={(event) =>
-                                                    createForm.setData(
-                                                        'name',
-                                                        event.target.value,
-                                                    )
-                                                }
-                                                placeholder="Alur pemeriksaan usulan aset"
-                                            />
-                                            <FieldError>
-                                                {createForm.errors.name}
-                                            </FieldError>
-                                        </Field>
-                                        {needsLegalEntity && (
-                                            <Field className="md:col-span-2">
-                                                <div className="grid gap-4 md:grid-cols-2">
-                                                    <div>
-                                                        <NativeSelect
-                                                            label="Perusahaan"
-                                                            value={
-                                                                createForm.data
-                                                                    .legal_entity_id
-                                                            }
-                                                            disabled={
-                                                                !canManage
-                                                            }
-                                                            onChange={(event) =>
-                                                                createForm.setData(
-                                                                    'legal_entity_id',
-                                                                    event.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                        >
-                                                            <option value="">
-                                                                Pilih perusahaan
-                                                            </option>
-                                                            {legalEntities.map(
-                                                                (entity) => (
-                                                                    <option
-                                                                        key={
-                                                                            entity.id
-                                                                        }
-                                                                        value={
-                                                                            entity.id
-                                                                        }
-                                                                    >
-                                                                        {
-                                                                            entity.name
-                                                                        }
-                                                                    </option>
-                                                                ),
-                                                            )}
-                                                        </NativeSelect>
-                                                        <FieldError>
-                                                            {
-                                                                createForm
-                                                                    .errors
-                                                                    .legal_entity_id
-                                                            }
-                                                        </FieldError>
-                                                    </div>
-                                                </div>
-                                            </Field>
-                                        )}
-                                        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border/40 pt-2 md:col-span-2">
-                                            <p className="text-xs text-muted-foreground">
-                                                {needsLegalEntity
-                                                    ? 'Semua dokumen proses ini akan mengikuti perusahaan yang dipilih.'
-                                                    : 'Workflow ini berlaku untuk seluruh bisnis (scope tenant).'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </PageDialogBody>
-                            </form>
-                        </PageDialogContent>
-                    </PageDialog>
-                )}
+                            />
+                            <ActionButton
+                                action="cancel"
+                                onClick={() =>
+                                    createTransition.request(() =>
+                                        setCreateOpen(false),
+                                    )
+                                }
+                                disabled={createForm.processing}
+                            />
+                        </PageDialogToolbar>
+                        <>
+                            {createFormRequestSummary}
+                            <FormErrorHeader errors={createForm.errors} />
+                        </>
 
-                {parameters.length > 0 && (
-                    <Card className="overflow-hidden shadow-xs">
-                        <CardHeader className="border-b border-border bg-card/50">
-                            <div className="flex items-center gap-3">
-                                <div className="flex flex-row items-center gap-3">
-                                    <CardTitle className="text-foreground">
-                                        Parameter Workflow
-                                    </CardTitle>
-                                    <CardDescription className="mt-0.5 text-xs text-muted-foreground">
-                                        Berlaku untuk seluruh workflow milik
-                                        tenant ini.
-                                    </CardDescription>
-                                </div>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="flex flex-col gap-6 p-6">
-                            {parameters.map((parameter) => (
-                                <div
-                                    key={parameter.code}
-                                    className="flex items-start justify-between gap-6"
+                        <PageDialogBody>
+                            <p className="mb-4 text-sm text-muted-foreground">
+                                Pilih proses yang membutuhkan persetujuan.
+                                Setelah disimpan sebagai draf, lanjutkan
+                                menyusun langkah dan penerima tugas.
+                            </p>
+                            <FormGrid>
+                                <FormControl error={createForm.errors.name}>
+                                    <Input
+                                        label="Nama workflow"
+                                        required
+                                        maxLength={160}
+                                        value={createForm.data.name}
+                                        onChange={(event) =>
+                                            createForm.setData(
+                                                'name',
+                                                event.target.value,
+                                            )
+                                        }
+                                    />
+                                </FormControl>
+                                <FormControl
+                                    error={createForm.errors.workflow_type_id}
                                 >
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-medium text-foreground">
-                                            {parameter.label}
-                                        </p>
-                                        <p className="mt-1 text-xs text-muted-foreground">
-                                            {parameter.penjelasan}
-                                        </p>
-                                    </div>
-                                    <Switch
-                                        checked={parameter.value}
-                                        disabled={
-                                            !canManage ||
-                                            parameterForm.processing
+                                    <InlineLookup
+                                        label="Proses"
+                                        required
+                                        items={workflowTypes}
+                                        value={selectedType ?? null}
+                                        columns={[
+                                            {
+                                                id: 'app',
+                                                header: 'Aplikasi',
+                                                cell: (type) => type.app_name,
+                                                width: 180,
+                                            },
+                                            {
+                                                id: 'process',
+                                                header: 'Proses',
+                                                cell: (type) => type.name,
+                                                width: 280,
+                                            },
+                                        ]}
+                                        getItemValue={(type) => type.id}
+                                        getItemLabel={(type) =>
+                                            `${type.app_name} — ${type.name}`
                                         }
-                                        onCheckedChange={(checked) => {
-                                            // `transform` memulangkan void di versi ini, jadi
-                                            // pengirimannya berdiri sendiri, bukan dirantai.
-                                            parameterForm.transform(() => ({
-                                                code: parameter.code,
-                                                value: checked,
-                                            }));
-                                            parameterForm.post(
-                                                '/settings/workflows/parameters',
-                                                { preserveScroll: true },
-                                            );
-                                        }}
+                                        onValueChange={(type) =>
+                                            createForm.setData((current) => ({
+                                                ...current,
+                                                workflow_type_id: type.id,
+                                                legal_entity_id:
+                                                    type.scope === 'tenant'
+                                                        ? ''
+                                                        : current.legal_entity_id,
+                                            }))
+                                        }
+                                        portalContainer={createPortal}
+                                        showDetails={false}
                                     />
-                                </div>
-                            ))}
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* Card Daftar Workflow (Desain Modern yang Disukai) */}
-                <Card className="overflow-hidden shadow-xs">
-                    <CardHeader className="border-b border-border bg-card/50">
-                        <div className="flex items-center justify-between gap-4">
-                            <div className="flex flex-row items-center gap-3">
-                                <CardTitle className="whitespace-nowrap text-foreground">
-                                    Daftar Workflow Terpasang
-                                </CardTitle>
-                                <CardDescription className="text-xs text-muted-foreground">
-                                    Kelola alur persetujuan, buka canvas untuk
-                                    mengedit alur, atau ubah status
-                                    keaktifannya.
-                                </CardDescription>
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        {workflows.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center p-12 text-center">
-                                <div className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground">
-                                    <WorkflowIcon className="size-6" />
-                                </div>
-                                <h3 className="text-sm font-semibold text-foreground">
-                                    Belum ada workflow
-                                </h3>
-                                <p className="mt-1 max-w-sm text-xs text-muted-foreground">
-                                    Pilih Baru untuk membuat alur persetujuan
-                                    pertama Anda.
+                                </FormControl>
+                                {needsLegalEntity && (
+                                    <FormControl
+                                        error={
+                                            createForm.errors.legal_entity_id
+                                        }
+                                        hint="Alur ini hanya berlaku untuk dokumen dari perusahaan yang dipilih."
+                                    >
+                                        <InlineLookup
+                                            label="Perusahaan"
+                                            required
+                                            items={legalEntities}
+                                            value={
+                                                legalEntities.find(
+                                                    (entity) =>
+                                                        entity.id ===
+                                                        createForm.data
+                                                            .legal_entity_id,
+                                                ) ?? null
+                                            }
+                                            columns={[
+                                                {
+                                                    id: 'name',
+                                                    header: 'Perusahaan',
+                                                    cell: (entity) =>
+                                                        entity.name,
+                                                },
+                                            ]}
+                                            getItemValue={(entity) => entity.id}
+                                            getItemLabel={(entity) =>
+                                                entity.name
+                                            }
+                                            onValueChange={(entity) =>
+                                                createForm.setData(
+                                                    'legal_entity_id',
+                                                    entity.id,
+                                                )
+                                            }
+                                            portalContainer={createPortal}
+                                            showDetails={false}
+                                        />
+                                    </FormControl>
+                                )}
+                            </FormGrid>
+                            {selectedType?.scope === 'tenant' && (
+                                <p className="mt-4 text-sm text-muted-foreground">
+                                    Proses ini dipakai bersama dan tidak
+                                    dibatasi ke satu perusahaan.
                                 </p>
-                            </div>
-                        ) : (
-                            <div className="divide-y divide-border/60">
-                                {workflows.map((workflow) => {
-                                    const isActive =
-                                        workflow.status === 'active';
-                                    const isDraft = workflow.status === 'draft';
+                            )}
+                            {!workflowTypes.length && (
+                                <p
+                                    role="status"
+                                    className="mt-4 text-sm text-muted-foreground"
+                                >
+                                    Belum ada proses aplikasi yang dapat memakai
+                                    workflow.
+                                </p>
+                            )}
+                        </PageDialogBody>
+                    </form>
+                </PageDialogContent>
+                {createTransition.confirmation}
+            </PageDialog>
 
-                                    return (
-                                        <div
-                                            key={workflow.id}
-                                            className="flex flex-wrap items-center justify-between gap-4 p-4 transition-colors hover:bg-accent/30"
+            <PageDialog
+                open={settingsOpen}
+                onOpenChange={(open) => {
+                    if (!parameterForm.processing) {
+                        setSettingsOpen(open);
+                    }
+                }}
+            >
+                <PageDialogContent
+                    title="Pengaturan workflow"
+                    busy={parameterForm.processing}
+                >
+                    <PageDialogToolbar>
+                        <PageDialogClose asChild>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="command"
+                                disabled={parameterForm.processing}
+                            >
+                                Selesai
+                            </Button>
+                        </PageDialogClose>
+                    </PageDialogToolbar>
+                    <PageDialogBody>
+                        <p className="mb-4 text-sm text-muted-foreground">
+                            Pengaturan berlaku untuk seluruh workflow. Perubahan
+                            langsung disimpan.
+                        </p>
+                        <>
+                            {parameterFormRequestSummary}
+                            <FormErrorHeader
+                                errors={parameterForm.errors}
+                                operation="Pengaturan workflow belum disimpan"
+                            />
+                        </>
+                        <FormGrid columns={1}>
+                            {parameters.map((parameter) => (
+                                <FormControl
+                                    key={parameter.code}
+                                    hint={parameter.penjelasan}
+                                >
+                                    <Field orientation="horizontal">
+                                        <FieldLabel
+                                            htmlFor={`workflow-${parameter.code}`}
                                         >
-                                            <div className="flex min-w-0 flex-1 items-center gap-3.5">
-                                                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
-                                                    <GitBranch className="size-5" />
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <div className="flex items-center gap-2">
-                                                        <h4 className="truncate text-sm font-bold text-foreground">
-                                                            {workflow.name}
-                                                        </h4>
-                                                        <Badge variant="outline">
-                                                            {isActive
-                                                                ? 'Aktif'
-                                                                : isDraft
-                                                                  ? 'Draf'
-                                                                  : 'Nonaktif'}
-                                                        </Badge>
-                                                    </div>
-                                                    <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
-                                                        <span className="font-medium text-foreground">
-                                                            {workflow.app_name}
-                                                        </span>
-                                                        <span>•</span>
-                                                        <span>
-                                                            {workflow.type_name}
-                                                        </span>
-                                                    </p>
-                                                </div>
-                                            </div>
+                                            {parameter.label}
+                                        </FieldLabel>
+                                        <Switch
+                                            id={`workflow-${parameter.code}`}
+                                            checked={
+                                                pendingParameter?.code ===
+                                                parameter.code
+                                                    ? pendingParameter.value
+                                                    : parameter.value
+                                            }
+                                            disabled={
+                                                !canManage ||
+                                                parameterForm.processing
+                                            }
+                                            onCheckedChange={(value) => {
+                                                if (!canManage) {
+                                                    return;
+                                                }
 
-                                            <div className="flex shrink-0 items-center gap-2">
-                                                <Button
-                                                    asChild
-                                                    size="sm"
-                                                    variant="default"
-                                                    className="text-xs font-medium shadow-2xs"
-                                                >
-                                                    <Link
-                                                        href={`/settings/workflows/${workflow.id}/edit`}
-                                                    >
-                                                        <GitBranch className="mr-1.5 size-3.5" />
-                                                        Buka Canvas Alur
-                                                    </Link>
-                                                </Button>
+                                                setParameterStatus('');
+                                                setPendingParameter({
+                                                    code: parameter.code,
+                                                    value,
+                                                });
+                                                parameterForm.transform(() => ({
+                                                    code: parameter.code,
+                                                    value,
+                                                }));
+                                                parameterForm.post(
+                                                    '/settings/workflows/parameters',
+                                                    wrapParameterFormRequest({
+                                                        preserveScroll: true,
+                                                        onSuccess: () =>
+                                                            setParameterStatus(
+                                                                'Pengaturan disimpan.',
+                                                            ),
+                                                        onFinish: () =>
+                                                            setPendingParameter(
+                                                                null,
+                                                            ),
+                                                    }),
+                                                );
+                                            }}
+                                        />
+                                    </Field>
+                                </FormControl>
+                            ))}
+                        </FormGrid>
+                        <p
+                            role="status"
+                            className="mt-3 text-sm text-muted-foreground"
+                        >
+                            {parameterForm.processing
+                                ? 'Menyimpan pengaturan…'
+                                : parameterStatus}
+                        </p>
+                    </PageDialogBody>
+                </PageDialogContent>
+            </PageDialog>
 
-                                                {isActive && (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        disabled={
-                                                            !canManage ||
-                                                            toggleForm.processing
-                                                        }
-                                                        className="text-xs text-muted-foreground hover:text-foreground"
-                                                        onClick={() => {
-                                                            toggleForm.transform(
-                                                                () => ({
-                                                                    version:
-                                                                        workflow.version,
-                                                                }),
-                                                            );
-                                                            toggleForm.post(
-                                                                `/settings/workflows/${workflow.id}/deactivate`,
-                                                                {
-                                                                    preserveScroll: true,
-                                                                },
-                                                            );
-                                                        }}
-                                                    >
-                                                        <Power className="mr-1.5 size-3.5" />
-                                                        Nonaktifkan
-                                                    </Button>
-                                                )}
+            <AlertDialog
+                open={Boolean(changing)}
+                onOpenChange={(open) => {
+                    if (!open && !toggleForm.processing) {
+                        setChanging(null);
+                    }
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            {changing?.enabled
+                                ? 'Nonaktifkan workflow?'
+                                : 'Aktifkan workflow?'}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {changing?.enabled
+                                ? `Permintaan baru tidak lagi memakai alur “${changing.name}”. Proses yang sudah berjalan tetap memakai versinya.`
+                                : `Permintaan baru yang sesuai akan memakai alur “${changing?.name ?? ''}”.`}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <>
+                        {toggleFormRequestSummary}
+                        <FormErrorHeader
+                            errors={toggleForm.errors}
+                            operation="Status workflow belum diubah"
+                        />
+                    </>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={toggleForm.processing}>
+                            Batal
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            disabled={toggleForm.processing}
+                            onClick={(event) => {
+                                event.preventDefault();
 
-                                                {workflow.status ===
-                                                    'inactive' && (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        disabled={
-                                                            !canManage ||
-                                                            toggleForm.processing
-                                                        }
-                                                        className="text-xs"
-                                                        onClick={() => {
-                                                            toggleForm.transform(
-                                                                () => ({
-                                                                    version:
-                                                                        workflow.version,
-                                                                }),
-                                                            );
-                                                            toggleForm.post(
-                                                                `/settings/workflows/${workflow.id}/activate`,
-                                                                {
-                                                                    preserveScroll: true,
-                                                                },
-                                                            );
-                                                        }}
-                                                    >
-                                                        <Check className="mr-1.5 size-3.5" />
-                                                        Aktifkan
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            </main>
+                                if (!changing || !canManage) {
+                                    return;
+                                }
+
+                                toggleForm.transform(() => ({
+                                    version: changing.version,
+                                }));
+                                toggleForm.post(
+                                    `/settings/workflows/${changing.id}/${changing.enabled ? 'deactivate' : 'activate'}`,
+                                    wrapToggleFormRequest({
+                                        preserveScroll: true,
+                                        onSuccess: () => setChanging(null),
+                                    }),
+                                );
+                            }}
+                        >
+                            {toggleForm.processing
+                                ? 'Memproses…'
+                                : changing?.enabled
+                                  ? 'Nonaktifkan'
+                                  : 'Aktifkan'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     );
 }
+Workflows.layout = {
+    breadcrumbs: [{ title: 'Workflow', href: '/settings/workflows' }],
+};

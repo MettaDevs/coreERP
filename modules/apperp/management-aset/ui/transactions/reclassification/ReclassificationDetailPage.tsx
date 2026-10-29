@@ -20,22 +20,21 @@ import {
 } from '@apperp/ui/collapsible-section';
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
-import { Field, FieldDescription } from '@apperp/ui/field';
+import { DatePicker } from '@apperp/ui/date-picker';
+import { FieldError } from '@apperp/ui/field';
+
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { usePageDialogRecord } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 
 import { Textarea } from '@apperp/ui/textarea';
-import {
-    ApiError,
-    api,
-    errorMessage,
-    newIdempotencyKey,
-    toastSaveError,
-} from '../../api';
-import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
+import { RecordLookup } from '../../_shared/RecordLookup';
+import { ApiError, api, errorMessage, newIdempotencyKey } from '../../api';
+import { useMasterOptions } from '../../master/useMasterOptions';
 import { useRecordOptions } from '../../use-record-list';
+import { useSaveFeedback } from '../../use-save-feedback';
 import { PostingPreviewPanel } from '../_shared/PostingPreviewPanel';
 import type { PostingPreview } from '../_shared/PostingPreviewPanel';
 import { RecordCardHeader } from '../_shared/record-card';
@@ -128,6 +127,20 @@ export default function ReclassificationDetailPage({
     reclassificationId?: string;
     mode: Mode;
 }) {
+    const [feedbackSections, setFeedbackSections] = useState<string[]>([
+        'general',
+        'lines',
+    ]);
+
+    const {
+        scopeRef: feedbackScopeRef,
+        feedbackSummary,
+        reportSaveError,
+        clearSaveFeedback,
+    } = useSaveFeedback(undefined, reclassificationId, () =>
+        setFeedbackSections(['general', 'lines']),
+    );
+
     const embedded = usePageDialogRecord(undefined);
 
     const can = izin(permissions);
@@ -257,7 +270,8 @@ export default function ReclassificationDetailPage({
             tersimpan?.legal_entity_id ?? context.legal_entity_id;
 
         if (!legalEntity) {
-            toast.error(
+            reportSaveError(
+                null,
                 'Pilih perusahaan aktif terlebih dahulu pada header CoreERP.',
             );
 
@@ -277,7 +291,8 @@ export default function ReclassificationDetailPage({
                 .map((baris) => ({
                     id: baris.id ?? null,
                     aset_id: baris.aset_id,
-                    group_aset_tujuan_id: baris.group_aset_tujuan_id || null,
+                    group_aset_tujuan_id:
+                        baris.group_aset_tujuan_id || (pecah ? '' : null),
                     persen: pecah && baris.persen !== '' ? baris.persen : null,
                     nilai_perolehan:
                         pecah && baris.nilai_perolehan !== ''
@@ -298,6 +313,7 @@ export default function ReclassificationDetailPage({
                         body: JSON.stringify(payload),
                     },
                 );
+                clearSaveFeedback();
                 toast.success(
                     `Reklasifikasi ${hasil.data.kode} disimpan sebagai draf.`,
                 );
@@ -313,6 +329,7 @@ export default function ReclassificationDetailPage({
                     version: tersimpan?.version,
                 }),
             });
+            clearSaveFeedback();
             toast.success('Perubahan reklasifikasi disimpan.');
             saveCompleted(String(reclassificationId));
         } catch (caught) {
@@ -320,7 +337,7 @@ export default function ReclassificationDetailPage({
                 setGalat(caught.validationErrors);
             }
 
-            toastSaveError(caught, 'Reklasifikasi belum dapat disimpan.');
+            reportSaveError(caught, 'Reklasifikasi belum dapat disimpan.');
         } finally {
             setMenyimpan(false);
         }
@@ -359,6 +376,7 @@ export default function ReclassificationDetailPage({
             setTersimpan(hasil.data);
             setRecord(keForm(hasil.data));
             setPratinjau(null);
+            clearSaveFeedback();
             toast.success(
                 `Nilai aset dipindahkan. Jurnal: ${postingLabel(hasil.data.posting?.status)}.`,
             );
@@ -368,7 +386,7 @@ export default function ReclassificationDetailPage({
                 setGalat(caught.validationErrors);
             }
 
-            toastSaveError(caught, 'Reklasifikasi belum dapat diposting.');
+            reportSaveError(caught, 'Reklasifikasi belum dapat diposting.');
         } finally {
             setMenyimpan(false);
         }
@@ -384,10 +402,11 @@ export default function ReclassificationDetailPage({
                 method: 'DELETE',
                 body: JSON.stringify({ version: tersimpan?.version }),
             });
+            clearSaveFeedback();
             toast.success('Draf reklasifikasi diarsipkan.');
             deleteCompleted();
         } catch (caught) {
-            toastSaveError(caught, 'Reklasifikasi belum dapat diarsipkan.');
+            reportSaveError(caught, 'Reklasifikasi belum dapat diarsipkan.');
         } finally {
             setMenyimpan(false);
         }
@@ -416,23 +435,18 @@ export default function ReclassificationDetailPage({
         mode === 'create'
             ? 'Reklasifikasi aset baru'
             : (tersimpan?.kode ?? 'Reklasifikasi aset');
-    const pilihDari = (
-        options: { id: string }[],
-        id: string | null | undefined,
-    ) => {
-        const dipilih = options.find((option) => option.id === id);
 
-        return dipilih ? optionLabel(dipilih as never) : null;
-    };
     const masalahBaris = (index: number) =>
         pesan(`details.${index}.aset_id`) ??
         pesan(`details.${index}.group_aset_tujuan_id`) ??
         pesan(`details.${index}.persen`) ??
         pesan(`details.${index}.nilai_perolehan`);
-    const grupItems = grup.options.map(optionLabel);
 
     return (
-        <div className="flex h-full min-h-0 flex-col overflow-hidden">
+        <div
+            ref={feedbackScopeRef}
+            className="flex h-full min-h-0 flex-col overflow-hidden"
+        >
             <RecordCardHeader
                 recordTitle={tersimpan?.kode ?? 'Baru'}
                 editing={!readOnly}
@@ -455,6 +469,7 @@ export default function ReclassificationDetailPage({
                 }
             />
             <RecordActionBar
+                feedback={feedbackSummary}
                 title={embedded ? undefined : judul}
                 trailing={
                     tersimpan ? (
@@ -528,7 +543,8 @@ export default function ReclassificationDetailPage({
             >
                 <div className="space-y-5 p-5">
                     <CollapsibleSectionGroup
-                        defaultValue={['general', 'lines']}
+                        value={feedbackSections}
+                        onValueChange={setFeedbackSections}
                     >
                         <CollapsibleSection
                             value="general"
@@ -536,8 +552,16 @@ export default function ReclassificationDetailPage({
                             summary={`${kindLabel(record.jenis)} · ${tanggalTampil(record.tanggal)}`}
                         >
                             <div className="space-y-4">
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    <Field>
+                                <FormGrid>
+                                    <FormControl
+                                        data-error-field="jenis"
+                                        error={pesan('jenis')}
+                                        hint={
+                                            pecah
+                                                ? 'Sebagian nilai aset dipindah ke aset baru yang lahir saat diposting.'
+                                                : 'Aset yang sama pindah seluruhnya ke group aset lain.'
+                                        }
+                                    >
                                         {readOnly || mode === 'edit' ? (
                                             <Input
                                                 label="Jenis reklasifikasi"
@@ -569,33 +593,29 @@ export default function ReclassificationDetailPage({
                                                 }
                                             />
                                         )}
-                                        <FieldDescription>
-                                            {pesan('jenis') ||
-                                                (pecah
-                                                    ? 'Sebagian nilai aset dipindah ke aset baru yang lahir saat diposting.'
-                                                    : 'Aset yang sama pindah seluruhnya ke group aset lain.')}
-                                        </FieldDescription>
-                                    </Field>
-                                    <Field>
-                                        <Input
+                                    </FormControl>
+                                    <FormControl
+                                        data-error-field="tanggal"
+                                        error={pesan('tanggal')}
+                                        hint={
+                                            'Tanggal jurnal. Penyusutan sampai tanggal ini harus sudah difinalkan.'
+                                        }
+                                    >
+                                        <DatePicker
                                             label="Tanggal reklasifikasi"
-                                            type="date"
+
                                             required
                                             readOnly={readOnly}
                                             value={record.tanggal}
-                                            onChange={(event) =>
+                                            onValueChange={(value) =>
                                                 setRecord({
                                                     ...record,
-                                                    tanggal: event.target.value,
+                                                    tanggal: value,
                                                 })
                                             }
                                         />
-                                        <FieldDescription>
-                                            {pesan('tanggal') ||
-                                                'Tanggal jurnal. Penyusutan sampai tanggal ini harus sudah difinalkan.'}
-                                        </FieldDescription>
-                                    </Field>
-                                    <Field>
+                                    </FormControl>
+                                    <FormControl data-error-field="responsible_org_unit_id">
                                         {readOnly ? (
                                             <Input
                                                 label="Unit penanggung jawab"
@@ -606,17 +626,22 @@ export default function ReclassificationDetailPage({
                                                 }
                                             />
                                         ) : (
-                                            <Select
-                                                {...unitKerja.selectProps}
+                                            <RecordLookup
+                                                source={unitKerja}
                                                 label="Unit penanggung jawab"
                                                 required
                                                 items={unitKerja.options.map(
-                                                    optionLabel,
+                                                    (record) => ({
+                                                        value: record.id,
+                                                        label: unitKerja.getLabel(
+                                                            record,
+                                                        ),
+                                                    }),
                                                 )}
-                                                value={pilihDari(
-                                                    unitKerja.options,
-                                                    record.responsible_org_unit_id,
-                                                )}
+                                                value={
+                                                    record.responsible_org_unit_id ||
+                                                    null
+                                                }
                                                 placeholder="Pilih unit kerja"
                                                 searchPlaceholder="Cari unit kerja"
                                                 emptyMessage="Unit kerja tidak ditemukan."
@@ -626,26 +651,27 @@ export default function ReclassificationDetailPage({
                                                     setRecord({
                                                         ...record,
                                                         responsible_org_unit_id:
-                                                            unitKerja.options.find(
-                                                                (option) =>
-                                                                    optionLabel(
-                                                                        option,
-                                                                    ) === item,
-                                                            )?.id ?? '',
+                                                            item ?? '',
                                                     })
                                                 }
                                             />
                                         )}
                                         {pesan('responsible_org_unit_id') && (
-                                            <FieldDescription>
+                                            <FieldError>
                                                 {pesan(
                                                     'responsible_org_unit_id',
                                                 )}
-                                            </FieldDescription>
+                                            </FieldError>
                                         )}
-                                    </Field>
-                                </div>
-                                <Field>
+                                    </FormControl>
+                                </FormGrid>
+                                <FormControl
+                                    data-error-field="keterangan"
+                                    error={pesan('keterangan')}
+                                    hint={
+                                        'Ikut ke keterangan jurnal di aplikasi finance, misalnya salah klasifikasi saat penerimaan.'
+                                    }
+                                >
                                     <Textarea
                                         label="Alasan"
                                         required
@@ -660,11 +686,7 @@ export default function ReclassificationDetailPage({
                                             })
                                         }
                                     />
-                                    <FieldDescription>
-                                        {pesan('keterangan') ||
-                                            'Ikut ke keterangan jurnal di aplikasi finance, misalnya salah klasifikasi saat penerimaan.'}
-                                    </FieldDescription>
-                                </Field>
+                                </FormControl>
                             </div>
                         </CollapsibleSection>
                         <CollapsibleSection
@@ -736,6 +758,7 @@ export default function ReclassificationDetailPage({
                                             {
                                                 id: 'column-1',
                                                 header: 'Aset',
+                                                content: 'control',
                                                 cell: ({
                                                     baris,
                                                     index,
@@ -745,47 +768,47 @@ export default function ReclassificationDetailPage({
                                                     <>
                                                         {!baris.id &&
                                                         !readOnly ? (
-                                                            <Select
-                                                                {...assetSource.selectProps}
-                                                                items={aset.map(
-                                                                    labelAset,
-                                                                )}
-                                                                value={
-                                                                    dipilih
-                                                                        ? labelAset(
-                                                                              dipilih,
-                                                                          )
-                                                                        : null
-                                                                }
-                                                                placeholder="Pilih aset"
-                                                                searchPlaceholder="Cari kode atau nama aset"
-                                                                emptyMessage="Aset tidak ditemukan."
-                                                                ariaLabel={`Aset baris ${index + 1}`}
-                                                                portalContainer={
-                                                                    lookupPortal
-                                                                }
-                                                                onValueChange={(
-                                                                    item,
-                                                                ) =>
-                                                                    ubahBaris(
-                                                                        index,
-                                                                        {
-                                                                            aset_id:
-                                                                                aset.find(
-                                                                                    (
-                                                                                        calon,
-                                                                                    ) =>
-                                                                                        labelAset(
-                                                                                            calon,
-                                                                                        ) ===
-                                                                                        item,
-                                                                                )
-                                                                                    ?.id ??
-                                                                                '',
-                                                                        },
-                                                                    )
-                                                                }
-                                                            />
+                                                            <FormControl>
+                                                                <RecordLookup
+                                                                    label="Pilih aset"
+                                                                    source={
+                                                                        assetSource
+                                                                    }
+                                                                    items={aset.map(
+                                                                        (
+                                                                            record,
+                                                                        ) => ({
+                                                                            value: record.id,
+                                                                            label: assetSource.getLabel(
+                                                                                record,
+                                                                            ),
+                                                                        }),
+                                                                    )}
+                                                                    value={
+                                                                        dipilih?.id ??
+                                                                        null
+                                                                    }
+                                                                    placeholder="Pilih aset"
+                                                                    searchPlaceholder="Cari kode atau nama aset"
+                                                                    emptyMessage="Aset tidak ditemukan."
+                                                                    ariaLabel={`Aset baris ${index + 1}`}
+                                                                    portalContainer={
+                                                                        lookupPortal
+                                                                    }
+                                                                    onValueChange={(
+                                                                        item,
+                                                                    ) =>
+                                                                        ubahBaris(
+                                                                            index,
+                                                                            {
+                                                                                aset_id:
+                                                                                    item ??
+                                                                                    '',
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </FormControl>
                                                         ) : (
                                                             <span>
                                                                 {labelAset({
@@ -823,6 +846,7 @@ export default function ReclassificationDetailPage({
                                             {
                                                 id: 'column-2',
                                                 header: 'Group tujuan',
+                                                content: 'control',
                                                 cell: ({ baris, index }) => (
                                                     <>
                                                         {readOnly ? (
@@ -831,54 +855,59 @@ export default function ReclassificationDetailPage({
                                                                 ? GROUP_ASAL
                                                                 : '—'))
                                                         ) : (
-                                                            <Select
-                                                                {...grup.selectProps}
-                                                                items={
-                                                                    pecah
-                                                                        ? [
-                                                                              GROUP_ASAL,
-                                                                              ...grupItems,
-                                                                          ]
-                                                                        : grupItems
-                                                                }
-                                                                value={
-                                                                    pilihDari(
-                                                                        grup.options,
-                                                                        baris.group_aset_tujuan_id,
-                                                                    ) ??
-                                                                    (pecah
-                                                                        ? GROUP_ASAL
-                                                                        : null)
-                                                                }
-                                                                placeholder="Pilih group tujuan"
-                                                                searchPlaceholder="Cari group aset"
-                                                                emptyMessage="Group aset tidak ditemukan."
-                                                                ariaLabel={`Group tujuan baris ${index + 1}`}
-                                                                portalContainer={
-                                                                    lookupPortal
-                                                                }
-                                                                onValueChange={(
-                                                                    item,
-                                                                ) =>
-                                                                    ubahBaris(
-                                                                        index,
-                                                                        {
-                                                                            group_aset_tujuan_id:
-                                                                                grup.options.find(
-                                                                                    (
-                                                                                        option,
-                                                                                    ) =>
-                                                                                        optionLabel(
-                                                                                            option,
-                                                                                        ) ===
-                                                                                        item,
-                                                                                )
-                                                                                    ?.id ??
-                                                                                '',
-                                                                        },
-                                                                    )
-                                                                }
-                                                            />
+                                                            <FormControl>
+                                                                <RecordLookup
+                                                                    label="Pilih group tujuan"
+                                                                    source={
+                                                                        grup
+                                                                    }
+                                                                    items={[
+                                                                        ...(pecah
+                                                                            ? [
+                                                                                  {
+                                                                                      value: '',
+                                                                                      label: GROUP_ASAL,
+                                                                                  },
+                                                                              ]
+                                                                            : []),
+                                                                        ...grup.options.map(
+                                                                            (
+                                                                                record,
+                                                                            ) => ({
+                                                                                value: record.id,
+                                                                                label: grup.getLabel(
+                                                                                    record,
+                                                                                ),
+                                                                            }),
+                                                                        ),
+                                                                    ]}
+                                                                    value={
+                                                                        baris.group_aset_tujuan_id ||
+                                                                        (pecah
+                                                                            ? ''
+                                                                            : null)
+                                                                    }
+                                                                    placeholder="Pilih group tujuan"
+                                                                    searchPlaceholder="Cari group aset"
+                                                                    emptyMessage="Group aset tidak ditemukan."
+                                                                    ariaLabel={`Group tujuan baris ${index + 1}`}
+                                                                    portalContainer={
+                                                                        lookupPortal
+                                                                    }
+                                                                    onValueChange={(
+                                                                        item,
+                                                                    ) =>
+                                                                        ubahBaris(
+                                                                            index,
+                                                                            {
+                                                                                group_aset_tujuan_id:
+                                                                                    item ??
+                                                                                    '',
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </FormControl>
                                                         )}
                                                     </>
                                                 ),
@@ -891,6 +920,7 @@ export default function ReclassificationDetailPage({
                                                           id: 'column-3',
                                                           header: 'Persen',
                                                           align: 'right',
+                                                          content: 'control',
                                                           cell: ({
                                                               baris,
                                                               index,
@@ -903,32 +933,34 @@ export default function ReclassificationDetailPage({
                                                                           '—'
                                                                       )
                                                                   ) : (
-                                                                      <Input
-                                                                          aria-label={`Persen baris ${index + 1}`}
-                                                                          type="number"
-                                                                          min="0"
-                                                                          max="100"
-                                                                          step="0.01"
-                                                                          value={
-                                                                              baris.persen
-                                                                          }
-                                                                          disabled={
-                                                                              baris.nilai_perolehan !==
-                                                                              ''
-                                                                          }
-                                                                          onChange={(
-                                                                              event,
-                                                                          ) =>
-                                                                              ubahBaris(
-                                                                                  index,
-                                                                                  {
-                                                                                      persen: event
-                                                                                          .target
-                                                                                          .value,
-                                                                                  },
-                                                                              )
-                                                                          }
-                                                                      />
+                                                                      <FormControl>
+                                                                          <Input
+                                                                              aria-label={`Persen baris ${index + 1}`}
+                                                                              type="number"
+                                                                              min="0"
+                                                                              max="100"
+                                                                              step="0.01"
+                                                                              value={
+                                                                                  baris.persen
+                                                                              }
+                                                                              disabled={
+                                                                                  baris.nilai_perolehan !==
+                                                                                  ''
+                                                                              }
+                                                                              onChange={(
+                                                                                  event,
+                                                                              ) =>
+                                                                                  ubahBaris(
+                                                                                      index,
+                                                                                      {
+                                                                                          persen: event
+                                                                                              .target
+                                                                                              .value,
+                                                                                      },
+                                                                                  )
+                                                                              }
+                                                                          />
+                                                                      </FormControl>
                                                                   )}
                                                               </div>
                                                           ),
@@ -943,6 +975,7 @@ export default function ReclassificationDetailPage({
                                                           id: 'column-4',
                                                           header: 'Atau nilai perolehan',
                                                           align: 'right',
+                                                          content: 'control',
                                                           cell: ({
                                                               baris,
                                                               index,
@@ -954,32 +987,34 @@ export default function ReclassificationDetailPage({
                                                                               baris.nilai_perolehan,
                                                                       )
                                                                   ) : (
-                                                                      <Input
-                                                                          aria-label={`Nilai perolehan baris ${index + 1}`}
-                                                                          type="number"
-                                                                          min="0"
-                                                                          step="0.01"
-                                                                          value={
-                                                                              baris.nilai_perolehan
-                                                                          }
-                                                                          disabled={
-                                                                              baris.persen !==
-                                                                              ''
-                                                                          }
-                                                                          onChange={(
-                                                                              event,
-                                                                          ) =>
-                                                                              ubahBaris(
-                                                                                  index,
-                                                                                  {
-                                                                                      nilai_perolehan:
-                                                                                          event
-                                                                                              .target
-                                                                                              .value,
-                                                                                  },
-                                                                              )
-                                                                          }
-                                                                      />
+                                                                      <FormControl>
+                                                                          <Input
+                                                                              aria-label={`Nilai perolehan baris ${index + 1}`}
+                                                                              type="number"
+                                                                              min="0"
+                                                                              step="0.01"
+                                                                              value={
+                                                                                  baris.nilai_perolehan
+                                                                              }
+                                                                              disabled={
+                                                                                  baris.persen !==
+                                                                                  ''
+                                                                              }
+                                                                              onChange={(
+                                                                                  event,
+                                                                              ) =>
+                                                                                  ubahBaris(
+                                                                                      index,
+                                                                                      {
+                                                                                          nilai_perolehan:
+                                                                                              event
+                                                                                                  .target
+                                                                                                  .value,
+                                                                                      },
+                                                                                  )
+                                                                              }
+                                                                          />
+                                                                      </FormControl>
                                                                   )}
                                                               </div>
                                                           ),
@@ -993,6 +1028,7 @@ export default function ReclassificationDetailPage({
                                                       {
                                                           id: 'column-5',
                                                           header: 'Aset baru',
+                                                          content: 'control',
                                                           cell: ({
                                                               baris,
                                                               index,
@@ -1003,26 +1039,28 @@ export default function ReclassificationDetailPage({
                                                                       (baris.nama_aset_baru ||
                                                                           '—'))
                                                                   ) : (
-                                                                      <Input
-                                                                          aria-label={`Nama aset baru baris ${index + 1}`}
-                                                                          placeholder="Sama dengan aset asal"
-                                                                          value={
-                                                                              baris.nama_aset_baru
-                                                                          }
-                                                                          onChange={(
-                                                                              event,
-                                                                          ) =>
-                                                                              ubahBaris(
-                                                                                  index,
-                                                                                  {
-                                                                                      nama_aset_baru:
-                                                                                          event
-                                                                                              .target
-                                                                                              .value,
-                                                                                  },
-                                                                              )
-                                                                          }
-                                                                      />
+                                                                      <FormControl>
+                                                                          <Input
+                                                                              aria-label={`Nama aset baru baris ${index + 1}`}
+                                                                              placeholder="Sama dengan aset asal"
+                                                                              value={
+                                                                                  baris.nama_aset_baru
+                                                                              }
+                                                                              onChange={(
+                                                                                  event,
+                                                                              ) =>
+                                                                                  ubahBaris(
+                                                                                      index,
+                                                                                      {
+                                                                                          nama_aset_baru:
+                                                                                              event
+                                                                                                  .target
+                                                                                                  .value,
+                                                                                      },
+                                                                                  )
+                                                                              }
+                                                                          />
+                                                                      </FormControl>
                                                                   )}
                                                               </>
                                                           ),
@@ -1034,31 +1072,34 @@ export default function ReclassificationDetailPage({
                                             {
                                                 id: 'column-6',
                                                 header: 'Keterangan',
+                                                content: 'control',
                                                 cell: ({ baris, index }) => (
                                                     <>
                                                         {readOnly ? (
                                                             baris.keterangan ||
                                                             '—'
                                                         ) : (
-                                                            <Input
-                                                                aria-label={`Keterangan baris ${index + 1}`}
-                                                                value={
-                                                                    baris.keterangan
-                                                                }
-                                                                onChange={(
-                                                                    event,
-                                                                ) =>
-                                                                    ubahBaris(
-                                                                        index,
-                                                                        {
-                                                                            keterangan:
-                                                                                event
-                                                                                    .target
-                                                                                    .value,
-                                                                        },
-                                                                    )
-                                                                }
-                                                            />
+                                                            <FormControl>
+                                                                <Input
+                                                                    aria-label={`Keterangan baris ${index + 1}`}
+                                                                    value={
+                                                                        baris.keterangan
+                                                                    }
+                                                                    onChange={(
+                                                                        event,
+                                                                    ) =>
+                                                                        ubahBaris(
+                                                                            index,
+                                                                            {
+                                                                                keterangan:
+                                                                                    event
+                                                                                        .target
+                                                                                        .value,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </FormControl>
                                                         )}
                                                     </>
                                                 ),

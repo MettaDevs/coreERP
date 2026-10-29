@@ -16,5 +16,11 @@
     "judul": "Pusat admin (internal)",
     "publik": false,
     "berkas": "pusat-admin.yaml"
+  },
+  {
+    "id": "product-registration",
+    "judul": "Pendaftaran trial produk (internal)",
+    "publik": false,
+    "berkas": "product-registration.yaml"
   }
 ]

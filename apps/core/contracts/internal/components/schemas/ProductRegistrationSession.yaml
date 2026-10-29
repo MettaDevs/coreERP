@@ -1,0 +1,68 @@
+type: object
+required:
+- authenticated
+- customer
+- products
+- tenant
+properties:
+  authenticated:
+    type: boolean
+  customer:
+    oneOf:
+    - type: 'null'
+    - type: object
+      required:
+      - id
+      - name
+      - email
+      - email_verified
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type:
+          - string
+          - 'null'
+          format: email
+        email_verified:
+          type: boolean
+  products:
+    type: array
+    items:
+      type: object
+      required:
+      - code
+      - name
+      - trial_days
+      - profiles
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        trial_days:
+          type: integer
+          minimum: 1
+          maximum: 90
+        profiles:
+          type: array
+          items:
+            type: object
+            required:
+            - code
+            - name
+            - description
+            properties:
+              code:
+                type: string
+              name:
+                type: string
+              description:
+                type: string
+  tenant:
+    oneOf:
+    - type: 'null'
+    - $ref: '#/components/schemas/ProductRegistrationTenant'

@@ -5,6 +5,8 @@ namespace Modules\Apperp\ManagementAset\Tests\Feature;
 use App\Platform\Access\Models\Role;
 use App\Platform\Identity\Models\User;
 use App\Platform\Modules\Contracts\DataClass;
+use App\Platform\Modules\Contracts\FundingSourceDirectory;
+use App\Platform\Modules\Contracts\PlanningYearDirectory;
 use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -269,6 +271,9 @@ class LampiranDokumenAsetTest extends TestCase
 
     private function perencanaan(?string $typeId = null): string
     {
+        $this->pastikanOrganisasiAda($this->tenantId, $this->unitId, 'operating_unit');
+        $year = app(PlanningYearDirectory::class)->importLegacy($this->tenantId, $this->legalEntityId, 2026);
+        $fundingSource = app(FundingSourceDirectory::class)->importLegacy($this->tenantId, 'Anggaran operasional');
         $jenis = $typeId ?? (string) Str::ulid();
         $now = now();
         if ($typeId === null) {
@@ -279,11 +284,12 @@ class LampiranDokumenAsetTest extends TestCase
             ->withHeader('Idempotency-Key', 'plan-'.Str::ulid())
             ->postJson('/api/modules/management-aset/v1/perencanaan-aset', [
                 'legal_entity_id' => $this->legalEntityId, 'planning_org_unit_id' => $this->unitId,
-                'planned_on' => '2026-07-30', 'planning_year' => 2026, 'planning_type' => 'regular',
-                'funding_source' => 'Anggaran operasional', 'description' => 'Perangkat tim',
+                'planned_on' => '2026-07-30', 'planning_year_id' => $year['id'],
+                'responsible_user_id' => (string) auth()->id(), 'description' => 'Perangkat tim',
                 'details' => [[
                     'jenis_aset_id' => $jenis, 'satuan_id' => $this->buatSatuanUji($this->tenantId), 'quantity' => 1,
                     'requested_specification' => 'RAM 16 GB', 'estimated_unit_price' => 15000000,
+                    'needed_on' => '2026-10-01', 'funding_source_id' => $fundingSource['id'],
                 ]],
             ])->assertCreated()->json('data.id');
     }

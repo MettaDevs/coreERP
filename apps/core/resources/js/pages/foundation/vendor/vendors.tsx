@@ -31,13 +31,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import { toast } from 'sonner';
 import { RecordListScroll } from '@/components/record-list-scroll';
-import { useRecordTransition } from '@/hooks/use-record-transition';
-import {
-    apiJson,
-    CoreApiError,
-    errorText,
-    toastSaveError,
-} from '@/lib/core-api';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
+import { useSaveFeedback } from '@/hooks/use-save-feedback';
+import { apiJson, CoreApiError, errorText } from '@/lib/core-api';
 import { loadLookupItems } from '@/lib/lookup-loader';
 import type { BreadcrumbItem } from '@/types/navigation';
 import {
@@ -122,6 +118,7 @@ function Filters({
 
     return (
         <form
+            noValidate
             className="flex flex-col gap-3 sm:flex-row sm:items-end"
             onSubmit={(event) => {
                 event.preventDefault();
@@ -230,8 +227,10 @@ function VendorCard({
     portalContainer,
     onBusyChange,
     onDirtyChange,
+    lockedLegalEntityId,
 }: {
     vendor: Vendor | null;
+    lockedLegalEntityId?: string;
     legalEntities: LegalEntity[];
     automaticNumbers: boolean;
     onClose: () => void;
@@ -272,6 +271,15 @@ function VendorCard({
         return () => onDirtyChange(false);
     }, [dirty, onDirtyChange]);
     const [errors, setErrors] = useState<Record<string, string[]>>({});
+    const {
+        report: reportSaveError,
+        clear: clearSaveError,
+        summary: saveErrorSummary,
+        scopeRef: saveScopeRef,
+    } = useSaveFeedback<HTMLDivElement>();
+    const [openSections, setOpenSections] = useState(
+        vendor ? ['general', 'addresses'] : ['general'],
+    );
     const [saving, setSaving] = useState(false);
     const detailTransition = useRecordTransition(
         draftDetails.value.locations.length > 0 ||
@@ -436,6 +444,7 @@ function VendorCard({
         setSaving(true);
         setErrors({});
         setSaveError('');
+        clearSaveError();
 
         try {
             const result = await apiJson<{ data: Vendor }>(
@@ -486,13 +495,12 @@ function VendorCard({
                 onCreated(result.data);
             }
         } catch (caught) {
-            setSaveError(errorText(caught, 'Vendor belum dapat disimpan.'));
-
             if (caught instanceof CoreApiError) {
                 setErrors(caught.errors);
+                setOpenSections(['general', 'addresses']);
             }
 
-            toastSaveError(caught, 'Vendor belum disimpan.');
+            reportSaveError(caught, 'Vendor belum disimpan.');
         } finally {
             setSaving(false);
         }
@@ -520,8 +528,8 @@ function VendorCard({
         );
 
     return (
-        <div className="flex h-full min-h-0 flex-col">
-            <RecordActionBar>
+        <div ref={saveScopeRef} className="flex h-full min-h-0 flex-col">
+            <RecordActionBar feedback={saveErrorSummary}>
                 <ActionButton
                     action="save"
                     type="submit"
@@ -551,6 +559,7 @@ function VendorCard({
                         </p>
                     )}
                     <form
+                        noValidate
                         id="vendor-form"
                         onSubmit={(event) => {
                             event.preventDefault();
@@ -558,9 +567,8 @@ function VendorCard({
                         }}
                     >
                         <CollapsibleSectionGroup
-                            defaultValue={
-                                vendor ? ['general', 'addresses'] : ['general']
-                            }
+                            value={openSections}
+                            onValueChange={setOpenSections}
                         >
                             <CollapsibleSection
                                 value="general"
@@ -571,6 +579,7 @@ function VendorCard({
                                     <VendorField
                                         label="Nomor vendor"
                                         error={error('number')}
+                                        field="number"
                                         hint={
                                             automaticNumbers
                                                 ? 'Nomor dibuat otomatis saat vendor disimpan dan unik di seluruh perusahaan.'
@@ -603,8 +612,9 @@ function VendorCard({
                                     <VendorField
                                         label="Perusahaan"
                                         error={error('legal_entity_id')}
+                                        field="legal_entity_id"
                                     >
-                                        {vendor ? (
+                                        {vendor || lockedLegalEntityId ? (
                                             <Input
                                                 label="Perusahaan"
                                                 value={legalEntityName}
@@ -699,6 +709,7 @@ function VendorCard({
                                         <VendorField
                                             label="Nama vendor"
                                             error={error('party_id')}
+                                            field="party_id"
                                         >
                                             <InlineLookup
                                                 portalContainer={
@@ -797,6 +808,9 @@ function VendorCard({
                                     ) : (
                                         <VendorField
                                             label="Nama vendor"
+                                            field={
+                                                vendor ? 'name' : 'party_name'
+                                            }
                                             error={error(
                                                 vendor ? 'name' : 'party_name',
                                             )}
@@ -845,6 +859,7 @@ function VendorCard({
                                         <VendorField
                                             label="Jenis Vendor"
                                             error={error('party_type')}
+                                            field="party_type"
                                         >
                                             <NativeSelect
                                                 label="Jenis Vendor"
@@ -881,6 +896,9 @@ function VendorCard({
                                     <Field orientation="horizontal">
                                         <Switch
                                             id="vendor-active"
+                                            disabled={Boolean(
+                                                !vendor && lockedLegalEntityId,
+                                            )}
                                             checked={form.active}
                                             onCheckedChange={(checked) =>
                                                 set('active', checked)
@@ -931,17 +949,19 @@ function VendorCard({
 
 function VendorField({
     label,
+    field,
     hint,
     error,
     children,
 }: {
     label: string;
+    field?: string;
     hint?: string;
     error?: string;
     children: ReactNode;
 }) {
     return (
-        <Field data-invalid={Boolean(error)}>
+        <Field data-error-field={field} data-invalid={Boolean(error)}>
             <div className="flex min-w-0 items-center gap-2">
                 <div className="min-w-0 flex-1">{children}</div>
                 {hint && <VendorHint label={label}>{hint}</VendorHint>}
@@ -1162,6 +1182,113 @@ function VendorReadCard({
                 </main>
             </VendorContextPanel>
         </div>
+    );
+}
+
+type VendorCreateContext = Pick<
+    Props,
+    | 'legalEntities'
+    | 'automaticNumbers'
+    | 'canReadAddressBook'
+    | 'canManageAddressBook'
+>;
+
+/** Kartu vendor Core yang sama dapat dibuka dari lookup tanpa meninggalkan draft induk. */
+export function VendorCreateCard({
+    legalEntityId,
+    onClose,
+    onCreated,
+}: {
+    legalEntityId: string;
+    onClose: () => void;
+    onCreated: (vendor: Vendor) => void;
+}) {
+    const [context, setContext] = useState<VendorCreateContext | null>(null);
+    const [error, setError] = useState('');
+    const [reload, setReload] = useState(0);
+    const [saving, setSaving] = useState(false);
+    const [dirty, setDirty] = useState(false);
+    const portal = useRef<HTMLDivElement>(null);
+    const transition = useRecordTransition(dirty, saving);
+    useEffect(() => {
+        const request = new AbortController();
+        apiJson<{ data: VendorCreateContext }>(
+            `/api/v1/vendors/create-context?legal_entity_id=${encodeURIComponent(legalEntityId)}`,
+            { signal: request.signal },
+        )
+            .then((result) => {
+                if (!request.signal.aborted) {
+                    setContext(result.data);
+                    setError('');
+                }
+            })
+            .catch((caught) => {
+                if (!request.signal.aborted) {
+                    setError(
+                        errorText(caught, 'Form vendor belum dapat dimuat.'),
+                    );
+                }
+            });
+
+        return () => request.abort();
+    }, [legalEntityId, reload]);
+
+    return (
+        <>
+            <PageDialog
+                open
+                onOpenChange={(open) => {
+                    if (!open) {
+                        transition.request(onClose);
+                    }
+                }}
+            >
+                <PageDialogContent ref={portal} title="Vendor" busy={saving}>
+                    {error && (
+                        <div
+                            role="alert"
+                            className="p-4 text-sm text-destructive"
+                        >
+                            {error}
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => setReload((value) => value + 1)}
+                            >
+                                Coba lagi
+                            </Button>
+                        </div>
+                    )}
+                    {!context && !error && (
+                        <p
+                            role="status"
+                            className="p-4 text-sm text-muted-foreground"
+                        >
+                            Memuat form vendor…
+                        </p>
+                    )}
+                    {context && (
+                        <VendorCard
+                            vendor={null}
+                            lockedLegalEntityId={legalEntityId}
+                            legalEntities={context.legalEntities}
+                            automaticNumbers={context.automaticNumbers}
+                            canReadAddressBook={context.canReadAddressBook}
+                            canManageAddressBook={context.canManageAddressBook}
+                            initialParty={null}
+                            portalContainer={portal}
+                            onBusyChange={setSaving}
+                            onDirtyChange={setDirty}
+                            onClose={() => transition.request(onClose)}
+                            onCreated={onCreated}
+                            onSaved={onClose}
+                            onOpenExisting={onCreated}
+                        />
+                    )}
+                </PageDialogContent>
+            </PageDialog>
+            {transition.confirmation}
+        </>
     );
 }
 

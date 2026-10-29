@@ -129,6 +129,30 @@ try {
     });
     assert.equal(Object.hasOwn(model.models.rows[0], 'kode'), false);
     assert.equal(JSON.stringify(model).includes('local-row-key'), false);
+    const partialValue = draftMasterPayload('maintenance-checklist-variables', {
+        values: [row({ line_number: 3, value: '', result_code: 'none' })],
+    }).values.values;
+    assert.equal(partialValue.length, 1);
+    assert.equal(partialValue[0].value, null);
+    assert.equal(Object.hasOwn(partialValue[0], 'id'), false);
+    const partialLine = draftMasterPayload('maintenance-checklist-templates', {
+        lines: [
+            row({
+                line_number: 5,
+                type: 'text',
+                nama: '',
+                instruksi: 'Belum lengkap',
+                wajib: false,
+            }),
+        ],
+    }).lines.lines;
+    assert.equal(partialLine.length, 1);
+    assert.equal(partialLine[0].nama, null);
+    assert.equal(Object.hasOwn(partialLine[0], 'id'), false);
+    assert.equal(
+        JSON.stringify({ partialValue, partialLine }).includes('local-row-key'),
+        false,
+    );
     console.log(
         'Draft master payload: empty sections, link IDs, conditional fields, counter/time basis, unit references, row numbering, and automatic code omission passed.',
     );

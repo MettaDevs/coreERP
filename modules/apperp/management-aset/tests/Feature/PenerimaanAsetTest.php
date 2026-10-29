@@ -490,6 +490,74 @@ class PenerimaanAsetTest extends TestCase
             ->assertJsonValidationErrors(['details.0.jumlah']);
     }
 
+    public function test_new_receipt_saves_attachments_once_with_its_parent(): void
+    {
+        Storage::fake('s3');
+        $payload = $this->payload([$this->baris(2)]);
+        $file = UploadedFile::fake()->createWithContent('invoice.pdf', "%PDF-1.4\ntrailer <<>>\n%%EOF");
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penerimaan-aset.create', 'management-aset.penerimaan-aset.read', 'management-aset.penerimaan-aset.update'])
+            ->withHeader('Idempotency-Key', 'receipt-with-files');
+        $body = ['payload' => json_encode($payload, JSON_THROW_ON_ERROR), 'attachments' => [$file]];
+        $id = (string) $this->post('/api/modules/management-aset/v1/penerimaan-aset', $body, ['Accept' => 'application/json'])
+            ->assertCreated()->json('data.id');
+        $this->assertDatabaseHas('document_attachments', ['tenant_id' => $this->tenantId, 'record_type' => 'aset_tr_penerimaan_aset', 'record_id' => $id, 'file_name' => 'invoice.pdf']);
+        $this->assertSame(1, count(Storage::disk('s3')->allFiles()));
+        $this->post('/api/modules/management-aset/v1/penerimaan-aset', $body, ['Accept' => 'application/json'])
+            ->assertOk()->assertJsonPath('data.id', $id);
+        $this->assertSame(1, DB::table('document_attachments')->where('record_id', $id)->count());
+        $this->assertSame(1, count(Storage::disk('s3')->allFiles()));
+        $this->assertSame(0, DB::table('aset_tr_aset')->where('penerimaan_aset_id', $id)->count());
+    }
+
+    public function test_invalid_or_unauthorized_draft_files_leave_no_receipt(): void
+    {
+        Storage::fake('s3');
+        $payload = $this->payload([$this->baris(1)]);
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penerimaan-aset.create', 'management-aset.penerimaan-aset.read'])
+            ->withHeader('Idempotency-Key', 'forbidden-draft-files');
+        $this->post('/api/modules/management-aset/v1/penerimaan-aset', [
+            'payload' => json_encode($payload, JSON_THROW_ON_ERROR),
+            'attachments' => [UploadedFile::fake()->createWithContent('invoice.pdf', "%PDF-1.4\n%%EOF")],
+        ], ['Accept' => 'application/json'])->assertForbidden();
+        $this->assertDatabaseMissing('aset_tr_penerimaan_aset', ['creation_key' => 'forbidden-draft-files']);
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penerimaan-aset.create', 'management-aset.penerimaan-aset.read', 'management-aset.penerimaan-aset.update'])
+            ->withHeader('Idempotency-Key', 'invalid-draft-files');
+        $this->post('/api/modules/management-aset/v1/penerimaan-aset', [
+            'payload' => json_encode($payload, JSON_THROW_ON_ERROR),
+            'attachments' => [UploadedFile::fake()->createWithContent('invoice.exe', 'MZ-invalid')],
+        ], ['Accept' => 'application/json'])->assertUnprocessable()->assertJsonValidationErrors('attachments.0');
+        $this->assertDatabaseMissing('aset_tr_penerimaan_aset', ['creation_key' => 'invalid-draft-files']);
+        $this->assertSame([], Storage::disk('s3')->allFiles());
+    }
+
+    public function test_completion_flows_attachment_references_to_matching_assets_once(): void
+    {
+        Storage::fake('s3');
+        $group = $this->groupSiapSusut();
+        $id = $this->draf([$this->baris(2, group: $group), $this->baris(1, group: $group)]);
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penerimaan-aset.read', 'management-aset.penerimaan-aset.update']);
+        $path = '/api/v1/records/aset_tr_penerimaan_aset/'.$id.'/attachments';
+        $pdf = "%PDF-1.4\ntrailer <<>>\n%%EOF";
+        $this->post($path, ['file' => UploadedFile::fake()->createWithContent('header.pdf', $pdf)], ['Accept' => 'application/json'])->assertCreated();
+        $this->post($path, ['file' => UploadedFile::fake()->createWithContent('line.pdf', $pdf), 'line_number' => 1], ['Accept' => 'application/json'])->assertCreated();
+        $completed = $this->selesaikan($id);
+        $completed->assertOk();
+        $assets = DB::table('aset_tr_aset')->where('penerimaan_aset_id', $id)->pluck('id');
+        $copies = DB::table('document_attachments')->where('record_type', 'aset_tr_aset')->whereIn('record_id', $assets)->get();
+        $this->assertSame(5, $copies->count());
+        $sourcePaths = DB::table('document_attachments')->where('record_id', $id)->pluck('storage_path')->all();
+        foreach ($copies as $copy) {
+            $this->assertContains($copy->storage_path, $sourcePaths);
+        }
+        $this->assertSame(2, count(Storage::disk('s3')->allFiles()), 'Flow must not duplicate file bytes.');
+        $this->selesaikan($id, $this->versiDokumen($id))->assertUnprocessable();
+        $this->assertSame(5, DB::table('document_attachments')->where('record_type', 'aset_tr_aset')->whereIn('record_id', $assets)->count());
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.read']);
+        foreach ($assets as $assetId) {
+            $this->getJson('/api/v1/records/aset_tr_aset/'.$assetId.'/attachments')->assertOk();
+        }
+    }
+
     /** @param list<array<string, mixed>> $details */
     private function draf(array $details): string
     {

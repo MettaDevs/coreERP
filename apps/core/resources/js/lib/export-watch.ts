@@ -20,12 +20,12 @@ const MAX_ANNOUNCED = 200;
 
 type Listener = () => void;
 
-let exports: ReportExport[] = [];
+let exports: ReportExport[] | null = null;
 let timer: number | null = null;
 let announced: Set<string> | null = null;
 const listeners = new Set<Listener>();
 
-export function getExports(): ReportExport[] {
+export function getExports(): ReportExport[] | null {
     return exports;
 }
 
@@ -170,7 +170,10 @@ function stopPolling(): void {
 
 /** Dipanggil dialog cetak setelah permintaan diterima Core. */
 export function trackExport(item: ReportExport): void {
-    exports = [item, ...exports.filter((other) => other.id !== item.id)];
+    exports = [
+        item,
+        ...(exports ?? []).filter((other) => other.id !== item.id),
+    ];
     emit();
     startPolling();
 }

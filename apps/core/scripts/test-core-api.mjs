@@ -9,6 +9,35 @@ const source = await readFile(
     new URL('../resources/js/lib/core-api.ts', import.meta.url),
     'utf8',
 );
+const feedbackSource = ts.createSourceFile(
+    'form-feedback.tsx',
+    await readFile(
+        new URL(
+            '../../../packages/ui/src/components/form-feedback.tsx',
+            import.meta.url,
+        ),
+        'utf8',
+    ),
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+);
+const feedbackFunction = feedbackSource.statements.find(
+    (node) =>
+        ts.isFunctionDeclaration(node) &&
+        node.name?.text === 'createSaveFeedback',
+);
+assert.ok(feedbackFunction);
+const feedbackModule = ts.transpileModule(
+    feedbackFunction.getText(feedbackSource),
+    {
+        compilerOptions: {
+            module: ts.ModuleKind.ESNext,
+            target: ts.ScriptTarget.ES2022,
+        },
+    },
+).outputText;
+const feedbackUrl = `data:text/javascript;base64,${Buffer.from(feedbackModule).toString('base64')}`;
 const compiled = ts
     .transpileModule(source, {
         compilerOptions: {
@@ -17,8 +46,8 @@ const compiled = ts
         },
     })
     .outputText.replace(
-        "from 'sonner'",
-        `from ${JSON.stringify(import.meta.resolve('sonner'))}`,
+        "from '@apperp/ui/form-feedback'",
+        `from ${JSON.stringify(feedbackUrl)}`,
     );
 const { apiUpload, apiRequest, CoreApiError } = await import(
     `data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`

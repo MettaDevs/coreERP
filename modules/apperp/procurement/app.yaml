@@ -78,10 +78,14 @@ security:
     - { code: procurement.dashboard.form, name: Layar dashboard pengadaan, type: form }
     - { code: procurement.vendor.form, name: Layar vendor/supplier, type: form }
     - { code: procurement.prakualifikasi.form, name: Layar prakualifikasi vendor, type: form }
+    - { code: procurement.prakualifikasi.api, name: API prakualifikasi vendor, type: api }
     - { code: procurement.kualifikasi.form, name: Layar kualifikasi vendor, type: form }
     - { code: procurement.harga-perkiraan.form, name: Layar harga perkiraan, type: form }
+    - { code: procurement.harga-perkiraan.api, name: API harga perkiraan, type: api }
     - { code: procurement.kategori-pengadaan.form, name: Layar kategori pengadaan, type: form }
+    - { code: procurement.kategori-pengadaan.api, name: API kategori pengadaan, type: api }
     - { code: procurement.jenis-vendor.form, name: Layar jenis vendor/supplier, type: form }
+    - { code: procurement.jenis-vendor.api, name: API jenis vendor/supplier, type: api }
     - { code: procurement.metode-pembayaran.form, name: Layar metode pembayaran, type: form }
     - { code: procurement.termin-pembayaran.form, name: Layar termin pembayaran, type: form }
     - { code: procurement.item-jasa.form, name: Layar item jasa, type: form }
@@ -96,10 +100,22 @@ security:
     - { code: procurement.dashboard.read, name: Lihat dashboard pengadaan, entry_point: procurement.dashboard.form, access: read }
     - { code: procurement.vendor.read, name: Lihat vendor/supplier, entry_point: procurement.vendor.form, access: read }
     - { code: procurement.prakualifikasi.read, name: Lihat prakualifikasi, entry_point: procurement.prakualifikasi.form, access: read }
+    - { code: procurement.prakualifikasi.create, name: Tambah prakualifikasi, entry_point: procurement.prakualifikasi.api, access: create }
+    - { code: procurement.prakualifikasi.update, name: Ubah prakualifikasi, entry_point: procurement.prakualifikasi.api, access: update }
+    - { code: procurement.prakualifikasi.archive, name: Arsipkan prakualifikasi, entry_point: procurement.prakualifikasi.api, access: delete }
     - { code: procurement.kualifikasi.read, name: Lihat kualifikasi, entry_point: procurement.kualifikasi.form, access: read }
     - { code: procurement.harga-perkiraan.read, name: Lihat harga perkiraan, entry_point: procurement.harga-perkiraan.form, access: read }
+    - { code: procurement.harga-perkiraan.create, name: Tambah harga perkiraan, entry_point: procurement.harga-perkiraan.api, access: create }
+    - { code: procurement.harga-perkiraan.update, name: Ubah harga perkiraan, entry_point: procurement.harga-perkiraan.api, access: update }
+    - { code: procurement.harga-perkiraan.archive, name: Arsipkan harga perkiraan, entry_point: procurement.harga-perkiraan.api, access: delete }
     - { code: procurement.kategori-pengadaan.read, name: Lihat kategori pengadaan, entry_point: procurement.kategori-pengadaan.form, access: read }
+    - { code: procurement.kategori-pengadaan.create, name: Tambah kategori pengadaan, entry_point: procurement.kategori-pengadaan.api, access: create }
+    - { code: procurement.kategori-pengadaan.update, name: Ubah kategori pengadaan, entry_point: procurement.kategori-pengadaan.api, access: update }
+    - { code: procurement.kategori-pengadaan.archive, name: Arsipkan kategori pengadaan, entry_point: procurement.kategori-pengadaan.api, access: delete }
     - { code: procurement.jenis-vendor.read, name: Lihat jenis vendor/supplier, entry_point: procurement.jenis-vendor.form, access: read }
+    - { code: procurement.jenis-vendor.create, name: Tambah jenis vendor/supplier, entry_point: procurement.jenis-vendor.api, access: create }
+    - { code: procurement.jenis-vendor.update, name: Ubah jenis vendor/supplier, entry_point: procurement.jenis-vendor.api, access: update }
+    - { code: procurement.jenis-vendor.archive, name: Arsipkan jenis vendor/supplier, entry_point: procurement.jenis-vendor.api, access: delete }
     - { code: procurement.metode-pembayaran.read, name: Lihat metode pembayaran, entry_point: procurement.metode-pembayaran.form, access: read }
     - { code: procurement.termin-pembayaran.read, name: Lihat termin pembayaran, entry_point: procurement.termin-pembayaran.form, access: read }
     - { code: procurement.item-jasa.read, name: Lihat item jasa, entry_point: procurement.item-jasa.form, access: read }
@@ -115,45 +131,200 @@ security:
       name: Buka dashboard pengadaan
       permissions:
         - procurement.dashboard.read
-    - code: procurement.master.view
-      name: Buka master data pengadaan
+    - code: procurement.vendor.view
+      name: Lihat vendor/supplier
       permissions:
         - procurement.vendor.read
+    - code: procurement.prakualifikasi.view
+      name: Lihat prakualifikasi vendor
+      permissions:
         - procurement.prakualifikasi.read
+    - code: procurement.prakualifikasi.maintain
+      name: Pelihara prakualifikasi vendor
+      permissions:
+        - procurement.prakualifikasi.read
+        - procurement.prakualifikasi.create
+        - procurement.prakualifikasi.update
+    - code: procurement.prakualifikasi.retire
+      name: Arsipkan prakualifikasi vendor
+      permissions:
+        - procurement.prakualifikasi.archive
+    - code: procurement.kualifikasi.view
+      name: Lihat kualifikasi vendor
+      permissions:
         - procurement.kualifikasi.read
+    - code: procurement.harga-perkiraan.view
+      name: Lihat harga perkiraan
+      permissions:
         - procurement.harga-perkiraan.read
+    - code: procurement.harga-perkiraan.maintain
+      name: Pelihara harga perkiraan
+      permissions:
+        - procurement.harga-perkiraan.read
+        - procurement.harga-perkiraan.create
+        - procurement.harga-perkiraan.update
+    - code: procurement.harga-perkiraan.retire
+      name: Arsipkan harga perkiraan
+      permissions:
+        - procurement.harga-perkiraan.archive
+    - code: procurement.kategori-pengadaan.view
+      name: Lihat kategori pengadaan
+      permissions:
         - procurement.kategori-pengadaan.read
+    - code: procurement.kategori-pengadaan.maintain
+      name: Pelihara kategori pengadaan
+      permissions:
+        - procurement.kategori-pengadaan.read
+        - procurement.kategori-pengadaan.create
+        - procurement.kategori-pengadaan.update
+    - code: procurement.kategori-pengadaan.retire
+      name: Arsipkan kategori pengadaan
+      permissions:
+        - procurement.kategori-pengadaan.archive
+    - code: procurement.jenis-vendor.view
+      name: Lihat jenis vendor/supplier
+      permissions:
         - procurement.jenis-vendor.read
+    - code: procurement.jenis-vendor.maintain
+      name: Pelihara jenis vendor/supplier
+      permissions:
+        - procurement.jenis-vendor.read
+        - procurement.jenis-vendor.create
+        - procurement.jenis-vendor.update
+    - code: procurement.jenis-vendor.retire
+      name: Arsipkan jenis vendor/supplier
+      permissions:
+        - procurement.jenis-vendor.archive
+    - code: procurement.metode-pembayaran.view
+      name: Lihat metode pembayaran
+      permissions:
         - procurement.metode-pembayaran.read
+    - code: procurement.termin-pembayaran.view
+      name: Lihat termin pembayaran
+      permissions:
         - procurement.termin-pembayaran.read
+    - code: procurement.item-jasa.view
+      name: Lihat item jasa
+      permissions:
         - procurement.item-jasa.read
+    - code: procurement.item-subkont.view
+      name: Lihat item subkont
+      permissions:
         - procurement.item-subkont.read
-    - code: procurement.transaksi.view
-      name: Buka transaksi pengadaan
+    - code: procurement.permintaan-pembelian.view
+      name: Lihat permintaan pembelian
       permissions:
         - procurement.permintaan-pembelian.read
+    - code: procurement.permintaan-penawaran.view
+      name: Lihat permintaan penawaran
+      permissions:
         - procurement.permintaan-penawaran.read
+    - code: procurement.pesanan-pembelian.view
+      name: Lihat pesanan pembelian
+      permissions:
         - procurement.pesanan-pembelian.read
+    - code: procurement.penerimaan-barang.view
+      name: Lihat penerimaan barang
+      permissions:
         - procurement.penerimaan-barang.read
-    - code: procurement.laporan.view
-      name: Buka laporan pengadaan
+    - code: procurement.laporan-pengadaan.view
+      name: Lihat laporan pengadaan
       permissions:
         - procurement.laporan-pengadaan.read
 
   duties:
-    - code: procurement.dashboard.manage
-      name: Kelola dashboard pengadaan
+    - code: procurement.dashboard.inquire
+      name: Lihat dashboard pengadaan
       privileges:
         - procurement.dashboard.view
-    - code: procurement.master.manage
-      name: Kelola master data pengadaan
+    - code: procurement.vendor.inquire
+      name: Lihat data vendor/supplier
       privileges:
-        - procurement.master.view
-    - code: procurement.transaksi.manage
-      name: Kelola transaksi pengadaan
+        - procurement.vendor.view
+    - code: procurement.prakualifikasi.inquire
+      name: Lihat prakualifikasi vendor
       privileges:
-        - procurement.transaksi.view
-    - code: procurement.laporan.manage
-      name: Kelola laporan pengadaan
+        - procurement.prakualifikasi.view
+    - code: procurement.prakualifikasi.manage
+      name: Kelola prakualifikasi vendor
       privileges:
-        - procurement.laporan.view
+        - procurement.prakualifikasi.maintain
+        - procurement.prakualifikasi.retire
+    - code: procurement.kualifikasi.inquire
+      name: Lihat kualifikasi vendor
+      privileges:
+        - procurement.kualifikasi.view
+    - code: procurement.harga-perkiraan.inquire
+      name: Lihat harga perkiraan
+      privileges:
+        - procurement.harga-perkiraan.view
+    - code: procurement.harga-perkiraan.manage
+      name: Kelola harga perkiraan
+      privileges:
+        - procurement.harga-perkiraan.maintain
+        - procurement.harga-perkiraan.retire
+    - code: procurement.kategori-pengadaan.inquire
+      name: Lihat kategori pengadaan
+      privileges:
+        - procurement.kategori-pengadaan.view
+    - code: procurement.kategori-pengadaan.manage
+      name: Kelola kategori pengadaan
+      privileges:
+        - procurement.kategori-pengadaan.maintain
+        - procurement.kategori-pengadaan.retire
+    - code: procurement.jenis-vendor.inquire
+      name: Lihat jenis vendor/supplier
+      privileges:
+        - procurement.jenis-vendor.view
+    - code: procurement.jenis-vendor.manage
+      name: Kelola jenis vendor/supplier
+      privileges:
+        - procurement.jenis-vendor.maintain
+        - procurement.jenis-vendor.retire
+    - code: procurement.metode-pembayaran.inquire
+      name: Lihat metode pembayaran
+      privileges:
+        - procurement.metode-pembayaran.view
+    - code: procurement.termin-pembayaran.inquire
+      name: Lihat termin pembayaran
+      privileges:
+        - procurement.termin-pembayaran.view
+    - code: procurement.item-jasa.inquire
+      name: Lihat item jasa
+      privileges:
+        - procurement.item-jasa.view
+    - code: procurement.item-subkont.inquire
+      name: Lihat item subkont
+      privileges:
+        - procurement.item-subkont.view
+    - code: procurement.permintaan-pembelian.inquire
+      name: Lihat permintaan pembelian
+      privileges:
+        - procurement.permintaan-pembelian.view
+    - code: procurement.permintaan-penawaran.inquire
+      name: Lihat permintaan penawaran
+      privileges:
+        - procurement.permintaan-penawaran.view
+    - code: procurement.pesanan-pembelian.inquire
+      name: Lihat pesanan pembelian
+      privileges:
+        - procurement.pesanan-pembelian.view
+    - code: procurement.penerimaan-barang.inquire
+      name: Lihat penerimaan barang
+      privileges:
+        - procurement.penerimaan-barang.view
+    - code: procurement.laporan-pengadaan.inquire
+      name: Lihat laporan pengadaan
+      privileges:
+        - procurement.laporan-pengadaan.view
+
+number_sequences:
+  references:
+    - code: procurement.prakualifikasi
+      name: Nomor prakualifikasi vendor
+      default_prefix: PRKP
+      allowed_scopes:
+        - tenant
+      default_settings:
+        allow_automatic: true
+        allow_manual: true

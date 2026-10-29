@@ -1,0 +1,104 @@
+get:
+  tags:
+  - Pusat admin
+  operationId: internal.productTenants.index
+  summary: Daftar tenant produk eksternal
+  security:
+  - controlPlaneToken: []
+  responses:
+    '200':
+      description: Daftar dengan cursor, tanpa kredensial.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+            - data
+            - next_cursor
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ManagedProductTenant'
+              next_cursor:
+                type:
+                - string
+                - 'null'
+    '401':
+      description: Token pusat admin salah.
+  parameters:
+  - name: search
+    in: query
+    schema:
+      type: string
+      maxLength: 150
+  - name: cursor
+    in: query
+    schema:
+      type: string
+  - name: limit
+    in: query
+    schema:
+      type: integer
+      minimum: 1
+      maximum: 50
+post:
+  tags:
+  - Pusat admin
+  operationId: internal.productTenants.store
+  summary: Daftarkan dan mulai penyiapan tenant produk dari release terkunci
+  security:
+  - controlPlaneToken: []
+  responses:
+    '202':
+      description: Permintaan diterima.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ManagedProductTenant'
+    '401':
+      description: Token pusat admin salah.
+    '404':
+      description: Tenant atau operator tidak ditemukan.
+    '409':
+      description: Permintaan bertentangan dengan keadaan saat ini.
+    '422':
+      description: Isian belum sesuai.
+  description: Tidak membuat user, client, environment PostgreSQL atau module CoreERP.
+    Worker produk memulihkan seed SQL Server secara asynchronous. Retry memakai release
+    yang sama dan tidak menimpa tenant ready. Pendaftaran mandiri belum tersedia.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+          - product
+          - profile
+          - name
+          - slug
+          - owner_name
+          - owner_email
+          - idempotency_key
+          - requested_by
+          properties:
+            product:
+              type: string
+            profile:
+              type: string
+            name:
+              type: string
+            slug:
+              type: string
+            owner_name:
+              type: string
+            owner_email:
+              type: string
+              format: email
+              maxLength: 250
+            idempotency_key:
+              type: string
+              format: uuid
+            requested_by:
+              type: integer

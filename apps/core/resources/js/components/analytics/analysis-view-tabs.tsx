@@ -6,10 +6,12 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
 } from '@apperp/ui/dropdown-menu';
+import { FormControl } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@apperp/ui/tabs';
 import { ChevronDown, Plus } from 'lucide-react';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useId, useLayoutEffect, useRef, useState } from 'react';
+import { FormErrorHeader } from '@/components/form-error-header';
 /** Tab tampilan bersama; aksinya hanya mengubah konfigurasi analisis milik pengguna. */
 export function AnalysisViewTabs({
     names,
@@ -52,6 +54,10 @@ export function AnalysisViewTabs({
     }, [active, namesKey]);
     const [editing, setEditing] = useState<string | null>(null);
     const [name, setName] = useState('');
+    const [renameErrors, setRenameErrors] = useState<Record<string, string>>(
+        {},
+    );
+    const renameErrorId = useId();
 
     return (
         <div className="flex min-w-0 flex-col gap-2 py-2">
@@ -87,6 +93,7 @@ export function AnalysisViewTabs({
                                             onClick={() => {
                                                 setEditing(value);
                                                 setName(value);
+                                                setRenameErrors({});
                                             }}
                                         >
                                             Ubah nama
@@ -126,28 +133,67 @@ export function AnalysisViewTabs({
             </div>
             {editing && (
                 <form
+                    noValidate
                     className="flex flex-wrap items-center gap-2"
                     onSubmit={(event) => {
                         event.preventDefault();
 
+                        const next = name.trim();
+
+                        if (
+                            !next ||
+                            next.length > 80 ||
+                            names.some(
+                                (value) => value === next && value !== editing,
+                            )
+                        ) {
+                            setRenameErrors({
+                                name: 'Isi nama tampilan yang belum dipakai, paling banyak 80 karakter.',
+                            });
+
+                            return;
+                        }
+
                         if (onRename(editing, name.trim())) {
+                            setRenameErrors({});
                             setEditing(null);
+                        } else {
+                            setRenameErrors({
+                                name: 'Nama tampilan belum dapat diganti. Periksa nama dan coba simpan lagi.',
+                            });
                         }
                     }}
                 >
-                    <Input
-                        autoFocus
-                        aria-label="Nama tampilan"
-                        className="w-64"
-                        value={name}
-                        maxLength={80}
-                        onChange={(event) => setName(event.target.value)}
+                    <FormErrorHeader
+                        errors={renameErrors}
+                        operation="Nama tampilan belum disimpan"
                     />
-                    <ActionButton
-                        action="save"
-                        type="submit"
-                        disabled={!name.trim()}
-                    />
+                    <FormControl
+                        error={
+                            renameErrors.name ? (
+                                <span id={renameErrorId}>
+                                    {renameErrors.name}
+                                </span>
+                            ) : undefined
+                        }
+                        data-error-field="name"
+                    >
+                        <Input
+                            autoFocus
+                            name="name"
+                            label="Nama tampilan"
+                            required
+                            aria-invalid={!!renameErrors.name}
+                            aria-describedby={
+                                renameErrors.name ? renameErrorId : undefined
+                            }
+                            className="w-64"
+                            value={name}
+                            maxLength={80}
+                            onChange={(event) => setName(event.target.value)}
+                        />
+                    </FormControl>
+                    <ActionButton action="save" type="submit" />
                     <ActionButton
                         action="cancel"
                         type="button"

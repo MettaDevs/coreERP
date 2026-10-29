@@ -163,6 +163,23 @@ final class RowVersionTest extends TestCase
         $this->assertSame(['nama'], DB::table('change_log_entries')->where('record_id', $id)->pluck('field_name')->all());
     }
 
+    public function test_creation_lock_keeps_versions_and_separates_tenant_slots(): void
+    {
+        $id = $this->insert('Creation lock');
+        $before = DB::table('change_log_entries')->where('record_id', $id)->count();
+        DB::transaction(function () use ($id): void {
+            RowVersion::lockCreation(DB::table('contoh_versi')->where('id', $id));
+            $locks = fn (): int => (int) DB::table('pg_locks')->where('locktype', 'advisory')->whereRaw('pid = pg_backend_pid()')->count();
+            $count = $locks();
+            foreach ([(string) Str::ulid(), (string) Str::ulid()] as $tenantId) {
+                RowVersion::lockCreation(DB::table('contoh_versi')->where('tenant_id', $tenantId)->where('nama', 'same-key'));
+            }
+            $this->assertSame($count + 2, $locks());
+        });
+        $this->assertSame(1, $this->version($id));
+        $this->assertSame($before, DB::table('change_log_entries')->where('record_id', $id)->count());
+    }
+
     private function insert(string $nama): string
     {
         $id = (string) Str::ulid();

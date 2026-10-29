@@ -8,6 +8,7 @@ import {
     Clock,
     Coins,
     Contact,
+    CreditCard,
     Database,
     FileOutput,
     FileText,
@@ -261,6 +262,18 @@ export function useShellNavigation() {
                         label: 'Mata uang',
                         icon: Coins,
                         href: '/settings/currencies',
+                        permission: 'core.reference-data.read',
+                    },
+                    {
+                        label: 'Metode pembayaran',
+                        icon: CreditCard,
+                        href: '/settings/payment-methods',
+                        permission: 'core.reference-data.read',
+                    },
+                    {
+                        label: 'Termin pembayaran',
+                        icon: Clock,
+                        href: '/settings/payment-terms',
                         permission: 'core.reference-data.read',
                     },
                     {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset\Services;
 
+use App\Platform\Modules\Contracts\AttachmentFlowTarget;
 use App\Platform\Modules\Contracts\DataClass;
 use App\Platform\Modules\Contracts\FinanceEvidenceRecordType;
 use App\Platform\Modules\Contracts\RequestContext;
@@ -43,7 +44,7 @@ use Modules\Apperp\ManagementAset\Support\OrganizationScope;
  * Status dokumen tidak ikut menentukan: lampiran boleh ditambah pada dokumen yang sudah selesai, seperti
  * lampiran pada dokumen terposting di BC.
  */
-final class AssetAttachments implements FinanceEvidenceRecordType
+final class AssetAttachments implements AttachmentFlowTarget, FinanceEvidenceRecordType
 {
     private const MODULE = 'management-aset';
 
@@ -162,6 +163,30 @@ final class AssetAttachments implements FinanceEvidenceRecordType
         $type = $query->value('jenis_dokumen');
 
         return is_string($type) && in_array($type, DokumenSiklusAsetController::TYPES, true) ? $type : null;
+    }
+
+    /** @return iterable<array{record_id: string, source_line_number: ?int}> */
+    public function inheritedAttachmentRecords(string $tenantId, string $sourceType, string $sourceId): iterable
+    {
+        if ($this->model !== Aset::class || $sourceType !== (new PenerimaanAset)->getTable()) {
+            return [];
+        }
+        $assetTable = (new Aset)->getTable();
+        $lineTable = (new PenerimaanAsetDetail)->getTable();
+
+        return Aset::query()
+            ->leftJoin($lineTable.' as origin_line', function ($join) use ($assetTable, $tenantId): void {
+                $join->on('origin_line.id', '=', $assetTable.'.penerimaan_aset_detail_id')
+                    ->where('origin_line.tenant_id', $tenantId);
+            })
+            ->where($assetTable.'.tenant_id', $tenantId)
+            ->where($assetTable.'.penerimaan_aset_id', $sourceId)
+            ->orderBy($assetTable.'.id')
+            ->select([$assetTable.'.id as record_id', 'origin_line.line_number as source_line_number'])
+            ->toBase()->cursor()->map(static fn ($row): array => [
+                'record_id' => (string) $row->record_id,
+                'source_line_number' => $row->source_line_number === null ? null : (int) $row->source_line_number,
+            ]);
     }
 
     private function allows(string $resource, string $action): bool

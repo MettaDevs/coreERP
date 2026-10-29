@@ -241,4 +241,32 @@ class LicenseRenewalTest extends SiteTestCase
         Http::assertNothingSent();
         $this->assertNull(Site::query()->findOrFail($site->id)->license_issued_at);
     }
+
+    public function test_suspension_during_entitlement_lookup_prevents_issuing_a_license(): void
+    {
+        $site = $this->enrolledSite();
+        Http::fake([$this->entitlementsUrl($site) => function () use ($site) {
+            Site::query()->whereKey($site->id)->update(['license_suspended_at' => now()]);
+
+            return Http::response(['tenant_id' => $site->tenant_id, 'apps' => []]);
+        }]);
+        $license = app(LicenseRenewal::class)->licenseFor($site, $this->report($site, ['license_expires_at' => null]));
+        $this->assertNull($license);
+        $this->assertNull($site->refresh()->license_issued_at);
+        $this->assertSame(0, OperatorAuditEvent::query()->where('action', 'site.license.renewed')->count());
+    }
+
+    public function test_policy_changed_during_entitlement_lookup_is_used_for_the_signed_license(): void
+    {
+        $site = $this->enrolledSite();
+        Http::fake([$this->entitlementsUrl($site) => function () use ($site) {
+            Site::query()->whereKey($site->id)->update(['license_perpetual' => true]);
+
+            return Http::response(['tenant_id' => $site->tenant_id, 'apps' => []]);
+        }]);
+        $license = app(LicenseRenewal::class)->licenseFor($site, $this->report($site, ['license_expires_at' => null]));
+        $this->assertNotNull($license);
+        $this->assertNull(json_decode($license['license'], true, flags: JSON_THROW_ON_ERROR)['valid_until']);
+        $this->assertTrue($site->refresh()->license_issued_perpetual);
+    }
 }

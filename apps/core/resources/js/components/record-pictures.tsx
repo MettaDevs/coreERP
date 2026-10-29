@@ -1,5 +1,4 @@
 import { ActionButton } from '@apperp/ui/action-button';
-import { Alert, AlertDescription } from '@apperp/ui/alert';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -26,6 +25,7 @@ import { Spinner } from '@apperp/ui/spinner';
 import { ChevronLeft, ChevronRight, ImageIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { FormErrorHeader } from '@/components/form-error-header';
 import { AttachmentPreview } from '@/components/record-attachments';
 import { RecordUploadDialog } from '@/components/record-upload-dialog';
 import { apiJson, apiRequest } from '@/lib/core-api';
@@ -52,6 +52,7 @@ export function RecordPictures({
     const [error, setError] = useState<string | null>(null);
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [archiving, setArchiving] = useState<Attachment | null>(null);
+    const [archiveError, setArchiveError] = useState<string | null>(null);
     const [uploadOpen, setUploadOpen] = useState(false);
     const path = `/api/v1/records/${encodeURIComponent(recordType)}/${encodeURIComponent(recordId)}/pictures`;
     const pictures = page?.data ?? [];
@@ -87,7 +88,7 @@ export function RecordPictures({
 
     async function archive(picture: Attachment) {
         setBusy(true);
-        setError(null);
+        setArchiveError(null);
 
         try {
             await apiRequest(
@@ -108,11 +109,13 @@ export function RecordPictures({
                     : current,
             );
             toast.success('Foto sudah diarsipkan.');
+            setArchiving(null);
         } catch (caught) {
-            setError(attachmentError(caught, 'Foto belum dapat diarsipkan.'));
+            setArchiveError(
+                attachmentError(caught, 'Foto belum dapat diarsipkan.'),
+            );
         } finally {
             setBusy(false);
-            setArchiving(null);
         }
     }
 
@@ -137,9 +140,12 @@ export function RecordPictures({
                     }
                 />
             )}
+            <FormErrorHeader
+                message={error}
+                operation="Foto belum dapat dimuat"
+            />
             {error && (
-                <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
+                <div>
                     <Button
                         type="button"
                         variant="outline"
@@ -153,7 +159,7 @@ export function RecordPictures({
                     >
                         Muat ulang foto
                     </Button>
-                </Alert>
+                </div>
             )}
             {loading ? (
                 <div role="status" className="flex items-center gap-2 text-sm">
@@ -212,9 +218,10 @@ export function RecordPictures({
                                             type="button"
                                             disabled={busy}
                                             aria-label={`Delete foto: ${picture.file_name}`}
-                                            onClick={() =>
-                                                setArchiving(picture)
-                                            }
+                                            onClick={() => {
+                                                setArchiveError(null);
+                                                setArchiving(picture);
+                                            }}
                                         />
                                     )}
                                 </figure>
@@ -316,6 +323,10 @@ export function RecordPictures({
                             tersimpan.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
+                    <FormErrorHeader
+                        message={archiveError}
+                        operation="Foto belum dapat diarsipkan"
+                    />
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={busy}>
                             Batal

@@ -15,12 +15,14 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
+import { FormControl } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { PageDialog, PageDialogContent } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
 import { useRecordList } from '../../use-record-list';
 import type { RecordCardState } from '../_shared/record-card';
 import { bukaDaftar } from './aset';
@@ -53,20 +55,22 @@ export default function PenerimaanListPage({
     const [card, setCard] = useState<RecordCardState>(null);
     const [cardBusy, setCardBusy] = useState(false);
     const [cardDirty, setCardDirty] = useState(false);
-    const discardChanges = () =>
-        !cardDirty || window.confirm('Buang perubahan yang belum disimpan?');
+    const {
+        request: requestChangesTransition,
+        confirmation: changesTransitionConfirmation,
+    } = useRecordTransition(cardDirty, cardBusy);
     const openNewCard = () => {
-        if (!cardBusy && discardChanges()) {
+        requestChangesTransition(() => {
             setCardDirty(false);
             setCard({ mode: 'create' });
-        }
+        });
     };
     const closeCard = () => {
-        if (!cardBusy && discardChanges()) {
+        requestChangesTransition(() => {
             setCard(null);
             setCardDirty(false);
             list.reload();
-        }
+        });
     };
     const [cardRevision, setCardRevision] = useState(0);
     const cardContentRef = useRef<HTMLDivElement>(null);
@@ -202,6 +206,7 @@ export default function PenerimaanListPage({
 
     return (
         <>
+            {changesTransitionConfirmation}
             <ListPageLayout
                 header={
                     <RecordActionBar title="Penerimaan aset">
@@ -233,37 +238,42 @@ export default function PenerimaanListPage({
                 filters={
                     <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end">
                         <div className="w-full sm:w-72">
-                            <Input
-                                label="Cari"
-                                type="search"
-                                placeholder="Nomor penerimaan, lokasi, atau unit"
-                                value={search}
-                                onChange={(event) =>
-                                    setSearch(event.target.value)
-                                }
-                            />
+                            <FormControl>
+                                <Input
+                                    label="Cari"
+                                    type="search"
+                                    placeholder="Nomor penerimaan, lokasi, atau unit"
+                                    value={search}
+                                    onChange={(event) =>
+                                        setSearch(event.target.value)
+                                    }
+                                />
+                            </FormControl>
                         </div>
                         <div className="w-full sm:w-52">
-                            <Select
-                                label="Status"
-                                items={PILIHAN_STATUS.map(
-                                    (pilihan) => pilihan.label,
-                                )}
-                                value={
-                                    PILIHAN_STATUS.find(
-                                        (pilihan) => pilihan.value === status,
-                                    )?.label ?? null
-                                }
-                                ariaLabel="Saring berdasarkan status"
-                                onValueChange={(value) =>
-                                    setStatus(
+                            <FormControl>
+                                <Select
+                                    label="Status"
+                                    items={PILIHAN_STATUS.map(
+                                        (pilihan) => pilihan.label,
+                                    )}
+                                    value={
                                         PILIHAN_STATUS.find(
                                             (pilihan) =>
-                                                pilihan.label === value,
-                                        )?.value ?? '',
-                                    )
-                                }
-                            />
+                                                pilihan.value === status,
+                                        )?.label ?? null
+                                    }
+                                    ariaLabel="Saring berdasarkan status"
+                                    onValueChange={(value) =>
+                                        setStatus(
+                                            PILIHAN_STATUS.find(
+                                                (pilihan) =>
+                                                    pilihan.label === value,
+                                            )?.value ?? '',
+                                        )
+                                    }
+                                />
+                            </FormControl>
                         </div>
                     </div>
                 }
@@ -352,14 +362,14 @@ export default function PenerimaanListPage({
                                 list.reload();
                             }}
                             onRequestView={(id) => {
-                                if (!cardBusy && discardChanges()) {
+                                requestChangesTransition(() => {
                                     setCard({ mode: 'view', id });
-                                }
+                                });
                             }}
                             onRequestEdit={(id) => {
-                                if (!cardBusy && discardChanges()) {
+                                requestChangesTransition(() => {
                                     setCard({ mode: 'edit', id });
-                                }
+                                });
                             }}
                             onDirtyChange={setCardDirty}
                         />

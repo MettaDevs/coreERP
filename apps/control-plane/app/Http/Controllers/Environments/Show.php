@@ -44,6 +44,16 @@ class Show extends Controller
 
         $onClientServer = $row->hosting === 'client_server';
 
+        $moduleResult = function () use ($onClientServer, $modules, $row): array {
+            return once(function () use ($onClientServer, $modules, $row): array {
+                try {
+                    return ['items' => $onClientServer ? [] : $modules($row), 'error' => null];
+                } catch (EnvironmentRejected $failure) {
+                    return ['items' => [], 'error' => $failure->getMessage()];
+                }
+            });
+        };
+
         return Inertia::render('environments/show', [
             'environment' => fn (): array => $row->forScreen() + [
                 'ownDatabase' => $row->database_name !== null,
@@ -55,7 +65,8 @@ class Show extends Controller
             // Entitlement menjawab apa yang boleh ada; hanya tabel di dalam databasenya yang
             // menjawab apa yang benar-benar ada — dan selisih keduanya persis yang dicari operator
             // ketika ia bertanya kenapa sebuah demo terasa kosong.
-            'modules' => fn (): array => $onClientServer ? [] : $modules($row),
+            'modules' => fn (): array => $moduleResult()['items'],
+            'modulesError' => fn (): ?string => $moduleResult()['error'],
             // Sama persis dengan daftar status yang diterima `environment:provision`. Ditulis di
             // sini supaya tombolnya tidak pernah muncul untuk keadaan yang akan ditolak Core —
             // tombol yang selalu terlihat lalu selalu gagal melatih orang mengabaikan pesannya.

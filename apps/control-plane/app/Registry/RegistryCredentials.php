@@ -69,6 +69,11 @@ final class RegistryCredentials
         );
 
         $recorded = DB::transaction(function () use ($site, $operationId, $robot, $ipAddress): bool {
+            $currentSite = Site::query()->whereKey($site->id)->lockForUpdate()->firstOrFail();
+            if ($currentSite->revoked()) {
+                return false;
+            }
+
             $locked = SiteOperation::query()->whereKey($operationId)->where('site_id', $site->id)->lockForUpdate()->first();
 
             // Operasi dapat ditutup selama robot dibuat. Robot yang lahir untuk operasi yang sudah tidak

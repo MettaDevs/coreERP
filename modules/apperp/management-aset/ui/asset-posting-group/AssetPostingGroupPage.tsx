@@ -1,4 +1,3 @@
-import { CircleAlert } from 'lucide-react';
 import { useEffect } from 'react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ReactNode, RefObject } from 'react';
@@ -19,6 +18,7 @@ import { Button } from '@apperp/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
 import { DataTable, DataTableText } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
+import { DatePicker } from '@apperp/ui/date-picker';
 import { DialogToolbar } from '@apperp/ui/dialog';
 import {
     Empty,
@@ -26,27 +26,24 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
-import {
-    Field,
-    FieldDescription,
-    FieldError,
-    FieldGroup,
-    FieldHint,
-} from '@apperp/ui/field';
+import { FieldDescription, FieldError } from '@apperp/ui/field';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { IncrementalListStatus } from '@apperp/ui/incremental-list-status';
 import { Input } from '@apperp/ui/input';
 import { usePageDialogRecord } from '@apperp/ui/page-dialog';
 import { PageDialog, PageDialogContent } from '@apperp/ui/page-dialog';
-import { Select } from '@apperp/ui/select';
 
 import type { ListLoader } from '@apperp/ui/use-incremental-list';
 import { useIncrementalList } from '@apperp/ui/use-incremental-list';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
-import { api, ApiError, toastSaveError } from '../api';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
+import RecordLookup from '../_shared/RecordLookup';
+import { api, ApiError } from '../api';
 import { recordQueryUrl } from '../transactions/_shared/record-card';
 import { useRecordCardDirty } from '../transactions/_shared/use-record-card-dirty';
 import { useRecordQueryTarget } from '../transactions/_shared/use-record-query-target';
 import { recordListParams, useRecordOptions } from '../use-record-list';
+import { useSaveFeedback } from '../use-save-feedback';
 
 type AccountColumn = { column: string; label: string; required: boolean };
 
@@ -87,7 +84,7 @@ type Matrix = {
 };
 
 /** Nilai pilihan "tidak dipetakan"; `Select` tidak punya pilihan kosong bawaan. */
-const NONE = '__none__';
+const NONE = '';
 
 /**
  * Kenapa akun yang sudah dipetakan tidak bisa dipakai posting, atau `null` bila bisa. Hanya terjadi
@@ -524,19 +521,21 @@ function PostingGroupSheet({
     const row =
         group.rows.find((baris) => baris.effective_from === selected) ?? null;
 
-    const discardCard = () =>
-        !cardDirty || window.confirm('Buang perubahan yang belum disimpan?');
+    const {
+        request: requestCardTransition,
+        confirmation: cardTransitionConfirmation,
+    } = useRecordTransition(cardDirty, cardBusy);
     const closeCard = () => {
-        if (!cardBusy && discardCard()) {
+        requestCardTransition(() => {
             onClose();
-        }
+        });
     };
     const selectDate = (date: string | null) => {
-        if (!cardBusy && discardCard()) {
+        requestCardTransition(() => {
             onDateChange();
             setSelected(date);
             setCardDirty(false);
-        }
+        });
     };
     const cardNavigation = useRecordNavigation({
         items: list.items,
@@ -565,6 +564,7 @@ function PostingGroupSheet({
                 }
             }}
         >
+            {cardTransitionConfirmation}
             <PageDialogContent
                 ref={sheetRef}
                 title={'Setup akun/COA aset'}
@@ -632,6 +632,16 @@ function RowEditor({
     onDirtyChange: (dirty: boolean) => void;
     onCancel: () => void;
 }) {
+    const {
+        feedbackSummary: formFeedbackSummary,
+        reportSaveError: formFeedbackReportSaveError,
+        clearSaveFeedback: formFeedbackClearSaveFeedback,
+    } = useSaveFeedback(portal, `${group.id}:${row?.effective_from ?? 'new'}`);
+    const formFeedback = {
+        reportSaveError: formFeedbackReportSaveError,
+        clearSaveFeedback: formFeedbackClearSaveFeedback,
+    };
+
     const [effectiveFrom, setEffectiveFrom] = useState(matrix.today);
     const [values, setValues] = useState<Record<string, string | null>>(() =>
         Object.fromEntries(
@@ -684,6 +694,7 @@ function RowEditor({
                         : values,
                 ),
             });
+            formFeedback.clearSaveFeedback();
             toast.success(`Setup akun/COA aset ${group.kode} disimpan.`);
             onSaved();
             onClose();
@@ -698,7 +709,10 @@ function RowEditor({
                 );
             }
 
-            toastSaveError(caught, 'Setup akun/COA aset belum tersimpan.');
+            formFeedback.reportSaveError(
+                caught,
+                'Setup akun/COA aset belum tersimpan.',
+            );
         } finally {
             setSaving(false);
         }
@@ -716,13 +730,14 @@ function RowEditor({
                 method: 'DELETE',
                 body: JSON.stringify({ version: row.version }),
             });
+            formFeedback.clearSaveFeedback();
             toast.success(
                 `Baris ${formatDate(row.effective_from)} diarsipkan.`,
             );
             onSaved();
             onClose();
         } catch (caught) {
-            toastSaveError(caught, 'Baris belum diarsipkan.');
+            formFeedback.reportSaveError(caught, 'Baris belum diarsipkan.');
         } finally {
             setArchiving(false);
             setSaving(false);
@@ -785,31 +800,35 @@ function RowEditor({
                     )}
                 </DialogToolbar>
             )}
+            {formFeedbackSummary}
             <div
                 data-page-dialog-body
                 className="min-h-0 flex-1 overflow-y-auto px-6 py-5"
             >
-                <FieldGroup>
+                <FormGrid columns={1}>
                     {row === null && (
-                        <Field data-invalid={Boolean(errors.effective_from)}>
-                            <Input
-                                type="date"
+                        <FormControl
+                            data-invalid={Boolean(errors.effective_from)}
+                            hint={
+                                <>
+                                    Posting bertanggal sejak tanggal ini memakai
+                                    baris baru; posting sebelumnya tetap memakai
+                                    baris lama.
+                                </>
+                            }
+                        >
+                            <DatePicker
+                                portalContainer={portal}
                                 label="Berlaku sejak"
                                 required
                                 value={effectiveFrom}
-                                onChange={(event) =>
-                                    setEffectiveFrom(event.target.value)
-                                }
+                                onValueChange={setEffectiveFrom}
                             />
-                            <FieldDescription>
-                                Posting bertanggal sejak tanggal ini memakai
-                                baris baru; posting sebelumnya tetap memakai
-                                baris lama.
-                            </FieldDescription>
+
                             {errors.effective_from && (
                                 <FieldError>{errors.effective_from}</FieldError>
                             )}
-                        </Field>
+                        </FormControl>
                     )}
                     {matrix.accounts.map((column) => (
                         <AccountField
@@ -835,7 +854,7 @@ function RowEditor({
                             Anda hanya dapat melihat baris ini.
                         </FieldDescription>
                     )}
-                </FieldGroup>
+                </FormGrid>
             </div>
 
             <AlertDialog
@@ -955,29 +974,6 @@ const ACCOUNT_HINTS: Record<string, string> = {
 };
 
 /** Ikon bantuan kecil di sebelah kontrolnya, pola yang sama dengan `DynamicField`. */
-function withAccountHint(column: AccountColumn, control: ReactNode) {
-    const hint = ACCOUNT_HINTS[column.column];
-
-    if (!hint) {
-        return control;
-    }
-
-    return (
-        <div className="flex items-end gap-1.5">
-            <div className="min-w-0 flex-1">{control}</div>
-            <FieldHint hint={hint}>
-                <button
-                    type="button"
-                    aria-label={`Contoh jurnal ${column.label}`}
-                    className="text-muted-foreground hover:text-foreground mb-2.5 shrink-0"
-                >
-                    <CircleAlert className="size-4" />
-                </button>
-            </FieldHint>
-        </div>
-    );
-}
-
 function AccountField({
     column,
     value,
@@ -1021,44 +1017,41 @@ function AccountField({
 
     if (disabled) {
         return (
-            <Field>
-                {withAccountHint(
-                    column,
-                    <Input
-                        label={column.label}
-                        value={
-                            current
-                                ? accountLabel(current)
-                                : value
-                                  ? 'Akun tidak tersedia'
-                                  : 'Tidak dipetakan'
-                        }
-                        disabled
-                    />,
-                )}
-            </Field>
+            <FormControl hint={ACCOUNT_HINTS[column.column]}>
+                <Input
+                    label={column.label}
+                    value={
+                        current
+                            ? accountLabel(current)
+                            : value
+                              ? 'Akun tidak tersedia'
+                              : 'Tidak dipetakan'
+                    }
+                    disabled
+                />
+            </FormControl>
         );
     }
 
     return (
-        <Field data-invalid={Boolean(error)}>
-            {withAccountHint(
-                column,
-                <Select
-                    {...source.selectProps}
-                    label={column.label}
-                    required={column.required}
-                    items={items}
-                    value={value ?? NONE}
-                    placeholder="Pilih akun"
-                    searchPlaceholder="Cari nomor atau nama akun"
-                    emptyMessage="Akun tidak ditemukan."
-                    portalContainer={portal}
-                    onValueChange={(next) =>
-                        onChange(next === null || next === NONE ? null : next)
-                    }
-                />,
-            )}
+        <FormControl
+            data-invalid={Boolean(error)}
+            hint={ACCOUNT_HINTS[column.column]}
+        >
+            <RecordLookup
+                source={source}
+                label={column.label}
+                required={column.required}
+                items={items}
+                value={value ?? NONE}
+                placeholder="Pilih akun"
+                searchPlaceholder="Cari nomor atau nama akun"
+
+                portalContainer={portal}
+                onValueChange={(next) =>
+                    onChange(next === null || next === NONE ? null : next)
+                }
+            />
             {reason && (
                 <FieldDescription>
                     {reason}. Posting yang memakai akun ini tertahan sampai
@@ -1066,6 +1059,6 @@ function AccountField({
                 </FieldDescription>
             )}
             {error && <FieldError>{error}</FieldError>}
-        </Field>
+        </FormControl>
     );
 }

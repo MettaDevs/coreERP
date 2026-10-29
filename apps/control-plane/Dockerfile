@@ -52,7 +52,7 @@ RUN npm run build
 
 # ------------------------------------------------------------------ runtime
 
-FROM php:8.4-apache
+FROM php:8.4.27-apache-trixie
 
 # `pdo_pgsql` dan `pgsql` untuk membaca tabel Core. `intl` dipakai pemformatan tanggal dan angka
 # pada layar operator. Tidak ada gd, zip, maupun opentelemetry: konsol tidak menghasilkan dokumen

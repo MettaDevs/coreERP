@@ -7,6 +7,7 @@ use App\Platform\Modules\Contracts\FinancePostingSettings;
 use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\OrganizationDirectory;
 use App\Platform\Modules\Contracts\PostingFeed;
+use App\Platform\Modules\Contracts\RecordDocuments;
 use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Modules\Contracts\VendorDirectory;
 use Brick\Math\BigDecimal;
@@ -150,6 +151,7 @@ class PenerimaanAsetController extends Controller
     public function store(Request $request, AssetNumberSequenceIssuer $numbers): JsonResponse
     {
         $this->guard($request, 'create');
+        $this->mergeUploadPayload($request);
         $key = $this->creationKey($request);
         $tenant = $this->tenant($request);
         if ($existing = $this->replay($request, $key)) {
@@ -160,6 +162,10 @@ class PenerimaanAsetController extends Controller
         app(OrganizationScope::class)->require($request, $data['legal_entity_id'], $data['responsible_org_unit_id']);
         $this->validateLookups($request, $data);
         $this->validateVendor($request, $data);
+        $files = app(RecordDocuments::class)->validateUploads($request->file('attachments', []));
+        if ($files !== []) {
+            $this->guard($request, 'update');
+        }
 
         // Nomor diterbitkan setelah seluruh validasi supaya permintaan yang ditolak tidak
         // membakar counter, dan sebelum transaksi supaya kegagalan Core tidak menahan
@@ -171,11 +177,14 @@ class PenerimaanAsetController extends Controller
         }
 
         try {
-            $id = DB::transaction(function () use ($request, $data, $key, $kode): string {
+            $id = DB::transaction(function () use ($request, $data, $key, $kode, $files): string {
                 $this->validateRequestLinks($request, $data);
                 $record = $this->header($request, $data, $key, $kode);
                 (new PenerimaanAset)->forceFill($record)->save();
                 $this->gantiBaris((string) $record['id'], $data['details']);
+                if ($files !== []) {
+                    app(RecordDocuments::class)->append(self::TABEL, (string) $record['id'], $files);
+                }
 
                 return (string) $record['id'];
             });
@@ -197,6 +206,7 @@ class PenerimaanAsetController extends Controller
     public function update(Request $request, string $id): JsonResponse
     {
         $this->guard($request, 'update');
+        $this->mergeUploadPayload($request);
         $penerimaan = $this->dokumen($request, $id);
         abort_unless(
             PenerimaanStatus::dapatDisunting($penerimaan->status),
@@ -213,8 +223,9 @@ class PenerimaanAsetController extends Controller
         app(OrganizationScope::class)->require($request, $data['legal_entity_id'], $data['responsible_org_unit_id']);
         $this->validateLookups($request, $data);
         $this->validateVendor($request, $data);
+        $files = app(RecordDocuments::class)->validateUploads($request->file('attachments', []));
 
-        DB::transaction(function () use ($request, $id, $version, $data): void {
+        DB::transaction(function () use ($request, $id, $version, $data, $files): void {
             $this->validateRequestLinks($request, $data);
             RowVersion::claim(PenerimaanAset::query()->whereKey($id), $version);
             $updated = PenerimaanAset::query()
@@ -226,6 +237,9 @@ class PenerimaanAsetController extends Controller
             abort_unless($updated > 0, 422, 'Penerimaan yang sudah selesai tidak dapat diubah; asetnya sudah terdaftar dan bernomor.');
             PenerimaanAsetDetail::query()->where('penerimaan_aset_id', $id)->delete();
             $this->gantiBaris($id, $data['details']);
+            if ($files !== []) {
+                app(RecordDocuments::class)->append(self::TABEL, $id, $files);
+            }
         });
 
         return $this->show($request, $id);
@@ -518,6 +532,38 @@ class PenerimaanAsetController extends Controller
      * Vendor aktif satu entitas legal untuk pemilih vendor penerimaan. Vendor milik Core (K-06) dan
      * boleh dilihat semua anggota tenant, jadi yang dijaga hanya izin membaca penerimaan.
      */
+    public function attachmentLimits(Request $request): JsonResponse
+    {
+        $this->guard($request, 'read');
+
+        return response()->json(['data' => app(RecordDocuments::class)->limits()]);
+    }
+
+    private function mergeUploadPayload(Request $request): void
+    {
+        if (! $request->has('payload')) {
+            return;
+        }
+
+        $payloadJson = $request->input('payload');
+        if (! is_string($payloadJson)) {
+            throw ValidationException::withMessages(['payload' => 'Isian penerimaan belum dapat dibaca.']);
+        }
+        validator(['payload' => $payloadJson], ['payload' => ['required', 'json']])->validate();
+        $payload = json_decode($payloadJson, true);
+        if (! is_array($payload) || array_is_list($payload)) {
+            throw ValidationException::withMessages(['payload' => 'Isian penerimaan belum dapat dibaca.']);
+        }
+        $input = [];
+        foreach ($payload as $key => $value) {
+            if (! is_string($key)) {
+                throw ValidationException::withMessages(['payload' => 'Isian penerimaan belum dapat dibaca.']);
+            }
+            $input[$key] = $value;
+        }
+        $request->merge($input);
+    }
+
     public function vendor(Request $request): JsonResponse
     {
         $this->guard($request, 'read');
@@ -621,6 +667,7 @@ class PenerimaanAsetController extends Controller
                         'accumulated_depreciation' => $satuan['accumulated'],
                     ];
                 }
+                app(RecordDocuments::class)->flow(self::TABEL, $id, (new Aset)->getTable());
                 $perolehan->publish($penerimaan, $lines, $terbit);
             });
         } catch (NumberSequenceException $exception) {

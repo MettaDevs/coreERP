@@ -169,6 +169,30 @@ class DocumentAttachmentTest extends TestCase
         $this->assertStringContainsString('attachment;', (string) $unduh->headers->get('Content-Disposition'));
     }
 
+    public function test_document_batches_are_bounded_and_continue_without_losing_the_total(): void
+    {
+        $first = $this->unggah($this->owner, $this->vendorId, $this->pdf('batch-00.pdf'))
+            ->assertCreated()->json('data.id');
+        $template = DocumentAttachment::query()->findOrFail($first);
+        for ($index = 1; $index < 45; $index++) {
+            $attachment = $template->replicate();
+            $attachment->file_name = sprintf('batch-%02d.pdf', $index);
+            $attachment->save();
+        }
+
+        $path = $this->daftar($this->vendorId);
+        $page = $this->actingAs($this->owner)->getJson($path)
+            ->assertOk()->assertJsonCount(40, 'data')->assertJsonPath('meta.total', 45);
+        $next = $this->getJson($path.'?cursor='.urlencode($page->json('next_cursor')))
+            ->assertOk()->assertJsonCount(5, 'data')->assertJsonPath('next_cursor', null)
+            ->assertJsonPath('meta.total', 45);
+        $ids = [...array_column($page->json('data'), 'id'), ...array_column($next->json('data'), 'id')];
+        $this->assertCount(45, array_unique($ids));
+        $this->getJson($path.'?q=batch-44')->assertOk()->assertJsonCount(1, 'data');
+        $this->getJson($path.'?per_page=100000')->assertUnprocessable()->assertJsonValidationErrors('per_page');
+        $this->getJson($path.'?cursor=invalid')->assertUnprocessable()->assertJsonValidationErrors('cursor');
+    }
+
     public function test_pengguna_tanpa_hak_atas_vendor_tidak_dapat_melihat_mengunduh_melampirkan_atau_mengarsipkan(): void
     {
         $id = $this->lampiran($this->vendorId);

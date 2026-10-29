@@ -26,6 +26,8 @@ import {
 import { Head, Link, router } from '@inertiajs/react';
 import { ArrowLeft, CalendarDays, Check, Play } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { FormErrorHeader } from '@/components/form-error-header';
+import { withInertiaErrors } from '@/hooks/use-inertia-feedback';
 import { cn } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types/navigation';
 
@@ -180,7 +182,7 @@ export default function WorkingTimeCalendarTimes({
                 to_date: composeToDate,
                 version: calendar.version,
             },
-            {
+            withInertiaErrors({
                 preserveScroll: true,
                 onSuccess: () => {
                     setIsComposeOpen(false);
@@ -189,10 +191,11 @@ export default function WorkingTimeCalendarTimes({
                     setComposeErrors(err);
                 },
                 onFinish: () => setIsComposing(false),
-            },
+            }),
         );
     };
 
+    const [dayErrors, setDayErrors] = useState<Record<string, string>>({});
     const handleToggleDayControl = (day: CalendarDay) => {
         if (!calendar || !canManage) {
             return;
@@ -200,16 +203,19 @@ export default function WorkingTimeCalendarTimes({
 
         const newControl = day.control === 'open' ? 'closed' : 'open';
         setIsUpdatingDay(true);
+        setDayErrors({});
 
         router.put(
             `/settings/working-time-calendars/${calendar.id}/days/${day.id}`,
             // Hanya statusnya yang dikirim. Tutup pengambilan tidak ikut berubah, dan jumlah
             // jam dihitung ulang server dari baris jam kerja hari itu.
             { control: newControl, version: calendar.version },
-            {
+            withInertiaErrors({
                 preserveScroll: true,
                 onFinish: () => setIsUpdatingDay(false),
-            },
+                onError: (errors) =>
+                    setDayErrors({ _form: Object.values(errors).join(' ') }),
+            }),
         );
     };
 
@@ -225,7 +231,16 @@ export default function WorkingTimeCalendarTimes({
 
             <ListPageLayout>
                 {/* Command Bar / Action Ribbon */}
-                <RecordActionBar>
+                <RecordActionBar
+                    feedback={
+                        Object.keys(dayErrors).length ? (
+                            <FormErrorHeader
+                                errors={dayErrors}
+                                operation="Status hari belum diubah"
+                            />
+                        ) : null
+                    }
+                >
                     <div className="flex flex-wrap items-center gap-2">
                         <Link
                             href="/settings/working-time-calendars"
@@ -688,6 +703,10 @@ export default function WorkingTimeCalendarTimes({
                             />
                         </DialogClose>
                     </PageDialogToolbar>
+                    <FormErrorHeader
+                        errors={composeErrors}
+                        operation="Jam kerja belum dapat dibuat"
+                    />
 
                     <DialogBody className="space-y-4 py-2">
                         <Input
