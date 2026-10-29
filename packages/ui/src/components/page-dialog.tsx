@@ -15,6 +15,7 @@ import {
 import { Dialog as DialogPrimitive } from 'radix-ui';
 import * as React from 'react';
 import { toast } from 'sonner';
+import { DocumentLineCellContext } from '../document-line-context';
 import { createPageDialogRecordStore } from '../lib/page-dialog-record';
 import {
     getPageDialogRevision,
@@ -25,6 +26,7 @@ import {
 import { cn } from '../utils';
 import { Badge } from './badge';
 import { Button } from './button';
+import { ContextualTitle } from './contextual-title';
 import {
     DialogAction as PageDialogAction,
     DialogBody as PageDialogBody,
@@ -93,6 +95,7 @@ type PageDialogContentProps = Omit<
 > &
     PageDialogRecord & {
         title: React.ReactNode;
+        titleHint?: React.ReactNode;
         description?: React.ReactNode;
         headerActions?: React.ReactNode;
         onNew?: () => void;
@@ -148,7 +151,9 @@ function PageDialogContent({
                         expanded={expanded ?? internalExpanded}
                         setExpanded={setExpanded}
                     >
-                        {children}
+                        <DocumentLineCellContext.Provider value={null}>
+                            {children}
+                        </DocumentLineCellContext.Provider>
                     </PageDialogSurface>
                 )}
             </DialogPrimitive.Portal>
@@ -168,6 +173,7 @@ function PageDialogSurface({
     onCloseAutoFocus,
     style,
     title,
+    titleHint,
     description,
     headerActions,
     onNew,
@@ -311,6 +317,7 @@ function PageDialogSurface({
                     >
                         <PageDialogHeader
                             title={title}
+                            titleHint={titleHint}
                             description={description}
                             defaults={{
                                 recordTitle,
@@ -350,6 +357,7 @@ function PageDialogSurface({
 
 function PageDialogHeader({
     title,
+    titleHint,
     description,
     defaults,
     actions,
@@ -357,6 +365,7 @@ function PageDialogHeader({
     navigation,
 }: {
     title: React.ReactNode;
+    titleHint?: React.ReactNode;
     description?: React.ReactNode;
     defaults: PageDialogRecord;
     actions?: React.ReactNode;
@@ -444,7 +453,15 @@ function PageDialogHeader({
                         <ArrowLeft />
                     </Button>
                 </DialogPrimitive.Close>
-                <PageDialogTitle>{title}</PageDialogTitle>
+                <PageDialogTitle>
+                    {titleHint ? (
+                        <ContextualTitle hint={titleHint}>
+                            {title}
+                        </ContextualTitle>
+                    ) : (
+                        title
+                    )}
+                </PageDialogTitle>
                 <div
                     className="core-page-dialog-record-actions"
                     role="group"

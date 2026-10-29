@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\InventarisasiAset;
 
+use App\Platform\Modules\Contracts\RecordSearch;
 use BaconQrCode\Common\ErrorCorrectionLevel;
 use BaconQrCode\Encoder\Encoder;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
@@ -62,13 +63,9 @@ final class AssetLabelController extends Controller
         // `ids` yang dikirim tetapi tidak berisi id sah tidak boleh jatuh ke "semua aset".
         if ($request->query->has('ids')) {
             $query->whereIn('aset_tr_aset.id', $ids);
-        } elseif ($search !== '') {
-            // Sama dengan pencarian `GET /aset`, supaya "cetak semua yang tampil" mencetak yang tampil.
-            $pattern = '%'.mb_strtolower($search).'%';
-            $query->where(fn ($builder) => $builder
-                ->whereRaw('LOWER(aset_tr_aset.kode) LIKE ?', [$pattern])
-                ->orWhereRaw('LOWER(aset_tr_aset.nama) LIKE ?', [$pattern])
-                ->orWhereRaw('LOWER(aset_tr_aset.serial_number) LIKE ?', [$pattern]));
+        } else {
+            // Satu pencarian dengan daftar register, termasuk saat mencetak semua hasil.
+            RecordSearch::apply($query, ['aset_tr_aset.kode', 'aset_tr_aset.nama', 'aset_tr_aset.serial_number'], $search, ['aset_tr_aset.kode', 'aset_tr_aset.serial_number']);
         }
 
         $rows = $query

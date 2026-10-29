@@ -6,6 +6,9 @@ import { cn } from '../utils';
 type ListPageLayoutProps = React.ComponentProps<'section'> & {
     header?: React.ReactNode;
     filters?: React.ReactNode;
+    /** Panel di samping isi tidak melepas tabel ketika dibuka atau ditutup. */
+    filterPanel?: React.ReactNode;
+    filterSide?: 'left' | 'right';
     footer?: React.ReactNode;
 };
 
@@ -17,6 +20,8 @@ type ListPageLayoutProps = React.ComponentProps<'section'> & {
 function ListPageLayout({
     header,
     filters,
+    filterPanel,
+    filterSide = 'left',
     footer,
     children,
     className,
@@ -33,10 +38,17 @@ function ListPageLayout({
         >
             {header != null && <div className="shrink-0">{header}</div>}
             {filters != null && <div className="shrink-0 pt-3">{filters}</div>}
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-                <TableScrollContext.Provider value="viewport">
-                    {children}
-                </TableScrollContext.Provider>
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:flex-row">
+                {filterSide === 'left' ? filterPanel : null}
+                <div
+                    data-slot="list-page-content"
+                    className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+                >
+                    <TableScrollContext.Provider value="viewport">
+                        {children}
+                    </TableScrollContext.Provider>
+                </div>
+                {filterSide === 'right' ? filterPanel : null}
             </div>
             {footer != null && <div className="shrink-0">{footer}</div>}
         </section>

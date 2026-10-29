@@ -6,8 +6,8 @@ use App\Platform\Modules\Contracts\AddressDirectory;
 use App\Platform\Modules\Contracts\FundingSourceDirectory;
 use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\OrganizationDirectory;
+use App\Platform\Modules\Contracts\RecordSearch;
 use App\Platform\Modules\Contracts\UnitOfMeasureDirectory;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -153,12 +153,7 @@ final class ReferenceDataController extends Controller
         ]);
         $query = KelompokHartaFiskal::query()->where('tenant_id', (string) $request->attributes->get('coreerp.tenant_id'));
         $search = trim((string) ($validated['q'] ?? ''));
-        if ($search !== '') {
-            $query->where(fn (Builder $builder) => $builder
-                ->whereRaw('LOWER(template_key) LIKE ?', ['%'.mb_strtolower($search).'%'])
-                ->orWhereRaw('LOWER(label) LIKE ?', ['%'.mb_strtolower($search).'%'])
-                ->orWhereRaw('LOWER(COALESCE(regulation_reference, \'\')) LIKE ?', ['%'.mb_strtolower($search).'%']));
-        }
+        RecordSearch::apply($query, ['template_key', 'label', 'regulation_reference'], $search, ['template_key']);
         if (($validated['aktif'] ?? null) !== null) {
             $query->where('aktif', filter_var($validated['aktif'], FILTER_VALIDATE_BOOL));
         }

@@ -1,5 +1,10 @@
 import { Info } from 'lucide-react';
+import { useId } from 'react';
 import type { ComponentProps, ReactNode } from 'react';
+import {
+    DocumentLineCellContext,
+    useDocumentLineCell,
+} from '../document-line-context';
 import { cn } from '../utils';
 import { Button } from './button';
 import { FieldError, FieldHint } from './field';
@@ -19,14 +24,29 @@ export function FormControl({
     hintLabel?: string;
     className?: string;
 }) {
+    const cell = useDocumentLineCell();
+    const errorId = useId();
+
     return (
         <div
             role="group"
             data-slot="form-control"
+            data-document-cell={cell && cell.compact !== false ? '' : undefined}
+            data-has-hint={hint ? '' : undefined}
             className={cn(className)}
             {...props}
         >
-            <div data-slot="form-control-body">{children}</div>
+            <div data-slot="form-control-body">
+                <DocumentLineCellContext.Provider
+                    value={
+                        cell
+                            ? { ...cell, errorId: error ? errorId : undefined }
+                            : null
+                    }
+                >
+                    {children}
+                </DocumentLineCellContext.Provider>
+            </div>
             <div data-slot="form-control-help" aria-hidden={!hint || undefined}>
                 {hint && (
                     <FieldHint hint={hint} side="right">
@@ -41,7 +61,7 @@ export function FormControl({
                     </FieldHint>
                 )}
             </div>
-            {error && <FieldError>{error}</FieldError>}
+            {error && <FieldError id={errorId}>{error}</FieldError>}
         </div>
     );
 }

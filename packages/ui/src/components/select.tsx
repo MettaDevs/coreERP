@@ -1,4 +1,8 @@
 import * as React from 'react';
+import {
+    documentLineLabel,
+    useDocumentLineCell,
+} from '../document-line-context';
 
 import { cn } from '../utils';
 import {
@@ -55,7 +59,7 @@ function Select({
     value,
     defaultValue = null,
     onValueChange,
-    label,
+    label: providedLabel,
     required = false,
     placeholder = 'Select an item',
     searchPlaceholder = 'Search...',
@@ -70,6 +74,8 @@ function Select({
     visibleValues,
     knownValues,
 }: SelectProps) {
+    const cell = useDocumentLineCell();
+    const label = cell && cell.compact !== false ? undefined : providedLabel;
     const normalizedItems = items.map((item) =>
         typeof item === 'string' ? { value: item, label: item } : item,
     );
@@ -125,7 +131,15 @@ function Select({
             >
                 <ComboboxTrigger
                     id={inputId}
-                    aria-label={ariaLabel ?? label}
+                    data-document-control={
+                        cell && cell.compact !== false ? '' : undefined
+                    }
+                    aria-required={required || undefined}
+                    aria-invalid={cell?.errorId ? true : undefined}
+                    aria-describedby={cell?.errorId}
+                    aria-label={
+                        ariaLabel ?? documentLineLabel(cell, providedLabel)
+                    }
                     className={cn(
                         'dark:border-input dark:bg-input/30 dark:text-foreground flex h-9 w-full items-center justify-between gap-2 rounded-[4px] border border-[#d9dfe7] bg-white px-3 py-1 text-left text-sm text-[#1f2937] shadow-none outline-none transition-colors focus:border-[#0284c7] focus:ring-2 focus:ring-[#0284c7]/15 disabled:cursor-not-allowed disabled:opacity-50 data-[popup-open]:border-[#0284c7] data-[placeholder]:text-[#8a94a6] data-[popup-open]:ring-2 data-[popup-open]:ring-[#0284c7]/15 [&>[data-slot=combobox-trigger-icon]]:ml-auto [&>[data-slot=combobox-trigger-icon]]:shrink-0',
                         className,

@@ -38,6 +38,7 @@ import {
     PageDialogToolbar,
     PageDialogTrigger,
 } from '@apperp/ui/page-dialog';
+import { matchesRecordSearch } from '@apperp/ui/record-search';
 import { Separator } from '@apperp/ui/separator';
 import { Tabs, TabsList, TabsTrigger } from '@apperp/ui/tabs';
 import { TransferList } from '@apperp/ui/transfer-list';
@@ -143,9 +144,6 @@ const toggle = (values: string[], value: string, checked: boolean) =>
     checked
         ? [...new Set([...values, value])]
         : values.filter((item) => item !== value);
-
-const matches = (haystack: string, needle: string) =>
-    haystack.toLowerCase().includes(needle.trim().toLowerCase());
 
 function StatusBadge({ value }: { value: Status }) {
     return (
@@ -384,7 +382,7 @@ function PermissionMatrix({
     const visible = rows.filter(
         (row) =>
             (!appFilter || row.appId === appFilter) &&
-            (!query || matches(row.label, query) || matches(row.key, query)),
+            (!query || matchesRecordSearch(query, [row.label, row.key])),
     );
     const codesIn = (candidates: MatrixRow[], access: string) =>
         candidates
@@ -671,7 +669,7 @@ function AccessReferencePicker({
     const choices = items.filter(
         (item) =>
             !selected.includes(item.id) &&
-            matches(`${item.label} ${item.description}`, query),
+            matchesRecordSearch(query, [item.label, item.description]),
     );
     const assigned = items.filter((item) => selected.includes(item.id));
 
@@ -1771,7 +1769,7 @@ export default function SecurityConfiguration({
                                 (code) =>
                                     dutyByCode.get(code)?.app_id === appFilter,
                             )) &&
-                        (!query || matches(role.name, query)),
+                        (!query || matchesRecordSearch(query, role.name)),
                 )
                 .map((role) => ({
                     id: role.id,
@@ -1796,7 +1794,9 @@ export default function SecurityConfiguration({
                         (index > 0 ||
                             !appFilter ||
                             duty.app_id === appFilter) &&
-                        (index > 0 || !query || matches(duty.name, query)),
+                        (index > 0 ||
+                            !query ||
+                            matchesRecordSearch(query, duty.name)),
                 )
                 .map((duty) => ({
                     id: duty.code,
@@ -1823,7 +1823,9 @@ export default function SecurityConfiguration({
                         (index > 0 ||
                             !appFilter ||
                             item.app_id === appFilter) &&
-                        (index > 0 || !query || matches(item.name, query)),
+                        (index > 0 ||
+                            !query ||
+                            matchesRecordSearch(query, item.name)),
                 )
                 .map((item) => ({
                     id: item.code,

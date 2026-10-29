@@ -9,8 +9,8 @@ get:
     - name: q
       in: query
       required: false
-      schema: { type: string }
-      description: Cocokkan sebagian nama atau email, tidak peka huruf besar-kecil.
+      schema: { type: string, maxLength: 200 }
+      description: Awalan kata pada nama atau email, urutan kata bebas dan tidak peka huruf besar-kecil. Tanda kutip mencari frasa berurutan dalam satu field.
   responses:
     '200':
       description: Daftar anggota aktif.
@@ -25,4 +25,5 @@ get:
                 items: { $ref: '#/components/schemas/Member' }
     '401': { $ref: '#/components/responses/Unauthenticated' }
     '403': { $ref: '#/components/responses/Forbidden' }
+    '422': { $ref: '#/components/responses/ValidationError' }
     '429': { $ref: '#/components/responses/RateLimited' }

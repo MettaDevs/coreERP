@@ -7,6 +7,7 @@ namespace App\Foundation\FinancePosting\ModuleServices;
 use App\Foundation\FinancePosting\Models\FinanceReferenceAccount;
 use App\Platform\Modules\Contracts\AccountDirectory;
 use App\Platform\Modules\Contracts\IncrementalList;
+use App\Platform\Modules\Contracts\RecordSearch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
@@ -23,7 +24,7 @@ final class AccountDirectoryCore implements AccountDirectory
         $query = FinanceReferenceAccount::query()->where('tenant_id', $tenantId)->where('active', true)
             ->where(fn (Builder $scope) => $legalEntityId === null ? $scope->whereNull('legal_entity_id') : $scope->whereNull('legal_entity_id')->orWhere('legal_entity_id', $legalEntityId));
         $batch = IncrementalList::query(Request::create('/lookup', 'GET', $input), $query->toBase(),
-            ['id' => 'id', 'code' => 'code', 'name' => 'name'], ['code', 'name', 'external_id'], 'code');
+            ['id' => 'id', 'code' => 'code', 'name' => 'name'], ['code', 'name', 'external_id'], 'code', identifierSearchColumns: ['code', 'external_id']);
         $batch['data'] = FinanceReferenceAccount::hydrate($batch['data']->map(fn ($row) => (array) $row)->all())->map(self::row(...));
 
         return $batch;
@@ -32,8 +33,6 @@ final class AccountDirectoryCore implements AccountDirectory
     public function search(string $tenantId, ?string $legalEntityId, string $keyword = '', int $limit = 20): array
     {
         $keyword = trim($keyword);
-        // `%` dan `_` di kata pencarian adalah huruf biasa, bukan wildcard.
-        $pattern = '%'.addcslashes($keyword, '\\%_').'%';
 
         return array_values(FinanceReferenceAccount::query()
             ->where('tenant_id', $tenantId)
@@ -41,10 +40,7 @@ final class AccountDirectoryCore implements AccountDirectory
             ->where(fn (Builder $query) => $legalEntityId === null
                 ? $query->whereNull('legal_entity_id')
                 : $query->whereNull('legal_entity_id')->orWhere('legal_entity_id', $legalEntityId))
-            ->when($keyword !== '', fn (Builder $query) => $query->where(fn (Builder $inner) => $inner
-                ->where('code', 'ilike', $pattern)
-                ->orWhere('name', 'ilike', $pattern)
-                ->orWhere('external_id', $keyword)))
+            ->tap(fn ($query) => RecordSearch::apply($query, ['code', 'name', 'external_id'], $keyword, ['code', 'external_id']))
             ->orderBy('code')
             ->limit(max(1, min($limit, 100)))
             ->get()

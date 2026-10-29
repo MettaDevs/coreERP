@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Apperp\ManagementAset\Reporting\Lists;
 
 use App\Platform\Modules\Contracts\ListExportSource;
+use App\Platform\Modules\Contracts\RecordSearch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\JoinClause;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
@@ -118,13 +119,7 @@ final class AssetRegisterList implements ListExportSource
         /** @var Builder<Aset> $query */
         $query = app(OrganizationScope::class)->asetQuery(Aset::query(), $context->request());
         $q = trim(is_string($filters['q'] ?? null) ? $filters['q'] : '');
-        if ($q !== '') {
-            $like = '%'.mb_strtolower($q).'%';
-            $query->where(fn (Builder $builder) => $builder
-                ->whereRaw('LOWER(aset_tr_aset.kode) LIKE ?', [$like])
-                ->orWhereRaw('LOWER(aset_tr_aset.nama) LIKE ?', [$like])
-                ->orWhereRaw('LOWER(aset_tr_aset.serial_number) LIKE ?', [$like]));
-        }
+        RecordSearch::apply($query, ['aset_tr_aset.kode', 'aset_tr_aset.nama', 'aset_tr_aset.serial_number'], $q, ['aset_tr_aset.kode', 'aset_tr_aset.serial_number']);
 
         return $query;
     }

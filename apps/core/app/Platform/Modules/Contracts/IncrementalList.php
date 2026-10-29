@@ -19,9 +19,10 @@ final class IncrementalList
      * @param  list<string>  $searchColumns
      * @param  list<string>  $numericColumns
      * @param  array<string, 'string'|'date'|'numeric'>  $nativeSortColumns  Kolom yang urutan native-nya sama dengan kontrak cursor.
+     * @param  list<string>  $identifierSearchColumns  Kolom pencarian identitas yang mengabaikan pemisah penulisan.
      * @return array{data: Collection<int, \stdClass>, next_cursor: ?string}
      */
-    public static function query(Request $request, Builder $query, array $columns, array $searchColumns, string $defaultSort = 'id', array $numericColumns = [], string $defaultDirection = 'asc', string $identity = 'id', array $nativeSortColumns = []): array
+    public static function query(Request $request, Builder $query, array $columns, array $searchColumns, string $defaultSort = 'id', array $numericColumns = [], string $defaultDirection = 'asc', string $identity = 'id', array $nativeSortColumns = [], array $identifierSearchColumns = []): array
     {
         $input = $request->validate([
             'q' => ['nullable', 'string', 'max:200'],
@@ -42,14 +43,7 @@ final class IncrementalList
             $list->whereIn('id', $input['record_ids']);
         }
         $keyword = trim((string) ($input['q'] ?? ''));
-        if ($keyword !== '') {
-            $pattern = '%'.addcslashes(mb_strtolower($keyword), '\\%_').'%';
-            $list->where(function (Builder $match) use ($searchColumns, $pattern): void {
-                foreach ($searchColumns as $column) {
-                    $match->orWhere(self::columnExpression($column, 'LOWER(CAST(%s AS TEXT))'), 'like', $pattern);
-                }
-            });
-        }
+        RecordSearch::apply($list, $searchColumns, $keyword, $identifierSearchColumns);
         $sort = $columns[$input['sort'] ?? $defaultSort];
         $direction = $input['direction'] ?? (isset($input['sort']) ? 'asc' : $defaultDirection);
         // NULL juga harus memiliki posisi supaya cursor tidak melewatkan record.

@@ -4,6 +4,7 @@ namespace Modules\Apperp\ManagementAset\Http\Controllers;
 
 use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\NumberSequenceIssuer;
+use App\Platform\Modules\Contracts\RecordSearch;
 use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -130,11 +131,7 @@ abstract class MasterDataController extends Controller
         // Perbandingan eksplisit terhadap string kosong, bukan truthiness: pencarian "0"
         // adalah kata kunci yang sah dan tidak boleh diperlakukan sebagai tanpa filter.
         $search = trim((string) ($validated['q'] ?? ''));
-        if ($search !== '') {
-            $query->where(fn (Builder $builder) => $builder
-                ->whereRaw('LOWER(kode) LIKE ?', ['%'.mb_strtolower($search).'%'])
-                ->orWhereRaw('LOWER(nama) LIKE ?', ['%'.mb_strtolower($search).'%']));
-        }
+        RecordSearch::apply($query, ['kode', 'nama'], $search, ['kode']);
         // `?aktif=` kosong berarti tanpa filter. Tanpa pemeriksaan null, ia akan
         // berubah menjadi `aktif = false` dan hanya menampilkan data tidak aktif.
         if (($validated['aktif'] ?? null) !== null) {

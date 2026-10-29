@@ -3,6 +3,7 @@
 import { XIcon } from 'lucide-react';
 import { Dialog as SheetPrimitive } from 'radix-ui';
 import * as React from 'react';
+import { DocumentLineCellContext } from '../document-line-context';
 
 import { cn } from '../utils';
 
@@ -73,7 +74,9 @@ function SheetContent({
                 )}
                 {...props}
             >
-                {children}
+                <DocumentLineCellContext.Provider value={null}>
+                    {children}
+                </DocumentLineCellContext.Provider>
                 {showCloseButton && (
                     <SheetPrimitive.Close className="rounded-xs ring-offset-background focus:ring-ring focus:outline-hidden data-[state=open]:bg-secondary absolute right-4 top-4 opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 disabled:pointer-events-none">
                         <XIcon className="size-4" />

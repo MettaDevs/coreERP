@@ -8,18 +8,21 @@ use App\Foundation\Vendor\Actions\SaveVendor;
 use App\Foundation\Vendor\Models\Vendor;
 use App\Foundation\Vendor\Support\SupplierCsvImporter;
 use App\Foundation\Vendor\Support\VendorActivity;
+use App\Foundation\Vendor\Support\VendorSearch;
 use App\Http\Controllers\Controller;
 use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\AddressBook\Models\Party;
 use App\Platform\AddressBook\Support\PartyDetailData;
 use App\Platform\Analytics\Query\AnalyticsQueryException;
 use App\Platform\Identity\Support\UserClock;
+use App\Platform\Modules\Contracts\RecordSearch;
 use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Tenant\Models\TenantMembership;
-use Illuminate\Contracts\Database\Query\Builder as QueryBuilder;
+use Illuminate\Database\Query\Builder as SearchQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -70,17 +73,12 @@ final class VendorController extends Controller
             'vendor' => ['nullable', 'ulid'],
         ]);
         $keyword = trim((string) ($filter['q'] ?? ''));
-        $pattern = '%'.addcslashes($keyword, '\\%_').'%';
-
         $vendors = Vendor::query()
             ->with('party:id,name,type')
             ->where('tenant_id', $tenant)
             ->when(($filter['legal_entity'] ?? null) !== null, fn ($query) => $query->where('legal_entity_id', $filter['legal_entity']))
             ->when(($filter['status'] ?? null) !== null, fn ($query) => $query->where('status', $filter['status']))
-            ->when($keyword !== '', fn ($query) => $query->where(fn (QueryBuilder $inner) => $inner
-                ->where('number', 'ilike', $pattern)
-                ->orWhere('tax_number', 'ilike', $pattern)
-                ->orWhereHas('party', fn ($party) => $party->where('name', 'ilike', $pattern))))
+            ->tap(fn ($query) => VendorSearch::apply($query, $tenant, $keyword))
             ->orderBy('number')->orderBy('id')
             ->simplePaginate(self::PER_PAGE)
             ->withQueryString()
@@ -112,18 +110,35 @@ final class VendorController extends Controller
         $membership = $this->authorizedMembership($request, CoreSecurityCatalog::VENDOR_UPDATE);
         $input = $request->validate(['q' => ['nullable', 'string', 'max:100'], 'cursor' => ['nullable', 'string', 'max:2000']]);
         $keyword = trim((string) ($input['q'] ?? ''));
-        $pattern = '%'.addcslashes($keyword, '\\%_').'%';
+        $tenantId = $membership->tenant_id;
 
         $parties = Party::query()
             ->where('tenant_id', $membership->tenant_id)
             ->where('status', 'active')
-            ->when($keyword !== '', fn ($query) => $query->where(fn ($names) => $names
-                ->where('search_name', 'like', '%'.addcslashes(Party::searchName($keyword), '\\%_').'%')
-                ->orWhere('name', 'ilike', $pattern)
-                ->orWhereIn('id', Vendor::query()->where('tenant_id', $membership->tenant_id)
-                    ->where(fn ($accounts) => $accounts->where('number', 'ilike', $pattern)
-                        ->orWhereHas('legalEntity', fn ($company) => $company->where('name', 'ilike', $pattern)))
-                    ->select('party_id'))))
+            ->tap(fn ($query) => RecordSearch::applyCandidates($query, $keyword,
+                function (array $term) use ($tenantId): SearchQuery {
+                    $names = DB::table('parties')->where('tenant_id', $tenantId)->whereNull('deleted_at')->select('id');
+                    $names->where(fn (SearchQuery $fields) => $fields
+                        ->where(fn (SearchQuery $field) => RecordSearch::matchTerm($field, 'name', $term))
+                        ->orWhere(fn (SearchQuery $field) => RecordSearch::matchTerm($field, 'search_name', $term)));
+                    $accounts = DB::table('vendors')->where('vendors.tenant_id', $tenantId)
+                        ->leftJoin('organizations as search_company', fn ($join) => $join
+                            ->on('search_company.id', '=', 'vendors.legal_entity_id')
+                            ->on('search_company.tenant_id', '=', 'vendors.tenant_id'))
+                        ->select('vendors.party_id');
+                    $accounts->where(fn (SearchQuery $fields) => $fields
+                        ->where(fn (SearchQuery $field) => RecordSearch::matchTerm($field, 'vendors.number', $term, true))
+                        ->orWhere(fn (SearchQuery $field) => RecordSearch::matchTerm($field, 'search_company.name', $term)));
+
+                    return $names->union($accounts);
+                },
+                function (array $term) use ($tenantId): SearchQuery {
+                    $accounts = DB::table('vendors')->where('tenant_id', $tenantId)->select('party_id');
+                    RecordSearch::matchTerm($accounts, 'number', $term, true);
+
+                    return $accounts;
+                },
+            ))
             ->orderBy('name')->orderBy('id')
             ->cursorPaginate(40, ['id', 'name', 'type']);
         $partyRows = $parties->getCollection();
@@ -149,12 +164,10 @@ final class VendorController extends Controller
             'cursor' => ['nullable', 'string', 'max:2000'],
         ]);
         $keyword = trim($data['q'] ?? '');
-        $pattern = '%'.addcslashes($keyword, '\\%_').'%';
         $vendors = Vendor::query()->where('tenant_id', $membership->tenant_id)
             ->where('legal_entity_id', $data['legal_entity_id'])->with('party')
             ->when(! empty($data['party_id']), fn ($query) => $query->where('party_id', $data['party_id']))
-            ->when($keyword !== '', fn ($query) => $query->where(fn ($match) => $match->where('number', 'ilike', $pattern)
-                ->orWhereHas('party', fn ($party) => $party->where('name', 'ilike', $pattern))))
+            ->tap(fn ($query) => VendorSearch::apply($query, $membership->tenant_id, $keyword))
             ->orderBy('number')->orderBy('id')->cursorPaginate(40);
 
         return response()->json(['data' => $vendors->getCollection()->map(fn (Vendor $vendor) => $this->present($vendor)),
@@ -166,11 +179,18 @@ final class VendorController extends Controller
         $membership = $this->authorizedMembership($request, CoreSecurityCatalog::VENDOR_UPDATE);
         $data = $request->validate(['q' => ['nullable', 'string', 'max:100'], 'cursor' => ['nullable', 'string', 'max:2000']]);
         $keyword = trim($data['q'] ?? '');
-        $pattern = '%'.addcslashes($keyword, '\\%_').'%';
+
         $companies = Organization::query()->where('tenant_id', $membership->tenant_id)->where('classification', 'legal_entity')
             ->with('legalEntity:organization_id,company_code')
-            ->when($keyword !== '', fn ($query) => $query->where(fn ($match) => $match->where('name', 'ilike', $pattern)
-                ->orWhereHas('legalEntity', fn ($entity) => $entity->where('company_code', 'ilike', $pattern))))
+            ->when($keyword !== '', function ($query) use ($keyword, $membership): void {
+                $candidates = Organization::query()->where('organizations.tenant_id', $membership->tenant_id)
+                    ->leftJoin('legal_entities as search_entity', fn ($join) => $join
+                        ->on('search_entity.organization_id', '=', 'organizations.id')
+                        ->on('search_entity.tenant_id', '=', 'organizations.tenant_id'))
+                    ->select('organizations.id');
+                RecordSearch::apply($candidates, ['organizations.name', 'search_entity.company_code'], $keyword, ['search_entity.company_code']);
+                $query->whereIn('organizations.id', $candidates);
+            })
             ->orderBy('name')->orderBy('id')->cursorPaginate(40);
 
         return response()->json(['data' => $companies->getCollection()->map(static fn (Organization $company) => [

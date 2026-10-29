@@ -265,15 +265,15 @@
     grid-template-columns: 28px minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
     flex-shrink: 0;
-    gap: 8px;
-    min-height: 40px;
-    padding: 4px 12px;
+    gap: 6px;
+    min-height: 36px;
+    padding: 2px 12px;
 }
 .core-page-dialog-record-actions,
 .core-page-dialog-window-actions {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     min-width: 0;
 }
 .core-page-dialog-record-actions {
@@ -284,10 +284,10 @@
     justify-content: flex-end;
 }
 .core-page-dialog-record-title {
-    padding: 8px 48px 16px;
-    font-size: 28px;
+    padding: 4px 40px 8px;
+    font-size: 22px;
     font-weight: 300;
-    line-height: 1.25;
+    line-height: 1.2;
     overflow-wrap: anywhere;
 }
 .core-page-dialog-main-navigation,
@@ -295,9 +295,9 @@
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 4px 12px;
-    min-height: 32px;
-    margin-inline: 48px;
+    gap: 2px 8px;
+    min-height: 28px;
+    margin-inline: 40px;
     border-bottom: 1px solid var(--border);
 }
 .core-page-dialog-previous,
@@ -374,8 +374,8 @@
         flex-wrap: wrap;
     }
     .core-page-dialog-record-title {
-        padding: 8px 16px 12px;
-        font-size: 24px;
+        padding: 4px 16px 6px;
+        font-size: 20px;
     }
     .core-page-dialog-main-navigation,
     .core-page-dialog-secondary-navigation {
@@ -515,4 +515,87 @@
         min-height: 44px;
         min-width: 44px;
     }
+}
+
+/* Label kolom menggantikan label visual setiap sel dokumen. */
+[data-cell-mode='document'] [data-slot='table-cell'] {
+    padding: 0.25rem 0.5rem;
+}
+[data-document-cell] {
+    grid-template-columns: minmax(0, 1fr);
+    padding-top: 0;
+}
+[data-document-cell][data-has-hint] {
+    grid-template-columns: minmax(0, 1fr) 1.75rem;
+}
+[data-document-cell]:not([data-has-hint]) > [data-slot='form-control-help'] {
+    display: none;
+}
+[data-document-cell] > [data-slot='form-control-body'],
+[data-document-cell] > [data-slot='form-control-help'] {
+    min-height: 1.75rem;
+    height: auto;
+}
+[data-document-cell]
+    [data-slot='form-control-body']
+    :is(
+        [data-slot='input'],
+        [data-slot='input-group'],
+        [data-slot='select-trigger']
+    ),
+[data-document-cell] [data-slot='select-control'] > button,
+[data-document-control] {
+    min-height: 1.75rem;
+    height: 1.75rem;
+    padding-block: 0.125rem;
+}
+[data-document-control][data-slot='textarea'] {
+    height: auto;
+}
+[data-document-cell] [data-slot='field-error'] {
+    white-space: normal;
+}
+
+[data-cell-mode='document'] [data-cell-content='control'] {
+    padding-block: 0;
+}
+
+/* Header daftar menyatu dengan halaman, tetap opak saat tabel digulir. */
+[data-seamless-header] {
+    --data-table-header-background: color-mix(
+        in oklab,
+        var(--muted) 30%,
+        var(--background)
+    );
+}
+[data-seamless-header] > [data-slot='table-container'] > table > thead,
+[data-seamless-header]
+    > [data-slot='table-container']
+    > table
+    > thead
+    > tr
+    > th {
+    background-color: var(--data-table-header-background);
+}
+[data-seamless-header]
+    > [data-slot='table-container']
+    > table
+    > thead
+    > tr
+    > th {
+    height: 2.5rem;
+    padding-block: 0.5rem;
+    vertical-align: bottom;
+}
+[data-seamless-header]
+    > [data-slot='table-container']
+    > table
+    > thead
+    > tr
+    > th:is(:hover, :focus-within, [aria-sort]) {
+    background-color: color-mix(
+        in oklab,
+        var(--primary) 10%,
+        var(--data-table-header-background)
+    );
 }

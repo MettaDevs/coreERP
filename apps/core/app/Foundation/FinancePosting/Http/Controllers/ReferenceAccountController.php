@@ -7,9 +7,9 @@ use App\Foundation\FinancePosting\Models\FinanceReferenceAccountImport;
 use App\Foundation\FinancePosting\Support\ReferenceAccountImporter;
 use App\Http\Controllers\Controller;
 use App\Platform\Access\Support\CoreSecurityCatalog;
+use App\Platform\Modules\Contracts\RecordSearch;
 use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Organization\Models\Organization;
-use Illuminate\Contracts\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
@@ -48,10 +48,7 @@ final class ReferenceAccountController extends Controller
             ->when($scope === 'all', fn ($query) => $query->whereNull('legal_entity_id'))
             ->when($scope !== null && $scope !== 'all', fn ($query) => $query->where('legal_entity_id', $scope))
             ->when(($filter['status'] ?? null) !== null, fn ($query) => $query->where('active', $filter['status'] === 'active'))
-            ->when($keyword !== '', fn ($query) => $query->where(fn (QueryBuilder $inner) => $inner
-                ->where('code', 'ilike', '%'.addcslashes($keyword, '\\%_').'%')
-                ->orWhere('name', 'ilike', '%'.addcslashes($keyword, '\\%_').'%')
-                ->orWhere('external_id', $keyword)))
+            ->tap(fn ($query) => RecordSearch::apply($query, ['code', 'name', 'external_id'], $keyword, ['code', 'external_id']))
             ->orderBy('code')->orderBy('id')
             ->simplePaginate(self::PER_PAGE)
             ->withQueryString()

@@ -1,4 +1,8 @@
 import * as React from 'react';
+import {
+    documentLineLabel,
+    useDocumentLineCell,
+} from '../document-line-context';
 
 import { cn } from '../utils';
 import { useRecordEditActivation } from './record-edit-boundary';
@@ -11,7 +15,7 @@ type TextareaProps = React.ComponentProps<'textarea'> & {
 function Textarea({
     className,
     id,
-    label,
+    label: providedLabel,
     placeholder,
     required,
     editActivation = true,
@@ -19,6 +23,8 @@ function Textarea({
     onKeyDown,
     ...props
 }: TextareaProps) {
+    const cell = useDocumentLineCell();
+    const label = cell && cell.compact !== false ? undefined : providedLabel;
     const generatedId = React.useId();
     const textareaId = id ?? (label ? generatedId : undefined);
     const activation = useRecordEditActivation();
@@ -32,6 +38,9 @@ function Textarea({
         <textarea
             id={textareaId}
             data-slot="textarea"
+            data-document-control={
+                cell && cell.compact !== false ? '' : undefined
+            }
             required={required}
             placeholder={label ? ' ' : placeholder}
             className={cn(
@@ -40,6 +49,13 @@ function Textarea({
                 className,
             )}
             {...props}
+            aria-invalid={
+                props['aria-invalid'] ?? (cell?.errorId ? true : undefined)
+            }
+            aria-describedby={props['aria-describedby'] ?? cell?.errorId}
+            aria-label={
+                props['aria-label'] ?? documentLineLabel(cell, providedLabel)
+            }
             onClick={(event) => {
                 onClick?.(event);
 

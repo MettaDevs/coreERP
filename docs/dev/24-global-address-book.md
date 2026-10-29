@@ -14,17 +14,17 @@ Skema lengkapnya ada di `apps/core/database/migrations/2026_07_27_020000_create_
 
 **Satu tabel negara.** `country_regions` juga negara bagi master wilayah (`ref_provinces`, `ref_postal_codes`, `ref_address_parameters`, `ref_administrative_divisions`, `ref_country_hierarchy_levels`, `time_zones`); `ref_countries` tidak lagi ditunjuk foreign key mana pun dan dibuang pada rilis berikutnya. Master wilayah dipakai bersama seluruh tenant dan **tidak punya pintu tulis di sisi tenant**: isinya dari migrasi, seeder, dan perintah impor, dan halaman Address setup hanya membaca. Alasannya di [buku alamat global](/todo/buku-alamat-global/), OWN-05.
 
-| Tabel | Isi | Aturan yang dijaga database |
-| --- | --- | --- |
-| `parties` | Nama pihak, jenis `person` atau `organization` (bentuk nama, bukan peran), `search_name` untuk pencarian | Composite unique `(tenant_id, id)`; `type` wajib ada di `party_types` |
-| `locations` | Satu tempat (padanan `LogisticsLocation`): nama, tanpa kolom party | Composite unique `(tenant_id, id)` |
-| `party_locations` | Tautan party ke tempat (padanan `DirPartyLocation`), utama atau bukan, berlaku dari–sampai | Partial unique: satu tautan utama per party, dan satu tautan per pasangan party–tempat, di antara yang belum diarsipkan |
-| `party_location_purposes` | Kegunaan satu tautan, boleh lebih dari satu | Kode wajib ada di `location_purposes`; satu baris aktif per kegunaan per tautan |
-| `location_purposes` | Referensi kegunaan platform: `business`, `delivery`, `invoice`, `payment`, `home` | Diisi migration, bukan milik tenant |
-| `postal_addresses` | Alamat pos satu tempat dan bentuk tercetaknya `formatted` | Satu per tempat; kode negara wajib ada di `country_regions` |
-| `electronic_addresses` | Kontak satu tempat: `email`, `phone`, `whatsapp`, `fax`, `url`, dengan keterangan dan penanda utama | Partial unique: satu kontak utama per tempat per jenis |
-| `organization_parties` | Tautan organisasi ke party-nya, satu ke satu | Unique per party, sehingga satu party paling banyak mewakili satu organisasi |
-| `party_role_registrations` | Registry peran party per legal entity, ditulis app pemilik peran | Unique `(party, peran, legal entity)` |
+| Tabel                      | Isi                                                                                                      | Aturan yang dijaga database                                                                                             |
+| -------------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `parties`                  | Nama pihak, jenis `person` atau `organization` (bentuk nama, bukan peran), `search_name` untuk pencarian | Composite unique `(tenant_id, id)`; `type` wajib ada di `party_types`                                                   |
+| `locations`                | Satu tempat (padanan `LogisticsLocation`): nama, tanpa kolom party                                       | Composite unique `(tenant_id, id)`                                                                                      |
+| `party_locations`          | Tautan party ke tempat (padanan `DirPartyLocation`), utama atau bukan, berlaku dari–sampai               | Partial unique: satu tautan utama per party, dan satu tautan per pasangan party–tempat, di antara yang belum diarsipkan |
+| `party_location_purposes`  | Kegunaan satu tautan, boleh lebih dari satu                                                              | Kode wajib ada di `location_purposes`; satu baris aktif per kegunaan per tautan                                         |
+| `location_purposes`        | Referensi kegunaan platform: `business`, `delivery`, `invoice`, `payment`, `home`                        | Diisi migration, bukan milik tenant                                                                                     |
+| `postal_addresses`         | Alamat pos satu tempat dan bentuk tercetaknya `formatted`                                                | Satu per tempat; kode negara wajib ada di `country_regions`                                                             |
+| `electronic_addresses`     | Kontak satu tempat: `email`, `phone`, `whatsapp`, `fax`, `url`, dengan keterangan dan penanda utama      | Partial unique: satu kontak utama per tempat per jenis                                                                  |
+| `organization_parties`     | Tautan organisasi ke party-nya, satu ke satu                                                             | Unique per party, sehingga satu party paling banyak mewakili satu organisasi                                            |
+| `party_role_registrations` | Registry peran party per legal entity, ditulis app pemilik peran                                         | Unique `(party, peran, legal entity)`                                                                                   |
 
 WhatsApp adalah jenis kontak tersendiri, bukan telepon berlabel, karena kop dan dokumen menampilkannya terpisah dari nomor telepon kantor.
 
@@ -41,7 +41,7 @@ Aturan yang ditegakkan kode, dan alasannya:
 - **Kontak menempel ke tempat.** `address_id` memasang kontak ke salah satu alamat; tanpa itu kontak menempel ke alamat utama, atau — bila party belum punya alamat — ke satu tempat tanpa alamat pos bernama "Informasi kontak" yang tidak tampil sebagai alamat.
 - **Bentuk tercetak disusun saat disimpan, ke kolom `formatted`.** Aturannya di `PostalAddressFormatter`: jalan dan gedung, PO Box, kelurahan atau kecamatan, lalu kota, provinsi, dan kode pos. Nama negara hanya ditulis untuk alamat di luar Indonesia. Dokumen resmi menyalin bentuk ini, sehingga perubahan alamat kemudian tidak menulis ulang dokumen lama.
 - **Kode negara dinormalkan lalu diperiksa ke tabel.** `id` dan `ID` sama; `ZZ` ditolak 422, bukan disimpan sebagai teks bebas.
-- **Layar Buku alamat butuh duty *Lihat organisasi*; mengubah kontak, lokasi, dan identitas cetak butuh *Kelola organisasi* (`core.organization.update`).** API baca kontak dan lokasi tetap terbuka bagi semua anggota tenant karena dipakai pemilih di layar lain. Organisasi tenant lain dijawab 404, bukan 403, supaya keberadaannya tidak bocor.
+- **Layar Buku alamat butuh duty _Lihat organisasi_; mengubah kontak, lokasi, dan identitas cetak butuh _Kelola organisasi_ (`core.organization.update`).** API baca kontak dan lokasi tetap terbuka bagi semua anggota tenant karena dipakai pemilih di layar lain. Organisasi tenant lain dijawab 404, bukan 403, supaya keberadaannya tidak bocor.
 
 ## Yang membaca buku alamat
 
@@ -307,6 +307,49 @@ buku aset saat ini dan bukan saldo utang. Feed posting tidak menyimpan pelunasan
 buku pembantu vendor, sehingga halaman tidak menyimpulkan saldo dari total debit
 jurnal. Pengaturan pembayaran yang belum mempunyai proses tetap tidak ditampilkan.
 
+### Pencarian daftar vendor
+
+Daftar Vendor memperbarui hasil otomatis setelah ketikan berhenti 250 ms. Query
+kosong dan perubahan perusahaan/status segera meminta hasil. Hook
+`use-vendor-list-query.ts` memakai kunjungan dan pembatalan native Inertia;
+batch lama direset dan respons query lama tidak mengganti ketikan yang lebih baru.
+Pencarian berhenti sementara ketika card dibuka. Panel filter Vendor berada di kiri,
+sedangkan FactBox tetap di kanan.
+
+Backend memakai engine Core `RecordSearch`, dengan nomor vendor dan NPWP sebagai
+identifier serta nama Party sebagai teks. Daftar, lookup, dan direktori vendor
+memakai satu aturan pencocokan. Batas query, tenant, perusahaan, status, serta urutan
+nomor lalu ID tetap berlaku. UI tetap bernama Cari dan tidak menyediakan pilihan mode.
+
+### Aturan pencarian vendor
+
+Acuannya [pencarian berbasis kata BC](https://learn.microsoft.com/en-us/dynamics365/business-central/ui-enter-criteria-filters#choose-between-modern-search-and-legacy-search)
+dan deklarasi [OptimizeForTextSearch](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/developer/properties/devenv-optimizefortextsearch-property).
+Implementasi CoreERP memakai PostgreSQL; source AL tidak menetapkan debounce client
+yang bisa disalin dari repository BC.
+
+| Input/aturan                                  | Hasil                                                         |
+| --------------------------------------------- | ------------------------------------------------------------- |
+| `sur ja` atau `jaya surya`                    | Awalan kata, semua syarat harus ditemukan, urutannya bebas    |
+| `urya`                                        | Tidak cocok dengan kata `Surya` karena bukan awalan           |
+| `"surya jaya"`                                | Frasa berurutan dalam satu field                              |
+| Nomor/NPWP bertitik, berhubung, atau berspasi | Dapat dicari lewat identitas yang sama tanpa pemisah tersebut |
+| Huruf besar/kecil                             | Diabaikan; Unicode dinormalisasi ke NFC                       |
+| `Cafe` dan `Café`                             | Tetap berbeda                                                 |
+| Salah ketik, sinonim, ranking relevansi       | Tidak diterapkan; urutan hasil tetap nomor lalu ID            |
+
+Indeks GIN expression berada pada nomor vendor, NPWP vendor, dan nama Party dengan
+konfigurasi `simple`. Nama Party tetap dibaca dari tabel sumber, sehingga perubahan
+identitas bersama tidak memerlukan salinan nama atau antrean pembaruan indeks lain.
+Migration hanya menambahkan indeks; nilai, ID, dan nomor existing tetap sama. Ekspresi
+indeks dibekukan dalam migration dan harus mengikuti ekspresi engine yang dipakai query.
+
+`VendorSearch` hanya menetapkan sumber kandidat yang telah dibatasi tenant. Parser,
+aturan prefix/frasa, dan normalisasi identifier berada pada `RecordSearch`. Kontrak
+matcher SDK dan backend diuji dengan fixture yang sama di
+`packages/ui/tests/fixtures/record-search.json`, ditambah tes PostgreSQL untuk scope,
+perubahan Party, lookup, dan pagination.
+
 ## Yang belum ada
 
 Direktori sudah mempunyai API session untuk party, alamat, kontak, dan hubungan. Akun
@@ -317,18 +360,20 @@ dibangun.
 
 ## Di mana kodenya
 
-| Berkas | Isi |
-| --- | --- |
-| `apps/core/app/Platform/AddressBook/Models/{Party,Location,PartyLocation,PartyLocationPurpose,LocationPurpose,PostalAddress,ElectronicAddress}.php`, `apps/core/app/Platform/Organization/Models/OrganizationParty.php`, `apps/core/app/Platform/Geography/Models/CountryRegion.php` | Model buku alamat |
-| `apps/core/app/Platform/AddressBook/Support/OrganizationAddressBook.php` | Tautan organisasi ke party, aturan satu utama, ringkasan untuk kop |
-| `apps/core/app/Platform/AddressBook/Support/PostalAddressFormatter.php` | Bentuk tercetak alamat |
-| `apps/core/app/Platform/AddressBook/Http/Controllers/` | Endpoint alamat dan kontak organisasi |
-| `apps/core/resources/js/pages/platform/organization/components/address-book-section.tsx` | Dua bagian pada kartu organisasi |
-| `apps/core/tests/Feature/Platform/AddressBook/OrganizationAddressBookTest.php` | Utama otomatis dan berpindah, satu utama per jenis, kop membaca buku alamat, hak akses |
-| `apps/core/tests/Feature/Platform/AddressBook/SharedLocationTest.php` | Tempat bersama, arsip tautan, kegunaan ganda, kontak per tempat, isolasi tenant |
-| `apps/core/tests/Feature/Platform/AddressBook/SharedLocationConcurrencyTest.php` | Index yang menolak dua utama dan tautan ganda dari dua koneksi |
-| `apps/core/app/Foundation/Vendor/Actions/SaveVendor.php`, `apps/core/app/Foundation/Vendor/Models/Vendor.php` | Vendor: party, akun vendor per legal entity, dan registry perannya |
-| `apps/core/tests/Feature/Foundation/Vendor/VendorTest.php` | Nomor vendor, satu vendor per party per legal entity, isolasi tenant, sinkron `updated_since` |
+| Berkas                                                                                                                                                                                                                                                                               | Isi                                                                                           |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| `apps/core/app/Platform/AddressBook/Models/{Party,Location,PartyLocation,PartyLocationPurpose,LocationPurpose,PostalAddress,ElectronicAddress}.php`, `apps/core/app/Platform/Organization/Models/OrganizationParty.php`, `apps/core/app/Platform/Geography/Models/CountryRegion.php` | Model buku alamat                                                                             |
+| `apps/core/app/Platform/AddressBook/Support/OrganizationAddressBook.php`                                                                                                                                                                                                             | Tautan organisasi ke party, aturan satu utama, ringkasan untuk kop                            |
+| `apps/core/app/Platform/AddressBook/Support/PostalAddressFormatter.php`                                                                                                                                                                                                              | Bentuk tercetak alamat                                                                        |
+| `apps/core/app/Platform/AddressBook/Http/Controllers/`                                                                                                                                                                                                                               | Endpoint alamat dan kontak organisasi                                                         |
+| `apps/core/resources/js/pages/platform/organization/components/address-book-section.tsx`                                                                                                                                                                                             | Dua bagian pada kartu organisasi                                                              |
+| `apps/core/tests/Feature/Platform/AddressBook/OrganizationAddressBookTest.php`                                                                                                                                                                                                       | Utama otomatis dan berpindah, satu utama per jenis, kop membaca buku alamat, hak akses        |
+| `apps/core/tests/Feature/Platform/AddressBook/SharedLocationTest.php`                                                                                                                                                                                                                | Tempat bersama, arsip tautan, kegunaan ganda, kontak per tempat, isolasi tenant               |
+| `apps/core/tests/Feature/Platform/AddressBook/SharedLocationConcurrencyTest.php`                                                                                                                                                                                                     | Index yang menolak dua utama dan tautan ganda dari dua koneksi                                |
+| `apps/core/app/Foundation/Vendor/Actions/SaveVendor.php`, `apps/core/app/Foundation/Vendor/Models/Vendor.php`                                                                                                                                                                        | Vendor: party, akun vendor per legal entity, dan registry perannya                            |
+| `apps/core/app/Foundation/Vendor/Support/VendorSearch.php`                                                                                                                                                                                                                           | Sumber kandidat vendor untuk engine pencarian Core                                            |
+| `apps/core/tests/Feature/Foundation/Vendor/VendorSearchTest.php`                                                                                                                                                                                                                     | Aturan kata/frasa, identifier, scope, lookup, dan pagination pencarian                        |
+| `apps/core/tests/Feature/Foundation/Vendor/VendorTest.php`                                                                                                                                                                                                                           | Nomor vendor, satu vendor per party per legal entity, isolasi tenant, sinkron `updated_since` |
 
 ## Halaman terkait
 

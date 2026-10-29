@@ -71,6 +71,21 @@ class PenerimaanAsetTest extends TestCase
         $this->assertSame([], $reads);
     }
 
+    public function test_incomplete_receipt_line_blocks_saving_the_entire_document(): void
+    {
+        $complete = $this->baris(1);
+        $incomplete = [...$complete, 'nama' => 'Aset belum dipilih grupnya', 'group_aset_id' => ''];
+        $payload = $this->payload([$complete, $incomplete]);
+
+        $this->sebagaiPengguna($this->tenantId, ['management-aset.penerimaan-aset.create'])
+            ->withHeader('Idempotency-Key', 'incomplete-'.Str::ulid())
+            ->postJson('/api/modules/management-aset/v1/penerimaan-aset', $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('details.1.group_aset_id');
+
+        $this->assertSame(0, DB::table('aset_tr_penerimaan_aset')->where('tenant_id', $this->tenantId)->count());
+    }
+
     public function test_nomor_po_manual_dapat_disimpan_dikosongkan_dan_dibatasi_panjangnya(): void
     {
         $payload = $this->payload([$this->baris(1)]);

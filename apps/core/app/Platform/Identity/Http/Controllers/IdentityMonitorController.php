@@ -4,6 +4,7 @@ namespace App\Platform\Identity\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Platform\Identity\Models\User;
+use App\Platform\Modules\Contracts\RecordSearch;
 use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,9 +24,7 @@ class IdentityMonitorController extends Controller
         // Akun aplikasi klien integrasi bukan identitas yang dapat masuk; ia tidak dipantau di sini.
         $identities = User::query()
             ->where('account_type', User::PERSON)
-            ->when($search, fn ($query) => $query->where(fn ($nested) => $nested
-                ->where('name', 'like', "%{$search}%")
-                ->orWhere('email', 'like', "%{$search}%")))
+            ->tap(fn ($query) => RecordSearch::apply($query, ['name', 'email'], $search))
             ->with(['memberships.tenant:id,name', 'memberships.roleAssignments' => fn ($query) => $query->where('status', 'active'), 'memberships.roleAssignments.role:id,name'])
             ->orderBy($sort, $direction)->orderBy('id', $direction)
             ->simplePaginate(40)

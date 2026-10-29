@@ -1,5 +1,6 @@
 import * as React from 'react';
 import type { DataTableColumn, DataTableSort } from './data-table';
+import { matchesRecordSearch } from './record-search';
 import { useIncrementalList } from './use-incremental-list';
 import type { ListBatch, ListRequest } from './use-incremental-list';
 
@@ -106,13 +107,10 @@ export function useInlineLookupData<T>({
         active: active && Boolean(loadItems),
         getKey: getItemValue,
     });
-    const normalized = query.trim().toLocaleLowerCase('id-ID');
     const filtered = loadItems
         ? []
         : items.filter((item) =>
-              getSearchText(item)
-                  .toLocaleLowerCase('id-ID')
-                  .includes(normalized),
+              matchesRecordSearch(query, getSearchText(item)),
           );
 
     if (compareItems && !loadItems) {

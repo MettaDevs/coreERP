@@ -519,6 +519,19 @@ Nilai divalidasi oleh `AssetAttributeValidator`.
 
 ---
 
+## Editor rincian penerimaan
+
+Baris penerimaan memakai `DocumentLines` SDK dengan kontrol sel rapat dan mode fokus.
+Editor yang sama dipakai saat mode fokus dibuka atau ditutup; draft dan state kontrol
+tetap ada. Pemilih banyak baris permintaan tetap mengikuti sisa yang dapat diterima.
+Pemilih jenis aset bersama modul dapat menambah baris langsung tanpa rujukan permintaan,
+tanpa mengubah baris yang sudah diisi atau menebak satuan dan nilai.
+
+Footer merangkum jumlah aset serta perkiraan nilai dari isian baris. Perkiraan ini
+belum menerapkan pembulatan mata uang per baris pada posting; pratinjau jurnal tetap
+menjadi sumber nilai yang akan dibukukan. Tabel nomor seri aset hasil penerimaan tetap
+memakai `DataTable` karena ia mengelola aset yang telah terbentuk.
+
 ## Di mana kodenya
 
 | Berkas | Isinya |
