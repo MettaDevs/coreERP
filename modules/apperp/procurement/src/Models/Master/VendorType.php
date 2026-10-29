@@ -46,4 +46,3 @@ class VendorType extends MasterData
         ];
     }
 }
-

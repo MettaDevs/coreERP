@@ -430,4 +430,3 @@ final class VendorTypeController extends Controller
         return $trimmed === '' ? null : $trimmed;
     }
 }
-

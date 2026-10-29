@@ -17,4 +17,3 @@ Route::patch('jenis-vendor/{id}/status', [VendorTypeController::class, 'updateSt
     ->name('procurement.vendor-type.update-status');
 Route::delete('jenis-vendor/{id}', [VendorTypeController::class, 'destroy'])
     ->name('procurement.vendor-type.destroy');
-
