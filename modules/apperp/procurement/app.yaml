@@ -83,6 +83,7 @@ security:
     - { code: procurement.harga-perkiraan.form, name: Layar harga perkiraan, type: form }
     - { code: procurement.harga-perkiraan.api, name: API harga perkiraan, type: api }
     - { code: procurement.kategori-pengadaan.form, name: Layar kategori pengadaan, type: form }
+    - { code: procurement.kategori-pengadaan.api, name: API kategori pengadaan, type: api }
     - { code: procurement.jenis-vendor.form, name: Layar jenis vendor/supplier, type: form }
     - { code: procurement.metode-pembayaran.form, name: Layar metode pembayaran, type: form }
     - { code: procurement.termin-pembayaran.form, name: Layar termin pembayaran, type: form }
@@ -107,6 +108,9 @@ security:
     - { code: procurement.harga-perkiraan.update, name: Ubah harga perkiraan, entry_point: procurement.harga-perkiraan.api, access: update }
     - { code: procurement.harga-perkiraan.archive, name: Arsipkan harga perkiraan, entry_point: procurement.harga-perkiraan.api, access: delete }
     - { code: procurement.kategori-pengadaan.read, name: Lihat kategori pengadaan, entry_point: procurement.kategori-pengadaan.form, access: read }
+    - { code: procurement.kategori-pengadaan.create, name: Tambah kategori pengadaan, entry_point: procurement.kategori-pengadaan.api, access: create }
+    - { code: procurement.kategori-pengadaan.update, name: Ubah kategori pengadaan, entry_point: procurement.kategori-pengadaan.api, access: update }
+    - { code: procurement.kategori-pengadaan.archive, name: Arsipkan kategori pengadaan, entry_point: procurement.kategori-pengadaan.api, access: delete }
     - { code: procurement.jenis-vendor.read, name: Lihat jenis vendor/supplier, entry_point: procurement.jenis-vendor.form, access: read }
     - { code: procurement.metode-pembayaran.read, name: Lihat metode pembayaran, entry_point: procurement.metode-pembayaran.form, access: read }
     - { code: procurement.termin-pembayaran.read, name: Lihat termin pembayaran, entry_point: procurement.termin-pembayaran.form, access: read }
@@ -163,6 +167,16 @@ security:
       name: Lihat kategori pengadaan
       permissions:
         - procurement.kategori-pengadaan.read
+    - code: procurement.kategori-pengadaan.maintain
+      name: Pelihara kategori pengadaan
+      permissions:
+        - procurement.kategori-pengadaan.read
+        - procurement.kategori-pengadaan.create
+        - procurement.kategori-pengadaan.update
+    - code: procurement.kategori-pengadaan.retire
+      name: Arsipkan kategori pengadaan
+      permissions:
+        - procurement.kategori-pengadaan.archive
     - code: procurement.jenis-vendor.view
       name: Lihat jenis vendor/supplier
       permissions:
@@ -239,6 +253,11 @@ security:
       name: Lihat kategori pengadaan
       privileges:
         - procurement.kategori-pengadaan.view
+    - code: procurement.kategori-pengadaan.manage
+      name: Kelola kategori pengadaan
+      privileges:
+        - procurement.kategori-pengadaan.maintain
+        - procurement.kategori-pengadaan.retire
     - code: procurement.jenis-vendor.inquire
       name: Lihat jenis vendor/supplier
       privileges:

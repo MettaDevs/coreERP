@@ -107,7 +107,14 @@ export default function App({
                 />
             );
         case 'kategori-pengadaan':
-            return <ProcurementCategoryPage />;
+            return (
+                <ProcurementCategoryPage
+                    view={view}
+                    segments={segments}
+                    permissions={permissions}
+                    context={context}
+                />
+            );
         case 'jenis-vendor':
             return <VendorTypePage />;
         case 'metode-pembayaran':
