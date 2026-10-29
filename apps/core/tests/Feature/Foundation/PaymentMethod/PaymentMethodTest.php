@@ -179,7 +179,7 @@ class PaymentMethodTest extends TestCase
             'code' => $code,
             'name' => $name,
             'active' => true,
-        ]);
+        ])->refresh();
     }
 
     private function createTenant(): Tenant

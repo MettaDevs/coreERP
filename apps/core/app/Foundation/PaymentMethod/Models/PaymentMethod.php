@@ -39,6 +39,11 @@ final class PaymentMethod extends Model
         'creation_payload_hash',
     ];
 
+    protected $attributes = [
+        'active' => true,
+        'version' => 1,
+    ];
+
     protected function casts(): array
     {
         return [
