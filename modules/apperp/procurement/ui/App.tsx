@@ -116,7 +116,14 @@ export default function App({
                 />
             );
         case 'jenis-vendor':
-            return <VendorTypePage />;
+            return (
+                <VendorTypePage
+                    view={view}
+                    segments={segments}
+                    permissions={permissions}
+                    context={context}
+                />
+            );
         case 'metode-pembayaran':
             return <PaymentMethodPage />;
         case 'termin-pembayaran':

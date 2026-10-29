@@ -85,6 +85,7 @@ security:
     - { code: procurement.kategori-pengadaan.form, name: Layar kategori pengadaan, type: form }
     - { code: procurement.kategori-pengadaan.api, name: API kategori pengadaan, type: api }
     - { code: procurement.jenis-vendor.form, name: Layar jenis vendor/supplier, type: form }
+    - { code: procurement.jenis-vendor.api, name: API jenis vendor/supplier, type: api }
     - { code: procurement.metode-pembayaran.form, name: Layar metode pembayaran, type: form }
     - { code: procurement.termin-pembayaran.form, name: Layar termin pembayaran, type: form }
     - { code: procurement.item-jasa.form, name: Layar item jasa, type: form }
@@ -112,6 +113,9 @@ security:
     - { code: procurement.kategori-pengadaan.update, name: Ubah kategori pengadaan, entry_point: procurement.kategori-pengadaan.api, access: update }
     - { code: procurement.kategori-pengadaan.archive, name: Arsipkan kategori pengadaan, entry_point: procurement.kategori-pengadaan.api, access: delete }
     - { code: procurement.jenis-vendor.read, name: Lihat jenis vendor/supplier, entry_point: procurement.jenis-vendor.form, access: read }
+    - { code: procurement.jenis-vendor.create, name: Tambah jenis vendor/supplier, entry_point: procurement.jenis-vendor.api, access: create }
+    - { code: procurement.jenis-vendor.update, name: Ubah jenis vendor/supplier, entry_point: procurement.jenis-vendor.api, access: update }
+    - { code: procurement.jenis-vendor.archive, name: Arsipkan jenis vendor/supplier, entry_point: procurement.jenis-vendor.api, access: delete }
     - { code: procurement.metode-pembayaran.read, name: Lihat metode pembayaran, entry_point: procurement.metode-pembayaran.form, access: read }
     - { code: procurement.termin-pembayaran.read, name: Lihat termin pembayaran, entry_point: procurement.termin-pembayaran.form, access: read }
     - { code: procurement.item-jasa.read, name: Lihat item jasa, entry_point: procurement.item-jasa.form, access: read }
@@ -181,6 +185,16 @@ security:
       name: Lihat jenis vendor/supplier
       permissions:
         - procurement.jenis-vendor.read
+    - code: procurement.jenis-vendor.maintain
+      name: Pelihara jenis vendor/supplier
+      permissions:
+        - procurement.jenis-vendor.read
+        - procurement.jenis-vendor.create
+        - procurement.jenis-vendor.update
+    - code: procurement.jenis-vendor.retire
+      name: Arsipkan jenis vendor/supplier
+      permissions:
+        - procurement.jenis-vendor.archive
     - code: procurement.metode-pembayaran.view
       name: Lihat metode pembayaran
       permissions:
@@ -262,6 +276,11 @@ security:
       name: Lihat jenis vendor/supplier
       privileges:
         - procurement.jenis-vendor.view
+    - code: procurement.jenis-vendor.manage
+      name: Kelola jenis vendor/supplier
+      privileges:
+        - procurement.jenis-vendor.maintain
+        - procurement.jenis-vendor.retire
     - code: procurement.metode-pembayaran.inquire
       name: Lihat metode pembayaran
       privileges:
