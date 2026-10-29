@@ -89,7 +89,14 @@ export default function App({
                 />
             );
         case 'kualifikasi':
-            return <VendorQualificationPage />;
+            return (
+                <VendorQualificationPage
+                    view={view}
+                    segments={segments}
+                    permissions={permissions}
+                    context={context}
+                />
+            );
         case 'harga-perkiraan':
             return <OwnerEstimatePage />;
         case 'kategori-pengadaan':
