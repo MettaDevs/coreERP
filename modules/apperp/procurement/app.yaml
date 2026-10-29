@@ -87,7 +87,6 @@ security:
     - { code: procurement.jenis-vendor.form, name: Layar jenis vendor/supplier, type: form }
     - { code: procurement.jenis-vendor.api, name: API jenis vendor/supplier, type: api }
     - { code: procurement.metode-pembayaran.form, name: Layar metode pembayaran, type: form }
-    - { code: procurement.metode-pembayaran.api, name: API metode pembayaran, type: api }
     - { code: procurement.termin-pembayaran.form, name: Layar termin pembayaran, type: form }
     - { code: procurement.item-jasa.form, name: Layar item jasa, type: form }
     - { code: procurement.item-subkont.form, name: Layar item subkont, type: form }
@@ -118,9 +117,6 @@ security:
     - { code: procurement.jenis-vendor.update, name: Ubah jenis vendor/supplier, entry_point: procurement.jenis-vendor.api, access: update }
     - { code: procurement.jenis-vendor.archive, name: Arsipkan jenis vendor/supplier, entry_point: procurement.jenis-vendor.api, access: delete }
     - { code: procurement.metode-pembayaran.read, name: Lihat metode pembayaran, entry_point: procurement.metode-pembayaran.form, access: read }
-    - { code: procurement.metode-pembayaran.create, name: Tambah metode pembayaran, entry_point: procurement.metode-pembayaran.api, access: create }
-    - { code: procurement.metode-pembayaran.update, name: Ubah metode pembayaran, entry_point: procurement.metode-pembayaran.api, access: update }
-    - { code: procurement.metode-pembayaran.archive, name: Arsipkan metode pembayaran, entry_point: procurement.metode-pembayaran.api, access: delete }
     - { code: procurement.termin-pembayaran.read, name: Lihat termin pembayaran, entry_point: procurement.termin-pembayaran.form, access: read }
     - { code: procurement.item-jasa.read, name: Lihat item jasa, entry_point: procurement.item-jasa.form, access: read }
     - { code: procurement.item-subkont.read, name: Lihat item subkont, entry_point: procurement.item-subkont.form, access: read }
@@ -203,16 +199,6 @@ security:
       name: Lihat metode pembayaran
       permissions:
         - procurement.metode-pembayaran.read
-    - code: procurement.metode-pembayaran.maintain
-      name: Pelihara metode pembayaran
-      permissions:
-        - procurement.metode-pembayaran.read
-        - procurement.metode-pembayaran.create
-        - procurement.metode-pembayaran.update
-    - code: procurement.metode-pembayaran.retire
-      name: Arsipkan metode pembayaran
-      permissions:
-        - procurement.metode-pembayaran.archive
     - code: procurement.termin-pembayaran.view
       name: Lihat termin pembayaran
       permissions:
@@ -299,11 +285,6 @@ security:
       name: Lihat metode pembayaran
       privileges:
         - procurement.metode-pembayaran.view
-    - code: procurement.metode-pembayaran.manage
-      name: Kelola metode pembayaran
-      privileges:
-        - procurement.metode-pembayaran.maintain
-        - procurement.metode-pembayaran.retire
     - code: procurement.termin-pembayaran.inquire
       name: Lihat termin pembayaran
       privileges:

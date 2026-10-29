@@ -28,6 +28,7 @@ use App\Platform\Modules\Contracts\ListExportSources;
 use App\Platform\Modules\Contracts\ModuleReportProviders;
 use App\Platform\Modules\Contracts\NumberSequenceIssuer;
 use App\Platform\Modules\Contracts\OrganizationDirectory;
+use App\Platform\Modules\Contracts\PaymentMethodDirectory;
 use App\Platform\Modules\Contracts\PlanningYearDirectory;
 use App\Platform\Modules\Contracts\PostingAccountResolvers;
 use App\Platform\Modules\Contracts\PostingFeed;
@@ -105,6 +106,7 @@ final class CoreServices
         NumberSequenceIssuer::class,
         FiscalCalendarDirectory::class,
         FundingSourceDirectory::class,
+        PaymentMethodDirectory::class,
         PlanningYearDirectory::class,
         UnitOfMeasureDirectory::class,
         WorkflowEngine::class,
