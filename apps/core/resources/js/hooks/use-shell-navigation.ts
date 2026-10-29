@@ -271,6 +271,12 @@ export function useShellNavigation() {
                         permission: 'core.reference-data.read',
                     },
                     {
+                        label: 'Termin pembayaran',
+                        icon: Clock,
+                        href: '/settings/payment-terms',
+                        permission: 'core.reference-data.read',
+                    },
+                    {
                         label: 'Daftar akun',
                         icon: BookOpen,
                         href: '/settings/finance-accounts',
