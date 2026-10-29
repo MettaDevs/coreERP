@@ -6,22 +6,25 @@ import {
     CollapsibleSectionGroup,
 } from '@apperp/ui/collapsible-section';
 import { Empty, EmptyDescription } from '@apperp/ui/empty';
-import { Field, FieldDescription, FieldError } from '@apperp/ui/field';
+import { FieldDescription, FieldError } from '@apperp/ui/field';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { usePageDialogRecord } from '@apperp/ui/page-dialog';
 import { RecordEditBoundary } from '@apperp/ui/record-edit-boundary';
 import type { ApiValidationErrors } from '../../api';
 import { api, ApiError, errorMessage, newIdempotencyKey } from '../../api';
 import { recordQueryUrl } from '../../transactions/_shared/record-card';
+import { useSaveFeedback } from '../../use-save-feedback';
 import type {
     DraftMasterDetailsValue,
+    MasterDetailsPayload,
     DraftSectionKey,
 } from '../DraftMasterDetails';
 import DraftMasterDetails, { draftMasterPayload } from '../DraftMasterDetails';
 import DynamicField from '../DynamicField';
 import type { FieldValue } from '../fields';
 import { isVisible, payloadValue, valueFrom } from '../fields';
-import GroupBookMatrix from '../GroupBookMatrix';
+import GroupBookMatrix, { groupBookRowsPayload } from '../GroupBookMatrix';
 import JenisAsetAtribut from '../JenisAsetAtribut';
 import type { MasterConfig, MasterRecord, Permission } from '../masters';
 import { permission } from '../masters';
@@ -63,10 +66,10 @@ export default function RecordDetailPane({
     mode,
     permissions,
     canEdit,
+    saving,
     onRequestEdit,
     onDirtyChange,
     onSavingChange,
-    onVersionChange,
     onSaved,
 }: {
     formId: string;
@@ -75,11 +78,10 @@ export default function RecordDetailPane({
     mode: DetailMode;
     permissions: Permission[];
     canEdit: boolean;
+    saving: boolean;
     onRequestEdit: () => void;
     onDirtyChange: (dirty: boolean) => void;
     onSavingChange: (saving: boolean) => void;
-    /** Rincian yang disimpan menaikkan versi record ini; induk mencatat versi barunya. */
-    onVersionChange: (version: number) => void;
     onSaved: (record: MasterRecord, created: boolean) => void;
 }) {
     const readOnly = mode === 'view';
@@ -100,18 +102,28 @@ export default function RecordDetailPane({
     const [draftDetails, setDraftDetails] = useState<DraftMasterDetailsValue>(
         {},
     );
+    const [stagedDetails, setStagedDetails] = useState<MasterDetailsPayload>(
+        {},
+    );
     const [detailErrors, setDetailErrors] = useState<ApiValidationErrors>({});
     const [error, setError] = useState('');
     const creationKey = useRef(newIdempotencyKey());
     const formRef = useRef<HTMLFormElement>(null);
+    const [openSections, setOpenSections] = useState(
+        sections
+            .filter((section) => section.defaultOpen)
+            .map((section) => section.id),
+    );
+    const { feedbackSummary, reportSaveError, clearSaveFeedback, fieldError } =
+        useSaveFeedback(formRef, record?.id, () =>
+            setOpenSections(sections.map((section) => section.id)),
+        );
     /**
      * Field yang menunggu fokus setelah perisai sunting hilang. Disimpan pada ref, bukan
      * state, karena tidak ikut menentukan tampilan apa pun: ia hanya dibaca sekali oleh
      * effect di bawah begitu `readOnly` berubah, lalu dikosongkan lagi.
      */
     const pendingFocusRef = useRef<string | null>(null);
-    const [pabrikanAsetDetailVersion, setPabrikanAsetDetailVersion] =
-        useState(0);
 
     /**
      * Detail tambahan disimpan berpasangan dengan kunci yang menghasilkannya, lalu
@@ -136,12 +148,8 @@ export default function RecordDetailPane({
     const jenisAsetDetailLoading =
         jenisAsetKunci !== null && jenisAsetTermuat === null;
 
-    // Nomor versi ikut masuk kunci: memintanya naik berarti detail pabrikan dianggap
-    // belum termuat lagi, persis seperti saat record-nya baru dibuka.
     const pabrikanAsetKunci =
-        config.resource === 'pabrikan-aset' && record?.id
-            ? `${record.id}|${pabrikanAsetDetailVersion}`
-            : null;
+        config.resource === 'pabrikan-aset' && record?.id ? record.id : null;
     const [pabrikanAsetMuatan, setPabrikanAsetMuatan] = useState<{
         kunci: string;
         detail: PabrikanAsetDetail | null;
@@ -268,10 +276,17 @@ export default function RecordDetailPane({
 
     async function submit(event: FormEvent) {
         event.preventDefault();
+        clearSaveFeedback();
 
         if (mode === 'create' && (numberPolicy.loading || numberPolicy.error)) {
-            setError(
-                numberPolicy.error || 'Tunggu pengaturan kode selesai dimuat.',
+            reportSaveError(
+                new ApiError(
+                    numberPolicy.error ||
+                        'Tunggu pengaturan kode selesai dimuat.',
+                    {},
+                    422,
+                ),
+                'Data belum dapat disimpan.',
             );
 
             return;
@@ -294,6 +309,10 @@ export default function RecordDetailPane({
 
             if (!record && numberPolicy.allowManual) {
                 payload.kode = manualCode.trim() || null;
+            }
+
+            if (record && Object.keys(stagedDetails).length > 0) {
+                payload.details = stagedDetails;
             }
 
             if (record) {
@@ -332,7 +351,8 @@ export default function RecordDetailPane({
                 setDetailErrors(caught.validationErrors);
             }
 
-            setError(errorMessage(caught, 'Data belum dapat disimpan.'));
+            reportSaveError(caught, 'Data belum dapat disimpan.');
+            setOpenSections(sections.map((section) => section.id));
         } finally {
             onSavingChange(false);
         }
@@ -357,6 +377,11 @@ export default function RecordDetailPane({
                 </Empty>
             </div>
         );
+    }
+
+    function stageDetails(next: MasterDetailsPayload) {
+        markDirty();
+        setStagedDetails((current) => ({ ...current, ...next }));
     }
 
     function sectionBody(section: DetailSection) {
@@ -411,13 +436,14 @@ export default function RecordDetailPane({
                         loading={pabrikanAsetDetailLoading}
                         error={pabrikanAsetDetailError}
                     />
-                    <div className="grid gap-5 pt-1 sm:grid-cols-2">
+                    <FormGrid>
                         {section.fields
                             .filter((field) => isVisible(field, values))
                             .map((field) => (
                                 <DynamicField
                                     key={field.name}
                                     config={field}
+                                    error={fieldError(field.name)}
                                     value={values[field.name]}
                                     readOnly={readOnly}
                                     onRequestEdit={enterEdit}
@@ -430,7 +456,7 @@ export default function RecordDetailPane({
                                     }}
                                 />
                             ))}
-                    </div>
+                    </FormGrid>
                 </div>
             );
         }
@@ -449,21 +475,28 @@ export default function RecordDetailPane({
                     canReadJenis={permissions.includes(
                         permission('jenis-aset', 'read'),
                     )}
-                    canCreate={permissions.includes(
-                        permission('model-aset', 'create'),
-                    )}
-                    canUpdate={permissions.includes(
-                        permission('model-aset', 'update'),
-                    )}
-                    canArchive={permissions.includes(
-                        permission('model-aset', 'archive'),
-                    )}
+                    canCreate={
+                        !readOnly &&
+                        canEdit &&
+                        permissions.includes(permission('model-aset', 'create'))
+                    }
+                    canUpdate={
+                        !readOnly &&
+                        canEdit &&
+                        permissions.includes(permission('model-aset', 'update'))
+                    }
+                    canArchive={
+                        !readOnly &&
+                        canEdit &&
+                        permissions.includes(
+                            permission('model-aset', 'archive'),
+                        )
+                    }
                     canReadAset={permissions.includes(
                         'management-aset.aset.read',
                     )}
-                    onChanged={() =>
-                        setPabrikanAsetDetailVersion((current) => current + 1)
-                    }
+                    onChange={stageDetails}
+                    validationErrors={detailErrors}
                 />
             ) : null;
         }
@@ -473,8 +506,12 @@ export default function RecordDetailPane({
                 <GroupBookMatrix
                     groupId={record.id}
                     canEdit={!readOnly && canEdit}
-                    version={record.version}
-                    onVersionChange={onVersionChange}
+                    onChange={(rows) => {
+                        stageDetails({
+                            books: { rows: groupBookRowsPayload(rows) },
+                        });
+                    }}
+                    validationErrors={detailErrors}
                 />
             ) : null;
         }
@@ -484,8 +521,8 @@ export default function RecordDetailPane({
                 <JenisAsetAtribut
                     jenisAsetId={record.id}
                     canEdit={!readOnly && canEdit}
-                    version={record.version}
-                    onVersionChange={onVersionChange}
+                    onChange={stageDetails}
+                    validationErrors={detailErrors}
                 />
             ) : null;
         }
@@ -493,13 +530,12 @@ export default function RecordDetailPane({
         if (section.models) {
             return record ? (
                 <JenisAsetModels
-                    jenisAsetId={record.id}
                     detail={jenisAsetDetail}
                     loading={jenisAsetDetailLoading}
                     error={jenisAsetDetailError}
                     canEdit={!readOnly && canEdit}
-                    version={record.version}
-                    onVersionChange={onVersionChange}
+                    onChange={stageDetails}
+                    validationErrors={detailErrors}
                 />
             ) : null;
         }
@@ -512,8 +548,8 @@ export default function RecordDetailPane({
                     key={record.id}
                     jobTypeId={record.id}
                     canEdit={!readOnly && canEdit}
-                    version={record.version}
-                    onVersionChange={onVersionChange}
+                    onChange={stageDetails}
+                    validationErrors={detailErrors}
                 />
             ) : null;
         }
@@ -523,8 +559,8 @@ export default function RecordDetailPane({
                 <MaintenanceChecklistVariableValues
                     variableId={record.id}
                     canEdit={!readOnly && canEdit}
-                    version={record.version}
-                    onVersionChange={onVersionChange}
+                    onChange={stageDetails}
+                    validationErrors={detailErrors}
                 />
             ) : null;
         }
@@ -534,8 +570,8 @@ export default function RecordDetailPane({
                 <MaintenanceChecklistTemplateLines
                     templateId={record.id}
                     canEdit={!readOnly && canEdit}
-                    version={record.version}
-                    onVersionChange={onVersionChange}
+                    onChange={stageDetails}
+                    validationErrors={detailErrors}
                 />
             ) : null;
         }
@@ -548,8 +584,8 @@ export default function RecordDetailPane({
                     key={record.id}
                     jenisAsetId={record.id}
                     canEdit={!readOnly && canEdit}
-                    version={record.version}
-                    onVersionChange={onVersionChange}
+                    onChange={stageDetails}
+                    validationErrors={detailErrors}
                 />
             ) : null;
         }
@@ -560,8 +596,8 @@ export default function RecordDetailPane({
                     key={record.id}
                     assetTypeId={record.id}
                     canEdit={!readOnly && canEdit}
-                    version={record.version}
-                    onVersionChange={onVersionChange}
+                    onChange={stageDetails}
+                    validationErrors={detailErrors}
                 />
             ) : null;
         }
@@ -572,8 +608,8 @@ export default function RecordDetailPane({
                     key={record.id}
                     jenisAsetId={record.id}
                     canEdit={!readOnly && canEdit}
-                    version={record.version}
-                    onVersionChange={onVersionChange}
+                    onChange={stageDetails}
+                    validationErrors={detailErrors}
                 />
             ) : null;
         }
@@ -584,8 +620,8 @@ export default function RecordDetailPane({
                     key={record.id}
                     planId={record.id}
                     canEdit={!readOnly && canEdit}
-                    version={record.version}
-                    onVersionChange={onVersionChange}
+                    onChange={stageDetails}
+                    validationErrors={detailErrors}
                 />
             ) : null;
         }
@@ -596,8 +632,8 @@ export default function RecordDetailPane({
                     key={record.id}
                     planId={record.id}
                     canEdit={!readOnly && canEdit}
-                    version={record.version}
-                    onVersionChange={onVersionChange}
+                    onChange={stageDetails}
+                    validationErrors={detailErrors}
                 />
             ) : null;
         }
@@ -615,7 +651,7 @@ export default function RecordDetailPane({
                 {section.counters && (
                     <JenisAsetCounters detail={jenisAsetDetail} />
                 )}
-                <div className="grid gap-5 pt-1 sm:grid-cols-2">
+                <FormGrid>
                     {section.fields
                         .filter((field) => isVisible(field, values))
                         .map((field) =>
@@ -623,6 +659,7 @@ export default function RecordDetailPane({
                             field.name === 'useful_life_periods' ? (
                                 <ServiceLifeFields
                                     key={field.name}
+                                    error={fieldError(field.name)}
                                     value={values[field.name]}
                                     frequency={values.frequency}
                                     required={field.required}
@@ -639,6 +676,7 @@ export default function RecordDetailPane({
                                 <DynamicField
                                     key={field.name}
                                     config={field}
+                                    error={fieldError(field.name)}
                                     value={values[field.name]}
                                     readOnly={readOnly}
                                     onRequestEdit={enterEdit}
@@ -661,7 +699,7 @@ export default function RecordDetailPane({
                                 />
                             ),
                         )}
-                </div>
+                </FormGrid>
             </div>
         );
     }
@@ -674,16 +712,21 @@ export default function RecordDetailPane({
             className="flex h-full min-h-0 min-w-0 flex-col"
         >
             <form
+                noValidate
+                inert={saving || undefined}
+                aria-busy={saving}
                 id={formId}
                 ref={formRef}
                 onSubmit={submit}
                 className="[&_[data-readonly]:hover]:bg-muted/40 flex min-h-0 flex-col [&_[data-readonly]]:rounded-md [&_[data-readonly]]:transition-colors"
             >
+                {feedbackSummary}
                 <div className="shrink-0 border-b px-6 py-4">
                     <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
-                        <div className="w-60">
+                        <div className="w-60" data-error-field="kode">
                             <Input
                                 id="kode"
+                                aria-invalid={!!fieldError('kode')}
                                 label={config.kodeLabel}
                                 value={
                                     record?.kode ??
@@ -707,6 +750,9 @@ export default function RecordDetailPane({
                                     markDirty();
                                 }}
                             />
+                            {fieldError('kode') && (
+                                <FieldError>{fieldError('kode')}</FieldError>
+                            )}
                             {!record && numberPolicy.allowManual && (
                                 <FieldDescription>
                                     {numberPolicy.allowAutomatic
@@ -719,10 +765,12 @@ export default function RecordDetailPane({
                         <div
                             className="min-w-64 flex-1"
                             data-field-name="nama"
+                            data-error-field="nama"
                             data-readonly={readOnly || undefined}
                         >
                             <Input
                                 id="nama"
+                                aria-invalid={!!fieldError('nama')}
                                 label={config.namaLabel}
                                 required
                                 maxLength={150}
@@ -733,6 +781,9 @@ export default function RecordDetailPane({
                                     setNama(event.target.value);
                                 }}
                             />
+                            {fieldError('nama') && (
+                                <FieldError>{fieldError('nama')}</FieldError>
+                            )}
                         </div>
                         <Badge variant={values.aktif ? 'default' : 'secondary'}>
                             {values.aktif ? 'Aktif' : 'Tidak aktif'}
@@ -745,23 +796,23 @@ export default function RecordDetailPane({
                     className="min-h-0 flex-1 overflow-y-auto px-6 py-4"
                 >
                     {(config.parents?.length ?? 0) > 0 && (
-                        <Field data-invalid="true" className="mb-4">
+                        <FormControl data-invalid="true" className="mb-4">
                             <FieldError>
                                 Master ini memiliki induk, dan panel detail
                                 belum merendernya. Pakai tampilan daftar sampai
                                 dukungan induk ditambahkan.
                             </FieldError>
-                        </Field>
+                        </FormControl>
                     )}
                     <CollapsibleSectionGroup
-                        defaultValue={sections
-                            .filter((section) => section.defaultOpen)
-                            .map((section) => section.id)}
+                        value={openSections}
+                        onValueChange={setOpenSections}
                     >
                         {sections.map((section) => (
                             <CollapsibleSection
                                 key={section.id}
                                 value={section.id}
+                                keepMounted
                                 title={section.title}
                                 summary={summaryFor(section, values)}
                             >

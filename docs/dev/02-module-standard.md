@@ -575,6 +575,23 @@ Kelasnya memakai kontrak `AttachmentRecordType`:
   sana.
 - **Arsip, bukan hapus.** Lampiran diarsipkan dengan `deleted_at` dan berkasnya tetap di disk. Lampiran
   data bisnis, jadi tidak didaftarkan untuk retensi.
+- **Lampiran draf ikut Simpan induk.** `DraftRecordAttachments` menyimpan pilihan `File` di browser,
+  tanpa membuat induk tersembunyi atau mengunggah berkas satu per satu setelah induk tersimpan.
+  Penerimaan mengirim JSON pada `payload` serta `attachments[]` dalam satu POST multipart. Pemilik
+  dokumen memvalidasi kepala/rincian, lalu memanggil kontrak `RecordDocuments` di dalam transaksi
+  yang sama. Kegagalan membatalkan metadata dan membersihkan berkas baru. Kunci idempotensi tetap
+  sama saat retry isian dan pilihan berkas yang sama; kegagalan tidak mengosongkan draft pengguna.
+  Metadata batas unggah berasal dari server: `max_kb`, `max_files`, dan `max_total_kb`. Batas gabungan
+  bawaan 10 MB menyisakan ruang isian dokumen di bawah `post_max_size` 12M.
+- **Aliran dokumen meneruskan referensi berkas.** Pada penyelesaian penerimaan, `RecordDocuments.flow`
+  menyalin metadata lampiran ke aset hasilnya dan memakai kembali `storage_path` serta hash yang sama.
+  Module pemilik menyatakan target sah melalui `AttachmentFlowTarget`; Core tidak menebak tabel atau
+  hubungan bisnisnya. Lampiran kepala diteruskan ke seluruh aset, lampiran baris hanya ke aset dari
+  baris itu. Pembacaan/penyisipan dibatch, tanpa mengunduh atau menyalin isi berkas per aset. Retry
+  tidak menggandakan referensi dan tidak menghidupkan kembali lampiran yang sudah diarsipkan.
+  Penambahan setelah penyelesaian tetap berada di dokumen asal. Pola ini mengadaptasi aliran lampiran
+  [Business Central](https://learn.microsoft.com/en-us/dynamics365/business-central/ui-how-add-link-to-record):
+  `DocumentAttachmentMgmt.CopyAttachments` meneruskan metadata dan referensi `Media` saat dokumen diproses.
 - **Tabel yang diberi lampiran** mengikuti pola BC: master data dan dokumen, bukan setup, data referensi,
   atau entry hasil hitungan. Daftar fase 1 ada di [gap 7](/todo/AnalisaGapCoreErpkeBCPhase1/#gap-7).
 

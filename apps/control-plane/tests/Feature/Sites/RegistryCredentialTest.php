@@ -298,4 +298,22 @@ final class RegistryCredentialTest extends SiteTestCase
             self::HARBOR.'/api/v2.0/robots/*' => Http::response([], 200),
         ]);
     }
+
+    public function test_a_robot_created_after_site_revocation_is_deleted_without_delivering_its_secret(): void
+    {
+        [$site, $operation] = $this->heldOperation('upgrade');
+        Http::fake(function (HarborRequest $request) use ($site) {
+            if ($request->method() === 'POST') {
+                Site::query()->whereKey($site->id)->update(['revoked_at' => now()]);
+
+                return Http::response(['id' => 44, 'name' => 'robot$coreerp+situs-44', 'secret' => self::ROBOT_SECRET, 'expires_at' => now()->addDay()->getTimestamp()], 201);
+            }
+
+            return Http::response([], 200);
+        });
+        $this->agent('POST', '/api/agent/v1/registry-credential', $site, ['operation_id' => $operation->id])
+            ->assertStatus(409)->assertJsonMissingPath('password');
+        Http::assertSent(fn (HarborRequest $request): bool => $request->method() === 'DELETE' && $request->url() === self::HARBOR.'/api/v2.0/robots/44');
+        $this->assertNull($operation->refresh()->registry_robot_id);
+    }
 }

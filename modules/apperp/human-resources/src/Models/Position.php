@@ -52,7 +52,7 @@ class Position extends Model
 
     protected $table = 'hr_positions';
 
-    protected $fillable = ['tenant_id', 'creation_key', 'code', 'name', 'job_id', 'operating_unit_id', 'valid_from', 'valid_until'];
+    protected $fillable = ['tenant_id', 'creation_key', 'creation_payload_hash', 'code', 'name', 'job_id', 'operating_unit_id', 'valid_from', 'valid_until'];
 
     /**
      * Alasannya sama dengan pada `Worker`: bentuk jawaban endpoint tidak boleh ikut berubah
@@ -60,7 +60,7 @@ class Position extends Model
      *
      * @var list<string>
      */
-    protected $hidden = ['deleted_at'];
+    protected $hidden = ['deleted_at', 'creation_payload_hash'];
 
     /** @return BelongsTo<Job, $this> */
     public function job(): BelongsTo

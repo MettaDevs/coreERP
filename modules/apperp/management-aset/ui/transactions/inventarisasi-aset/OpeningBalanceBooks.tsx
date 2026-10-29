@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@apperp/ui/button';
 import type { DataTableColumn } from '@apperp/ui/data-table';
 import { DataTable } from '@apperp/ui/data-table';
+import { FormControl } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { TableCell, TableRow } from '@apperp/ui/table';
 import { api } from '../../api';
@@ -260,35 +261,41 @@ function BarisBuku({
                 )}
             </TableCell>
             <TableCell>
-                <Input
-                    aria-label={`Akumulasi per unit buku ${buku.kode}`}
-                    type="number"
-                    min={0}
-                    readOnly={readOnly || buku.di_post}
-                    value={String(
-                        isi?.akumulasi_per_unit ??
-                            baris.akumulasi_per_unit ??
-                            '',
-                    )}
-                    onChange={(event) =>
-                        ubah({ akumulasi_per_unit: event.target.value })
-                    }
-                />
+                <FormControl>
+                    <Input
+                        aria-label={`Akumulasi per unit buku ${buku.kode}`}
+                        type="number"
+                        min={0}
+                        readOnly={readOnly || buku.di_post}
+                        value={String(
+                            isi?.akumulasi_per_unit ??
+                                baris.akumulasi_per_unit ??
+                                '',
+                        )}
+                        onChange={(event) =>
+                            ubah({ akumulasi_per_unit: event.target.value })
+                        }
+                    />
+                </FormControl>
             </TableCell>
             <TableCell>
-                <Input
-                    aria-label={`Periode berjalan buku ${buku.kode}`}
-                    type="number"
-                    min={0}
-                    step={1}
-                    readOnly={readOnly || buku.di_post}
-                    value={String(
-                        isi?.periode_berjalan ?? baris.periode_berjalan ?? '',
-                    )}
-                    onChange={(event) =>
-                        ubah({ periode_berjalan: event.target.value })
-                    }
-                />
+                <FormControl>
+                    <Input
+                        aria-label={`Periode berjalan buku ${buku.kode}`}
+                        type="number"
+                        min={0}
+                        step={1}
+                        readOnly={readOnly || buku.di_post}
+                        value={String(
+                            isi?.periode_berjalan ??
+                                baris.periode_berjalan ??
+                                '',
+                        )}
+                        onChange={(event) =>
+                            ubah({ periode_berjalan: event.target.value })
+                        }
+                    />
+                </FormControl>
             </TableCell>
             {!readOnly && (
                 <TableCell>

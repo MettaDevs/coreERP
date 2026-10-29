@@ -34,6 +34,7 @@ import type { ListLoader } from '@apperp/ui/use-incremental-list';
 import { Head, useForm } from '@inertiajs/react';
 import { ArrowDown, ArrowUp, CircleHelp } from 'lucide-react';
 import { useId, useState } from 'react';
+import { FormErrorHeader } from '@/components/form-error-header';
 import { apiJson, CoreApiError, errorText } from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
 
@@ -430,6 +431,7 @@ function SequenceForm({
             className="flex h-full min-h-0 min-w-0 flex-col"
         >
             <form
+                noValidate
                 className="flex min-h-0 flex-1 flex-col"
                 onSubmit={(event) => {
                     event.preventDefault();
@@ -470,6 +472,8 @@ function SequenceForm({
                         </>
                     )}
                 </RecordActionBar>
+                <FormErrorHeader errors={errors} message={saveError} />
+
                 <div
                     className="min-h-0 flex-1 overflow-auto p-4"
                     scroll-region=""
@@ -484,7 +488,7 @@ function SequenceForm({
                         >
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <RecordEditControl label="Mode dasar">
-                                    <Field>
+                                    <Field data-error-field={'profile_code'}>
                                         <NativeSelect
                                             label="Mode dasar"
                                             value={form.data.profile_code}
@@ -511,7 +515,7 @@ function SequenceForm({
                                     </Field>
                                 </RecordEditControl>
                                 <RecordEditControl label="Berlaku untuk">
-                                    <Field>
+                                    <Field data-error-field={'scope_type'}>
                                         <NativeSelect
                                             label="Berlaku untuk"
                                             value={form.data.scope_type}
@@ -545,7 +549,7 @@ function SequenceForm({
                                     </Field>
                                 </RecordEditControl>
                                 <RecordEditControl label="Status">
-                                    <Field>
+                                    <Field data-error-field={'status'}>
                                         <NativeSelect
                                             label="Status"
                                             value={form.data.status}
@@ -573,7 +577,7 @@ function SequenceForm({
                                     </Field>
                                 </RecordEditControl>
                                 <RecordEditControl label="Mulai ulang nomor">
-                                    <Field>
+                                    <Field data-error-field={'reset_period'}>
                                         <NativeSelect
                                             label="Mulai ulang nomor"
                                             value={form.data.reset_period}
@@ -612,7 +616,7 @@ function SequenceForm({
                         >
                             <div className="space-y-6">
                                 <div className="grid gap-4 sm:grid-cols-2">
-                                    <Field>
+                                    <Field data-error-field={'minimum_number'}>
                                         <Input
                                             label="Nomor awal"
                                             type="number"
@@ -632,7 +636,7 @@ function SequenceForm({
                                             {errors.minimum_number?.[0]}
                                         </FieldError>
                                     </Field>
-                                    <Field>
+                                    <Field data-error-field={'maximum_number'}>
                                         <Input
                                             label="Batas akhir"
                                             type="number"
@@ -706,7 +710,11 @@ function SequenceForm({
                                     />
                                 </div>
                                 <div className="max-w-sm">
-                                    <Field>
+                                    <Field
+                                        data-error-field={
+                                            'preallocation_quantity'
+                                        }
+                                    >
                                         <Input
                                             label="Jumlah nomor disiapkan"
                                             type="number"

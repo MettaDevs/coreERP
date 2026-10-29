@@ -146,6 +146,119 @@ final class MasterDraftDetailsTest extends TestCase
         $this->assertDatabaseMissing('aset_m_pabrikan_aset', ['nama' => 'Duplicate model codes']);
     }
 
+    public function test_existing_master_sections_update_atomically_and_empty_arrays_remove_all(): void
+    {
+        $attribute = $this->createMaster('tipe-atribut', ['nama' => 'Atomic attribute', 'data_type' => 'string'])->assertCreated()->json('data.id');
+        $condition = $this->createMaster('kondisi-aset', ['nama' => 'Atomic condition'])->assertCreated()->json('data.id');
+        $type = $this->createMaster('jenis-aset', ['nama' => 'Before sections'])->assertCreated()->json('data');
+        $sections = ['attributes' => ['rows' => [['tipe_atribut_id' => $attribute, 'wajib' => true]]], 'conditions' => ['condition_ids' => [$condition]]];
+        $this->patchMaster('jenis-aset', $type, ['nama' => 'Must roll back', 'details' => [...$sections, 'conditions' => ['condition_ids' => [(string) Str::ulid()]]]])
+            ->assertUnprocessable()->assertJsonValidationErrors('details.conditions.condition_ids.0');
+        $this->assertDatabaseHas('aset_m_jenis_aset', ['id' => $type['id'], 'nama' => 'Before sections', 'version' => $type['version']]);
+        $this->assertDatabaseMissing('aset_m_jenis_aset_atribut', ['jenis_aset_id' => $type['id']]);
+        $saved = $this->patchMaster('jenis-aset', $type, ['nama' => 'After sections', 'details' => $sections])->assertOk()->json('data');
+        $this->assertDatabaseHas('aset_m_jenis_aset_atribut', ['jenis_aset_id' => $type['id'], 'tipe_atribut_id' => $attribute, 'deleted_at' => null]);
+        $this->assertDatabaseHas('aset_m_jenis_aset_kondisi', ['jenis_aset_id' => $type['id'], 'kondisi_aset_id' => $condition, 'deleted_at' => null]);
+        $this->patchMaster('jenis-aset', $saved, ['details' => ['attributes' => ['rows' => []], 'conditions' => ['condition_ids' => []]]])->assertOk();
+        $this->assertDatabaseMissing('aset_m_jenis_aset_atribut', ['jenis_aset_id' => $type['id'], 'deleted_at' => null]);
+        $this->assertDatabaseMissing('aset_m_jenis_aset_kondisi', ['jenis_aset_id' => $type['id'], 'deleted_at' => null]);
+    }
+
+    public function test_existing_models_and_variants_apply_operations_without_replacing_unseen_rows(): void
+    {
+        foreach ($this->childResources() as [$resource, $section, $table, $ownerField]) {
+            $parent = $this->createMaster($resource, ['nama' => 'Operations '.$resource, 'details' => [$section => ['rows' => [['nama' => 'Edit me'], ['nama' => 'Archive me'], ['nama' => 'Unseen']]]]])->assertCreated()->json('data');
+            $children = DB::table($table)->where($ownerField, $parent['id'])->orderBy('nama')->get()->keyBy('nama');
+            $saved = $this->patchMaster($resource, $parent, ['nama' => 'Saved operations', 'details' => [$section => [
+                'rows' => [['id' => $children['Edit me']->id, 'version' => $children['Edit me']->version, 'nama' => 'Edited'], ['creation_key' => 'new-'.Str::lower(Str::random(16)), 'nama' => 'New child']],
+                'deleted' => [['id' => $children['Archive me']->id, 'version' => $children['Archive me']->version]],
+            ]]])->assertOk()->json('data');
+            $this->assertDatabaseHas($table, ['id' => $children['Unseen']->id, 'nama' => 'Unseen', 'version' => $children['Unseen']->version, 'deleted_at' => null]);
+            $this->assertDatabaseHas($table, ['id' => $children['Edit me']->id, 'nama' => 'Edited', 'deleted_at' => null]);
+            $this->assertNotNull(DB::table($table)->where('id', $children['Archive me']->id)->value('deleted_at'));
+            $this->patchMaster($resource, $saved, ['details' => [$section => ['rows' => [['creation_key' => 'another-'.Str::lower(Str::random(16)), 'nama' => 'Later child']]]]])->assertOk();
+            $this->assertSame(4, DB::table($table)->where($ownerField, $parent['id'])->whereNull('deleted_at')->count());
+        }
+    }
+
+    public function test_child_operations_reject_stale_foreign_missing_key_and_missing_permissions_atomically(): void
+    {
+        foreach ($this->childResources() as [$resource, $section, $table, $ownerField, $childResource]) {
+            $parent = $this->createMaster($resource, ['nama' => 'Protected parent', 'details' => [$section => ['rows' => [['nama' => 'Protected child']]]]])->assertCreated()->json('data');
+            $child = DB::table($table)->where($ownerField, $parent['id'])->first();
+            $other = $this->createMaster($resource, ['nama' => 'Other parent', 'details' => [$section => ['rows' => [['nama' => 'Other child']]]]])->assertCreated()->json('data');
+            $foreign = DB::table($table)->where($ownerField, $other['id'])->first();
+            $crossTenant = $this->createMaster($resource, ['nama' => 'Cross tenant', 'details' => [$section => ['rows' => [['nama' => 'Cross child']]]]], tenant: $this->buatTenantUji())->assertCreated()->json('data');
+            $crossChild = DB::table($table)->where($ownerField, $crossTenant['id'])->first();
+            foreach ([$foreign, $crossChild] as $wrongChild) {
+                $this->patchMaster($resource, $parent, ['nama' => 'Must roll back', 'details' => [$section => ['rows' => [['id' => $wrongChild->id, 'version' => $wrongChild->version, 'nama' => 'Attack']]]]])
+                    ->assertUnprocessable()->assertJsonValidationErrors('details.'.$section.'.rows.0.id');
+            }
+            $this->patchMaster($resource, $parent, ['nama' => 'Must roll back', 'details' => [$section => ['rows' => [['nama' => 'Missing key']]]]])
+                ->assertUnprocessable()->assertJsonValidationErrors('details.'.$section.'.rows.0.creation_key');
+            $this->patchMaster($resource, $parent, ['nama' => 'Must roll back', 'details' => [$section => ['rows' => [['creation_key' => 'rollback-'.Str::lower(Str::random(16)), 'nama' => 'Rollback child'], ['id' => $child->id, 'version' => $child->version + 99, 'nama' => 'Stale']]]]])
+                ->assertConflict()->assertJsonPath('error.code', 'stale_version');
+            $this->assertDatabaseMissing($table, ['nama' => 'Rollback child']);
+            foreach (['create', 'update', 'archive'] as $action) {
+                $permissions = ['management-aset.'.$resource.'.read', 'management-aset.'.$resource.'.update'];
+                $payload = match ($action) {
+                    'create' => ['rows' => [['creation_key' => 'forbidden-'.Str::lower(Str::random(16)), 'nama' => 'Forbidden']]],
+                    'update' => ['rows' => [['id' => $child->id, 'version' => $child->version, 'nama' => 'Forbidden']]],
+                    'archive' => ['rows' => [], 'deleted' => [['id' => $child->id, 'version' => $child->version]]],
+                };
+                $this->sebagaiPengguna($this->tenantId, $permissions)->patchJson('/api/modules/management-aset/v1/'.$resource.'/'.$parent['id'], ['version' => $parent['version'], 'nama' => 'Must roll back', 'details' => [$section => $payload]])->assertForbidden();
+            }
+            $this->assertDatabaseHas($table, ['id' => $child->id, 'nama' => 'Protected child', 'version' => $child->version, 'deleted_at' => null]);
+            $parentTable = $resource === 'pabrikan-aset' ? 'aset_m_pabrikan_aset' : 'aset_m_maintenance_job_type';
+            $this->assertDatabaseHas($parentTable, ['id' => $parent['id'], 'nama' => 'Protected parent', 'version' => $parent['version']]);
+        }
+    }
+
+    public function test_unsupported_master_details_are_rejected(): void
+    {
+        $type = $this->createMaster('jenis-aset', ['nama' => 'Strict details'])->assertCreated()->json('data');
+        $this->patchMaster('jenis-aset', $type, ['details' => ['variants' => ['rows' => []]]])->assertUnprocessable()->assertJsonValidationErrors('details');
+    }
+
+    public function test_aggregate_creation_retry_compares_original_header_and_details_without_recreating_children(): void
+    {
+        $input = ['nama' => 'Retry aggregate', 'details' => ['models' => ['rows' => [['nama' => 'Original child']]]]];
+        $created = $this->createMaster('pabrikan-aset', $input, 'hashed-master')->assertCreated()->json('data');
+        $this->createMaster('pabrikan-aset', ['details' => $input['details'], 'nama' => $input['nama']], 'hashed-master')->assertOk()->assertJsonPath('data.id', $created['id']);
+        $this->createMaster('pabrikan-aset', [...$input, 'nama' => 'Changed parent'], 'hashed-master')->assertConflict()->assertJsonPath('error.code', 'idempotency_conflict');
+        $this->createMaster('pabrikan-aset', [...$input, 'details' => ['models' => ['rows' => [['nama' => 'Changed child']]]]], 'hashed-master')->assertConflict()->assertJsonPath('error.code', 'idempotency_conflict');
+        $this->assertSame(1, DB::table('aset_m_model_aset')->where('pabrikan_aset_id', $created['id'])->count());
+        $this->assertSame(1, DB::table('number_sequence_issues')->where('idempotency_key', 'pabrikan-aset:hashed-master')->count());
+        DB::table('aset_m_pabrikan_aset')->where('id', $created['id'])->update(['creation_payload_hash' => null]);
+        $this->createMaster('pabrikan-aset', $input, 'hashed-master')->assertConflict()->assertJsonPath('error.code', 'idempotency_conflict');
+    }
+
+    /** @return list<array{string, string, string, string, string}> */
+    private function childResources(): array
+    {
+        return [
+            ['pabrikan-aset', 'models', 'aset_m_model_aset', 'pabrikan_aset_id', 'model-aset'],
+            ['maintenance-job-types', 'variants', 'aset_m_maintenance_job_type_variant', 'maintenance_job_type_id', 'maintenance-job-type-variants'],
+        ];
+    }
+
+    /**
+     * @param  array{id: string, version: int}  $record
+     * @param  array<string, mixed>  $payload
+     * @return TestResponse<Response>
+     */
+    private function patchMaster(string $resource, array $record, array $payload): TestResponse
+    {
+        $permissions = [];
+        foreach (['pabrikan-aset', 'model-aset', 'jenis-aset', 'tipe-atribut', 'kondisi-aset', 'maintenance-job-types', 'maintenance-job-type-variants', 'maintenance-checklist-variables', 'maintenance-checklist-templates', 'tipe-work-order', 'rencana-pemeliharaan'] as $name) {
+            foreach (['read', 'create', 'update', 'archive'] as $action) {
+                $permissions[] = 'management-aset.'.$name.'.'.$action;
+            }
+        }
+
+        return $this->sebagaiPengguna($this->tenantId, $permissions)->patchJson('/api/modules/management-aset/v1/'.$resource.'/'.$record['id'], ['version' => $record['version'], ...$payload]);
+    }
+
     /**
      * @param  array<string, mixed>  $payload
      * @return TestResponse<Response>

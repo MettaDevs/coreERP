@@ -20,29 +20,28 @@ import {
     CardTitle,
 } from '@apperp/ui/card';
 import { Checkbox } from '@apperp/ui/checkbox';
-import { DialogClose } from '@apperp/ui/dialog';
 import {
-    DialogToolbar,
-    Dialog,
-    DialogBody,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@apperp/ui/dialog';
+    CollapsibleSection,
+    CollapsibleSectionGroup,
+} from '@apperp/ui/collapsible-section';
+import { DataTable } from '@apperp/ui/data-table';
 import { Empty, EmptyDescription, EmptyTitle } from '@apperp/ui/empty';
-import {
-    Field,
-    FieldError,
-    FieldGroup,
-    FieldLegend,
-    FieldSet,
-} from '@apperp/ui/field';
+import { FieldError, FieldLegend, FieldSet } from '@apperp/ui/field';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
+import { InlineLookup } from '@apperp/ui/inline-lookup';
 import { Input } from '@apperp/ui/input';
-import { NativeSelect } from '@apperp/ui/native-select';
+import {
+    PageDialog,
+    PageDialogBody,
+    PageDialogClose,
+    PageDialogContent,
+    PageDialogToolbar,
+    PageDialogTrigger,
+} from '@apperp/ui/page-dialog';
 import { Separator } from '@apperp/ui/separator';
 import { Tabs, TabsList, TabsTrigger } from '@apperp/ui/tabs';
+import { TransferList } from '@apperp/ui/transfer-list';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
 import { Head, Link, useForm } from '@inertiajs/react';
 import {
     Check,
@@ -59,8 +58,10 @@ import {
     ShieldCheck,
     UserCog,
 } from 'lucide-react';
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { FormErrorHeader } from '@/components/form-error-header';
 import Heading from '@/components/heading';
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 
 type Source = 'manifest' | 'custom';
 type Status = 'draft' | 'active';
@@ -217,7 +218,7 @@ function Column({
                             onClick={() => onSelect(row.id)}
                             className={`flex w-full items-center gap-2.5 border-l-4 px-3.5 py-2.5 text-left text-sm transition-all hover:bg-accent/60 ${
                                 selected === row.id
-                                    ? 'border-l-primary bg-primary/10 font-semibold text-primary'
+                                    ? 'border-l-primary bg-primary/10 text-primary'
                                     : 'border-l-transparent text-foreground'
                             }`}
                         >
@@ -313,6 +314,37 @@ type MatrixRow = {
  * memang mendeklarasikan izin untuk pasangan itu — sel mati berarti tidak ada
  * kode yang mengeceknya, jadi mencentangnya tidak akan pernah berefek.
  */
+function ApplicationFilter({
+    apps,
+    value,
+    onChange,
+    portalContainer,
+}: {
+    apps: App[];
+    value: string;
+    onChange: (id: string) => void;
+    portalContainer?: React.RefObject<HTMLDivElement | null>;
+}) {
+    const items = [{ id: '', name: 'Semua aplikasi' }, ...apps];
+
+    return (
+        <InlineLookup
+            label="Aplikasi"
+            items={items}
+            value={items.find((item) => item.id === value) ?? null}
+            onValueChange={(item) => onChange(item.id)}
+            getItemValue={(item) => item.id}
+            getItemLabel={(item) => item.name}
+            columns={[
+                { id: 'name', header: 'Aplikasi', cell: (item) => item.name },
+            ]}
+            portalContainer={portalContainer}
+            showDetails={false}
+            showFullList={false}
+        />
+    );
+}
+
 function PermissionMatrix({
     apps,
     permissions,
@@ -324,6 +356,7 @@ function PermissionMatrix({
     selected: string[];
     onChange: (codes: string[]) => void;
 }) {
+    const portalRef = useRef<HTMLDivElement>(null);
     const [query, setQuery] = useState('');
     const [appFilter, setAppFilter] = useState('');
     const appName = new Map(apps.map((app) => [app.id, app.name]));
@@ -353,7 +386,6 @@ function PermissionMatrix({
             (!appFilter || row.appId === appFilter) &&
             (!query || matches(row.label, query) || matches(row.key, query)),
     );
-    const grouped = [...Map.groupBy(visible, (row) => row.appId)];
     const codesIn = (candidates: MatrixRow[], access: string) =>
         candidates
             .map((row) => row.byAccess.get(access))
@@ -371,172 +403,343 @@ function PermissionMatrix({
     };
 
     return (
-        <div className="space-y-3">
+        <div ref={portalRef} className="space-y-3">
             <div className="flex flex-wrap items-center gap-3">
                 <div className="relative min-w-[200px] flex-1">
                     <Search className="absolute top-2.5 left-2.5 size-3.5 text-muted-foreground" />
                     <Input
                         type="search"
-                        placeholder="Cari entry point / titik akses…"
+                        aria-label="Cari titik akses"
+                        placeholder="Cari titik akses…"
                         className="h-9 bg-background pl-8 text-xs"
                         value={query}
                         onChange={(event) => setQuery(event.target.value)}
                     />
                 </div>
                 <div className="w-56 shrink-0">
-                    <NativeSelect
+                    <ApplicationFilter
+                        apps={apps}
                         value={appFilter}
-                        onChange={(event) => setAppFilter(event.target.value)}
-                    >
-                        <option value="">Semua aplikasi</option>
-                        {apps.map((app) => (
-                            <option key={app.id} value={app.id}>
-                                {app.name}
-                            </option>
-                        ))}
-                    </NativeSelect>
+                        onChange={setAppFilter}
+                        portalContainer={portalRef}
+                    />
                 </div>
             </div>
 
-            <div className="max-h-96 overflow-auto rounded-lg border border-border bg-card shadow-xs">
-                <table className="w-full text-xs">
-                    <thead className="sticky top-0 z-10 bg-muted/90 backdrop-blur-xs">
-                        <tr className="border-b border-border">
-                            <th className="px-4 py-2.5 text-left font-bold tracking-wider text-muted-foreground uppercase">
-                                Titik Akses (Entry Point)
-                            </th>
-                            {ACCESS_LEVELS.map((access) => (
-                                <th
-                                    key={access}
-                                    className="min-w-[90px] px-2 py-2.5 text-center"
-                                >
-                                    <button
-                                        type="button"
-                                        onClick={() => toggleColumn(access)}
-                                        className="w-full cursor-pointer rounded-md border border-border/60 bg-background/80 px-2 py-1 text-xs font-semibold shadow-2xs transition-all hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
-                                        title={`Klik untuk pilih semua izin ${access}`}
-                                    >
-                                        {access}
-                                    </button>
-                                </th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/60">
-                        {grouped.length === 0 ? (
-                            <tr>
-                                <td
-                                    colSpan={ACCESS_LEVELS.length + 1}
-                                    className="p-8 text-center font-medium text-muted-foreground"
-                                >
-                                    Tidak ada entry point yang cocok dengan
-                                    kriteria pencarian.
-                                </td>
-                            </tr>
-                        ) : (
-                            grouped.map(([appId, items]) => (
-                                <Fragment key={appId}>
-                                    <tr className="border-y border-border/80 bg-muted/40 font-semibold">
-                                        <td
-                                            colSpan={ACCESS_LEVELS.length + 1}
-                                            className="px-4 py-2 text-[11px] tracking-wider text-primary uppercase"
-                                        >
-                                            <span className="inline-flex items-center gap-1.5">
-                                                <Layers className="size-3.5 shrink-0" />
-                                                {appName.get(appId) ?? appId}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                    {items.map((row) => (
-                                        <tr
-                                            key={row.key}
-                                            className="transition-colors hover:bg-accent/40"
-                                        >
-                                            <td className="px-4 py-2.5">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs font-semibold text-foreground">
-                                                        {row.label}
-                                                    </span>
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="border-border/60 bg-muted/50 px-1.5 py-0 font-mono text-[10px] text-muted-foreground"
-                                                    >
-                                                        {row.type}
-                                                    </Badge>
-                                                </div>
-                                                <span className="mt-0.5 block font-mono text-[11px] text-muted-foreground/80">
-                                                    {row.key}
-                                                </span>
-                                            </td>
-                                            {ACCESS_LEVELS.map((access) => {
-                                                const code =
-                                                    row.byAccess.get(access);
-                                                const isChecked = code
-                                                    ? selected.includes(code)
-                                                    : false;
+            <div
+                className="flex flex-wrap items-center gap-2"
+                aria-label="Pilih satu kolom izin"
+            >
+                {ACCESS_LEVELS.map((access) => {
+                    const codes = codesIn(visible, access);
+                    const allSelected =
+                        codes.length > 0 &&
+                        codes.every((code) => selected.includes(code));
 
-                                                return (
-                                                    <td
-                                                        key={access}
-                                                        className={`px-2 py-2.5 text-center transition-colors ${
-                                                            isChecked
-                                                                ? 'bg-primary/5'
-                                                                : ''
-                                                        }`}
-                                                    >
-                                                        {code ? (
-                                                            <div className="flex items-center justify-center">
-                                                                <Checkbox
-                                                                    checked={
-                                                                        isChecked
-                                                                    }
-                                                                    onCheckedChange={(
-                                                                        checked,
-                                                                    ) =>
-                                                                        onChange(
-                                                                            toggle(
-                                                                                selected,
-                                                                                code,
-                                                                                checked ===
-                                                                                    true,
-                                                                            ),
-                                                                        )
-                                                                    }
-                                                                    aria-label={`${row.label} - ${access}`}
-                                                                />
-                                                            </div>
-                                                        ) : (
-                                                            <span
-                                                                className="text-xs text-muted-foreground/30 select-none"
-                                                                title="Aplikasi tidak mendeklarasikan izin ini"
-                                                            >
-                                                                —
-                                                            </span>
-                                                        )}
-                                                    </td>
-                                                );
-                                            })}
-                                        </tr>
-                                    ))}
-                                </Fragment>
-                            ))
-                        )}
-                    </tbody>
-                </table>
+                    return (
+                        <Button
+                            key={access}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={codes.length === 0}
+                            onClick={() => toggleColumn(access)}
+                        >
+                            {allSelected ? 'Kosongkan' : 'Pilih'} {access}
+                        </Button>
+                    );
+                })}
             </div>
-            <div className="flex items-center justify-between px-1 text-xs text-muted-foreground">
-                <span>
-                    ✨ Total{' '}
-                    <strong className="font-semibold text-foreground">
-                        {selected.length}
-                    </strong>{' '}
-                    izin terpilih untuk tugas akses ini.
-                </span>
-                <span>
-                    Gunakan tombol kolom di header untuk memilih seluruh izin
-                    sejajar.
-                </span>
+            <DataTable<MatrixRow>
+                data={visible}
+                getRowKey={(row) => row.key}
+                showRowNumbers={false}
+                showColumnMenu={false}
+                className="max-h-96"
+                emptyMessage="Tidak ada titik akses yang cocok dengan pencarian."
+                columns={[
+                    {
+                        id: 'entry',
+                        header: 'Titik akses',
+                        minWidth: 320,
+                        cell: (row) => (
+                            <div className="space-y-1 py-1">
+                                <span className="block">{row.label}</span>
+                                <span className="block text-xs text-muted-foreground">
+                                    {appName.get(row.appId) ?? row.appId} ·{' '}
+                                    {row.type}
+                                </span>
+                                <span className="block font-mono text-xs text-muted-foreground">
+                                    {row.key}
+                                </span>
+                            </div>
+                        ),
+                    },
+                    ...ACCESS_LEVELS.map((access) => ({
+                        id: access,
+                        header: access,
+                        width: 96,
+                        align: 'center' as const,
+                        cell: (row: MatrixRow) => {
+                            const code = row.byAccess.get(access);
+
+                            return code ? (
+                                <Checkbox
+                                    checked={selected.includes(code)}
+                                    aria-label={`${row.label} - ${access}`}
+                                    onCheckedChange={(checked) =>
+                                        onChange(
+                                            toggle(
+                                                selected,
+                                                code,
+                                                checked === true,
+                                            ),
+                                        )
+                                    }
+                                />
+                            ) : (
+                                <span title="Izin ini tidak tersedia">—</span>
+                            );
+                        },
+                    })),
+                ]}
+            />
+            <p className="text-sm text-muted-foreground" aria-live="polite">
+                {selected.length} izin dipilih. Tombol kolom hanya mengubah izin
+                yang tampil sesuai pencarian dan filter. Tanda — berarti izin
+                tidak tersedia.
+            </p>
+        </div>
+    );
+}
+
+function PrivilegeAccessDetail({
+    privilege,
+    permissions,
+    apps,
+}: {
+    privilege: Privilege;
+    permissions: Permission[];
+    apps: App[];
+}) {
+    const permissionByCode = new Map(
+        permissions.map((item) => [item.code, item]),
+    );
+    const appById = new Map(apps.map((item) => [item.id, item.name]));
+
+    return (
+        <div className="space-y-3">
+            {privilege.description ? (
+                <p className="text-sm text-muted-foreground">
+                    {privilege.description}
+                </p>
+            ) : null}
+            <DataTable
+                data={privilege.permission_codes}
+                getRowKey={(code) => code}
+                emptyMessage="Tugas akses ini belum berisi izin."
+                columns={[
+                    {
+                        id: 'name',
+                        header: 'Izin',
+                        cell: (code) =>
+                            permissionByCode.get(code)?.name ??
+                            `Izin tidak tersedia: ${code}`,
+                    },
+                    {
+                        id: 'entry',
+                        header: 'Titik akses',
+                        cell: (code) =>
+                            permissionByCode.get(code)?.entry_point?.name ??
+                            '—',
+                    },
+                    {
+                        id: 'access',
+                        header: 'Tingkat akses',
+                        cell: (code) =>
+                            permissionByCode.get(code)?.access_level ?? '—',
+                    },
+                    {
+                        id: 'app',
+                        header: 'Aplikasi',
+                        cell: (code) => {
+                            const permission = permissionByCode.get(code);
+
+                            return permission
+                                ? (appById.get(permission.app_id) ??
+                                      permission.app_id)
+                                : '—';
+                        },
+                    },
+                    {
+                        id: 'description',
+                        header: 'Penjelasan',
+                        cell: (code) =>
+                            permissionByCode.get(code)?.description ?? '—',
+                    },
+                ]}
+            />
+        </div>
+    );
+}
+
+function DutyAccessDetail({
+    duty,
+    privileges,
+    permissions,
+    apps,
+}: {
+    duty: Duty;
+    privileges: Privilege[];
+    permissions: Permission[];
+    apps: App[];
+}) {
+    const privilegeByCode = new Map(
+        privileges.map((item) => [item.code, item]),
+    );
+
+    return (
+        <div className="space-y-3">
+            {duty.description ? (
+                <p className="text-sm text-muted-foreground">
+                    {duty.description}
+                </p>
+            ) : null}
+            {duty.privilege_codes.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                    Tanggung jawab ini belum berisi tugas akses.
+                </p>
+            ) : null}
+            <CollapsibleSectionGroup
+                key={duty.code}
+                defaultValue={duty.privilege_codes}
+            >
+                {duty.privilege_codes.map((code) => {
+                    const privilege = privilegeByCode.get(code);
+
+                    return (
+                        <CollapsibleSection
+                            key={code}
+                            value={code}
+                            title={
+                                privilege?.name ??
+                                `Tugas akses tidak tersedia: ${code}`
+                            }
+                            summary={
+                                privilege
+                                    ? `${privilege.permission_codes.length} izin`
+                                    : 'Rincian tidak tersedia'
+                            }
+                        >
+                            {privilege ? (
+                                <PrivilegeAccessDetail
+                                    privilege={privilege}
+                                    permissions={permissions}
+                                    apps={apps}
+                                />
+                            ) : (
+                                <p className="text-sm text-muted-foreground">
+                                    Referensi ini tidak ditemukan dalam daftar
+                                    tugas akses yang tersedia.
+                                </p>
+                            )}
+                        </CollapsibleSection>
+                    );
+                })}
+            </CollapsibleSectionGroup>
+        </div>
+    );
+}
+
+function AccessReferencePicker({
+    items,
+    selected,
+    onChange,
+    label,
+    renderDetail,
+}: {
+    items: { id: string; label: string; description: string }[];
+    selected: string[];
+    onChange: (codes: string[]) => void;
+    label: string;
+    renderDetail: (id: string) => React.ReactNode;
+}) {
+    const [activeId, setActiveId] = useState<string | null>(null);
+    const detailRef = useRef<HTMLDivElement>(null);
+    const activeItem = items.find((item) => item.id === activeId);
+    const [query, setQuery] = useState('');
+    const choices = items.filter(
+        (item) =>
+            !selected.includes(item.id) &&
+            matches(`${item.label} ${item.description}`, query),
+    );
+    const assigned = items.filter((item) => selected.includes(item.id));
+
+    return (
+        <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+                Klik {label} untuk melihat rincian aksesnya di bawah. Gunakan
+                panah untuk memasukkan atau mengeluarkannya. Perubahan berlaku
+                setelah Simpan.
+            </p>
+            <div className="flex min-h-7 items-center gap-2">
+                <p
+                    role="status"
+                    className="min-w-0 flex-1 truncate text-sm text-muted-foreground"
+                >
+                    {activeItem
+                        ? `Pratinjau: ${activeItem.label}`
+                        : 'Pilih satu baris untuk memeriksa rincian akses.'}
+                </p>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="command"
+                    disabled={!activeItem}
+                    onClick={() =>
+                        detailRef.current?.scrollIntoView({ block: 'start' })
+                    }
+                >
+                    Lihat rincian
+                </Button>
             </div>
+            <TransferList
+                size="large"
+                onActiveItemChange={setActiveId}
+                remaining={choices}
+                selected={assigned}
+                remainingTitle={`Tersedia (${choices.length})`}
+                selectedTitle={`Dipilih (${assigned.length})`}
+                searchValue={query}
+                onSearchChange={setQuery}
+                remainingEmptyLabel="Tidak ada pilihan yang cocok."
+                selectedEmptyLabel="Belum ada yang dipilih. Tidak ada akses tambahan yang diberikan."
+                onChange={({ selected: next }) =>
+                    onChange([
+                        ...selected.filter(
+                            (id) => !items.some((item) => item.id === id),
+                        ),
+                        ...next.map((item) => item.id),
+                    ])
+                }
+            />
+            <Card ref={detailRef}>
+                <CardHeader>
+                    <CardTitle>
+                        {activeItem
+                            ? `Rincian: ${activeItem.label}`
+                            : 'Rincian akses'}
+                    </CardTitle>
+                    <CardDescription>
+                        {activeItem
+                            ? `${activeItem.description} · ${selected.includes(activeItem.id) ? 'Sudah dipilih' : 'Belum dipilih'}`
+                            : `Klik salah satu ${label} di sisi Tersedia atau Dipilih untuk memeriksa izin yang dibawanya.`}
+                    </CardDescription>
+                </CardHeader>
+                {activeItem ? (
+                    <CardContent>{renderDetail(activeItem.id)}</CardContent>
+                ) : null}
+            </Card>
         </div>
     );
 }
@@ -550,15 +753,35 @@ function PrivilegeDialog({
     permissions: Permission[];
     privilege?: Privilege;
 }) {
+    const { wrap: wrapFormRequest, summary: formRequestSummary } =
+        useInertiaFeedback();
+
     const [open, setOpen] = useState(false);
     const form = useForm({
         name: privilege?.name ?? '',
         permission_codes: privilege?.permission_codes ?? [],
     });
+    const transition = useRecordTransition(form.isDirty, form.processing);
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
+        <PageDialog
+            open={open}
+            onOpenChange={(next) => {
+                if (next) {
+                    setOpen(true);
+
+                    return;
+                }
+
+                transition.request(() => {
+                    form.reset();
+                    form.clearErrors();
+                    setOpen(false);
+                });
+            }}
+        >
+            {transition.confirmation}
+            <PageDialogTrigger asChild>
                 <Button
                     variant={privilege ? 'outline' : 'default'}
                     size="sm"
@@ -575,28 +798,16 @@ function PrivilegeDialog({
                     )}
                     {privilege ? 'Edit draf' : 'Tugas Akses'}
                 </Button>
-            </DialogTrigger>
-            <DialogContent size="full">
-                <DialogHeader>
-                    <div className="flex items-center gap-3">
-                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                            <KeyRound className="size-5" />
-                        </div>
-                        <div>
-                            <DialogTitle className="text-base font-bold text-foreground">
-                                {privilege
-                                    ? `Edit ${privilege.name}`
-                                    : 'Tugas Akses Baru'}
-                            </DialogTitle>
-                            <DialogDescription className="mt-0.5 text-xs text-muted-foreground">
-                                Centang pasangan entry point dan access level
-                                yang diperlukan. Klik judul kolom untuk memilih
-                                seluruh kolom sekaligus.
-                            </DialogDescription>
-                        </div>
-                    </div>
-                </DialogHeader>
+            </PageDialogTrigger>
+            <PageDialogContent
+                title="Tugas akses"
+                editing
+                recordTitle={privilege?.name ?? 'Baru'}
+                description="Pilih layar dan tindakan yang diperlukan. Izin yang tidak dipilih tidak diberikan."
+                busy={form.processing}
+            >
                 <form
+                    noValidate
                     className="contents"
                     onSubmit={(event) => {
                         event.preventDefault();
@@ -616,7 +827,7 @@ function PrivilegeDialog({
                             }));
                             form.put(
                                 `/settings/security-configuration/privileges/${privilege.code}`,
-                                done,
+                                wrapFormRequest(done),
                             );
 
                             return;
@@ -624,33 +835,59 @@ function PrivilegeDialog({
 
                         form.post(
                             '/settings/security-configuration/privileges',
-                            done,
+                            wrapFormRequest(done),
                         );
                     }}
                 >
-                    <DialogToolbar>
+                    <PageDialogToolbar>
                         <ActionButton
                             action="save"
                             type="submit"
                             disabled={form.processing}
                         />
-                        <DialogClose asChild>
+                        <PageDialogClose asChild>
                             <ActionButton action="cancel" type="button" />
-                        </DialogClose>
-                    </DialogToolbar>
-                    <DialogBody>
-                        <FieldGroup>
-                            <Field>
-                                <Input
-                                    label="Nama tugas akses"
-                                    value={form.data.name}
-                                    onChange={(event) =>
-                                        form.setData('name', event.target.value)
-                                    }
-                                />
-                                <FieldError>{form.errors.name}</FieldError>
-                            </Field>
-                            <FieldSet>
+                        </PageDialogClose>
+                    </PageDialogToolbar>
+                    <>
+                        {formRequestSummary}
+                        <FormErrorHeader
+                            errors={form.errors}
+                            operation="Perubahan akses belum disimpan"
+                        />
+                    </>
+                    <PageDialogBody>
+                        <FieldError>
+                            {Object.entries(form.errors)
+                                .filter(
+                                    ([key]) =>
+                                        ![
+                                            'name',
+                                            'duty_codes',
+                                            'privilege_codes',
+                                            'permission_codes',
+                                        ].includes(key),
+                                )
+                                .map(([, message]) => message)
+                                .join(' ')}
+                        </FieldError>
+                        <div className="space-y-6">
+                            <FormGrid columns={1}>
+                                <FormControl error={form.errors.name}>
+                                    <Input
+                                        name="name"
+                                        label="Nama tugas akses"
+                                        value={form.data.name}
+                                        onChange={(event) =>
+                                            form.setData(
+                                                'name',
+                                                event.target.value,
+                                            )
+                                        }
+                                    />
+                                </FormControl>
+                            </FormGrid>
+                            <FieldSet data-error-field="permission_codes">
                                 <FieldLegend>
                                     Pilih izin yang diperlukan
                                 </FieldLegend>
@@ -666,53 +903,83 @@ function PrivilegeDialog({
                                     {form.errors.permission_codes}
                                 </FieldError>
                             </FieldSet>
-                        </FieldGroup>
-                    </DialogBody>
+                        </div>
+                    </PageDialogBody>
                 </form>
-            </DialogContent>
-        </Dialog>
+            </PageDialogContent>
+        </PageDialog>
     );
 }
 
 function DuplicateButton({ path }: { path: string }) {
+    const { wrap: wrapFormRequest, summary: formRequestSummary } =
+        useInertiaFeedback();
+
     const form = useForm({});
 
     return (
-        <Button
-            variant="outline"
-            size="sm"
-            disabled={form.processing}
-            onClick={() => form.post(path)}
-        >
-            <CopyPlus />
-            Duplikat
-        </Button>
+        <div className="flex flex-col gap-2">
+            <>
+                {formRequestSummary}
+                <FormErrorHeader
+                    errors={form.errors}
+                    operation="Tindakan belum berhasil"
+                />
+            </>
+            <Button
+                variant="outline"
+                size="sm"
+                disabled={form.processing}
+                onClick={() => form.post(path, wrapFormRequest())}
+            >
+                <CopyPlus />
+                Duplikat
+            </Button>
+        </div>
     );
 }
 
 function DutyDialog({
     apps,
     privileges,
+    permissions,
     duty,
 }: {
     apps: App[];
     privileges: Privilege[];
+    permissions: Permission[];
     duty?: Duty;
 }) {
+    const { wrap: wrapFormRequest, summary: formRequestSummary } =
+        useInertiaFeedback();
+
     const [open, setOpen] = useState(false);
-    const [query, setQuery] = useState('');
     const form = useForm({
         name: duty?.name ?? '',
         privilege_codes: duty?.privilege_codes ?? [],
     });
+    const transition = useRecordTransition(form.isDirty, form.processing);
     const appName = new Map(apps.map((app) => [app.id, app.name]));
-    const visible = privileges.filter(
-        (privilege) => !query || matches(privilege.name, query),
-    );
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
+        <PageDialog
+            open={open}
+            onOpenChange={(next) => {
+                if (next) {
+                    setOpen(true);
+
+                    return;
+                }
+
+                transition.request(() => {
+                    form.reset();
+                    form.clearErrors();
+                    setOpen(false);
+                });
+            }}
+        >
+            {transition.confirmation}
+            <PageDialogTrigger asChild>
                 <Button
                     size="sm"
                     variant={duty ? 'outline' : 'default'}
@@ -729,28 +996,16 @@ function DutyDialog({
                     )}
                     {duty ? 'Edit draf' : 'Tanggung Jawab'}
                 </Button>
-            </DialogTrigger>
-            <DialogContent>
-                <DialogHeader>
-                    <div className="flex items-center gap-3">
-                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                            <ShieldCheck className="size-5" />
-                        </div>
-                        <div>
-                            <DialogTitle className="text-base font-bold text-foreground">
-                                {duty
-                                    ? `Edit ${duty.name}`
-                                    : 'Tanggung Jawab Baru'}
-                            </DialogTitle>
-                            <DialogDescription className="mt-0.5 text-xs text-muted-foreground">
-                                Tanggung jawab menggabungkan beberapa tugas
-                                akses menjadi satu bagian proses bisnis yang
-                                dapat dipasang pada role.
-                            </DialogDescription>
-                        </div>
-                    </div>
-                </DialogHeader>
+            </PageDialogTrigger>
+            <PageDialogContent
+                title="Tanggung jawab"
+                editing
+                recordTitle={duty?.name ?? 'Baru'}
+                description="Gabungkan tugas akses untuk satu pekerjaan. Pilihan akan menjadi bagian dari role yang memakai tanggung jawab ini."
+                busy={form.processing}
+            >
                 <form
+                    noValidate
                     className="contents"
                     onSubmit={(event) => {
                         event.preventDefault();
@@ -768,7 +1023,7 @@ function DutyDialog({
                             }));
                             form.put(
                                 `/settings/security-configuration/duties/${duty.code}`,
-                                done,
+                                wrapFormRequest(done),
                             );
 
                             return;
@@ -776,120 +1031,113 @@ function DutyDialog({
 
                         form.post(
                             '/settings/security-configuration/duties',
-                            done,
+                            wrapFormRequest(done),
                         );
                     }}
                 >
-                    <DialogToolbar>
+                    <PageDialogToolbar>
                         <ActionButton
                             action="save"
                             type="submit"
                             disabled={form.processing}
                         />
-                        <DialogClose asChild>
+                        <PageDialogClose asChild>
                             <ActionButton action="cancel" type="button" />
-                        </DialogClose>
-                    </DialogToolbar>
-                    <DialogBody>
-                        <FieldGroup>
-                            <Field>
-                                <Input
-                                    label="Nama tanggung jawab"
-                                    value={form.data.name}
-                                    onChange={(event) =>
-                                        form.setData('name', event.target.value)
-                                    }
-                                />
-                                <FieldError>{form.errors.name}</FieldError>
-                            </Field>
-                            <FieldSet>
+                        </PageDialogClose>
+                    </PageDialogToolbar>
+                    <>
+                        {formRequestSummary}
+                        <FormErrorHeader
+                            errors={form.errors}
+                            operation="Perubahan akses belum disimpan"
+                        />
+                    </>
+                    <PageDialogBody>
+                        <FieldError>
+                            {Object.entries(form.errors)
+                                .filter(
+                                    ([key]) =>
+                                        ![
+                                            'name',
+                                            'duty_codes',
+                                            'privilege_codes',
+                                            'permission_codes',
+                                        ].includes(key),
+                                )
+                                .map(([, message]) => message)
+                                .join(' ')}
+                        </FieldError>
+                        <div className="space-y-6">
+                            <FormGrid columns={1}>
+                                <FormControl error={form.errors.name}>
+                                    <Input
+                                        name="name"
+                                        label="Nama tanggung jawab"
+                                        value={form.data.name}
+                                        onChange={(event) =>
+                                            form.setData(
+                                                'name',
+                                                event.target.value,
+                                            )
+                                        }
+                                    />
+                                </FormControl>
+                            </FormGrid>
+                            <FieldSet data-error-field="privilege_codes">
                                 <FieldLegend>Pilih tugas akses</FieldLegend>
-                                <Input
-                                    label="Cari tugas akses"
-                                    value={query}
-                                    onChange={(event) =>
-                                        setQuery(event.target.value)
+                                <AccessReferencePicker
+                                    label="tugas akses"
+                                    renderDetail={(code) => {
+                                        const privilege = privileges.find(
+                                            (item) => item.code === code,
+                                        );
+
+                                        return privilege ? (
+                                            <PrivilegeAccessDetail
+                                                privilege={privilege}
+                                                permissions={permissions}
+                                                apps={apps}
+                                            />
+                                        ) : null;
+                                    }}
+                                    items={privileges.map((item) => ({
+                                        id: item.code,
+                                        label: item.name,
+                                        description: `${item.app_id ? (appName.get(item.app_id) ?? item.app_id) : 'Dibuat khusus'} · ${item.permission_codes.length} izin · ${item.status === 'active' ? 'Diterbitkan' : 'Draf'}`,
+                                    }))}
+                                    selected={form.data.privilege_codes}
+                                    onChange={(codes) =>
+                                        form.setData('privilege_codes', codes)
                                     }
                                 />
-                                <div className="max-h-72 space-y-2 overflow-y-auto rounded-lg border border-border bg-white p-3 shadow-2xs dark:bg-card">
-                                    {visible.map((privilege) => {
-                                        const checked =
-                                            form.data.privilege_codes.includes(
-                                                privilege.code,
-                                            );
-
-                                        return (
-                                            <label
-                                                key={privilege.code}
-                                                className={`flex cursor-pointer items-start gap-3 rounded-md border p-2.5 text-sm transition-colors ${
-                                                    checked
-                                                        ? 'border-primary/40 bg-primary/5'
-                                                        : 'border-border/60 bg-card hover:bg-accent/40'
-                                                }`}
-                                            >
-                                                <Checkbox
-                                                    checked={checked}
-                                                    onCheckedChange={(
-                                                        checked,
-                                                    ) =>
-                                                        form.setData(
-                                                            'privilege_codes',
-                                                            toggle(
-                                                                form.data
-                                                                    .privilege_codes,
-                                                                privilege.code,
-                                                                checked ===
-                                                                    true,
-                                                            ),
-                                                        )
-                                                    }
-                                                    className="mt-0.5"
-                                                />
-                                                <span className="min-w-0 flex-1">
-                                                    <span className="block text-xs font-semibold text-foreground">
-                                                        {privilege.name}
-                                                    </span>
-                                                    <span className="text-[11px] text-muted-foreground">
-                                                        {privilege.app_id
-                                                            ? (appName.get(
-                                                                  privilege.app_id,
-                                                              ) ??
-                                                              privilege.app_id)
-                                                            : 'Dibuat khusus'}{' '}
-                                                        ·{' '}
-                                                        {
-                                                            privilege
-                                                                .permission_codes
-                                                                .length
-                                                        }{' '}
-                                                        izin
-                                                    </span>
-                                                </span>
-                                            </label>
-                                        );
-                                    })}
-                                </div>
                                 <FieldError>
                                     {form.errors.privilege_codes}
                                 </FieldError>
                             </FieldSet>
-                        </FieldGroup>
-                    </DialogBody>
+                        </div>
+                    </PageDialogBody>
                 </form>
-            </DialogContent>
-        </Dialog>
+            </PageDialogContent>
+        </PageDialog>
     );
 }
 
 function RoleDialog({
     apps,
     duties,
+    privileges,
+    permissions,
     role,
 }: {
     apps: App[];
     duties: Duty[];
+    privileges: Privilege[];
+    permissions: Permission[];
     role?: Role;
 }) {
+    const { wrap: wrapFormRequest, summary: formRequestSummary } =
+        useInertiaFeedback();
+
     const [open, setOpen] = useState(false);
     const form = useForm({
         name: role?.name ?? '',
@@ -897,24 +1145,30 @@ function RoleDialog({
         // Sub role dipertahankan apa adanya; form ini hanya mengurus duty.
         child_role_ids: role?.child_roles.map((item) => item.id) ?? [],
     });
+    const transition = useRecordTransition(form.isDirty, form.processing);
     // Draf tidak boleh menjadi sumber hak role — API menolaknya dengan 422.
     const selectable = duties.filter((duty) => duty.status === 'active');
-    const groups = [
-        ...apps.map((app) => ({
-            id: app.id,
-            name: app.name,
-            items: selectable.filter((duty) => duty.app_id === app.id),
-        })),
-        {
-            id: 'custom',
-            name: 'Dibuat khusus',
-            items: selectable.filter((duty) => duty.source === 'custom'),
-        },
-    ].filter((group) => group.items.length > 0);
+    const appName = new Map(apps.map((app) => [app.id, app.name]));
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
+        <PageDialog
+            open={open}
+            onOpenChange={(next) => {
+                if (next) {
+                    setOpen(true);
+
+                    return;
+                }
+
+                transition.request(() => {
+                    form.reset();
+                    form.clearErrors();
+                    setOpen(false);
+                });
+            }}
+        >
+            {transition.confirmation}
+            <PageDialogTrigger asChild>
                 <Button
                     variant={role ? 'outline' : 'default'}
                     size="sm"
@@ -931,28 +1185,16 @@ function RoleDialog({
                     )}
                     {role ? 'Edit role' : 'Role'}
                 </Button>
-            </DialogTrigger>
-            <DialogContent>
-                <DialogHeader>
-                    <div className="flex items-center gap-3">
-                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                            <UserCog className="size-5" />
-                        </div>
-                        <div>
-                            <DialogTitle className="text-base font-bold text-foreground">
-                                {role
-                                    ? 'Edit Security Role'
-                                    : 'Security Role Baru'}
-                            </DialogTitle>
-                            <DialogDescription className="mt-0.5 text-xs text-muted-foreground">
-                                Role menentukan tindakan yang boleh dilakukan.
-                                Batas data diatur saat role diberikan ke
-                                anggota.
-                            </DialogDescription>
-                        </div>
-                    </div>
-                </DialogHeader>
+            </PageDialogTrigger>
+            <PageDialogContent
+                title="Role"
+                editing
+                recordTitle={role?.name ?? 'Baru'}
+                description="Pilih tanggung jawab yang dibutuhkan. Batas data diatur saat role diberikan kepada anggota."
+                busy={form.processing}
+            >
                 <form
+                    noValidate
                     className="contents"
                     onSubmit={(event) => {
                         event.preventDefault();
@@ -963,113 +1205,124 @@ function RoleDialog({
                                 ...data,
                                 version: role.version,
                             }));
-                            form.put(`/settings/access/roles/${role.id}`, done);
+                            form.put(
+                                `/settings/access/roles/${role.id}`,
+                                wrapFormRequest(done),
+                            );
 
                             return;
                         }
 
-                        form.post('/settings/access/roles', done);
+                        form.post(
+                            '/settings/access/roles',
+                            wrapFormRequest(done),
+                        );
                     }}
                 >
-                    <DialogToolbar>
+                    <PageDialogToolbar>
                         <ActionButton
                             action="save"
                             type="submit"
                             disabled={form.processing}
                         />
-                        <DialogClose asChild>
+                        <PageDialogClose asChild>
                             <ActionButton action="cancel" type="button" />
-                        </DialogClose>
-                    </DialogToolbar>
-                    <DialogBody>
-                        <FieldGroup>
-                            <Field>
-                                <Input
-                                    label="Nama role"
-                                    value={form.data.name}
-                                    onChange={(event) =>
-                                        form.setData('name', event.target.value)
+                        </PageDialogClose>
+                    </PageDialogToolbar>
+                    <>
+                        {formRequestSummary}
+                        <FormErrorHeader
+                            errors={form.errors}
+                            operation="Perubahan akses belum disimpan"
+                        />
+                    </>
+                    <PageDialogBody>
+                        <FieldError>
+                            {Object.entries(form.errors)
+                                .filter(
+                                    ([key]) =>
+                                        ![
+                                            'name',
+                                            'duty_codes',
+                                            'privilege_codes',
+                                            'permission_codes',
+                                        ].includes(key),
+                                )
+                                .map(([, message]) => message)
+                                .join(' ')}
+                        </FieldError>
+                        <div className="space-y-6">
+                            <FormGrid columns={1}>
+                                <FormControl error={form.errors.name}>
+                                    <Input
+                                        name="name"
+                                        label="Nama role"
+                                        value={form.data.name}
+                                        onChange={(event) =>
+                                            form.setData(
+                                                'name',
+                                                event.target.value,
+                                            )
+                                        }
+                                    />
+                                </FormControl>
+                            </FormGrid>
+                            <FieldSet data-error-field="duty_codes">
+                                <FieldLegend>Tanggung jawab bisnis</FieldLegend>
+                                <p className="text-sm text-muted-foreground">
+                                    Pilih sedikitnya satu tanggung jawab yang
+                                    sudah diterbitkan.
+                                </p>
+                                <AccessReferencePicker
+                                    label="tanggung jawab"
+                                    renderDetail={(code) => {
+                                        const duty = duties.find(
+                                            (item) => item.code === code,
+                                        );
+
+                                        return duty ? (
+                                            <DutyAccessDetail
+                                                duty={duty}
+                                                privileges={privileges}
+                                                permissions={permissions}
+                                                apps={apps}
+                                            />
+                                        ) : null;
+                                    }}
+                                    items={selectable.map((item) => ({
+                                        id: item.code,
+                                        label: item.name,
+                                        description: `${item.app_id ? (appName.get(item.app_id) ?? item.app_id) : 'Dibuat khusus'} · ${item.privilege_codes.length} tugas akses`,
+                                    }))}
+                                    selected={form.data.duty_codes}
+                                    onChange={(codes) =>
+                                        form.setData('duty_codes', codes)
                                     }
                                 />
-                                <FieldError>{form.errors.name}</FieldError>
-                            </Field>
-                            <FieldSet>
-                                <FieldLegend>Tanggung jawab bisnis</FieldLegend>
-                                <div className="max-h-72 space-y-4 overflow-y-auto rounded-lg border border-border bg-white p-3.5 shadow-2xs dark:bg-card">
-                                    {groups.map((group) => (
-                                        <div
-                                            key={group.id}
-                                            className="space-y-2"
-                                        >
-                                            <p className="text-xs font-bold tracking-wider text-muted-foreground uppercase">
-                                                {group.name}
-                                            </p>
-                                            <div className="space-y-1.5">
-                                                {group.items.map((duty) => {
-                                                    const checked =
-                                                        form.data.duty_codes.includes(
-                                                            duty.code,
-                                                        );
-
-                                                    return (
-                                                        <label
-                                                            key={duty.code}
-                                                            className={`flex cursor-pointer items-start gap-3 rounded-md border p-2.5 text-sm transition-colors ${
-                                                                checked
-                                                                    ? 'border-primary/40 bg-primary/5'
-                                                                    : 'border-border/60 bg-card hover:bg-accent/40'
-                                                            }`}
-                                                        >
-                                                            <Checkbox
-                                                                checked={
-                                                                    checked
-                                                                }
-                                                                onCheckedChange={(
-                                                                    checked,
-                                                                ) =>
-                                                                    form.setData(
-                                                                        'duty_codes',
-                                                                        toggle(
-                                                                            form
-                                                                                .data
-                                                                                .duty_codes,
-                                                                            duty.code,
-                                                                            checked ===
-                                                                                true,
-                                                                        ),
-                                                                    )
-                                                                }
-                                                                className="mt-0.5"
-                                                            />
-                                                            <span className="min-w-0 flex-1">
-                                                                <span className="block text-xs font-semibold text-foreground">
-                                                                    {duty.name}
-                                                                </span>
-                                                                <span className="text-[11px] text-muted-foreground">
-                                                                    {
-                                                                        duty
-                                                                            .privilege_codes
-                                                                            .length
-                                                                    }{' '}
-                                                                    tugas akses
-                                                                </span>
-                                                            </span>
-                                                        </label>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
                                 <FieldError>
                                     {form.errors.duty_codes}
                                 </FieldError>
                             </FieldSet>
-                        </FieldGroup>
-                    </DialogBody>
+                            {role && role.child_roles.length > 0 && (
+                                <section className="space-y-2">
+                                    <h3 className="text-sm font-medium">
+                                        Akses dari role lain
+                                    </h3>
+                                    <p className="text-sm text-muted-foreground">
+                                        Role ini juga mewarisi akses dari{' '}
+                                        {role.child_roles
+                                            .map((item) => item.name)
+                                            .join(', ')}
+                                        . Hubungan ini tetap dipertahankan saat
+                                        menyimpan.
+                                    </p>
+                                </section>
+                            )}
+                        </div>
+                    </PageDialogBody>
                 </form>
-            </DialogContent>
-        </Dialog>
+            </PageDialogContent>
+        </PageDialog>
     );
 }
 
@@ -1080,10 +1333,25 @@ function DeleteRoleButton({
     role: Role;
     onDeleted: () => void;
 }) {
+    const { wrap: wrapFormRequest, summary: formRequestSummary } =
+        useInertiaFeedback();
+
     const form = useForm({});
+    const [open, setOpen] = useState(false);
 
     return (
-        <AlertDialog>
+        <AlertDialog
+            open={open}
+            onOpenChange={(next) => {
+                if (!form.processing) {
+                    setOpen(next);
+
+                    if (next) {
+                        form.clearErrors();
+                    }
+                }
+            }}
+        >
             <AlertDialogTrigger asChild>
                 <ActionButton action="delete" />
             </AlertDialogTrigger>
@@ -1096,16 +1364,32 @@ function DeleteRoleButton({
                         dalamnya tidak ikut terhapus.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
+                <>
+                    {formRequestSummary}
+                    <FormErrorHeader
+                        errors={form.errors}
+                        operation="Penghapusan belum berhasil"
+                    />
+                </>
                 <AlertDialogFooter>
-                    <AlertDialogCancel>Batal</AlertDialogCancel>
+                    <AlertDialogCancel disabled={form.processing}>
+                        Batal
+                    </AlertDialogCancel>
                     <AlertDialogAction
                         disabled={form.processing}
                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        onClick={() => {
+                        onClick={(event) => {
+                            event.preventDefault();
                             form.transform(() => ({ version: role.version }));
-                            form.delete(`/settings/access/roles/${role.id}`, {
-                                onSuccess: onDeleted,
-                            });
+                            form.delete(
+                                `/settings/access/roles/${role.id}`,
+                                wrapFormRequest({
+                                    onSuccess: () => {
+                                        setOpen(false);
+                                        onDeleted();
+                                    },
+                                }),
+                            );
                         }}
                     >
                         Hapus
@@ -1117,21 +1401,33 @@ function DeleteRoleButton({
 }
 
 function PublishButton({ path, version }: { path: string; version: number }) {
+    const { wrap: wrapFormRequest, summary: formRequestSummary } =
+        useInertiaFeedback();
+
     const form = useForm({});
 
     return (
-        <Button
-            size="sm"
-            variant="default"
-            disabled={form.processing}
-            onClick={() => {
-                form.transform(() => ({ version }));
-                form.post(path);
-            }}
-        >
-            <Check className="mr-1 size-3.5" />
-            Terbitkan
-        </Button>
+        <div className="flex flex-col gap-2">
+            <>
+                {formRequestSummary}
+                <FormErrorHeader
+                    errors={form.errors}
+                    operation="Tindakan belum berhasil"
+                />
+            </>
+            <Button
+                size="sm"
+                variant="default"
+                disabled={form.processing}
+                onClick={() => {
+                    form.transform(() => ({ version }));
+                    form.post(path, wrapFormRequest());
+                }}
+            >
+                <Check className="mr-1 size-3.5" />
+                Terbitkan
+            </Button>
+        </div>
     );
 }
 
@@ -1144,10 +1440,25 @@ function DeleteDraftButton({
     name: string;
     version: number;
 }) {
+    const { wrap: wrapFormRequest, summary: formRequestSummary } =
+        useInertiaFeedback();
+
     const form = useForm({});
+    const [open, setOpen] = useState(false);
 
     return (
-        <AlertDialog>
+        <AlertDialog
+            open={open}
+            onOpenChange={(next) => {
+                if (!form.processing) {
+                    setOpen(next);
+
+                    if (next) {
+                        form.clearErrors();
+                    }
+                }
+            }}
+        >
             <AlertDialogTrigger asChild>
                 <ActionButton action="delete" />
             </AlertDialogTrigger>
@@ -1160,14 +1471,29 @@ function DeleteDraftButton({
                         disalin tidak ikut terhapus.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
+                <>
+                    {formRequestSummary}
+                    <FormErrorHeader
+                        errors={form.errors}
+                        operation="Penghapusan belum berhasil"
+                    />
+                </>
                 <AlertDialogFooter>
-                    <AlertDialogCancel>Batal</AlertDialogCancel>
+                    <AlertDialogCancel disabled={form.processing}>
+                        Batal
+                    </AlertDialogCancel>
                     <AlertDialogAction
                         disabled={form.processing}
                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        onClick={() => {
+                        onClick={(event) => {
+                            event.preventDefault();
                             form.transform(() => ({ version }));
-                            form.delete(path);
+                            form.delete(
+                                path,
+                                wrapFormRequest({
+                                    onSuccess: () => setOpen(false),
+                                }),
+                            );
                         }}
                     >
                         Hapus
@@ -1237,6 +1563,7 @@ function DraftPanel({
                         </span>
                         <div className="flex items-center gap-2">
                             <PrivilegeDialog
+                                key={`privilege:${item.code}:${item.version}`}
                                 apps={apps}
                                 permissions={permissions}
                                 privilege={item}
@@ -1288,7 +1615,9 @@ function DraftPanel({
                         </span>
                         <div className="flex items-center gap-2">
                             <DutyDialog
+                                key={`duty:${item.code}:${item.version}`}
                                 apps={apps}
+                                permissions={permissions}
                                 privileges={allPrivileges}
                                 duty={item}
                             />
@@ -1806,7 +2135,10 @@ export default function SecurityConfiguration({
                                 {tab === 'role' ? (
                                     <>
                                         <RoleDialog
+                                            key={'role:new'}
                                             apps={apps}
+                                            privileges={privileges}
+                                            permissions={permissions}
                                             duties={duties}
                                         />
                                         {selectedRole?.is_owner ? (
@@ -1817,7 +2149,10 @@ export default function SecurityConfiguration({
                                         ) : selectedRole ? (
                                             <>
                                                 <RoleDialog
+                                                    key={`role:${selectedRole.id}:${selectedRole.version}`}
                                                     apps={apps}
+                                                    privileges={privileges}
+                                                    permissions={permissions}
                                                     duties={duties}
                                                     role={selectedRole}
                                                 />
@@ -1833,12 +2168,15 @@ export default function SecurityConfiguration({
                                 ) : null}
                                 {tab === 'duty' ? (
                                     <DutyDialog
+                                        key={'duty:new'}
                                         apps={apps}
+                                        permissions={permissions}
                                         privileges={privileges}
                                     />
                                 ) : null}
                                 {tab === 'privilege' ? (
                                     <PrivilegeDialog
+                                        key={'privilege:new'}
                                         apps={apps}
                                         permissions={permissions}
                                     />
@@ -1850,7 +2188,9 @@ export default function SecurityConfiguration({
                                         />
                                         {editable(selectedDuty) ? (
                                             <DutyDialog
+                                                key={`duty:${selectedDuty.code}:${selectedDuty.version}`}
                                                 apps={apps}
+                                                permissions={permissions}
                                                 privileges={privileges}
                                                 duty={selectedDuty}
                                             />
@@ -1864,6 +2204,7 @@ export default function SecurityConfiguration({
                                         />
                                         {editable(selectedPrivilege) ? (
                                             <PrivilegeDialog
+                                                key={`privilege:${selectedPrivilege.code}:${selectedPrivilege.version}`}
                                                 apps={apps}
                                                 permissions={permissions}
                                                 privilege={selectedPrivilege}
@@ -1926,29 +2267,13 @@ export default function SecurityConfiguration({
                                                                 className="h-8 w-full rounded-md border pl-7 text-sm"
                                                             />
                                                         </div>
-                                                        <NativeSelect
+                                                        <ApplicationFilter
+                                                            apps={apps}
                                                             value={appFilter}
-                                                            onChange={(event) =>
-                                                                changeAppFilter(
-                                                                    event.target
-                                                                        .value,
-                                                                )
+                                                            onChange={
+                                                                changeAppFilter
                                                             }
-                                                        >
-                                                            <option value="">
-                                                                Semua aplikasi
-                                                            </option>
-                                                            {apps.map((app) => (
-                                                                <option
-                                                                    key={app.id}
-                                                                    value={
-                                                                        app.id
-                                                                    }
-                                                                >
-                                                                    {app.name}
-                                                                </option>
-                                                            ))}
-                                                        </NativeSelect>
+                                                        />
                                                     </div>
                                                 ) : undefined
                                             }

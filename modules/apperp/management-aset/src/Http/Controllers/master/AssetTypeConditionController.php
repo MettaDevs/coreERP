@@ -6,7 +6,6 @@ use App\Platform\Modules\Contracts\RowVersion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
 use Modules\Apperp\ManagementAset\Models\master\AssetTypeCondition;
@@ -36,12 +35,23 @@ final class AssetTypeConditionController extends Controller
         JenisAset::query()->findOrFail($assetTypeId);
         $data = validator($payload, [
             'condition_ids' => ['present', 'array', 'max:200'],
-            'condition_ids.*' => ['required', 'distinct', 'ulid', Rule::exists('aset_m_kondisi_aset', 'id')->where('tenant_id', $tenantId)->whereNull('deleted_at')],
+            'condition_ids.*' => ['required', 'distinct', 'ulid'],
         ])->validate();
-        foreach ($data['condition_ids'] as $conditionId) {
-            if (! KondisiAset::query()->whereKey($conditionId)->where('aktif', true)->exists() && ! AssetTypeCondition::query()->where('jenis_aset_id', $assetTypeId)->where('kondisi_aset_id', $conditionId)->exists()) {
-                throw ValidationException::withMessages(['condition_ids' => 'Kondisi yang dipilih sudah tidak aktif.']);
+        $conditions = KondisiAset::query()->whereIn('id', $data['condition_ids'])->get(['id', 'aktif'])->keyBy('id');
+        $errors = [];
+        foreach ($data['condition_ids'] as $index => $conditionId) {
+            if (! $conditions->has($conditionId)) {
+                $errors['condition_ids.'.$index] = 'Kondisi yang dipilih tidak tersedia.';
             }
+        }
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+        $active = $conditions->filter(fn (KondisiAset $condition): bool => $condition->aktif)->keys()->all();
+        $linked = AssetTypeCondition::query()->where('jenis_aset_id', $assetTypeId)
+            ->whereIn('kondisi_aset_id', $data['condition_ids'])->pluck('kondisi_aset_id')->all();
+        if (array_diff($data['condition_ids'], $active, $linked) !== []) {
+            throw ValidationException::withMessages(['condition_ids' => 'Kondisi yang dipilih sudah tidak aktif.']);
         }
         $expected = ($expectedVersion ?? RowVersion::expected($request));
 

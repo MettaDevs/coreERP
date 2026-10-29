@@ -8,6 +8,7 @@ use App\Platform\Modules\Contracts\DataClassification;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
@@ -29,8 +30,12 @@ use Illuminate\Support\Carbon;
  * @property string $unit
  * @property string $quantity
  * @property string $requested_specification
+ * @property ?string $funding_source_id
+ * @property ?string $funding_source_name
+ * @property ?Carbon $needed_on
  * @property string $estimated_unit_price
  * @property string $estimated_total_price
+ * @property bool $estimate_pending
  * @property ?Carbon $created_at
  * @property ?Carbon $updated_at
  */
@@ -39,10 +44,12 @@ class PerencanaanAsetDetail extends Model
 {
     use BelongsToTenant;
     use HasUlids;
+    use SoftDeletes;
 
     /** @var array<string, DataClass> */
     public const COLUMN_CLASSIFICATION = [
         'nama_aset' => DataClass::CustomerContent,
+        'funding_source_name' => DataClass::CustomerContent,
     ];
 
     protected $table = 'aset_tr_perencanaan_aset_details';
@@ -50,7 +57,8 @@ class PerencanaanAsetDetail extends Model
     protected $fillable = [
         'tenant_id', 'planning_id', 'line_number', 'jenis_aset_id', 'satuan_id',
         'nama_aset', 'unit', 'quantity', 'requested_specification',
-        'estimated_unit_price', 'estimated_total_price',
+        'estimated_unit_price', 'estimated_total_price', 'estimate_pending',
+        'needed_on', 'funding_source_id', 'funding_source_name',
     ];
 
     /** @return array<string, string> */
@@ -61,6 +69,8 @@ class PerencanaanAsetDetail extends Model
             'quantity' => 'decimal:4',
             'estimated_unit_price' => 'decimal:2',
             'estimated_total_price' => 'decimal:2',
+            'estimate_pending' => 'boolean',
+            'needed_on' => 'date:Y-m-d',
         ];
     }
 

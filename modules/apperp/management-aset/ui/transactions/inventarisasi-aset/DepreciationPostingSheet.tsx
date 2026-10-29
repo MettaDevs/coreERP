@@ -1,5 +1,5 @@
 import { TriangleAlert } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { PostingCheck } from '@/components/finance/posting-check';
 import type {
@@ -8,10 +8,11 @@ import type {
 } from '@/components/finance/posting-check';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
+import { DatePicker } from '@apperp/ui/date-picker';
 import { DialogToolbar } from '@apperp/ui/dialog';
-import { Field, FieldDescription, FieldGroup } from '@apperp/ui/field';
-import { Input } from '@apperp/ui/input';
-import { NativeSelect, NativeSelectOption } from '@apperp/ui/native-select';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
+import { getFormValidationErrors } from '@apperp/ui/form-feedback';
+import { InlineLookup } from '@apperp/ui/inline-lookup';
 import {
     Sheet,
     SheetContent,
@@ -19,7 +20,8 @@ import {
     SheetHeader,
     SheetTitle,
 } from '@apperp/ui/sheet';
-import { api, errorMessage } from '../../api';
+import { api, ApiError } from '../../api';
+import { useSaveFeedback } from '../../use-save-feedback';
 import type { Context } from './penerimaan';
 import { tanggalTampil } from './penerimaan';
 
@@ -102,6 +104,9 @@ export function DepreciationPostingSheet({
     onClose: () => void;
     onPosted: () => void;
 }) {
+    const contentRef = useRef<HTMLDivElement>(null);
+    const { feedbackSummary, reportSaveError, clearSaveFeedback, fieldError } =
+        useSaveFeedback(contentRef);
     const [bukuId, setBukuId] = useState(books[0]?.id ?? '');
     const [akhir, setAkhir] = useState(defaultPeriodEnd);
     const [hasil, setHasil] = useState<HasilPost | null>(null);
@@ -115,6 +120,33 @@ export function DepreciationPostingSheet({
     });
 
     const periksa = async () => {
+        clearSaveFeedback();
+        const errors = contentRef.current
+            ? getFormValidationErrors(contentRef.current)
+            : {};
+
+        if (!context.legal_entity_id) {
+            reportSaveError(
+                new ApiError(
+                    'Pilih perusahaan aktif terlebih dahulu pada header aplikasi.',
+                    {},
+                    422,
+                ),
+                'Jurnal belum dapat disiapkan.',
+            );
+
+            return;
+        }
+
+        if (Object.keys(errors).length) {
+            reportSaveError(
+                new ApiError('Periksa isian jurnal.', errors, 422),
+                'Jurnal belum dapat disiapkan.',
+            );
+
+            return;
+        }
+
         setSibuk(true);
         setGalat('');
 
@@ -124,15 +156,40 @@ export function DepreciationPostingSheet({
             );
             setHasil(jawab.data);
         } catch (caught) {
-            setGalat(
-                errorMessage(caught, 'Pratinjau jurnal belum dapat disusun.'),
-            );
+            reportSaveError(caught, 'Pratinjau jurnal belum dapat disusun.');
         } finally {
             setSibuk(false);
         }
     };
 
     const post = async () => {
+        clearSaveFeedback();
+        const errors = contentRef.current
+            ? getFormValidationErrors(contentRef.current)
+            : {};
+
+        if (!context.legal_entity_id) {
+            reportSaveError(
+                new ApiError(
+                    'Pilih perusahaan aktif terlebih dahulu pada header aplikasi.',
+                    {},
+                    422,
+                ),
+                'Jurnal belum dapat disiapkan.',
+            );
+
+            return;
+        }
+
+        if (Object.keys(errors).length) {
+            reportSaveError(
+                new ApiError('Periksa isian jurnal.', errors, 422),
+                'Jurnal belum dapat disiapkan.',
+            );
+
+            return;
+        }
+
         setSibuk(true);
         setGalat('');
 
@@ -152,7 +209,7 @@ export function DepreciationPostingSheet({
             onPosted();
             onClose();
         } catch (caught) {
-            setGalat(errorMessage(caught, 'Penyusutan belum dapat di-post.'));
+            reportSaveError(caught, 'Penyusutan belum dapat di-post.');
         } finally {
             setSibuk(false);
         }
@@ -170,6 +227,7 @@ export function DepreciationPostingSheet({
     return (
         <Sheet open onOpenChange={(open) => !open && onClose()}>
             <SheetContent
+                ref={contentRef}
                 side="right"
                 className="w-full gap-0 p-0 sm:max-w-3xl"
             >
@@ -208,6 +266,7 @@ export function DepreciationPostingSheet({
                         Periksa
                     </Button>
                 </DialogToolbar>
+                {feedbackSummary}
                 <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-5">
                     {!context.legal_entity_id ? (
                         <p className="text-destructive text-sm">
@@ -215,47 +274,56 @@ export function DepreciationPostingSheet({
                             CoreERP.
                         </p>
                     ) : (
-                        <FieldGroup>
-                            <Field>
-                                <NativeSelect
+                        <FormGrid columns={1}>
+                            <FormControl
+                                hint={
+                                    <>
+                                        Hanya buku yang mengirim jurnal
+                                        perolehan asetnya yang mengirim
+                                        penyusutan; buku lain tetap tercatat di
+                                        register.
+                                    </>
+                                }
+                            >
+                                <InlineLookup
                                     label="Buku penyusutan"
                                     required
-                                    value={bukuId}
-                                    onChange={(event) =>
-                                        ganti(() =>
-                                            setBukuId(event.target.value),
-                                        )
+                                    items={books}
+                                    value={
+                                        books.find(
+                                            (book) => book.id === bukuId,
+                                        ) ?? null
                                     }
-                                >
-                                    {books.map((buku) => (
-                                        <NativeSelectOption
-                                            key={buku.id}
-                                            value={buku.id}
-                                        >
-                                            {buku.kode}
-                                        </NativeSelectOption>
-                                    ))}
-                                </NativeSelect>
-                                <FieldDescription>
-                                    Hanya buku yang mengirim jurnal perolehan
-                                    asetnya yang mengirim penyusutan; buku lain
-                                    tetap tercatat di register.
-                                </FieldDescription>
-                            </Field>
-                            <Field>
-                                <Input
-                                    label="Akhir periode"
-                                    type="date"
-                                    required
-                                    value={akhir}
-                                    onChange={(event) =>
-                                        ganti(() =>
-                                            setAkhir(event.target.value),
-                                        )
+                                    getItemValue={(book) => book.id}
+                                    getItemLabel={(book) => book.kode}
+                                    columns={[
+                                        {
+                                            id: 'kode',
+                                            header: 'Kode',
+                                            cell: (book) => book.kode,
+                                        },
+                                    ]}
+                                    portalContainer={contentRef}
+                                    onValueChange={(book) =>
+                                        ganti(() => setBukuId(book.id))
                                     }
                                 />
-                            </Field>
-                        </FieldGroup>
+                            </FormControl>
+                            <FormControl
+                                data-error-field="period_ends_on"
+                                error={fieldError('period_ends_on')}
+                            >
+                                <DatePicker
+                                    label="Akhir periode"
+                                    portalContainer={contentRef}
+                                    required
+                                    value={akhir}
+                                    onValueChange={(value) =>
+                                        ganti(() => setAkhir(value))
+                                    }
+                                />
+                            </FormControl>
+                        </FormGrid>
                     )}
 
                     {galat && (

@@ -1,0 +1,50 @@
+post:
+  tags:
+  - Product registration
+  operationId: internal.productRegistration.storeTenant
+  summary: Buat trial produk untuk customer terverifikasi
+  security:
+  - productRegistrationGateway: []
+    productRegistrationSession: []
+  responses:
+    '202':
+      description: Permintaan berhasil.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProductRegistrationTenant'
+    '401':
+      description: Sesi atau kredensial bridge tidak berlaku.
+    '422':
+      description: Isian belum sesuai atau verifikasi belum selesai.
+    '429':
+      description: Batas permintaan tercapai.
+    '503':
+      description: Penyedia atau konfigurasi belum tersedia.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+          - product
+          - profile
+          - name
+          - slug
+          - idempotency_key
+          properties:
+            product:
+              type: string
+            profile:
+              type: string
+            name:
+              type: string
+              maxLength: 150
+            slug:
+              type: string
+              minLength: 3
+              maxLength: 63
+            idempotency_key:
+              type: string
+              format: uuid

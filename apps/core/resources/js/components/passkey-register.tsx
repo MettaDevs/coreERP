@@ -2,6 +2,7 @@ import { Button } from '@apperp/ui/button';
 import { Input } from '@apperp/ui/input';
 import { usePasskeyRegister } from '@laravel/passkeys/react';
 import { useState } from 'react';
+import { FormErrorHeader } from '@/components/form-error-header';
 import InputError from '@/components/input-error';
 
 type Props = {
@@ -73,9 +74,14 @@ export default function PasskeyRegistration({ onSuccess }: Props) {
 
     return (
         <form
+            noValidate
             onSubmit={handleSubmit}
             className="space-y-4 rounded-lg border border-border bg-muted/50 p-4"
         >
+            <FormErrorHeader
+                message={error}
+                operation="Passkey belum dapat ditambahkan"
+            />
             <div className="grid gap-2">
                 <Input
                     id="passkey-name"

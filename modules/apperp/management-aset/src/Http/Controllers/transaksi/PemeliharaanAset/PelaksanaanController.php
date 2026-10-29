@@ -242,31 +242,7 @@ class PelaksanaanController extends Controller
 
         DB::transaction(function () use ($id, $version, $data, $existing, $userId): void {
             RowVersion::claim(PemeliharaanAset::query()->whereKey($id), $version);
-            foreach ($data['baris'] as $baris) {
-                $row = $existing->get($baris['id']);
-                if (! $row) {
-                    throw ValidationException::withMessages(['baris' => 'Ada baris checklist yang bukan milik pekerjaan ini.']);
-                }
-                $tidakBerlaku = filter_var($baris['tidak_berlaku'] ?? false, FILTER_VALIDATE_BOOL);
-                $nilai = $tidakBerlaku ? null : ($baris['nilai'] ?? null);
-                $this->pastikanNilaiSah($row, $nilai);
-                $resultCode = $this->resultCode($row, $nilai);
-                $catatan = trim((string) ($baris['catatan_teknisi'] ?? ''));
-                if ($resultCode === 'none' && $catatan === '') {
-                    throw ValidationException::withMessages(['baris' => 'Pilih alasan di catatan teknisi saat hasil pemeriksaan Tidak dinilai.']);
-                }
-
-                PemeliharaanAsetChecklist::query()->where('id', $row->id)->update([
-                    'nilai' => $nilai,
-                    'result_code' => $resultCode,
-                    'tidak_berlaku' => $tidakBerlaku,
-                    'catatan_teknisi' => $catatan === '' ? null : $catatan,
-                    'diperiksa' => $tidakBerlaku || ($nilai !== null && $nilai !== ''),
-                    'diperiksa_oleh_user_id' => $userId,
-                    'diperiksa_pada' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
+            $this->writeChecklist($data['baris'], $existing, $userId);
         });
 
         return response()->json(['data' => $this->barisChecklist($jobId), 'version' => $this->versionOf($id)]);
@@ -299,20 +275,99 @@ class PelaksanaanController extends Controller
 
         DB::transaction(function () use ($id, $jobId, $version, $data, $sebabKeterangan, $tindakanKeterangan): void {
             RowVersion::claim(PemeliharaanAset::query()->whereKey($id), $version);
-            PemeliharaanAsetDetail::query()->where([
-                'id' => $jobId,
-                'pemeliharaan_aset_id' => $id,
-            ])->update([
-                'aktual_jam' => $data['aktual_jam'] ?? null,
-                'sebab_kerusakan_id' => $data['sebab_kerusakan_id'] ?? null,
-                'tindakan_perbaikan_id' => $data['tindakan_perbaikan_id'] ?? null,
-                'sebab_kerusakan_keterangan' => $sebabKeterangan,
-                'tindakan_perbaikan_keterangan' => $tindakanKeterangan,
-                'updated_at' => now(),
-            ]);
+            $this->writeExecution($id, $jobId, $data, $sebabKeterangan, $tindakanKeterangan);
         });
 
         return response()->json(['data' => $this->workOrder($request, $id)]);
+    }
+
+    public function saveExecutionBatch(Request $request, string $id): JsonResponse
+    {
+        $this->guard($request, 'execute');
+        $tenant = $this->tenant($request);
+        $workOrder = $this->workOrder($request, $id);
+        app(OrganizationScope::class)->require($request, $workOrder->legal_entity_id, $workOrder->responsible_org_unit_id);
+        $data = $request->validate([
+            'jobs' => ['required', 'array', 'min:1', 'max:200'],
+            'jobs.*.id' => ['required', 'ulid', 'distinct'],
+            'jobs.*.aktual_jam' => ['nullable', 'numeric', 'min:0', 'max:999999.99'],
+            'jobs.*.sebab_kerusakan_id' => ['nullable', 'ulid', Rule::exists('aset_m_sebab_kerusakan', 'id')->where('tenant_id', $tenant)->whereNull('deleted_at')],
+            'jobs.*.tindakan_perbaikan_id' => ['nullable', 'ulid', Rule::exists('aset_m_tindakan_perbaikan', 'id')->where('tenant_id', $tenant)->whereNull('deleted_at')],
+            'jobs.*.sebab_kerusakan_keterangan' => ['nullable', 'string', 'max:1000'],
+            'jobs.*.tindakan_perbaikan_keterangan' => ['nullable', 'string', 'max:1000'],
+            'jobs.*.checklist' => ['sometimes', 'array', 'max:200'],
+            'jobs.*.checklist.*.id' => ['required', 'ulid', 'distinct'],
+            'jobs.*.checklist.*.nilai' => ['nullable', 'string', 'max:255'],
+            'jobs.*.checklist.*.tidak_berlaku' => ['sometimes', 'boolean'],
+            'jobs.*.checklist.*.catatan_teknisi' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $version = RowVersion::expected($request);
+        DB::transaction(function () use ($request, $id, $version, $data): void {
+            RowVersion::claim(PemeliharaanAset::query()->whereKey($id), $version);
+            $locked = $this->workOrder($request, $id);
+            abort_unless(in_array($locked->status, [WorkOrderStatus::DIKERJAKAN, WorkOrderStatus::SELESAI], true), 422, 'Hasil pelaksanaan hanya dapat diubah saat pekerjaan sedang dikerjakan atau sudah selesai.');
+            foreach ($data['jobs'] as $job) {
+                $this->jobLine($locked, $job['id']);
+                $cause = $this->keteranganPilihan(SebabKerusakan::class, $job['sebab_kerusakan_id'] ?? null, $job['sebab_kerusakan_keterangan'] ?? null, 'sebab_kerusakan_keterangan');
+                $repair = $this->keteranganPilihan(TindakanPerbaikan::class, $job['tindakan_perbaikan_id'] ?? null, $job['tindakan_perbaikan_keterangan'] ?? null, 'tindakan_perbaikan_keterangan');
+                $this->writeExecution($id, $job['id'], $job, $cause, $repair);
+                if (array_key_exists('checklist', $job)) {
+                    abort_unless($locked->status === WorkOrderStatus::DIKERJAKAN, 422, 'Checklist hanya dapat diisi ketika pekerjaan sedang dikerjakan.');
+                    $this->writeChecklist($job['checklist'], $this->barisChecklist($job['id'])->keyBy('id'), (string) $request->attributes->get('coreerp.user_id'));
+                }
+            }
+        });
+
+        return response()->json(['data' => $this->workOrder($request, $id)]);
+    }
+
+    /**
+     * @param  list<array{id: string, nilai?: ?string, tidak_berlaku?: bool, catatan_teknisi?: ?string}>  $rows
+     * @param  Collection<array-key, stdClass>  $existing
+     */
+    private function writeChecklist(array $rows, Collection $existing, string $userId): void
+    {
+        foreach ($rows as $baris) {
+            $row = $existing->get($baris['id']);
+            if (! $row) {
+                throw ValidationException::withMessages(['baris' => 'Ada baris checklist yang bukan milik pekerjaan ini.']);
+            }
+            $tidakBerlaku = filter_var($baris['tidak_berlaku'] ?? false, FILTER_VALIDATE_BOOL);
+            $nilai = $tidakBerlaku ? null : ($baris['nilai'] ?? null);
+            $this->pastikanNilaiSah($row, $nilai);
+            $resultCode = $this->resultCode($row, $nilai);
+            $catatan = trim((string) ($baris['catatan_teknisi'] ?? ''));
+            if ($resultCode === 'none' && $catatan === '') {
+                throw ValidationException::withMessages(['baris' => 'Pilih alasan di catatan teknisi saat hasil pemeriksaan Tidak dinilai.']);
+            }
+
+            PemeliharaanAsetChecklist::query()->where('id', $row->id)->update([
+                'nilai' => $nilai,
+                'result_code' => $resultCode,
+                'tidak_berlaku' => $tidakBerlaku,
+                'catatan_teknisi' => $catatan === '' ? null : $catatan,
+                'diperiksa' => $tidakBerlaku || ($nilai !== null && $nilai !== ''),
+                'diperiksa_oleh_user_id' => $userId,
+                'diperiksa_pada' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
+    /** @param array<string, mixed> $data */
+    private function writeExecution(string $id, string $jobId, array $data, ?string $sebabKeterangan, ?string $tindakanKeterangan): void
+    {
+        PemeliharaanAsetDetail::query()->where([
+            'id' => $jobId,
+            'pemeliharaan_aset_id' => $id,
+        ])->update([
+            'aktual_jam' => $data['aktual_jam'] ?? null,
+            'sebab_kerusakan_id' => $data['sebab_kerusakan_id'] ?? null,
+            'tindakan_perbaikan_id' => $data['tindakan_perbaikan_id'] ?? null,
+            'sebab_kerusakan_keterangan' => $sebabKeterangan,
+            'tindakan_perbaikan_keterangan' => $tindakanKeterangan,
+            'updated_at' => now(),
+        ]);
     }
 
     /** @param class-string<Model> $model */
@@ -517,7 +572,7 @@ class PelaksanaanController extends Controller
      */
     private function pilihanVariabel(?string $sumberId, string $nilai): mixed
     {
-        return MaintenanceChecklistVariableValue::query()
+        return MaintenanceChecklistVariableValue::withTrashed()
             ->join(self::TABEL_BARIS_TEMPLATE.' as baris', function ($join): void {
                 $join->on('baris.variable_id', '=', self::TABEL_NILAI.'.variable_id')
                     ->on('baris.tenant_id', '=', self::TABEL_NILAI.'.tenant_id');
@@ -533,7 +588,7 @@ class PelaksanaanController extends Controller
             ->orderBy('line_number')->toBase()->get();
 
         $sourceIds = $rows->pluck('sumber_id')->filter()->values();
-        $variables = MaintenanceChecklistTemplateLine::query()
+        $variables = MaintenanceChecklistTemplateLine::withTrashed()
             ->join(self::TABEL_NILAI.' as nilai', function ($join): void {
                 $join->on('nilai.variable_id', '=', self::TABEL_BARIS_TEMPLATE.'.variable_id')
                     ->on('nilai.tenant_id', '=', self::TABEL_BARIS_TEMPLATE.'.tenant_id');

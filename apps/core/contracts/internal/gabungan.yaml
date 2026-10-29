@@ -74,3 +74,6 @@ tags:
     description: |
       Perintah dari konsol operator vendor. Satu-satunya tag di berkas ini yang pemanggilnya
       bukan app module, dan karena itu satu-satunya yang tidak memakai kredensial app.
+
+  - name: Product registration
+    description: Bridge landing dengan token khusus dan sesi customer, terpisah dari operator.

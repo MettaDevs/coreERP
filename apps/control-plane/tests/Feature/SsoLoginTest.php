@@ -398,6 +398,41 @@ class SsoLoginTest extends TestCase
         $this->assertSame(['subjek-lain'], ExternalIdentity::query()->pluck('subject')->all());
     }
 
+    public function test_unlink_keeps_history_and_allows_relinking_with_audits(): void
+    {
+        $operator = $this->operator('operator@contoh.test');
+        $this->link($operator, 'subjek-operator');
+        $archivedId = ExternalIdentity::query()->sole()->id;
+        $this->actingAs($operator)->delete('/akun/sso', ['password' => self::PASSWORD])->assertRedirect('/akun');
+        $this->assertNotNull(DB::table('external_identities')->where('id', $archivedId)->value('deleted_at'));
+        $this->assertDatabaseHas('operator_audit_events', ['action' => 'sso.unlink', 'subject_id' => $archivedId]);
+        $this->claimOverrides = ['sub' => 'subjek-operator'];
+        $state = $this->startConnect($operator);
+        $this->get('/sso/callback?code=kode-uji&state='.$state)->assertRedirect('/akun');
+        $this->assertSame(1, ExternalIdentity::query()->count());
+        $this->assertSame(2, DB::table('external_identities')->count());
+        $this->assertDatabaseHas('operator_audit_events', ['action' => 'sso.link', 'subject_id' => ExternalIdentity::query()->sole()->id]);
+    }
+
+    public function test_unlink_rolls_back_when_audit_write_fails(): void
+    {
+        $operator = $this->operator('operator@contoh.test');
+        $this->link($operator, 'subjek-operator');
+        DB::statement("ALTER TABLE operator_audit_events ADD CONSTRAINT reject_sso_audit CHECK (action != 'sso.unlink')");
+        $this->actingAs($operator)->delete('/akun/sso', ['password' => self::PASSWORD])->assertStatus(500);
+        $this->assertSame(1, ExternalIdentity::query()->count());
+        $this->assertNull(DB::table('external_identities')->sole()->deleted_at);
+    }
+
+    public function test_link_rolls_back_when_audit_write_fails(): void
+    {
+        $operator = $this->operator('operator@contoh.test');
+        DB::statement("ALTER TABLE operator_audit_events ADD CONSTRAINT reject_sso_audit CHECK (action != 'sso.link')");
+        $state = $this->startConnect($operator);
+        $this->get('/sso/callback?code=kode-uji&state='.$state)->assertStatus(500);
+        $this->assertSame(0, DB::table('external_identities')->count());
+    }
+
     public function test_the_account_page_shows_the_link_and_is_closed_to_non_operators(): void
     {
         $operator = $this->operator('operator@contoh.test');
@@ -532,6 +567,22 @@ class SsoLoginTest extends TestCase
     }
 
     /** Logout token dilarang memuat nonce — yang memuatnya bisa berupa ID token curian yang dikirim ulang. */
+    public function test_logout_token_replay_is_refused(): void
+    {
+        $token = $this->logoutToken('subjek-uji');
+        $this->post('/sso/backchannel-logout', ['logout_token' => $token])->assertOk();
+        $this->post('/sso/backchannel-logout', ['logout_token' => $token])->assertStatus(400);
+    }
+
+    public function test_logout_tokens_require_fresh_timestamps_and_unique_id(): void
+    {
+        foreach ([['iat' => null], ['jti' => null], ['exp' => null], ['iat' => time() - 301], ['iat' => time() + 120]] as $claims) {
+            $this->post('/sso/backchannel-logout', [
+                'logout_token' => $this->logoutToken('subjek-uji', $claims),
+            ])->assertStatus(400);
+        }
+    }
+
     public function test_a_backchannel_token_with_a_nonce_is_refused(): void
     {
         $this->post('/sso/backchannel-logout', [
@@ -687,11 +738,12 @@ class SsoLoginTest extends TestCase
             'aud' => self::CLIENT_ID,
             'sub' => $subject,
             'iat' => time(),
-            'jti' => 'jti-uji',
+            'exp' => time() + 300,
+            'jti' => bin2hex(random_bytes(16)),
             'events' => ['http://schemas.openid.net/event/backchannel-logout' => (object) []],
         ], $overrides);
 
-        return JWT::encode($claims, $this->privateKey, 'RS256', 'kunci-uji');
+        return JWT::encode(array_filter($claims, static fn (mixed $value): bool => $value !== null), $this->privateKey, 'RS256', 'kunci-uji');
     }
 
     /** @return array{0: string, 1: array<string, mixed>} */

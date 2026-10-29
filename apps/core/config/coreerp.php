@@ -244,6 +244,9 @@ return [
     'attachments' => [
         'disk' => env('COREERP_ATTACHMENT_DISK', 's3'),
         'max_kb' => (int) env('COREERP_ATTACHMENT_MAX_KB', 10240),
+        'max_files' => 10,
+        // Sisakan ruang pada post_max_size 12M untuk field dokumen dan pembungkus multipart.
+        'max_total_kb' => 10240,
         'extensions' => ['pdf', 'jpg', 'jpeg', 'png', 'docx', 'xlsx'],
     ],
 

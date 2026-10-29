@@ -30,10 +30,13 @@ import {
     EmptyTitle,
 } from '@apperp/ui/empty';
 import { Spinner } from '@apperp/ui/spinner';
+import { useIncrementalList } from '@apperp/ui/use-incremental-list';
+import type { ListRequest } from '@apperp/ui/use-incremental-list';
 import { Trash2 } from 'lucide-react';
 import { Download, FileText, Paperclip, Upload } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { FormErrorHeader } from '@/components/form-error-header';
 import { RecordUploadDialog } from '@/components/record-upload-dialog';
 import { useDateTimeFormat } from '@/hooks/use-date-time';
 import { apiJson, apiRequest } from '@/lib/core-api';
@@ -42,7 +45,13 @@ import type { Attachment } from '@/lib/record-files';
 
 type AttachmentPage = {
     data: Attachment[];
-    meta: { can_change: boolean; max_kb: number; extensions: string[] };
+    next_cursor: string | null;
+    meta: {
+        total: number;
+        can_change: boolean;
+        max_kb: number;
+        extensions: string[];
+    };
 };
 
 function downloadPath(attachment: Attachment): string {
@@ -151,47 +160,52 @@ export function RecordAttachments({
     recordId: string;
     onCountChange?: (count: number) => void;
 }) {
-    const [page, setPage] = useState<AttachmentPage | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [reloadVersion, setReloadVersion] = useState(0);
+    const [loadedMeta, setLoadedMeta] = useState<{
+        path: string;
+        meta: AttachmentPage['meta'];
+    } | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [selected, setSelected] = useState<Attachment | null>(null);
     const [archiving, setArchiving] = useState<Attachment | null>(null);
+    const [archiveError, setArchiveError] = useState<string | null>(null);
     const [uploadOpen, setUploadOpen] = useState(false);
     const formatDateTime = useDateTimeFormat();
     const path = `/api/v1/records/${encodeURIComponent(recordType)}/${encodeURIComponent(recordId)}/attachments`;
 
-    useEffect(() => {
-        const controller = new AbortController();
-        apiJson<AttachmentPage>(path, { signal: controller.signal })
-            .then((result) => {
-                if (!controller.signal.aborted) {
-                    setPage(result);
-                    setError(null);
-                }
-            })
-            .catch((caught: unknown) => {
-                if (!controller.signal.aborted) {
-                    setError(
-                        attachmentError(caught, 'Lampiran belum dapat dimuat.'),
-                    );
-                }
-            })
-            .finally(() => {
-                if (!controller.signal.aborted) {
-                    setLoading(false);
-                }
+    const loadItems = useCallback(
+        async ({ cursor, signal }: ListRequest) => {
+            const params = new URLSearchParams();
+
+            if (cursor) {
+                params.set('cursor', cursor);
+            }
+
+            const result = await apiJson<AttachmentPage>(`${path}?${params}`, {
+                signal,
             });
 
-        return () => controller.abort();
-    }, [path, reloadVersion]);
+            if (!signal.aborted) {
+                setLoadedMeta({ path, meta: result.meta });
+            }
+
+            return { items: result.data, nextCursor: result.next_cursor };
+        },
+        [path],
+    );
+    const list = useIncrementalList({
+        loadItems,
+        getKey: (item: Attachment) => item.id,
+    });
+    const meta = loadedMeta?.path === path ? loadedMeta.meta : null;
+    const page = meta ? { data: list.items, meta } : null;
+    const loading = list.loading;
 
     useEffect(() => {
-        if (page) {
-            onCountChange?.(page.data.length);
+        if (meta) {
+            onCountChange?.(meta.total);
         }
-    }, [page, onCountChange]);
+    }, [meta, onCountChange]);
 
     async function download(attachment: Attachment) {
         setBusy(true);
@@ -214,7 +228,7 @@ export function RecordAttachments({
 
     async function archive(attachment: Attachment) {
         setBusy(true);
-        setError(null);
+        setArchiveError(null);
 
         try {
             await apiRequest(
@@ -224,23 +238,13 @@ export function RecordAttachments({
                     body: JSON.stringify({ version: attachment.version }),
                 },
             );
-            setPage((current) =>
-                current
-                    ? {
-                          ...current,
-                          data: current.data.filter(
-                              (item) => item.id !== attachment.id,
-                          ),
-                      }
-                    : current,
-            );
+            list.reload();
             setArchiving(null);
             toast.success('Lampiran sudah diarsipkan.');
         } catch (caught) {
-            setError(
+            setArchiveError(
                 attachmentError(caught, 'Lampiran belum dapat diarsipkan.'),
             );
-            setArchiving(null);
         } finally {
             setBusy(false);
         }
@@ -286,22 +290,13 @@ export function RecordAttachments({
                     title="Upload berkas"
                     path={path}
                     limits={page.meta}
-                    onUploaded={(attachment) =>
-                        setPage((current) =>
-                            current
-                                ? {
-                                      ...current,
-                                      data: [...current.data, attachment],
-                                  }
-                                : current,
-                        )
-                    }
+                    onUploaded={() => list.reload()}
                 />
             )}
             <section className="space-y-4" aria-label="Dokumen lampiran">
                 <div className="flex items-center justify-between gap-2">
                     <h3 className="text-base font-medium">
-                        Dokumen{page ? ` (${page.data.length})` : ''}
+                        Dokumen{meta ? ` (${meta.total})` : ''}
                     </h3>
                     {page?.meta.can_change && (
                         <div>
@@ -319,25 +314,27 @@ export function RecordAttachments({
                     )}
                 </div>
                 <div className="space-y-4">
-                    {error && (
-                        <Alert variant="destructive">
-                            <AlertDescription>{error}</AlertDescription>
+                    <FormErrorHeader
+                        message={error || list.error}
+                        operation="Lampiran belum dapat dibuka"
+                    />
+                    {(error || list.error) && (
+                        <div>
                             <Button
                                 type="button"
                                 variant="outline"
                                 size="sm"
                                 disabled={busy || loading}
                                 onClick={() => {
-                                    setLoading(true);
                                     setError(null);
-                                    setReloadVersion((current) => current + 1);
+                                    list.reload();
                                 }}
                             >
                                 Muat ulang
                             </Button>
-                        </Alert>
+                        </div>
                     )}
-                    {loading ? (
+                    {loading && !list.items.length ? (
                         <div
                             role="status"
                             className="flex items-center gap-2 text-sm"
@@ -349,6 +346,7 @@ export function RecordAttachments({
                         page &&
                         (page.data.length > 0 ? (
                             <DataTable
+                                incremental={list}
                                 columns={columns}
                                 data={page.data}
                                 getRowKey={(item) => item.id}
@@ -387,11 +385,12 @@ export function RecordAttachments({
                                     }
 
                                     if (action === 'archive') {
+                                        setArchiveError(null);
                                         setArchiving(item);
                                     }
                                 }}
                             />
-                        ) : (
+                        ) : !list.error ? (
                             <Empty>
                                 <EmptyHeader>
                                     <EmptyMedia variant="icon">
@@ -405,7 +404,7 @@ export function RecordAttachments({
                                     </EmptyDescription>
                                 </EmptyHeader>
                             </Empty>
-                        ))
+                        ) : null)
                     )}
                     {page?.meta.can_change && (
                         <p className="text-xs text-muted-foreground">
@@ -479,6 +478,10 @@ export function RecordAttachments({
                             daftar lampiran ini. Berkasnya tetap tersimpan.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
+                    <FormErrorHeader
+                        message={archiveError}
+                        operation="Lampiran belum dapat diarsipkan"
+                    />
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={busy}>
                             Batal

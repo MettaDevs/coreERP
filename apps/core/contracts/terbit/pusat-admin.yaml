@@ -2,7 +2,7 @@
 # Jangan diedit tangan: suntingan di sini hilang pada perakitan berikutnya, dan CI menolaknya.
 openapi: 3.1.0
 info:
-  title: CoreERP — perintah pusat admin
+  title: CoreERP â€” perintah pusat admin
   version: 1.0.0
   description: |
     Perintah dari konsol operator vendor ke Core: melahirkan tenant, menyiapkan dan memutakhirkan
@@ -20,6 +20,354 @@ tags:
 - name: Pusat admin
   description: Perintah dari konsol operator vendor.
 paths:
+  /managed-products:
+    get:
+      tags:
+      - Pusat admin
+      operationId: internal.managedProducts.index
+      summary: Daftar produk terkelola dan jenis fasilitas yang tersedia
+      security:
+      - controlPlaneToken: []
+      responses:
+        '200':
+          description: Katalog tanpa rahasia worker.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - products
+                properties:
+                  products:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                      - code
+                      - name
+                      - profiles
+                      properties:
+                        code:
+                          type: string
+                        name:
+                          type: string
+                        profiles:
+                          type: array
+                          items:
+                            type: object
+                            required:
+                            - code
+                            - name
+                            properties:
+                              code:
+                                type: string
+                              name:
+                                type: string
+                              description:
+                                type: string
+        '401':
+          description: Token pusat admin salah.
+  /product-tenants:
+    get:
+      tags:
+      - Pusat admin
+      operationId: internal.productTenants.index
+      summary: Daftar tenant produk eksternal
+      security:
+      - controlPlaneToken: []
+      responses:
+        '200':
+          description: Daftar dengan cursor, tanpa kredensial.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - data
+                - next_cursor
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ManagedProductTenant'
+                  next_cursor:
+                    type:
+                    - string
+                    - 'null'
+        '401':
+          description: Token pusat admin salah.
+      parameters:
+      - name: search
+        in: query
+        schema:
+          type: string
+          maxLength: 150
+      - name: cursor
+        in: query
+        schema:
+          type: string
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+    post:
+      tags:
+      - Pusat admin
+      operationId: internal.productTenants.store
+      summary: Daftarkan dan mulai penyiapan tenant produk dari release terkunci
+      security:
+      - controlPlaneToken: []
+      responses:
+        '202':
+          description: Permintaan diterima.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagedProductTenant'
+        '401':
+          description: Token pusat admin salah.
+        '404':
+          description: Tenant atau operator tidak ditemukan.
+        '409':
+          description: Permintaan bertentangan dengan keadaan saat ini.
+        '422':
+          description: Isian belum sesuai.
+      description: Tidak membuat user, client, environment PostgreSQL atau module CoreERP. Worker produk
+        memulihkan seed SQL Server secara asynchronous. Retry memakai release yang sama dan tidak menimpa
+        tenant ready. Pendaftaran mandiri belum tersedia.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - product
+              - profile
+              - name
+              - slug
+              - owner_name
+              - owner_email
+              - idempotency_key
+              - requested_by
+              properties:
+                product:
+                  type: string
+                profile:
+                  type: string
+                name:
+                  type: string
+                slug:
+                  type: string
+                owner_name:
+                  type: string
+                owner_email:
+                  type: string
+                  format: email
+                  maxLength: 250
+                idempotency_key:
+                  type: string
+                  format: uuid
+                requested_by:
+                  type: integer
+  /product-tenants/{id}:
+    get:
+      tags:
+      - Pusat admin
+      operationId: internal.productTenants.show
+      summary: Rincian tenant dan kredensial untuk operator
+      security:
+      - controlPlaneToken: []
+      responses:
+        '200':
+          description: Permintaan diterima.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagedProductTenant'
+        '401':
+          description: Token pusat admin salah.
+        '404':
+          description: Tenant atau operator tidak ditemukan.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+  /product-tenants/{id}/retry:
+    post:
+      tags:
+      - Pusat admin
+      operationId: internal.productTenants.retry
+      summary: Lanjutkan penyiapan yang gagal
+      security:
+      - controlPlaneToken: []
+      responses:
+        '202':
+          description: Permintaan diterima.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagedProductTenant'
+        '401':
+          description: Token pusat admin salah.
+        '404':
+          description: Tenant atau operator tidak ditemukan.
+        '409':
+          description: Permintaan bertentangan dengan keadaan saat ini.
+        '422':
+          description: Isian belum sesuai.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - requested_by
+              properties:
+                requested_by:
+                  type: integer
+  /operators/{user}/verify-second-factor:
+    post:
+      tags:
+      - Pusat admin
+      operationId: internal.operators.verifySecondFactor
+      summary: Periksa kode MFA operator memakai kunci enkripsi Core
+      description: |
+        Hanya untuk akun person dengan hak provider_admin, tanpa kewajiban mengganti password,
+        serta MFA yang telah dikonfirmasi. Kode pemulihan dikonsumsi sekali dalam transaksi
+        dengan kunci baris user. Rahasia MFA tidak pernah dikirim ke konsol. Maksimal lima
+        percobaan per user per menit, termasuk percobaan berhasil; batas grup 30/menit tetap berlaku.
+        Respons tidak memakai envelope data.
+      security:
+      - controlPlaneToken: []
+      parameters:
+      - name: user
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - code
+              properties:
+                code:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+      responses:
+        '200':
+          description: Kode benar dan akun masih diizinkan masuk.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - verified
+                - user_id
+                properties:
+                  verified:
+                    type: boolean
+                    const: true
+                  user_id:
+                    type: integer
+        '401':
+          description: Token pusat admin tidak sah.
+        '422':
+          description: Kode salah, bentuk input salah, akun tidak ada atau tidak memenuhi syarat masuk.
+        '429':
+          description: Batas percobaan tercapai; Retry-After menyatakan detik sampai boleh mencoba lagi.
+  /environments:
+    post:
+      tags:
+      - Pusat admin
+      operationId: createEnvironment
+      summary: Mencatat lingkungan baru milik tenant
+      description: |
+        Core mencatat lingkungan berstatus provisioning, operasi pencatatan yang selesai, dan audit operator dalam satu transaksi.
+        Belum menyiapkan database. Satu lingkungan aktif per jenis per tenant; slug yang bentrok dicoba dengan akhiran angka.
+        Token menyatakan proses konsol. requested_by adalah operator yang diteruskan konsol tepercaya.
+      security:
+      - controlPlaneToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - tenant_id
+              - kind
+              - name
+              - requested_by
+              properties:
+                tenant_id:
+                  type: string
+                kind:
+                  type: string
+                  enum:
+                  - production
+                  - demo
+                  - sandbox
+                name:
+                  type: string
+                  maxLength: 100
+                requested_by:
+                  type: integer
+                  description: Id user operator yang ada di Core.
+                expires_at:
+                  type:
+                  - string
+                  - 'null'
+                  format: date
+                  description: Wajib untuk demo dan harus setelah hari ini.
+                hosting:
+                  type:
+                  - string
+                  - 'null'
+                  enum:
+                  - provider
+                  - client_server
+                  - null
+                  default: provider
+                  description: Server klien hanya untuk produksi.
+      responses:
+        '201':
+          description: Lingkungan tercatat dan belum disiapkan.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - environment_id
+                - tenant_id
+                properties:
+                  environment_id:
+                    type: string
+                  tenant_id:
+                    type: string
+        '401':
+          description: Token konsol tidak sah.
+        '422':
+          description: Isian tidak sah atau tenant sudah memiliki lingkungan jenis ini.
   /tenants:
     post:
       tags:
@@ -338,9 +686,8 @@ paths:
                     type: array
                     description: |
                       Dibaca dari database lingkungan itu, bukan disimpulkan dari entitlement
-                      tenantnya. Kosong bila tenantnya tidak membeli satu pun module yang ada
-                      di edisi ini — atau bila daftarnya tidak terbaca, yang sengaja tidak
-                      menggagalkan penyiapan yang sudah berhasil.
+                      tenantnya. Kosong berarti tidak ada pemasangan tambahan yang terbaca.
+                      Bila pembacaan gagal, modules_error menjelaskan kegagalannya.
                     items:
                       type: object
                       required:
@@ -362,6 +709,11 @@ paths:
                         seeded:
                           type: boolean
                           description: Data awal module ini sudah pernah diisi.
+                  modules_error:
+                    type: string
+                    nullable: true
+                    description: Penyiapan berhasil tetapi daftar aplikasi belum dapat dibaca; bukan bukti
+                      daftar kosong.
                   output:
                     type: string
                     description: Keluaran mentah perintahnya, untuk ditempel ke laporan.
@@ -477,6 +829,7 @@ paths:
                       - database
                       - fingerprint
                       - state
+                      - queued
                       - last_operation
                       properties:
                         id:
@@ -517,6 +870,12 @@ paths:
                             Satu kata yang dapat dijadikan lencana. `unknown` mencakup dua keadaan
                             yang keduanya bukan "tertinggal": sedang dikerjakan, dan belum pernah
                             punya skema sama sekali.
+                        queued:
+                          type: boolean
+                          description: |
+                            Pembaruan sudah dipesan dalam antrean dan belum memiliki operasi berjalan.
+                            Tetap true selama jeda percobaan ulang; kembali false setelah job selesai
+                            atau gagal permanen. Dibaca dari kunci unik job yang sama dengan pengantrean.
                         last_operation:
                           type: object
                           nullable: true
@@ -721,6 +1080,58 @@ components:
         message:
           type: string
           description: Pesan untuk operator app. Tidak pernah memuat data tenant lain.
+    ManagedProductTenant:
+      type: object
+      required:
+      - id
+      - product
+      - profile
+      - name
+      - slug
+      - status
+      properties:
+        id:
+          type: string
+        product:
+          type: string
+        profile:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        owner_name:
+          type: string
+        owner_email:
+          type: string
+        created_at:
+          type: string
+        status:
+          type: string
+          enum:
+          - queued
+          - provisioning
+          - ready
+          - failed
+        public_url:
+          type:
+          - string
+          - 'null'
+          format: uri
+        failure_message:
+          type:
+          - string
+          - 'null'
+        expires_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        credentials:
+          type: object
+          additionalProperties:
+            type: string
+          description: Hanya rincian operator, tidak pernah pada daftar atau audit.
     ValidationError:
       type: object
       required:

@@ -1,3 +1,5 @@
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
+import { FormErrorHeader } from '@/components/form-error-header';
 import { ActionButton } from '@apperp/ui/action-button';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Button } from '@apperp/ui/button';
@@ -35,6 +37,9 @@ type DateTimeProps = {
 const FOLLOW_LEGAL_ENTITY = 'ikuti-entitas-legal';
 
 function DateTimeSettings({ dateTime }: { dateTime: DateTimeProps }) {
+    const { wrap: wrapFormRequest, summary: formRequestSummary } =
+        useInertiaFeedback();
+
     const { date: workDate, today } = useWorkDate();
     const form = useForm<{ timezone: string | null; work_date: string }>({
         timezone: dateTime.timezone,
@@ -60,12 +65,16 @@ function DateTimeSettings({ dateTime }: { dateTime: DateTimeProps }) {
             </CardHeader>
             <CardContent>
                 <form
+                    noValidate
                     className="space-y-6"
                     onSubmit={(event) => {
                         event.preventDefault();
-                        form.patch('/settings/date-time', {
-                            preserveScroll: true,
-                        });
+                        form.patch(
+                            '/settings/date-time',
+                            wrapFormRequest({
+                                preserveScroll: true,
+                            }),
+                        );
                     }}
                 >
                     <RecordActionBar>
@@ -75,8 +84,12 @@ function DateTimeSettings({ dateTime }: { dateTime: DateTimeProps }) {
                             disabled={form.processing}
                         />
                     </RecordActionBar>
+                    <>
+                        {formRequestSummary}
+                        <FormErrorHeader errors={form.errors} />
+                    </>
 
-                    <div className="grid gap-2">
+                    <div className="grid gap-2" data-error-field={'timezone'}>
                         <Select
                             label="Zona waktu"
                             items={zones}
@@ -96,7 +109,7 @@ function DateTimeSettings({ dateTime }: { dateTime: DateTimeProps }) {
                         <InputError message={form.errors.timezone} />
                     </div>
 
-                    <div className="grid gap-2">
+                    <div className="grid gap-2" data-error-field={'work_date'}>
                         <div className="flex items-center gap-2">
                             <Input
                                 id="work_date"
@@ -156,6 +169,9 @@ export default function Profile(
     },
     /* @end-chisel-email-verification */
 ) {
+    const { wrap: wrapFormResponse1, summary: formResponse1Summary } =
+        useInertiaFeedback();
+
     const { auth } = usePage<PageProps>().props;
 
     return (
@@ -171,10 +187,11 @@ export default function Profile(
                     </CardHeader>
                     <CardContent>
                         <Form
+                            noValidate
                             {...ProfileController.update.form()}
-                            options={{
+                            options={wrapFormResponse1({
                                 preserveScroll: true,
-                            }}
+                            })}
                             className="space-y-6"
                         >
                             {({ processing, errors }) => (
@@ -187,8 +204,15 @@ export default function Profile(
                                             type="submit"
                                         />
                                     </RecordActionBar>
+                                    <>
+                                        {formResponse1Summary}
+                                        <FormErrorHeader errors={errors} />
+                                    </>
 
-                                    <div className="grid gap-2">
+                                    <div
+                                        className="grid gap-2"
+                                        data-error-field={'name'}
+                                    >
                                         <Input
                                             id="name"
                                             label="Nama lengkap"
@@ -205,7 +229,10 @@ export default function Profile(
                                         />
                                     </div>
 
-                                    <div className="grid gap-2">
+                                    <div
+                                        className="grid gap-2"
+                                        data-error-field={'email'}
+                                    >
                                         <Input
                                             id="email"
                                             label="Email"

@@ -71,3 +71,5 @@ Schedule::command('environment:purge')
     ->skip(fn (): bool => PurgeEnvironment::nothingToPurge());
 
 Schedule::command('workflow:notify')->everyMinute()->onOneServer()->withoutOverlapping();
+
+Schedule::command('product-tenants:reconcile')->everyMinute()->onOneServer()->withoutOverlapping();

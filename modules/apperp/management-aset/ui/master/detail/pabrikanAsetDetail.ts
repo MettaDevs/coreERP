@@ -4,6 +4,7 @@ export type PabrikanAsetDetail = {
 };
 
 export type PabrikanModelRecord = {
+    creation_key?: string;
     id: string;
     kode: string;
     nama: string;

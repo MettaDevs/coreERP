@@ -19,6 +19,7 @@ use App\Platform\AddressBook\Models\PartyType;
 use App\Platform\AddressBook\Support\OrganizationAddressBook;
 use App\Platform\AddressBook\Support\PartyDetailData;
 use App\Platform\Geography\Models\CountryRegion;
+use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\RowVersion;
 use App\Platform\Modules\Contracts\VendorDirectory;
 use App\Platform\Organization\Models\OrganizationParty;
@@ -72,6 +73,7 @@ final class GlobalAddressBookController extends Controller
         return Inertia::render('platform/address-book/index', [
             'parties' => Inertia::scroll(fn () => $query->orderBy('name')->orderBy('id')->simplePaginate(40)->withQueryString()->through(fn (Party $party): array => $this->present($party)))->matchOn('data.id'),
             'filters' => $filters,
+            'selectedAddressBook' => empty($filters['address_book']) ? null : AddressBook::withTrashed()->where('tenant_id', $tenant)->find($filters['address_book'], ['id', 'name', 'version', 'deleted_at']),
             ...$this->formMetadata($membership),
         ]);
     }
@@ -97,7 +99,6 @@ final class GlobalAddressBookController extends Controller
             'locationPurposes' => LocationPurpose::query()->orderBy('sort_order')->get(['code', 'name']),
             'countries' => CountryRegion::query()->orderBy('name')->get(['code', 'name']),
             'contactTypes' => ElectronicAddress::TYPES,
-            'addressBooks' => AddressBook::query()->where('tenant_id', $membership->tenant_id)->orderBy('name')->get(['id', 'name', 'version']),
         ];
     }
 
@@ -110,10 +111,12 @@ final class GlobalAddressBookController extends Controller
             ->where(fn ($query) => $query->where('from_party_id', $party->id)->orWhere('to_party_id', $party->id))->get();
         $relatedIds = $relationships->flatMap(fn ($row) => [$row->from_party_id, $row->to_party_id])->unique();
         $names = Party::query()->where('tenant_id', $tenant)->whereIn('id', $relatedIds)->pluck('name', 'id');
+        $bookIds = PartyAddressBook::query()->where('tenant_id', $tenant)->where('party_id', $party->id)->pluck('address_book_id');
 
         return response()->json(['data' => [
             ...$this->present($party),
-            'address_book_ids' => PartyAddressBook::query()->where('tenant_id', $tenant)->where('party_id', $party->id)->pluck('address_book_id'),
+            'address_book_ids' => $bookIds,
+            'address_books' => AddressBook::withTrashed()->where('tenant_id', $tenant)->whereIn('id', $bookIds)->get(['id', 'name', 'version', 'deleted_at']),
             'organization_id' => OrganizationParty::query()->where('tenant_id', $tenant)->where('party_id', $party->id)->value('organization_id'),
             'relationships' => $relationships->map(fn ($row) => [...$row->toArray(), 'from_name' => $names[$row->from_party_id] ?? 'Pihak terarsip', 'to_name' => $names[$row->to_party_id] ?? 'Pihak terarsip']),
             'vendors' => $canReadVendors ? app(VendorDirectory::class)->forParty($tenant, $party->id) : [],
@@ -232,6 +235,15 @@ final class GlobalAddressBookController extends Controller
         }
 
         return response()->json(['data' => $this->present($party->refresh())]);
+    }
+
+    public function books(Request $request): JsonResponse
+    {
+        $membership = $this->currentMembership($request);
+        abort_unless($membership->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_READ), 403);
+        $query = AddressBook::query()->where('tenant_id', $membership->tenant_id)->select(['id', 'name', 'version'])->toBase();
+
+        return response()->json(IncrementalList::query($request, $query, ['name' => 'name'], ['name'], 'name'));
     }
 
     public function storeBook(Request $request): JsonResponse
@@ -394,10 +406,13 @@ final class GlobalAddressBookController extends Controller
     /** @return array<string, mixed> */
     private function validated(Request $request, string $tenant, ?Party $party = null): array
     {
+        $availableBooks = Rule::exists('address_books', 'id')->where('tenant_id', $tenant)
+            ->where(fn ($query) => $query->whereNull('deleted_at')->orWhereIn('id', PartyAddressBook::query()
+                ->where('tenant_id', $tenant)->where('party_id', $party?->id)->select('address_book_id')));
         $rules = ['name' => ['required', 'string', 'max:200', 'regex:/\S/u'],
             'type' => ['required', Rule::in($party === null ? ['person', 'organization'] : [$party->type])],
             'search_name' => ['nullable', 'string', 'max:200'], 'status' => ['required', Rule::in(['active', 'inactive'])],
-            'address_book_ids' => ['sometimes', 'array'], 'address_book_ids.*' => ['ulid', 'distinct', Rule::exists('address_books', 'id')->where('tenant_id', $tenant)->whereNull('deleted_at')]];
+            'address_book_ids' => ['sometimes', 'array', $availableBooks], 'address_book_ids.*' => ['ulid', 'distinct']];
         foreach (Party::PROFILE_FIELDS as $field) {
             $rules[$field] = ['sometimes', 'nullable', 'string', 'max:200'];
         }
@@ -437,11 +452,12 @@ final class GlobalAddressBookController extends Controller
     /** @param list<string> $ids */
     private function syncBooks(Party $party, array $ids): void
     {
-        $available = AddressBook::query()->where('tenant_id', $party->tenant_id)->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->pluck('id')->all();
+        $books = AddressBook::withTrashed()->where('tenant_id', $party->tenant_id)->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get(['id', 'deleted_at']);
+        $links = PartyAddressBook::query()->where('tenant_id', $party->tenant_id)->where('party_id', $party->id)->get();
+        $available = $books->filter(fn (AddressBook $book): bool => $book->deleted_at === null || $links->contains('address_book_id', $book->id))->pluck('id')->all();
         if (count($available) !== count($ids)) {
             throw ValidationException::withMessages(['address_book_ids' => 'Salah satu buku alamat sudah diarsipkan. Muat ulang pilihannya.']);
         }
-        $links = PartyAddressBook::query()->where('tenant_id', $party->tenant_id)->where('party_id', $party->id)->get();
         foreach ($links as $link) {
             if (! in_array($link->address_book_id, $ids, true)) {
                 $link->delete();

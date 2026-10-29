@@ -1,5 +1,4 @@
 import { ActionButton } from '@apperp/ui/action-button';
-import { Alert, AlertDescription } from '@apperp/ui/alert';
 import { Button } from '@apperp/ui/button';
 import {
     Dialog,
@@ -20,9 +19,10 @@ import {
 import { Textarea } from '@apperp/ui/textarea';
 import { Trash2 } from 'lucide-react';
 import { Ellipsis, Plus } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
+import { FormErrorHeader } from '@/components/form-error-header';
 import { useDateTimeFormat } from '@/hooks/use-date-time';
-import { apiJson, apiRequest } from '@/lib/core-api';
+import { apiJson, apiRequest, CoreApiError } from '@/lib/core-api';
 import { attachmentError } from '@/lib/record-files';
 
 type Note = {
@@ -46,6 +46,11 @@ export function RecordNotes({
     const path = `/api/v1/records/${encodeURIComponent(recordType)}/${encodeURIComponent(recordId)}/notes`;
     const [page, setPage] = useState<NotePage | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [saveError, setSaveError] = useState<string | null>(null);
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>(
+        {},
+    );
+    const contentErrorId = `${useId()}-content-error`;
     const [busy, setBusy] = useState(false);
     const [open, setOpen] = useState(false);
     const [editing, setEditing] = useState<Note | null>(null);
@@ -80,14 +85,26 @@ export function RecordNotes({
 
     function show(note: Note | null) {
         setEditing(note);
+        setFieldErrors({});
         setContent(note?.content ?? '');
-        setError(null);
+        setSaveError(null);
         setOpen(true);
     }
 
     async function save() {
+        setFieldErrors({});
+
+        if (!content.trim()) {
+            setFieldErrors({ content: ['Isi catatan sebelum menyimpan.'] });
+            setSaveError(
+                'Catatan belum disimpan. Isi catatan terlebih dahulu.',
+            );
+
+            return;
+        }
+
         setBusy(true);
-        setError(null);
+        setSaveError(null);
 
         try {
             await apiRequest(editing ? `${path}/${editing.id}` : path, {
@@ -100,7 +117,13 @@ export function RecordNotes({
             setOpen(false);
             setReload((value) => value + 1);
         } catch (caught) {
-            setError(attachmentError(caught, 'Catatan belum dapat disimpan.'));
+            if (caught instanceof CoreApiError && caught.status < 500) {
+                setFieldErrors(caught.errors);
+            }
+
+            setSaveError(
+                attachmentError(caught, 'Catatan belum dapat disimpan.'),
+            );
         } finally {
             setBusy(false);
         }
@@ -153,10 +176,11 @@ export function RecordNotes({
                     </Button>
                 )}
             </div>
-            {error && !open && (
-                <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
-                </Alert>
+            {!open && (
+                <FormErrorHeader
+                    message={error}
+                    operation="Catatan belum dapat diproses"
+                />
             )}
             {!page && !error && (
                 <p className="text-sm text-muted-foreground">Memuat catatan…</p>
@@ -230,20 +254,35 @@ export function RecordNotes({
                             Catatan untuk data yang sedang dipilih.
                         </DialogDescription>
                     </DialogHeader>
+                    <FormErrorHeader
+                        message={saveError}
+                        errors={fieldErrors}
+                        operation="Catatan belum dapat disimpan"
+                    />
+
                     <DialogBody>
                         <Textarea
+                            data-error-field="content"
+                            aria-invalid={!!fieldErrors.content}
+                            aria-describedby={
+                                fieldErrors.content ? contentErrorId : undefined
+                            }
                             label="Isi catatan"
                             required
                             maxLength={10000}
                             rows={7}
                             value={content}
-                            readOnly={!page?.meta.can_change}
+                            readOnly={busy || !page?.meta.can_change}
                             onChange={(event) => setContent(event.target.value)}
                         />
-                        {error && (
-                            <Alert variant="destructive">
-                                <AlertDescription>{error}</AlertDescription>
-                            </Alert>
+                        {fieldErrors.content && (
+                            <p
+                                id={contentErrorId}
+                                role="alert"
+                                className="text-sm text-destructive"
+                            >
+                                {fieldErrors.content.join(' ')}
+                            </p>
                         )}
                     </DialogBody>
                     <DialogFooter>
@@ -260,7 +299,7 @@ export function RecordNotes({
                             <ActionButton
                                 action="save"
                                 type="button"
-                                disabled={busy || !content.trim()}
+                                disabled={busy}
                                 onClick={() => void save()}
                                 pending={busy}
                             />

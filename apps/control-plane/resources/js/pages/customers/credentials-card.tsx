@@ -1,4 +1,5 @@
 import { Button } from '@apperp/ui/button';
+import { Copy, Check } from 'lucide-react';
 import { useState } from 'react';
 
 export type Credentials = {
@@ -49,27 +50,26 @@ export default function CredentialsCard({
     }
 
     return (
-        <section className="rounded-lg border border-amber-300 bg-amber-50 p-5 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-50">
-            <h2 className="text-base font-semibold">
+        <section className="rounded-lg border border-warning/30 bg-card p-5 text-card-foreground">
+            <h2 className="text-sm font-semibold">
                 Akun admin untuk {credentials.name} sudah dibuat
             </h2>
-            <p className="mt-1 text-sm">
-                Sampaikan dua baris di bawah kepada admin tenant sekarang.{' '}
-                <strong className="font-semibold">
-                    Kata sandinya tidak akan muncul lagi
+            <p className="mt-2 text-sm text-muted-foreground">
+                Salin email dan kata sandi sementara sebelum meninggalkan
+                halaman ini.{' '}
+                <strong className="font-medium text-warning">
+                    Kata sandi hanya ditampilkan sekali.
                 </strong>{' '}
-                — ia tidak disimpan di mana pun, dan menutup halaman ini
-                menghilangkannya. Kalau telanjur hilang, tidak ada satu pun cara
-                membacanya lagi dari konsol ini.
+                Sampaikan keduanya kepada admin tenant.
             </p>
 
-            <dl className="mt-4 space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-background px-4 py-3 dark:border-amber-900/60">
+            <dl className="mt-4 grid gap-3 lg:grid-cols-2">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-warning/30 bg-background px-4 py-3">
                     <div className="min-w-0">
                         <dt className="text-xs text-muted-foreground">
                             Email admin
                         </dt>
-                        <dd className="truncate font-mono text-sm">
+                        <dd className="font-mono text-sm break-all">
                             {credentials.email}
                         </dd>
                     </div>
@@ -79,16 +79,21 @@ export default function CredentialsCard({
                         variant="outline"
                         onClick={() => void copy('email', credentials.email)}
                     >
-                        {copied === 'email' ? 'Tersalin' : 'Salin'}
+                        {copied === 'email' ? (
+                            <Check className="size-4" />
+                        ) : (
+                            <Copy className="size-4" />
+                        )}
+                        {copied === 'email' ? 'Tersalin' : 'Salin email'}
                     </Button>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-background px-4 py-3 dark:border-amber-900/60">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-warning/30 bg-background px-4 py-3">
                     <div className="min-w-0">
                         <dt className="text-xs text-muted-foreground">
                             Kata sandi sementara
                         </dt>
-                        <dd className="truncate font-mono text-lg font-semibold tracking-wide">
+                        <dd className="font-mono text-base font-semibold tracking-wide break-all">
                             {credentials.password}
                         </dd>
                     </div>
@@ -99,6 +104,11 @@ export default function CredentialsCard({
                             void copy('password', credentials.password)
                         }
                     >
+                        {copied === 'password' ? (
+                            <Check className="size-4" />
+                        ) : (
+                            <Copy className="size-4" />
+                        )}
                         {copied === 'password'
                             ? 'Tersalin'
                             : 'Salin kata sandi'}
@@ -108,9 +118,8 @@ export default function CredentialsCard({
 
             {copyFailed && (
                 <p className="mt-3 text-sm font-medium">
-                    Peramban menolak menyalin — biasanya karena halaman ini
-                    dibuka lewat alamat yang bukan HTTPS. Sorot dan salin
-                    teksnya dengan tangan.
+                    Teks belum tersalin. Sorot email atau kata sandinya, lalu
+                    salin secara manual.
                 </p>
             )}
 

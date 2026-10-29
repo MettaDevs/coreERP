@@ -33,13 +33,8 @@ import {
 
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import {
-    apiJson,
-    apiRequest,
-    CoreApiError,
-    errorText,
-    toastSaveError,
-} from '@/lib/core-api';
+import { useSaveFeedback } from '@/hooks/use-save-feedback';
+import { apiJson, apiRequest, CoreApiError, errorText } from '@/lib/core-api';
 
 /**
  * Setelan feed posting finance satu entitas legal: aktif atau tidak, tanggal cutover, dan riwayat
@@ -95,6 +90,12 @@ export function FinancePostingSection({
     canManage: boolean;
 }) {
     const base = `/api/v1/organizations/${organizationId}/finance-posting`;
+    const {
+        report: saveReport,
+        clear: saveClear,
+        summary: saveSummary,
+        scopeRef: saveScopeRef,
+    } = useSaveFeedback<HTMLDivElement>(organizationId);
     const [setting, setSetting] = useState<Setting | null>(null);
     const [loadError, setLoadError] = useState('');
     const [enabled, setEnabled] = useState(false);
@@ -140,6 +141,8 @@ export function FinancePostingSection({
         setSaving(true);
         setSaveErrors({});
 
+        saveClear();
+
         try {
             const result = await apiJson<{ data: Setting }>(base, {
                 method: 'PUT',
@@ -156,7 +159,7 @@ export function FinancePostingSection({
                 setSaveErrors(caught.errors);
             }
 
-            toastSaveError(caught, 'Setelan posting belum disimpan.');
+            saveReport(caught, 'Setelan posting belum disimpan.');
         } finally {
             setSaving(false);
         }
@@ -165,6 +168,8 @@ export function FinancePostingSection({
     const addMode = async () => {
         setAddingMode(true);
         setModeErrors({});
+
+        saveClear();
 
         try {
             const result = await apiJson<{ data: Setting }>(
@@ -185,13 +190,15 @@ export function FinancePostingSection({
                 setModeErrors(caught.errors);
             }
 
-            toast.error(errorText(caught, 'Mode belum dapat ditambahkan.'));
+            saveReport(caught, 'Mode belum dapat ditambahkan.');
         } finally {
             setAddingMode(false);
         }
     };
 
     const removeMode = async (row: ModeRow) => {
+        saveClear();
+
         try {
             await apiRequest(`${base}/settlement-modes/${row.id}`, {
                 method: 'DELETE',
@@ -201,7 +208,7 @@ export function FinancePostingSection({
             apply(result.data);
             toast.success('Mode penyelesaian dihapus.');
         } catch (caught) {
-            toastSaveError(caught, 'Mode belum dapat dihapus.');
+            saveReport(caught, 'Mode belum dapat dihapus.');
         }
     };
 
@@ -218,7 +225,8 @@ export function FinancePostingSection({
     }
 
     return (
-        <div className="space-y-6">
+        <div ref={saveScopeRef} className="space-y-6">
+            {saveSummary}
             <div className="space-y-4">
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                     <Badge variant={setting.enabled ? 'default' : 'outline'}>
@@ -259,7 +267,10 @@ export function FinancePostingSection({
                                 Kirim posting ke aplikasi finance
                             </FieldLabel>
                         </Field>
-                        <Field data-invalid={Boolean(saveErrors.cutover_date)}>
+                        <Field
+                            data-error-field="cutover_date"
+                            data-invalid={Boolean(saveErrors.cutover_date)}
+                        >
                             <Input
                                 type="date"
                                 label="Tanggal cutover"

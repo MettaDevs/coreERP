@@ -23,22 +23,13 @@ import {
     CardTitle,
 } from '@apperp/ui/card';
 import { Checkbox } from '@apperp/ui/checkbox';
+import {
+    CollapsibleSection,
+    CollapsibleSectionGroup,
+} from '@apperp/ui/collapsible-section';
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
-import { DialogClose } from '@apperp/ui/dialog';
-import {
-    DialogToolbar,
-    Dialog,
-    DialogAction,
-    DialogBody,
-    DialogCancel,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@apperp/ui/dialog';
+import { DialogAction } from '@apperp/ui/dialog';
 import {
     Empty,
     EmptyDescription,
@@ -47,43 +38,50 @@ import {
     EmptyTitle,
 } from '@apperp/ui/empty';
 import {
-    Field,
     FieldDescription,
     FieldGroup,
     FieldLegend,
     FieldSet,
 } from '@apperp/ui/field';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { MultiSelect } from '@apperp/ui/multi-select';
+import {
+    PageDialog,
+    PageDialogContent,
+    PageDialogBody,
+    PageDialogToolbar,
+    PageDialogClose,
+    PageDialogTrigger,
+} from '@apperp/ui/page-dialog';
 import { RadioGroup, RadioGroupItem } from '@apperp/ui/radio-group';
 import { Select } from '@apperp/ui/select';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@apperp/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@apperp/ui/tabs';
-import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { useIncrementalList } from '@apperp/ui/use-incremental-list';
+import type { ListRequest } from '@apperp/ui/use-incremental-list';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
+import { Deferred, Head, router, useForm, usePage } from '@inertiajs/react';
 import { Trash2 } from 'lucide-react';
-import {
-    Ban,
-    Check,
-    ChevronRight,
-    Copy,
-    Pencil,
-    ShieldCheck,
-    UserCog,
-    UserPlus,
-    Users,
-} from 'lucide-react';
+import { Ban, Check, Copy, Pencil, Users } from 'lucide-react';
 import type { RefObject } from 'react';
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { FormErrorHeader } from '@/components/form-error-header';
 import Heading from '@/components/heading';
+import {
+    useInertiaFeedback,
+    withInertiaErrors,
+} from '@/hooks/use-inertia-feedback';
 import { useInitials } from '@/hooks/use-initials';
+
+const accessLevelLabels: Record<string, string> = {
+    read: 'Lihat',
+    create: 'Buat',
+    update: 'Ubah',
+    delete: 'Delete',
+    correct: 'Koreksi',
+    invoke: 'Jalankan',
+};
 
 type Permission = {
     code: string;
@@ -177,10 +175,12 @@ type Props = {
     tenant: { id: string; name: string };
     canManage: boolean;
     members: Member[];
+    membersNextCursor: string | null;
     roles: Role[];
     dataPolicies: DataPolicy[];
     organizations: Organization[];
     invitations: Invitation[];
+    invitationsNextCursor: string | null;
     newInvitationCodes: string[];
     /** Tenant ini memakai SSO bersama, sehingga undangan lewat email mungkin dibuat. */
     ssoAvailable: boolean;
@@ -196,6 +196,49 @@ type Props = {
     apps?: App[];
     hierarchies?: Hierarchy[];
 };
+
+async function accessBatch<T>(
+    kind: 'members' | 'invitations',
+    input: Partial<ListRequest> & { recordId?: string },
+) {
+    const params = new URLSearchParams({ list: kind });
+
+    if (input.query) {
+        params.set('q', input.query);
+    }
+
+    if (input.cursor) {
+        params.set('cursor', input.cursor);
+    }
+
+    if (input.sort) {
+        params.set('sort', input.sort.columnId);
+        params.set('direction', input.sort.direction);
+    }
+
+    if (input.recordId) {
+        params.set('record_id', input.recordId);
+    }
+
+    const response = await fetch(`/settings/access?${params}`, {
+        signal: input.signal,
+        headers: {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+    });
+
+    if (!response.ok) {
+        throw new Error('Daftar akses belum dapat dimuat. Coba lagi.');
+    }
+
+    const batch = (await response.json()) as {
+        data: T[];
+        next_cursor: string | null;
+    };
+
+    return { items: batch.data, nextCursor: batch.next_cursor };
+}
 
 const unrestrictedScope = (policyCode: string): PolicyScope => ({
     policy_code: policyCode,
@@ -380,9 +423,9 @@ function PolicyScopePanel({
                 </FieldDescription>
             ) : (
                 <>
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <FormGrid>
                         {policy.requires_legal_entity && (
-                            <Field>
+                            <FormControl>
                                 <Select
                                     label="Badan hukum"
                                     items={organizations
@@ -401,9 +444,9 @@ function PolicyScopePanel({
                                     searchPlaceholder="Cari badan hukum..."
                                     portalContainer={portalContainer}
                                 />
-                            </Field>
+                            </FormControl>
                         )}
-                        <Field>
+                        <FormControl hint="Menentukan bentuk pohon dan unit yang termasuk ketika turunannya dipilih.">
                             <Select
                                 label="Susunan organisasi"
                                 items={hierarchies.map((hierarchy) => ({
@@ -419,12 +462,8 @@ function PolicyScopePanel({
                                 searchPlaceholder="Cari susunan organisasi..."
                                 portalContainer={portalContainer}
                             />
-                            <FieldDescription>
-                                Menentukan bentuk pohon di bawah, dan arti
-                                &quot;beserta turunannya&quot;.
-                            </FieldDescription>
-                        </Field>
-                    </div>
+                        </FormControl>
+                    </FormGrid>
                     <div className="space-y-2">
                         <Input
                             value={filter}
@@ -497,98 +536,81 @@ function PolicyScopePanel({
                             </FieldDescription>
                         )}
                     </div>
-                    <div className="overflow-auto rounded-md border">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    {policy.requires_legal_entity && (
-                                        <TableHead>Badan hukum</TableHead>
-                                    )}
-                                    <TableHead>Unit kerja</TableHead>
-                                    <TableHead>Jenis unit</TableHead>
-                                    <TableHead>Turunan</TableHead>
-                                    <TableHead>Susunan organisasi</TableHead>
-                                    <TableHead />
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {grants.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={
-                                                policy.requires_legal_entity
-                                                    ? 6
-                                                    : 5
-                                            }
-                                            className="text-muted-foreground"
-                                        >
-                                            Belum ada organisasi yang diberi
-                                            akses.
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    grants.map((scope) => {
-                                        const unit = scope.organization_id
-                                            ? organizationById.get(
-                                                  scope.organization_id,
-                                              )
-                                            : undefined;
-
-                                        return (
-                                            <TableRow key={grantKey(scope)}>
-                                                {policy.requires_legal_entity && (
-                                                    <TableCell>
-                                                        {(scope.legal_entity_id &&
-                                                            organizationById.get(
-                                                                scope.legal_entity_id,
-                                                            )?.name) ??
-                                                            '—'}
-                                                    </TableCell>
-                                                )}
-                                                <TableCell>
-                                                    {unit?.name ?? '—'}
-                                                </TableCell>
-                                                <TableCell className="text-muted-foreground">
-                                                    {unit?.unit_type ?? '—'}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {scope.include_descendants
-                                                        ? 'Termasuk'
-                                                        : 'Tidak'}
-                                                </TableCell>
-                                                <TableCell className="text-muted-foreground">
-                                                    {(scope.hierarchy_id &&
-                                                        hierarchyById.get(
-                                                            scope.hierarchy_id,
-                                                        )?.name) ??
-                                                        '—'}
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    <ActionButton
-                                                        action="delete"
-                                                        type="button"
-                                                        onClick={() =>
-                                                            onChange(
-                                                                grants.filter(
-                                                                    (item) =>
-                                                                        grantKey(
-                                                                            item,
-                                                                        ) !==
-                                                                        grantKey(
-                                                                            scope,
-                                                                        ),
-                                                                ),
-                                                            )
-                                                        }
-                                                    />
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })
-                                )}
-                            </TableBody>
-                        </Table>
-                    </div>
+                    <DataTable<PolicyScope>
+                        columns={[
+                            ...(policy.requires_legal_entity
+                                ? [
+                                      {
+                                          id: 'entity',
+                                          header: 'Badan hukum',
+                                          cell: (scope: PolicyScope) =>
+                                              (scope.legal_entity_id &&
+                                                  organizationById.get(
+                                                      scope.legal_entity_id,
+                                                  )?.name) ||
+                                              '—',
+                                      },
+                                  ]
+                                : []),
+                            {
+                                id: 'unit',
+                                header: 'Unit kerja',
+                                cell: (scope) =>
+                                    (scope.organization_id &&
+                                        organizationById.get(
+                                            scope.organization_id,
+                                        )?.name) ||
+                                    '—',
+                            },
+                            {
+                                id: 'type',
+                                header: 'Jenis unit',
+                                cell: (scope) =>
+                                    (scope.organization_id &&
+                                        organizationById.get(
+                                            scope.organization_id,
+                                        )?.unit_type) ||
+                                    '—',
+                            },
+                            {
+                                id: 'descendants',
+                                header: 'Turunan',
+                                cell: (scope) =>
+                                    scope.include_descendants
+                                        ? 'Termasuk'
+                                        : 'Tidak',
+                            },
+                            {
+                                id: 'hierarchy',
+                                header: 'Susunan organisasi',
+                                cell: (scope) =>
+                                    (scope.hierarchy_id &&
+                                        hierarchyById.get(scope.hierarchy_id)
+                                            ?.name) ||
+                                    '—',
+                            },
+                        ]}
+                        data={grants}
+                        getRowKey={grantKey}
+                        actions={[
+                            {
+                                id: 'delete',
+                                label: 'Delete',
+                                destructive: true,
+                                icon: <Trash2 />,
+                            },
+                        ]}
+                        actionsPlacement="inline"
+                        onRowAction={(_, scope) =>
+                            onChange(
+                                grants.filter(
+                                    (item) =>
+                                        grantKey(item) !== grantKey(scope),
+                                ),
+                            )
+                        }
+                        emptyMessage="Belum ada organisasi yang diberi akses."
+                    />
                 </>
             )}
         </div>
@@ -715,18 +737,29 @@ function RoleScopeDialog({
     const [draft, setDraft] = useState<PolicyScope[]>(scopes);
     const scoped = role.data_policy_codes.length > 0;
 
+    const transition = useRecordTransition(
+        JSON.stringify(draft) !== JSON.stringify(scopes),
+        false,
+    );
+
     return (
-        <Dialog
+        <PageDialog
             open={open}
             onOpenChange={(next) => {
-                setOpen(next);
+                if (!next) {
+                    transition.request(() => setOpen(false));
+
+                    return;
+                }
+
+                setOpen(true);
 
                 if (next) {
                     setDraft(scopes);
                 }
             }}
         >
-            <DialogTrigger asChild>
+            <PageDialogTrigger asChild>
                 <button
                     type="button"
                     disabled={!scoped}
@@ -735,28 +768,14 @@ function RoleScopeDialog({
                     {scopeSummary(role, scopes)}
                     {scoped && <span className="ml-1">…</span>}
                 </button>
-            </DialogTrigger>
-            <DialogContent ref={contentRef} size="wide">
-                <DialogHeader>
-                    <DialogTitle>Batas data — {role.name}</DialogTitle>
-                    <DialogDescription>
-                        Menentukan organisasi mana yang datanya boleh dijangkau
-                        role ini. Tiap kebijakan dinilai terpisah dan tidak
-                        saling memperluas akses.
-                    </DialogDescription>
-                </DialogHeader>
-                <DialogBody>
-                    <ScopeEditor
-                        role={role}
-                        scopes={draft}
-                        policies={policies}
-                        organizations={organizations}
-                        hierarchies={hierarchies}
-                        portalContainer={contentRef}
-                        onChange={setDraft}
-                    />
-                </DialogBody>
-                <DialogFooter>
+            </PageDialogTrigger>
+            <PageDialogContent
+                ref={contentRef}
+                title="Batas data"
+                recordTitle={role.name}
+                description="Tentukan organisasi yang datanya boleh digunakan. Setiap batas data berlaku secara terpisah."
+            >
+                <PageDialogToolbar>
                     <DialogAction
                         type="button"
                         onClick={() => {
@@ -766,10 +785,24 @@ function RoleScopeDialog({
                     >
                         Terapkan
                     </DialogAction>
-                    <DialogCancel />
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                    <PageDialogClose asChild>
+                        <ActionButton action="cancel" type="button" />
+                    </PageDialogClose>
+                </PageDialogToolbar>
+                <PageDialogBody>
+                    <ScopeEditor
+                        role={role}
+                        scopes={draft}
+                        policies={policies}
+                        organizations={organizations}
+                        hierarchies={hierarchies}
+                        portalContainer={contentRef}
+                        onChange={setDraft}
+                    />
+                </PageDialogBody>
+            </PageDialogContent>
+            {transition.confirmation}
+        </PageDialog>
     );
 }
 
@@ -801,132 +834,93 @@ function AssignmentPicker({
             ),
         );
 
-    return (
-        <>
-            <FieldSet>
-                <FieldLegend>Security role</FieldLegend>
-                {/* Grid bersel ala Business Central: satu baris per role,
-                    kolom yang menjelaskan isinya, bukan sekadar daftar centang. */}
-                <div className="overflow-auto rounded-lg border border-border bg-card shadow-2xs">
-                    <table className="w-full text-xs">
-                        <thead className="sticky top-0 z-10 bg-muted/80 backdrop-blur-xs">
-                            <tr className="border-b border-border">
-                                <th className="w-10 px-3 py-2 text-center" />
-                                <th className="px-3 py-2 text-left font-bold tracking-wider text-muted-foreground uppercase">
-                                    Role
-                                </th>
-                                <th className="px-3 py-2 text-left font-bold tracking-wider text-muted-foreground uppercase">
-                                    Tanggung jawab
-                                </th>
-                                <th className="px-3 py-2 text-left font-bold tracking-wider text-muted-foreground uppercase">
-                                    Batas data
-                                </th>
-                                <th className="px-3 py-2 text-left font-bold tracking-wider text-muted-foreground uppercase">
-                                    Sumber
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border/60">
-                            {roles.map((role) => {
-                                const automatic = disabledRoleIds.includes(
-                                    role.id,
-                                );
-                                const checked =
-                                    Boolean(assignmentFor(role.id)) ||
-                                    automatic;
+    const columns: DataTableColumn<Role>[] = [
+        {
+            id: 'selected',
+            header: 'Pilih',
+            width: 64,
+            content: 'control',
+            cell: (role) => {
+                const automatic = disabledRoleIds.includes(role.id);
 
-                                return (
-                                    <tr
-                                        key={role.id}
-                                        className={`transition-colors ${
-                                            checked
-                                                ? 'bg-primary/5 hover:bg-primary/10'
-                                                : 'hover:bg-accent/40'
-                                        }`}
-                                    >
-                                        <td className="px-3 py-2 text-center">
-                                            <Checkbox
-                                                checked={checked}
-                                                disabled={automatic}
-                                                onCheckedChange={(value) =>
-                                                    onChange(
-                                                        value === true
-                                                            ? [
-                                                                  ...assignments,
-                                                                  {
-                                                                      role_id:
-                                                                          role.id,
-                                                                      policy_scopes:
-                                                                          [],
-                                                                  },
-                                                              ]
-                                                            : assignments.filter(
-                                                                  (
-                                                                      assignment,
-                                                                  ) =>
-                                                                      assignment.role_id !==
-                                                                      role.id,
-                                                              ),
-                                                    )
-                                                }
-                                            />
-                                        </td>
-                                        <td className="px-3 py-2 font-semibold text-foreground">
-                                            {role.name}
-                                        </td>
-                                        <td className="px-3 py-2 text-muted-foreground">
-                                            {role.duties.length} tanggung jawab
-                                        </td>
-                                        <td className="px-3 py-2 text-muted-foreground">
-                                            {checked && !automatic ? (
-                                                <RoleScopeDialog
-                                                    role={role}
-                                                    scopes={
-                                                        assignmentFor(role.id)
-                                                            ?.policy_scopes ??
-                                                        []
-                                                    }
-                                                    policies={dataPolicies}
-                                                    organizations={
-                                                        organizations
-                                                    }
-                                                    hierarchies={hierarchies}
-                                                    onChange={(scopes) =>
-                                                        updateScopes(
-                                                            role.id,
-                                                            scopes,
-                                                        )
-                                                    }
-                                                />
-                                            ) : role.data_policy_codes.length >
-                                              0 ? (
-                                                `${role.data_policy_codes.length} kebijakan`
-                                            ) : (
-                                                'Tidak dibatasi'
-                                            )}
-                                        </td>
-                                        <td className="px-3 py-2 text-muted-foreground">
-                                            {automatic ? (
-                                                <Badge
-                                                    variant="outline"
-                                                    className="text-[10px] font-normal"
-                                                >
-                                                    Aturan otomatis
-                                                </Badge>
-                                            ) : (
-                                                <span className="text-xs">
-                                                    Manual
-                                                </span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-            </FieldSet>
-        </>
+                return (
+                    <Checkbox
+                        aria-label={`Berikan role ${role.name}`}
+                        checked={Boolean(assignmentFor(role.id)) || automatic}
+                        disabled={automatic}
+                        onCheckedChange={(value) =>
+                            onChange(
+                                value === true
+                                    ? [
+                                          ...assignments,
+                                          {
+                                              role_id: role.id,
+                                              policy_scopes: [],
+                                          },
+                                      ]
+                                    : assignments.filter(
+                                          (assignment) =>
+                                              assignment.role_id !== role.id,
+                                      ),
+                            )
+                        }
+                    />
+                );
+            },
+        },
+        { id: 'name', header: 'Role', cell: (role) => role.name },
+        {
+            id: 'duties',
+            header: 'Tanggung jawab',
+            width: 180,
+            cell: (role) => `${role.duties.length} tanggung jawab`,
+        },
+        {
+            id: 'scope',
+            header: 'Batas data',
+            cell: (role) =>
+                assignmentFor(role.id) && !disabledRoleIds.includes(role.id) ? (
+                    <RoleScopeDialog
+                        role={role}
+                        scopes={assignmentFor(role.id)?.policy_scopes ?? []}
+                        policies={dataPolicies}
+                        organizations={organizations}
+                        hierarchies={hierarchies}
+                        onChange={(scopes) => updateScopes(role.id, scopes)}
+                    />
+                ) : role.data_policy_codes.length > 0 ? (
+                    `${role.data_policy_codes.length} kebijakan`
+                ) : (
+                    'Tidak dibatasi'
+                ),
+        },
+        {
+            id: 'source',
+            header: 'Sumber',
+            width: 180,
+            cell: (role) =>
+                disabledRoleIds.includes(role.id) ? (
+                    <Badge variant="outline">Aturan otomatis</Badge>
+                ) : (
+                    'Manual'
+                ),
+        },
+    ];
+
+    return (
+        <FieldSet>
+            <FieldLegend>Role anggota</FieldLegend>
+            <FieldDescription>
+                Centang role yang diperlukan, lalu atur batas datanya. Role dari
+                aturan otomatis hanya dapat diubah melalui aturan asalnya.
+            </FieldDescription>
+            <DataTable
+                columns={columns}
+                data={roles}
+                getRowKey={(role) => role.id}
+                emptyMessage="Belum ada role yang dapat diberikan."
+            />
+        </FieldSet>
     );
 }
 
@@ -1034,6 +1028,7 @@ function ScopeDialog({
     organizations,
     hierarchies,
     onChange,
+    disabled = false,
 }: {
     code: CodeDraft;
     roles: Role[];
@@ -1041,6 +1036,7 @@ function ScopeDialog({
     organizations: Organization[];
     hierarchies: Hierarchy[];
     onChange: (assignments: Assignment[]) => void;
+    disabled?: boolean;
 }) {
     const [open, setOpen] = useState(false);
     const contentRef = useRef<HTMLDivElement>(null);
@@ -1052,37 +1048,68 @@ function ScopeDialog({
             ) && role.data_policy_codes.length > 0,
     );
 
+    const transition = useRecordTransition(
+        JSON.stringify(draft) !== JSON.stringify(code.assignments),
+        false,
+    );
+
     return (
-        <Dialog
+        <PageDialog
             open={open}
             onOpenChange={(next) => {
-                setOpen(next);
+                if (disabled) {
+                    return;
+                }
+
+                if (!next) {
+                    transition.request(() => setOpen(false));
+
+                    return;
+                }
+
+                setOpen(true);
 
                 if (next) {
                     setDraft(code.assignments);
                 }
             }}
         >
-            <DialogTrigger asChild>
+            <PageDialogTrigger asChild>
                 <button
                     type="button"
-                    disabled={scopedRoles.length === 0}
+                    disabled={disabled || scopedRoles.length === 0}
                     className="w-full text-left text-sm underline-offset-2 hover:underline disabled:cursor-default disabled:text-muted-foreground disabled:no-underline"
                 >
                     {codeScopeSummary(roles, code.assignments)}
                     {scopedRoles.length > 0 && <span className="ml-1">…</span>}
                 </button>
-            </DialogTrigger>
-            <DialogContent ref={contentRef} size="wide">
-                <DialogHeader>
-                    <DialogTitle>Batas data kode undangan</DialogTitle>
-                    <DialogDescription>
-                        Menentukan organisasi mana yang datanya boleh disentuh
-                        pemakai kode ini. Tiap kebijakan dinilai terpisah dan
-                        tidak saling memperluas akses.
-                    </DialogDescription>
-                </DialogHeader>
-                <DialogBody>
+            </PageDialogTrigger>
+            <PageDialogContent
+                ref={contentRef}
+                title="Batas data kode undangan"
+                recordTitle="Kode undangan"
+                description="Tentukan organisasi yang datanya boleh digunakan. Setiap batas data berlaku secara terpisah."
+            >
+                <PageDialogToolbar>
+                    <DialogAction
+                        type="button"
+                        disabled={disabled}
+                        onClick={() => {
+                            if (disabled) {
+                                return;
+                            }
+
+                            onChange(draft);
+                            setOpen(false);
+                        }}
+                    >
+                        Terapkan
+                    </DialogAction>
+                    <PageDialogClose asChild>
+                        <ActionButton action="cancel" type="button" />
+                    </PageDialogClose>
+                </PageDialogToolbar>
+                <PageDialogBody>
                     <FieldGroup>
                         {scopedRoles.map((role) => {
                             const assignment = draft.find(
@@ -1102,6 +1129,7 @@ function ScopeDialog({
                                         hierarchies={hierarchies}
                                         portalContainer={contentRef}
                                         onChange={(next) =>
+                                            !disabled &&
                                             setDraft((current) =>
                                                 current.map((item) =>
                                                     item.role_id === role.id
@@ -1119,21 +1147,10 @@ function ScopeDialog({
                             ) : null;
                         })}
                     </FieldGroup>
-                </DialogBody>
-                <DialogFooter>
-                    <DialogAction
-                        type="button"
-                        onClick={() => {
-                            onChange(draft);
-                            setOpen(false);
-                        }}
-                    >
-                        Terapkan
-                    </DialogAction>
-                    <DialogCancel />
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                </PageDialogBody>
+            </PageDialogContent>
+            {transition.confirmation}
+        </PageDialog>
     );
 }
 
@@ -1145,6 +1162,53 @@ function ScopeDialog({
  * memperlihatkan daftar yang sama dengan tabel di halaman. Baris tersebut
  * terkunci: mencabut kode dilakukan dari tabel halaman, bukan dari sini.
  */
+function mergeIssuedRows(
+    current: CodeDraft[],
+    incoming: Invitation[],
+    pristine: Map<string, string>,
+    refreshedKey?: string,
+) {
+    const fingerprints = new Map(pristine);
+    const latest = new Map(
+        incoming.map((invitation) => {
+            const row = issuedDraft(invitation);
+
+            return [row.key, row];
+        }),
+    );
+    const rows = current.map((row) => {
+        const next = latest.get(row.key);
+        latest.delete(row.key);
+
+        if (
+            next?.issued &&
+            row.issued &&
+            next.issued.version < row.issued.version
+        ) {
+            return row;
+        }
+
+        if (
+            next &&
+            (row.key === refreshedKey ||
+                pristine.get(row.key) === codeFingerprint(row))
+        ) {
+            fingerprints.set(row.key, codeFingerprint(next));
+
+            return next;
+        }
+
+        return row;
+    });
+
+    for (const row of latest.values()) {
+        fingerprints.set(row.key, codeFingerprint(row));
+        rows.push(row);
+    }
+
+    return { rows, fingerprints };
+}
+
 function InviteForm({
     roles,
     dataPolicies,
@@ -1153,28 +1217,89 @@ function InviteForm({
     // yang membacanya berada di dalam dialog; ketika dialog itu dapat dibuka, ia sudah ada.
     hierarchies = [],
     invitations,
+    invitationList,
     ssoAvailable,
 }: Pick<
     Props,
     'roles' | 'dataPolicies' | 'organizations' | 'hierarchies' | 'invitations'
-> & { ssoAvailable: boolean }) {
+> & {
+    ssoAvailable: boolean;
+    invitationList: ReturnType<typeof useIncrementalList<Invitation>>;
+}) {
+    const { wrap: wrapFormRequest, summary: formRequestSummary } =
+        useInertiaFeedback();
+
     const [open, setOpen] = useState(false);
     const [activeKey, setActiveKey] = useState<string | null>(null);
     const contentRef = useRef<HTMLDivElement>(null);
     const form = useForm({ codes: [blankCode()] });
-    const [issuedRows, setIssuedRows] = useState<CodeDraft[]>(() =>
-        invitations.map(issuedDraft),
-    );
+    const [issuedState, setIssuedState] = useState(() => ({
+        source: invitations,
+        rows: invitations.map(issuedDraft),
+        fingerprints: new Map(
+            invitations.map((invitation) => [
+                `issued-${invitation.id}`,
+                codeFingerprint(issuedDraft(invitation)),
+            ]),
+        ),
+    }));
+    const issuedRows = issuedState.rows;
+    const pristine = issuedState.fingerprints;
+    const setIssuedRows = (update: (rows: CodeDraft[]) => CodeDraft[]) =>
+        setIssuedState((current) => ({
+            ...current,
+            rows: update(current.rows),
+        }));
     const [saving, setSaving] = useState<string | null>(null);
+    const writeInFlight = useRef(false);
+    const [refreshError, setRefreshError] = useState('');
     const roleById = new Map(roles.map((role) => [role.id, role]));
-    const pristine = new Map(
-        invitations.map((invitation) => [
-            `issued-${invitation.id}`,
-            codeFingerprint(issuedDraft(invitation)),
-        ]),
-    );
+
+    if (issuedState.source !== invitations) {
+        setIssuedState((current) => ({
+            source: invitations,
+            ...mergeIssuedRows(current.rows, invitations, current.fingerprints),
+        }));
+    }
+
+    const refreshIssued = async (code: CodeDraft) => {
+        if (!code.issued) {
+            return;
+        }
+
+        setRefreshError('');
+
+        try {
+            const batch = await accessBatch<Invitation>('invitations', {
+                recordId: code.issued.id,
+            });
+
+            if (batch.items.length !== 1) {
+                throw new Error('Undangan belum dapat dimuat ulang.');
+            }
+
+            setIssuedState((current) => ({
+                ...current,
+                ...mergeIssuedRows(
+                    current.rows,
+                    batch.items,
+                    current.fingerprints,
+                    code.key,
+                ),
+            }));
+            invitationList.reload();
+        } catch {
+            setRefreshError(
+                'Perubahan sudah tersimpan, tetapi rincian terbaru belum dapat dimuat. Tutup lalu buka kembali undangan sebelum mengubahnya lagi.',
+            );
+        }
+    };
 
     const update = (key: string, change: Partial<CodeDraft>) => {
+        if (writeInFlight.current || form.processing) {
+            return;
+        }
+
         const apply = (code: CodeDraft) =>
             code.key === key ? { ...code, ...change } : code;
 
@@ -1197,11 +1322,39 @@ function InviteForm({
     const dirty = (code: CodeDraft) =>
         Boolean(code.issued) &&
         pristine.get(code.key) !== codeFingerprint(code);
+    const rowErrorKey = (code: CodeDraft, field: string) =>
+        code.issued
+            ? `issued.${code.key}.${field}`
+            : `codes.${form.data.codes.findIndex((item) => item.key === code.key)}.${field}`;
+    const rowError = (code: CodeDraft, field: string) =>
+        Object.entries(form.errors)
+            .filter(
+                ([key]) =>
+                    key === rowErrorKey(code, field) ||
+                    key.startsWith(`${rowErrorKey(code, field)}.`),
+            )
+            .map(([, value]) =>
+                Array.isArray(value) ? value.join(' ') : value,
+            )
+            .join(' ');
+    const reportIssuedErrors = (
+        code: CodeDraft,
+        errors: Record<string, string>,
+    ) =>
+        form.setError(
+            Object.fromEntries(
+                Object.entries(errors).map(([field, message]) => [
+                    field === '_form' ? '_form' : rowErrorKey(code, field),
+                    message,
+                ]),
+            ),
+        );
     const save = (code: CodeDraft) => {
-        if (!code.issued) {
+        if (!code.issued || writeInFlight.current || form.processing) {
             return;
         }
 
+        writeInFlight.current = true;
         setSaving(code.key);
         router.patch(
             `/settings/access/invitations/${code.issued.id}`,
@@ -1213,20 +1366,18 @@ function InviteForm({
                 })),
                 version: code.issued.version,
             },
-            {
+            withInertiaErrors({
                 preserveScroll: true,
-                onSuccess: (page) => {
-                    // Props tersegar dipakai langsung; `invitations` pada
-                    // closure ini masih memuat nilai sebelum penyimpanan.
-                    setIssuedRows(
-                        (page.props.invitations as Invitation[]).map(
-                            issuedDraft,
-                        ),
-                    );
+                onSuccess: async () => {
+                    await refreshIssued(code);
                     toast('Perubahan kode undangan disimpan.');
                 },
-                onFinish: () => setSaving(null),
-            },
+                onFinish: () => {
+                    writeInFlight.current = false;
+                    setSaving(null);
+                },
+                onError: (errors) => reportIssuedErrors(code, errors),
+            }),
         );
     };
 
@@ -1237,26 +1388,27 @@ function InviteForm({
      * sedang mati meninggalkan baris yang sah dengan surat yang tidak pernah keluar.
      */
     const resend = (code: CodeDraft) => {
-        if (!code.issued) {
+        if (!code.issued || writeInFlight.current || form.processing) {
             return;
         }
 
+        writeInFlight.current = true;
         setSaving(code.key);
         router.post(
             `/settings/access/invitations/${code.issued.id}/kirim-ulang`,
             {},
-            {
+            withInertiaErrors({
                 preserveScroll: true,
-                onSuccess: (page) => {
-                    setIssuedRows(
-                        (page.props.invitations as Invitation[]).map(
-                            issuedDraft,
-                        ),
-                    );
+                onSuccess: async () => {
+                    await refreshIssued(code);
                     toast('Penyedia SSO diminta mengirim ulang undangannya.');
                 },
-                onFinish: () => setSaving(null),
-            },
+                onFinish: () => {
+                    writeInFlight.current = false;
+                    setSaving(null);
+                },
+                onError: (errors) => reportIssuedErrors(code, errors),
+            }),
         );
     };
 
@@ -1267,6 +1419,7 @@ function InviteForm({
             ? [
                   {
                       id: 'sso_email',
+                      content: 'control',
                       header: 'Diundang',
                       width: 240,
                       cell: (code: CodeDraft) =>
@@ -1287,9 +1440,21 @@ function InviteForm({
                                   </span>
                               )
                           ) : (
-                              <div>
+                              <FormControl
+                                  data-error-field={rowErrorKey(
+                                      code,
+                                      'sso_email',
+                                  )}
+                                  error={rowError(code, 'sso_email')}
+                              >
                                   <Input
+                                      disabled={
+                                          saving !== null || form.processing
+                                      }
                                       type="email"
+                                      aria-invalid={
+                                          !!rowError(code, 'sso_email')
+                                      }
                                       value={code.sso_email}
                                       placeholder="nama@rumahsakit.co.id"
                                       onChange={(event) =>
@@ -1302,13 +1467,14 @@ function InviteForm({
                                       Kosongkan untuk kode anonim yang dapat
                                       dipakai siapa pun yang memegangnya.
                                   </p>
-                              </div>
+                              </FormControl>
                           ),
                   } satisfies DataTableColumn<CodeDraft>,
               ]
             : []),
         {
             id: 'label',
+            content: 'control',
             header: 'Keterangan',
             width: 240,
             // Kode berupa huruf acak; tanpa keterangan admin tidak akan ingat
@@ -1319,13 +1485,20 @@ function InviteForm({
                         {code.label || 'Tanpa keterangan'}
                     </span>
                 ) : (
-                    <Input
-                        value={code.label}
-                        placeholder="mis. Onboarding staf gudang Agustus"
-                        onChange={(event) =>
-                            update(code.key, { label: event.target.value })
-                        }
-                    />
+                    <FormControl
+                        data-error-field={rowErrorKey(code, 'label')}
+                        error={rowError(code, 'label')}
+                    >
+                        <Input
+                            disabled={saving !== null || form.processing}
+                            value={code.label}
+                            aria-invalid={!!rowError(code, 'label')}
+                            placeholder="mis. Onboarding staf gudang Agustus"
+                            onChange={(event) =>
+                                update(code.key, { label: event.target.value })
+                            }
+                        />
+                    </FormControl>
                 ),
         },
         {
@@ -1379,48 +1552,54 @@ function InviteForm({
         },
         {
             id: 'roles',
+            content: 'control',
             header: 'Security role',
             width: 260,
             // MultiSelect bekerja dengan daftar teks, jadi nama role dipetakan
             // balik ke id saat nilainya berubah.
             cell: (code) =>
-                locked(code) ? (
+                locked(code) || saving !== null || form.processing ? (
                     <span className="text-muted-foreground">
                         {rolesOf(code)
                             .map((role) => role.name)
                             .join(', ') || '—'}
                     </span>
                 ) : (
-                    <MultiSelect
-                        items={roles.map((role) => role.name)}
-                        value={rolesOf(code).map((role) => role.name)}
-                        onValueChange={(names) =>
-                            update(code.key, {
-                                assignments: names
-                                    .map((name) =>
-                                        roles.find(
-                                            (role) => role.name === name,
+                    <FormControl
+                        data-error-field={rowErrorKey(code, 'assignments')}
+                        error={rowError(code, 'assignments')}
+                    >
+                        <MultiSelect
+                            items={roles.map((role) => role.name)}
+                            value={rolesOf(code).map((role) => role.name)}
+                            onValueChange={(names) =>
+                                update(code.key, {
+                                    assignments: names
+                                        .map((name) =>
+                                            roles.find(
+                                                (role) => role.name === name,
+                                            ),
+                                        )
+                                        .filter((role): role is Role =>
+                                            Boolean(role),
+                                        )
+                                        .map(
+                                            (role) =>
+                                                code.assignments.find(
+                                                    (assignment) =>
+                                                        assignment.role_id ===
+                                                        role.id,
+                                                ) ?? {
+                                                    role_id: role.id,
+                                                    policy_scopes: [],
+                                                },
                                         ),
-                                    )
-                                    .filter((role): role is Role =>
-                                        Boolean(role),
-                                    )
-                                    .map(
-                                        (role) =>
-                                            code.assignments.find(
-                                                (assignment) =>
-                                                    assignment.role_id ===
-                                                    role.id,
-                                            ) ?? {
-                                                role_id: role.id,
-                                                policy_scopes: [],
-                                            },
-                                    ),
-                            })
-                        }
-                        placeholder="Pilih role"
-                        portalContainer={contentRef}
-                    />
+                                })
+                            }
+                            placeholder="Pilih role"
+                            portalContainer={contentRef}
+                        />
+                    </FormControl>
                 ),
         },
         {
@@ -1453,6 +1632,7 @@ function InviteForm({
                     </span>
                 ) : (
                     <ScopeDialog
+                        disabled={saving !== null || form.processing}
                         code={code}
                         roles={roles}
                         dataPolicies={dataPolicies}
@@ -1486,7 +1666,7 @@ function InviteForm({
                                 type="button"
                                 size="sm"
                                 variant="outline"
-                                disabled={saving === code.key}
+                                disabled={saving !== null}
                                 onClick={() => resend(code)}
                             >
                                 {code.issued.sso.notified_at
@@ -1505,7 +1685,7 @@ function InviteForm({
                     <ActionButton
                         action="save"
                         type="button"
-                        disabled={saving === code.key}
+                        disabled={saving !== null}
                         onClick={
                             code.issued.redeemed > 0
                                 ? undefined
@@ -1550,46 +1730,68 @@ function InviteForm({
         },
     ];
 
+    const transition = useRecordTransition(
+        issuedRows.some(dirty) ||
+            form.data.codes.some((code) =>
+                Boolean(
+                    code.label || code.sso_email || code.assignments.length,
+                ),
+            ),
+        form.processing || saving !== null,
+    );
+
     return (
-        <Dialog
+        <PageDialog
             open={open}
             onOpenChange={(next) => {
-                setOpen(next);
+                if (!next) {
+                    if (writeInFlight.current) {
+                        return;
+                    }
+
+                    transition.request(() => setOpen(false));
+
+                    return;
+                }
+
+                setOpen(true);
                 // Selalu mulai dari keadaan server: baris baru dikosongkan dan
                 // suntingan baris terbit yang belum disimpan dibuang.
-                setIssuedRows(invitations.map(issuedDraft));
+                setIssuedState({
+                    source: invitations,
+                    rows: invitations.map(issuedDraft),
+                    fingerprints: new Map(
+                        invitations.map((invitation) => [
+                            `issued-${invitation.id}`,
+                            codeFingerprint(issuedDraft(invitation)),
+                        ]),
+                    ),
+                });
+                setRefreshError('');
                 form.setData('codes', next ? [blankCode()] : []);
             }}
         >
-            <DialogTrigger asChild>
-                <ActionButton
-                    action="create"
-                    className="text-xs font-medium shadow-xs"
-                />
-            </DialogTrigger>
-            <DialogContent ref={contentRef} size="full">
-                <DialogHeader>
-                    <div className="flex items-center gap-3">
-                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                            <UserPlus className="size-5" />
-                        </div>
-                        <div>
-                            <DialogTitle className="text-base font-bold text-foreground">
-                                Kelola & Buat Kode Undangan
-                            </DialogTitle>
-                            <DialogDescription className="mt-0.5 text-xs text-muted-foreground">
-                                Kode yang sudah terbit dapat diubah di tempat
-                                dan disimpan per baris; kodenya tidak berganti.
-                                Setiap baris baru menghasilkan satu kode yang
-                                berlaku sampai dicabut.
-                            </DialogDescription>
-                        </div>
-                    </div>
-                </DialogHeader>
+            <PageDialogTrigger asChild>
+                <ActionButton action="create" />
+            </PageDialogTrigger>
+            <PageDialogContent
+                ref={contentRef}
+                title="Undangan"
+                recordTitle="Kode undangan"
+                description="Buat kode undangan, pilih role, lalu tentukan batas data yang diterima anggota."
+            >
                 <form
+                    noValidate
                     className="contents"
                     onSubmit={(event) => {
                         event.preventDefault();
+
+                        if (writeInFlight.current || form.processing) {
+                            return;
+                        }
+
+                        writeInFlight.current = true;
+                        setSaving('new');
                         // `key` hanya penanda baris di klien, tidak dikirim.
                         form.transform((data) => ({
                             codes: data.codes.map((code) => ({
@@ -1601,46 +1803,92 @@ function InviteForm({
                                 assignments: code.assignments,
                             })),
                         }));
-                        form.post('/settings/access/invitations', {
-                            onSuccess: () => setOpen(false),
-                        });
+                        form.post(
+                            '/settings/access/invitations',
+                            wrapFormRequest({
+                                onSuccess: () => setOpen(false),
+                                onFinish: () => {
+                                    writeInFlight.current = false;
+                                    setSaving(null);
+                                },
+                            }),
+                        );
                     }}
                 >
-                    <DialogToolbar>
-                        <DialogAction
+                    <PageDialogToolbar>
+                        <ActionButton
+                            action="save"
                             type="submit"
+                            pending={form.processing}
                             disabled={
-                                form.processing || form.data.codes.length === 0
+                                form.data.codes.length === 0 ||
+                                saving !== null ||
+                                form.processing
                             }
-                            className="px-5 font-medium shadow-xs"
-                        >
-                            <UserPlus className="mr-1.5 size-3.5" /> Buat{' '}
-                            {form.data.codes.length} kode
-                        </DialogAction>
-                        <DialogClose asChild>
+                        />
+                        <PageDialogClose asChild>
                             <ActionButton action="cancel" type="button" />
-                        </DialogClose>
-                    </DialogToolbar>
-                    <DialogBody className="space-y-4 py-4">
+                        </PageDialogClose>
+                    </PageDialogToolbar>
+                    <>
+                        {formRequestSummary}
+                        <FormErrorHeader
+                            errors={form.errors}
+                            message={refreshError}
+                            operation={
+                                refreshError
+                                    ? 'Perubahan sudah tersimpan'
+                                    : undefined
+                            }
+                        />
+                    </>
+
+                    <PageDialogBody className="space-y-4">
+                        {Object.keys(form.errors).length > 0 && (
+                            <Alert variant="destructive">
+                                <AlertTitle>Undangan belum disimpan</AlertTitle>
+                                <AlertDescription>
+                                    {Object.values(form.errors).map(
+                                        (error, index) => (
+                                            <p key={index}>{error}</p>
+                                        ),
+                                    )}
+                                </AlertDescription>
+                            </Alert>
+                        )}
                         <DataTable
                             columns={columns}
                             data={[...issuedRows, ...form.data.codes]}
+                            incremental={invitationList}
                             getRowKey={(code) => code.key}
                             getRowLabel={() => 'kode undangan'}
                             activeRowKey={activeKey ?? undefined}
                             rowActivation="single-click"
                             onRowClick={(code) => setActiveKey(code.key)}
-                            actions={[
-                                { id: 'duplicate', label: 'Duplikat baris' },
-                                {
-                                    id: 'delete',
-                                    label: 'Delete',
-                                    icon: <Trash2 aria-hidden="true" />,
-                                    destructive: true,
-                                    separatorBefore: true,
-                                },
-                            ]}
+                            actions={
+                                saving !== null || form.processing
+                                    ? []
+                                    : [
+                                          {
+                                              id: 'duplicate',
+                                              label: 'Duplikat baris',
+                                          },
+                                          {
+                                              id: 'delete',
+                                              label: 'Delete',
+                                              icon: (
+                                                  <Trash2 aria-hidden="true" />
+                                              ),
+                                              destructive: true,
+                                              separatorBefore: true,
+                                          },
+                                      ]
+                            }
                             onRowAction={(action, code) => {
+                                if (writeInFlight.current || form.processing) {
+                                    return;
+                                }
+
                                 if (action === 'duplicate') {
                                     form.setData('codes', [
                                         ...form.data.codes,
@@ -1669,11 +1917,14 @@ function InviteForm({
                                     ),
                                 );
                             }}
-                            onAddRow={() =>
-                                form.setData('codes', [
-                                    ...form.data.codes,
-                                    blankCode(),
-                                ])
+                            onAddRow={
+                                saving !== null || form.processing
+                                    ? undefined
+                                    : () =>
+                                          form.setData('codes', [
+                                              ...form.data.codes,
+                                              blankCode(),
+                                          ])
                             }
                             addRowLabel="Tambah"
                             emptyMessage="Belum ada baris."
@@ -1700,10 +1951,11 @@ function InviteForm({
                             </span>{' '}
                             untuk mengatur badan hukum dan unit kerja per role.
                         </div>
-                    </DialogBody>
+                    </PageDialogBody>
                 </form>
-            </DialogContent>
-        </Dialog>
+            </PageDialogContent>
+            {transition.confirmation}
+        </PageDialog>
     );
 }
 
@@ -1724,8 +1976,10 @@ function MemberAccessDialog({
     hierarchies: Hierarchy[];
     onClose: () => void;
 }) {
+    const { wrap: wrapFormRequest, summary: formRequestSummary } =
+        useInertiaFeedback();
+
     const contentRef = useRef<HTMLDivElement>(null);
-    const getInitials = useInitials();
     const form = useForm({
         assignments: (member?.assignments ?? [])
             .filter((assignment) => assignment.source !== 'automatic')
@@ -1734,6 +1988,7 @@ function MemberAccessDialog({
                 policy_scopes: assignment.policy_scopes,
             })),
     });
+    const transition = useRecordTransition(form.isDirty, form.processing);
     const automaticRoleIds = (member?.assignments ?? [])
         .filter((assignment) => assignment.source === 'automatic')
         .map((assignment) => assignment.role_id);
@@ -1742,54 +1997,23 @@ function MemberAccessDialog({
     );
 
     return (
-        <Dialog
+        <PageDialog
             open={Boolean(member)}
-            onOpenChange={(open) => !open && onClose()}
+            onOpenChange={(open) => {
+                if (!open) {
+                    transition.request(onClose);
+                }
+            }}
         >
-            <DialogContent ref={contentRef} size="full">
-                <DialogHeader>
-                    <div className="flex items-center gap-3">
-                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                            <UserCog className="size-5" />
-                        </div>
-                        <div>
-                            <DialogTitle className="text-base font-bold text-foreground">
-                                Atur Akses Anggota
-                            </DialogTitle>
-                            <DialogDescription className="mt-0.5 text-xs text-muted-foreground">
-                                Atur role dan batas data anggota.
-                            </DialogDescription>
-                        </div>
-                    </div>
-
-                    {member && (
-                        <div className="mt-3 flex items-center justify-between gap-4 rounded-lg border border-border bg-muted/30 p-2.5">
-                            <div className="flex items-center gap-3">
-                                <Avatar className="size-8 border border-border">
-                                    {member.avatar_url && (
-                                        <AvatarImage
-                                            src={member.avatar_url}
-                                            alt={member.name}
-                                        />
-                                    )}
-                                    <AvatarFallback className="bg-primary/10 text-xs font-medium text-primary">
-                                        {getInitials(member.name)}
-                                    </AvatarFallback>
-                                </Avatar>
-                                <div>
-                                    <p className="text-xs font-semibold text-foreground">
-                                        {member.name}
-                                    </p>
-                                    <p className="text-[11px] text-muted-foreground">
-                                        {member.email}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </DialogHeader>
-
+            <PageDialogContent
+                ref={contentRef}
+                title="Akses anggota"
+                recordTitle={member?.name}
+                description="Pilih role dan batas data, lalu simpan perubahan akses anggota."
+                busy={form.processing}
+            >
                 <form
+                    noValidate
                     className="contents"
                     onSubmit={(event) => {
                         event.preventDefault();
@@ -1801,22 +2025,44 @@ function MemberAccessDialog({
                             }));
                             form.patch(
                                 `/settings/access/memberships/${member.id}`,
-                                { onSuccess: onClose },
+                                wrapFormRequest({ onSuccess: onClose }),
                             );
                         }
                     }}
                 >
-                    <DialogToolbar>
+                    <PageDialogToolbar>
                         <ActionButton
                             action="save"
                             type="submit"
                             disabled={form.processing}
                         />
-                        <DialogClose asChild>
+                        <PageDialogClose asChild>
                             <ActionButton action="cancel" type="button" />
-                        </DialogClose>
-                    </DialogToolbar>
-                    <DialogBody>
+                        </PageDialogClose>
+                    </PageDialogToolbar>
+                    <>
+                        {formRequestSummary}
+                        <FormErrorHeader errors={form.errors} />
+                    </>
+
+                    <PageDialogBody>
+                        {Object.keys(form.errors).length > 0 && (
+                            <Alert variant="destructive">
+                                <AlertTitle>Akses belum disimpan</AlertTitle>
+                                <AlertDescription>
+                                    {Object.values(form.errors).map(
+                                        (error, index) => (
+                                            <p key={index}>{error}</p>
+                                        ),
+                                    )}
+                                </AlertDescription>
+                            </Alert>
+                        )}
+                        {member && (
+                            <p className="mb-4 text-sm text-muted-foreground">
+                                {member.email}
+                            </p>
+                        )}
                         <FieldGroup>
                             <AssignmentPicker
                                 assignments={form.data.assignments}
@@ -1832,10 +2078,10 @@ function MemberAccessDialog({
                             <FieldSet>
                                 <FieldLegend>Rincian akses anggota</FieldLegend>
                                 <FieldDescription>
-                                    Menjelaskan alasan anggota dapat memakai
-                                    layar atau tindakan tertentu.
+                                    Rincian akses yang sudah tersimpan. Pilihan
+                                    di atas berlaku setelah Anda menekan Simpan.
                                 </FieldDescription>
-                                <div className="space-y-2 rounded-md border p-3 text-sm">
+                                <CollapsibleSectionGroup>
                                     {(member?.assignments ?? []).map(
                                         (assignment) => {
                                             const role = roles.find(
@@ -1843,22 +2089,25 @@ function MemberAccessDialog({
                                                     item.id ===
                                                     assignment.role_id,
                                             );
+                                            const value = `${assignment.role_id}-${assignment.source}`;
 
                                             return (
-                                                <details
-                                                    key={`${assignment.role_id}-${assignment.source}`}
-                                                    className="group rounded-md border border-border/60 bg-muted/20 p-2.5 transition-colors [&[open]]:bg-muted/40"
+                                                <CollapsibleSection
+                                                    key={value}
+                                                    value={value}
+                                                    title={
+                                                        assignment.role_name ??
+                                                        role?.name ??
+                                                        'Role'
+                                                    }
+                                                    summary={
+                                                        assignment.source ===
+                                                        'automatic'
+                                                            ? 'Aturan otomatis'
+                                                            : 'Manual'
+                                                    }
                                                 >
-                                                    <summary className="flex cursor-pointer items-center justify-between text-xs font-semibold text-foreground">
-                                                        <span className="flex items-center gap-2">
-                                                            <ShieldCheck className="size-4 text-primary" />
-                                                            {assignment.role_name ??
-                                                                role?.name ??
-                                                                'Role'}
-                                                        </span>
-                                                        <ChevronRight className="size-4 text-muted-foreground transition-transform group-open:rotate-90" />
-                                                    </summary>
-                                                    <div className="mt-3 space-y-2 border-t border-border/40 pt-2.5 pl-2 text-muted-foreground">
+                                                    <CollapsibleSectionGroup>
                                                         {role?.duties.map(
                                                             (roleDuty) => {
                                                                 const duty =
@@ -1867,100 +2116,101 @@ function MemberAccessDialog({
                                                                     );
 
                                                                 return (
-                                                                    <details
+                                                                    <CollapsibleSection
                                                                         key={
                                                                             roleDuty.code
                                                                         }
-                                                                        className="group/duty space-y-1"
+                                                                        value={
+                                                                            roleDuty.code
+                                                                        }
+                                                                        title={
+                                                                            roleDuty.name
+                                                                        }
                                                                     >
-                                                                        <summary className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-foreground hover:text-primary">
-                                                                            <ChevronRight className="size-3.5 text-muted-foreground transition-transform group-open/duty:rotate-90" />
-                                                                            {
-                                                                                roleDuty.name
-                                                                            }
-                                                                        </summary>
-                                                                        <div className="mt-1.5 space-y-1.5 pl-5 text-[11px]">
-                                                                            {duty?.privileges?.map(
-                                                                                (
-                                                                                    privilege,
-                                                                                ) => (
-                                                                                    <div
-                                                                                        key={
-                                                                                            privilege.code
+                                                                        {duty?.privileges?.map(
+                                                                            (
+                                                                                privilege,
+                                                                            ) => (
+                                                                                <div
+                                                                                    key={
+                                                                                        privilege.code
+                                                                                    }
+                                                                                    className="space-y-2"
+                                                                                >
+                                                                                    <p className="text-sm">
+                                                                                        {
+                                                                                            privilege.name
                                                                                         }
-                                                                                        className="space-y-1 rounded border border-border/40 bg-background p-2"
-                                                                                    >
-                                                                                        <p className="font-semibold text-foreground">
+                                                                                    </p>
+                                                                                    <DataTable<Permission>
+                                                                                        columns={[
                                                                                             {
-                                                                                                privilege.name
-                                                                                            }
-                                                                                        </p>
-                                                                                        {privilege.permissions.map(
-                                                                                            (
-                                                                                                permission,
-                                                                                            ) => (
-                                                                                                <p
-                                                                                                    key={
-                                                                                                        permission.code
-                                                                                                    }
-                                                                                                    className="text-muted-foreground"
-                                                                                                >
-                                                                                                    •{' '}
-                                                                                                    {
-                                                                                                        permission.name
-                                                                                                    }{' '}
-                                                                                                    <span className="font-mono text-primary">
-                                                                                                        (
-                                                                                                        {
-                                                                                                            permission.access_level
-                                                                                                        }
-
-                                                                                                        )
-                                                                                                    </span>
-                                                                                                </p>
-                                                                                            ),
-                                                                                        )}
-                                                                                    </div>
-                                                                                ),
-                                                                            )}
-                                                                        </div>
-                                                                    </details>
+                                                                                                id: 'permission',
+                                                                                                header: 'Tindakan',
+                                                                                                cell: (
+                                                                                                    permission,
+                                                                                                ) =>
+                                                                                                    permission.name,
+                                                                                            },
+                                                                                            {
+                                                                                                id: 'level',
+                                                                                                header: 'Izin',
+                                                                                                width: 160,
+                                                                                                cell: (
+                                                                                                    permission,
+                                                                                                ) =>
+                                                                                                    accessLevelLabels[
+                                                                                                        permission
+                                                                                                            .access_level
+                                                                                                    ] ??
+                                                                                                    permission.access_level,
+                                                                                            },
+                                                                                        ]}
+                                                                                        data={
+                                                                                            privilege.permissions
+                                                                                        }
+                                                                                        getRowKey={(
+                                                                                            permission,
+                                                                                        ) =>
+                                                                                            permission.code
+                                                                                        }
+                                                                                    />
+                                                                                </div>
+                                                                            ),
+                                                                        )}
+                                                                    </CollapsibleSection>
                                                                 );
                                                             },
                                                         )}
-                                                        {assignment.policy_scopes.map(
-                                                            (scope) => (
-                                                                <p
-                                                                    key={`${scope.policy_code}-${scope.organization_id}`}
-                                                                    className="pt-1 text-xs font-medium text-foreground"
-                                                                >
-                                                                    Batas data:{' '}
-                                                                    <span className="text-primary">
-                                                                        {dataPolicies.find(
-                                                                            (
-                                                                                policy,
-                                                                            ) =>
-                                                                                policy.code ===
-                                                                                scope.policy_code,
-                                                                        )
-                                                                            ?.name ??
-                                                                            scope.policy_code}
-                                                                    </span>
-                                                                </p>
-                                                            ),
-                                                        )}
-                                                    </div>
-                                                </details>
+                                                    </CollapsibleSectionGroup>
+                                                    {assignment.policy_scopes.map(
+                                                        (scope) => (
+                                                            <p
+                                                                key={`${scope.policy_code}-${grantKey(scope)}`}
+                                                                className="text-sm text-muted-foreground"
+                                                            >
+                                                                Batas data:{' '}
+                                                                {dataPolicies.find(
+                                                                    (policy) =>
+                                                                        policy.code ===
+                                                                        scope.policy_code,
+                                                                )?.name ??
+                                                                    scope.policy_code}
+                                                            </p>
+                                                        ),
+                                                    )}
+                                                </CollapsibleSection>
                                             );
                                         },
                                     )}
-                                </div>
+                                </CollapsibleSectionGroup>
                             </FieldSet>
                         </FieldGroup>
-                    </DialogBody>
+                    </PageDialogBody>
                 </form>
-            </DialogContent>
-        </Dialog>
+            </PageDialogContent>
+            {transition.confirmation}
+        </PageDialog>
     );
 }
 
@@ -1968,6 +2218,8 @@ export default function Access({
     tenant,
     canManage,
     members,
+    membersNextCursor,
+    invitationsNextCursor,
     apps = [],
     roles,
     dataPolicies,
@@ -1978,11 +2230,56 @@ export default function Access({
     ssoAvailable = false,
     workersAvailable,
 }: Props) {
+    const { wrapRouter: wrapRouterRequest, summary: routerRequestSummary } =
+        useInertiaFeedback();
+
     const url = usePage().url;
     const queryString = url.includes('?') ? url.split('?')[1] : '';
     const section = new URLSearchParams(queryString).get('section');
     const activeSection = section === 'invitations' ? section : 'members';
+    const seededMembers = useRef<Member[] | null>(null);
+    const seededInvitations = useRef<Invitation[] | null>(null);
+    const loadMembers = useCallback(
+        (input: ListRequest) => {
+            const initial = seededMembers.current !== members;
+            seededMembers.current = members;
+
+            return initial && !input.cursor && !input.query && !input.sort
+                ? Promise.resolve({
+                      items: members,
+                      nextCursor: membersNextCursor,
+                  })
+                : accessBatch<Member>('members', input);
+        },
+        [members, membersNextCursor],
+    );
+    const loadInvitations = useCallback(
+        (input: ListRequest) => {
+            const initial = seededInvitations.current !== invitations;
+            seededInvitations.current = invitations;
+
+            return initial && !input.cursor && !input.query && !input.sort
+                ? Promise.resolve({
+                      items: invitations,
+                      nextCursor: invitationsNextCursor,
+                  })
+                : accessBatch<Invitation>('invitations', input);
+        },
+        [invitations, invitationsNextCursor],
+    );
+    const memberList = useIncrementalList({
+        loadItems: loadMembers,
+        getKey: (member) => member.id,
+        active: activeSection === 'members',
+    });
+    const invitationList = useIncrementalList({
+        loadItems: loadInvitations,
+        getKey: (invitation) => invitation.id,
+        active: activeSection === 'invitations',
+    });
     const [editingMember, setEditingMember] = useState<Member | null>(null);
+    const [revokingInvitation, setRevokingInvitation] =
+        useState<Invitation | null>(null);
     const getInitials = useInitials();
     const copy = (code: string) => {
         void navigator.clipboard.writeText(code);
@@ -1992,7 +2289,7 @@ export default function Access({
     const memberColumns: DataTableColumn<Member>[] = [
         {
             id: 'identity',
-            header: 'Identity',
+            header: 'Anggota',
             cell: (member) => (
                 <div className="flex items-center gap-3 py-0.5">
                     <Avatar size="default">
@@ -2043,28 +2340,9 @@ export default function Access({
                                   Belum tertaut
                               </span>
                           ),
-                      sortValue: (member) => member.worker?.name ?? '',
                   } satisfies DataTableColumn<Member>,
               ]
             : []),
-        {
-            id: 'actions',
-            header: 'Aksi',
-            align: 'right',
-            width: 140,
-            cell: (member) =>
-                canManage && member.can_edit_access ? (
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setEditingMember(member)}
-                    >
-                        <Pencil />
-                        Atur akses
-                    </Button>
-                ) : null,
-        },
     ];
     const invitationColumns: DataTableColumn<Invitation>[] = [
         {
@@ -2095,72 +2373,15 @@ export default function Access({
             header: 'Security role',
             cell: (invitation) => (invitation.roles ?? []).join(', ') || '—',
         },
-        {
-            id: 'actions',
-            header: 'Aksi',
-            align: 'right',
-            width: 240,
-            cell: (invitation) =>
-                canManage && !invitation.revoked_at ? (
-                    <div className="flex shrink-0 items-center justify-end gap-2 whitespace-nowrap">
-                        {invitation.code ? (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => copy(invitation.code ?? '')}
-                            >
-                                <Copy />
-                                Salin kode
-                            </Button>
-                        ) : null}
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <Button size="sm" variant="outline">
-                                    <Ban />
-                                    Cabut
-                                </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>
-                                        Cabut kode akses?
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        Anggota baru tidak dapat memakai kode
-                                        ini lagi. Akses anggota yang sudah
-                                        bergabung tidak berubah.
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel>Batal</AlertDialogCancel>
-                                    <AlertDialogAction
-                                        onClick={() =>
-                                            router.delete(
-                                                `/settings/access/invitations/${invitation.id}`,
-                                                {
-                                                    data: {
-                                                        version:
-                                                            invitation.version,
-                                                    },
-                                                },
-                                            )
-                                        }
-                                    >
-                                        Cabut kode
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                    </div>
-                ) : null,
-        },
     ];
 
     return (
         <>
             <Head title="Identity & access" />
             <main className="mx-auto flex w-full max-w-7xl min-w-0 flex-col gap-6 p-6">
+                {routerRequestSummary}
                 <Heading
+                    variant="small"
                     title="Identity & access"
                     description={`Kelola anggota dan tanggung jawab bisnis untuk ${tenant.name}.`}
                 />
@@ -2219,7 +2440,41 @@ export default function Access({
                         <CardContent>
                             <DataTable
                                 columns={memberColumns}
-                                data={members}
+                                data={memberList.items}
+                                incremental={memberList}
+                                actions={
+                                    canManage
+                                        ? [
+                                              {
+                                                  id: 'access',
+                                                  label: 'Atur akses',
+                                                  icon: <Pencil />,
+                                              },
+                                          ]
+                                        : []
+                                }
+                                getRowActions={(member) =>
+                                    canManage && member.can_edit_access
+                                        ? [
+                                              {
+                                                  id: 'access',
+                                                  label: 'Atur akses',
+                                                  icon: <Pencil />,
+                                              },
+                                          ]
+                                        : []
+                                }
+                                actionsPlacement="inline"
+                                onRowAction={(_, member) => {
+                                    if (canManage && member.can_edit_access) {
+                                        setEditingMember(member);
+                                    }
+                                }}
+                                onRowClick={(member) => {
+                                    if (canManage && member.can_edit_access) {
+                                        setEditingMember(member);
+                                    }
+                                }}
                                 getRowKey={(member) => member.id}
                             />
                         </CardContent>
@@ -2235,22 +2490,96 @@ export default function Access({
                             </CardDescription>
                             {canManage && (
                                 <CardAction>
-                                    <InviteForm
-                                        roles={roles}
-                                        dataPolicies={dataPolicies}
-                                        organizations={organizations}
-                                        hierarchies={hierarchies}
-                                        invitations={invitations}
-                                        ssoAvailable={ssoAvailable}
-                                    />
+                                    <Deferred
+                                        data={['apps', 'hierarchies']}
+                                        fallback={
+                                            <p
+                                                role="status"
+                                                className="text-sm text-muted-foreground"
+                                            >
+                                                Menyiapkan pilihan akses…
+                                            </p>
+                                        }
+                                    >
+                                        <InviteForm
+                                            roles={roles}
+                                            dataPolicies={dataPolicies}
+                                            organizations={organizations}
+                                            hierarchies={hierarchies}
+                                            invitations={invitationList.items}
+                                            invitationList={invitationList}
+                                            ssoAvailable={ssoAvailable}
+                                        />
+                                    </Deferred>
                                 </CardAction>
                             )}
                         </CardHeader>
                         <CardContent>
-                            {invitations.length ? (
+                            {invitationList.items.length ||
+                            invitationList.loading ||
+                            invitationList.error ? (
                                 <DataTable
                                     columns={invitationColumns}
-                                    data={invitations}
+                                    data={invitationList.items}
+                                    incremental={invitationList}
+                                    actions={
+                                        canManage
+                                            ? [
+                                                  {
+                                                      id: 'copy',
+                                                      label: 'Salin kode',
+                                                      icon: <Copy />,
+                                                  },
+                                                  {
+                                                      id: 'revoke',
+                                                      label: 'Cabut kode',
+                                                      icon: <Ban />,
+                                                      destructive: true,
+                                                  },
+                                              ]
+                                            : []
+                                    }
+                                    getRowActions={(invitation) =>
+                                        !canManage || invitation.revoked_at
+                                            ? []
+                                            : [
+                                                  ...(invitation.code
+                                                      ? [
+                                                            {
+                                                                id: 'copy',
+                                                                label: 'Salin kode',
+                                                                icon: <Copy />,
+                                                            },
+                                                        ]
+                                                      : []),
+                                                  {
+                                                      id: 'revoke',
+                                                      label: 'Cabut kode',
+                                                      icon: <Ban />,
+                                                      destructive: true,
+                                                  },
+                                              ]
+                                    }
+                                    actionsPlacement="inline"
+                                    onRowAction={(action, invitation) => {
+                                        if (
+                                            !canManage ||
+                                            invitation.revoked_at
+                                        ) {
+                                            return;
+                                        }
+
+                                        if (
+                                            action === 'copy' &&
+                                            invitation.code
+                                        ) {
+                                            copy(invitation.code);
+                                        }
+
+                                        if (action === 'revoke') {
+                                            setRevokingInvitation(invitation);
+                                        }
+                                    }}
                                     getRowKey={(invitation) => invitation.id}
                                 />
                             ) : (
@@ -2272,16 +2601,77 @@ export default function Access({
                         </CardContent>
                     </Card>
                 )}
-                <MemberAccessDialog
-                    key={editingMember?.id ?? 'closed'}
-                    member={editingMember}
-                    apps={apps}
-                    roles={roles}
-                    dataPolicies={dataPolicies}
-                    organizations={organizations}
-                    hierarchies={hierarchies}
-                    onClose={() => setEditingMember(null)}
-                />
+                <AlertDialog
+                    open={Boolean(revokingInvitation)}
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            setRevokingInvitation(null);
+                        }
+                    }}
+                >
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>
+                                Cabut kode akses?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Anggota baru tidak dapat memakai kode ini lagi.
+                                Akses anggota yang sudah bergabung tidak
+                                berubah.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Batal</AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={() => {
+                                    if (
+                                        canManage &&
+                                        revokingInvitation &&
+                                        !revokingInvitation.revoked_at
+                                    ) {
+                                        router.delete(
+                                            `/settings/access/invitations/${revokingInvitation.id}`,
+                                            wrapRouterRequest({
+                                                data: {
+                                                    version:
+                                                        revokingInvitation.version,
+                                                },
+                                                onSuccess: () =>
+                                                    setRevokingInvitation(null),
+                                            }),
+                                        );
+                                    }
+                                }}
+                            >
+                                Cabut kode
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+                {editingMember && (
+                    <Deferred
+                        data={['apps', 'hierarchies']}
+                        fallback={
+                            <p
+                                role="status"
+                                className="text-sm text-muted-foreground"
+                            >
+                                Menyiapkan pilihan role dan batas data…
+                            </p>
+                        }
+                    >
+                        <MemberAccessDialog
+                            key={`${editingMember?.id}:${editingMember?.version}`}
+                            member={editingMember}
+                            apps={apps}
+                            roles={roles}
+                            dataPolicies={dataPolicies}
+                            organizations={organizations}
+                            hierarchies={hierarchies}
+                            onClose={() => setEditingMember(null)}
+                        />
+                    </Deferred>
+                )}
             </main>
         </>
     );

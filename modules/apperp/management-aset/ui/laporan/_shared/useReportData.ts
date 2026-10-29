@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, errorMessage } from '../../api';
+import { REPORT_FILTER_PROFILES } from './reportFilterProfiles';
+import type { ReportCode, ReportFilterProfile } from './reportFilterProfiles';
 import type { FilterProps, MultiFilterProps } from './ReportFilters';
+import { normalizeReportFilters } from './reportFilterState';
 import {
     archivePreset,
     createPreset,
@@ -39,6 +42,20 @@ export type AdditionalFilterState = {
     reportCode: string;
     filters: Filters;
     update: (key: string, value: FilterValue) => void;
+};
+
+/** State filter dan profil yang dipakai engine untuk satu laporan terdaftar. */
+export type ReportFilterState = {
+    reportCode: ReportCode;
+    profile: ReportFilterProfile;
+    filters: Filters;
+    hasActiveFilters: boolean;
+    resetFilters: () => void;
+    bindFilter: (key: string) => FilterProps;
+    bindMultiFilter: (key: string) => MultiFilterProps;
+    presets: ReportPresetState;
+    additional: AdditionalFilterState;
+    notice: string;
 };
 
 /**
@@ -81,10 +98,18 @@ function queryString(filters: Filters): string {
  * sudah diterjemahkan Core menurut zona pengguna.
  */
 export function useReportData<T = Record<string, unknown>>(
-    reportCode: string,
+    reportCode: ReportCode,
     initialFilters: Filters = {},
 ) {
-    const [filters, setFilters] = useState<Filters>(initialFilters);
+    const profile: ReportFilterProfile = REPORT_FILTER_PROFILES[reportCode];
+    // Isian awal hanya dibaca sekali per laporan; referensinya tidak boleh memicu muat ulang.
+    const initial = useRef(
+        normalizeReportFilters(profile, initialFilters).filters,
+    );
+    const [filters, setFilters] = useState<Filters>(
+        () => normalizeReportFilters(profile, initialFilters).filters,
+    );
+    const [notice, setNotice] = useState('');
     const [ready, setReady] = useState(false);
     const [presets, setPresets] = useState<ReportPreset[]>([]);
     const [canShare, setCanShare] = useState(false);
@@ -100,8 +125,6 @@ export function useReportData<T = Record<string, unknown>>(
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [refreshKey, setRefreshKey] = useState(0);
-    // Isian awal hanya dibaca sekali per laporan; referensinya tidak boleh memicu muat ulang.
-    const initial = useRef(initialFilters);
     const lastRemembered = useRef<string | null>(null);
 
     // Opsi terakhir dan preset dimuat sebelum pratinjau pertama, supaya layar tidak memuat data dua kali.
@@ -119,14 +142,21 @@ export function useReportData<T = Record<string, unknown>>(
                 setCanShare(options.can_share);
 
                 if (options.last_used) {
-                    const remembered = fromParameters(
-                        options.last_used.parameters,
+                    const restored = normalizeReportFilters(profile, {
+                        ...initial.current,
+                        ...fromParameters(options.last_used.parameters),
+                    });
+                    const remembered = restored.filters;
+                    setNotice(
+                        restored.removed.length > 0
+                            ? 'Sebagian filter tersimpan sudah tidak tersedia pada laporan ini. Periksa kembali pilihan sebelum mencetak.'
+                            : '',
                     );
 
                     lastRemembered.current = JSON.stringify(
                         toParameters(remembered),
                     );
-                    setFilters({ ...initial.current, ...remembered });
+                    setFilters(remembered);
                 }
             })
             .catch(() => undefined)
@@ -139,7 +169,7 @@ export function useReportData<T = Record<string, unknown>>(
         return () => {
             cancelled = true;
         };
-    }, [reportCode]);
+    }, [reportCode, profile]);
 
     useEffect(() => {
         if (!ready) {
@@ -193,11 +223,17 @@ export function useReportData<T = Record<string, unknown>>(
 
     const updateFilter = (key: string, value: FilterValue) => {
         setSelectedPresetId(null);
-        setFilters((prev) => ({ ...prev, [key]: value }));
+        setNotice('');
+        setFilters(
+            (prev) =>
+                normalizeReportFilters(profile, { ...prev, [key]: value })
+                    .filters,
+        );
     };
 
     const resetFilters = () => {
         setSelectedPresetId(null);
+        setNotice('');
         setFilters(initial.current);
     };
 
@@ -237,27 +273,36 @@ export function useReportData<T = Record<string, unknown>>(
             setSelectedPresetId(preset?.id ?? null);
 
             if (preset) {
-                setFilters({
+                const restored = normalizeReportFilters(profile, {
                     ...initial.current,
                     ...fromParameters(preset.resolved_parameters),
                 });
+                setFilters(restored.filters);
+                setNotice(
+                    restored.removed.length > 0
+                        ? 'Sebagian filter pada preset sudah tidak tersedia pada laporan ini. Periksa kembali pilihan sebelum mencetak.'
+                        : '',
+                );
             }
         },
         save: async (name, parameters, shared) => {
             const preset = await createPreset(
                 reportCode,
                 name,
-                toParameters(parameters),
+                toParameters(
+                    normalizeReportFilters(profile, parameters).filters,
+                ),
                 shared,
             );
 
             setPresets((prev) => [...prev, preset]);
             setSelectedPresetId(preset.id);
             // Layar langsung memakai arti preset itu: "bulan ini" menjadi bulan berjalan, bukan bulan filter tadi.
-            setFilters({
+            const restored = normalizeReportFilters(profile, {
                 ...initial.current,
                 ...fromParameters(preset.resolved_parameters),
             });
+            setFilters(restored.filters);
         },
         archive: async (preset) => {
             await archivePreset(reportCode, preset);
@@ -266,20 +311,27 @@ export function useReportData<T = Record<string, unknown>>(
         },
     };
 
-    return {
+    const additionalState: AdditionalFilterState = {
+        reportCode,
         filters,
-        setFilters,
-        updateFilter,
+        update: updateFilter,
+    };
+
+    const filterState: ReportFilterState = {
+        reportCode,
+        profile,
+        filters,
+        hasActiveFilters: Object.values(filters).some(filled),
         resetFilters,
         bindFilter,
         bindMultiFilter,
-        hasActiveFilters: Object.values(filters).some(filled),
         presets: presetState,
-        additional: {
-            reportCode,
-            filters,
-            update: updateFilter,
-        } satisfies AdditionalFilterState,
+        additional: additionalState,
+        notice,
+    };
+
+    return {
+        filterState,
         rows,
         fields,
         loading: loading || !ready,
