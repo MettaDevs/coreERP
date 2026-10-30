@@ -33,10 +33,18 @@ try {
     await page.getByRole('region', { name: 'Salin production menjadi sandbox' }).getByText('Menunggu giliran', { exact: true }).waitFor();
     await page.getByText('Daftar aplikasi akan tersedia setelah penyalinan selesai.', { exact: true }).waitFor();
     await page.screenshot({ path: path.join(out, 'sandbox-queued.png'), fullPage: true });
+    const completionReload = page.waitForResponse(response =>
+        (response.request().headers()['x-inertia-partial-data'] ?? '').split(',').includes('modules'),
+        { timeout: 180000 },
+    );
     const stdout = fs.openSync(path.join(out, 'worker.log'), 'w');
     worker = spawn('php', ['artisan', 'queue:work', '--once', '--tries=1', '--no-interaction'], { cwd: path.join(process.env.GITHUB_WORKSPACE, 'apps/core'), env: process.env, stdio: ['ignore', stdout, stdout] });
     fs.closeSync(stdout);
     await page.getByRole('region', { name: 'Salin production menjadi sandbox' }).getByText('Sandbox aktif', { exact: true }).waitFor({ timeout: 180000 });
+    const metadataResponse = await completionReload;
+    if (metadataResponse.status() !== 200) throw new Error('Completion metadata refresh failed');
+    const metadata = await metadataResponse.json();
+    if (!Array.isArray(metadata.props.modules)) throw new Error('Completion response has no module list');
     await page.getByText('Belum ada aplikasi yang terpasang di lingkungan ini.', { exact: true }).waitFor();
     await page.screenshot({ path: path.join(out, 'sandbox-active.png'), fullPage: true });
     if (worker.exitCode === null) {
@@ -47,7 +55,7 @@ try {
     }
     if (worker.exitCode !== 0) throw new Error(`Worker exit ${worker.exitCode}`);
     if (errors.length) throw new Error(errors.join('\n'));
-    fs.writeFileSync(path.join(out, 'browser-proof.json'), JSON.stringify({ sourceId: fixture.source_id, targetId, loggedInThroughUi: true, clickedCopyButton: true, formValidationShown: true, realCoreApi: true, realQueueWorker: true, activeObservedThroughPolling: true, pageErrors: errors }, null, 2));
+    fs.writeFileSync(path.join(out, 'browser-proof.json'), JSON.stringify({ sourceId: fixture.source_id, targetId, loggedInThroughUi: true, clickedCopyButton: true, formValidationShown: true, realCoreApi: true, realQueueWorker: true, activeObservedThroughPolling: true, completionMetadataReloaded: true, moduleCount: metadata.props.modules.length, pageErrors: errors }, null, 2));
     console.log('Browser click, validation, queued target, real worker and active polling passed.');
 } catch (error) {
     await page.screenshot({ path: path.join(out, 'failure.png'), fullPage: true });
