@@ -87,8 +87,12 @@ class CopyEnvironmentTest extends TestCase
         Http::fake(['*' => Http::response([], 503)]);
         $source = $this->source();
         $target = $this->target($source, 'degraded');
+        DB::table('core_module_installations')->insert([
+            'tenant_id' => $source->tenant_id, 'module_id' => 'central-fixture', 'version' => '1.0.0',
+            'status' => 'installed', 'installed_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
         $this->actingAs($this->operator())->get('/lingkungan/'.$target->id)->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->component('environments/show')->where('canProvision', false)->where('copyState.canRequest', true)->where('copyState.sourceId', $source->id)->where('copyState.targetId', $target->id));
+            ->component('environments/show')->where('modules', [])->where('canProvision', false)->where('copyState.canRequest', true)->where('copyState.sourceId', $source->id)->where('copyState.targetId', $target->id));
     }
 
     public function test_a_running_cli_retry_is_shown_as_running_even_if_the_target_was_degraded(): void

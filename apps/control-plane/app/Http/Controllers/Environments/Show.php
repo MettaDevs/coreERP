@@ -45,6 +45,10 @@ class Show extends Controller
         $onClientServer = $row->hosting === 'client_server';
 
         $moduleResult = function () use ($onClientServer, $modules, $row): array {
+            if ($row->source_environment_id !== null && $row->status !== 'active') {
+                return ['items' => [], 'error' => null];
+            }
+
             return once(function () use ($onClientServer, $modules, $row): array {
                 try {
                     return ['items' => $onClientServer ? [] : $modules($row), 'error' => null];

@@ -102,6 +102,10 @@ export default function Show({
     // Produksi di server klien tidak punya database di server kita. Spanduk penyiapan dan daftar
     // module membaca server kita, jadi keduanya digantikan panel "Server klien".
     const onClientServer = environment.hosting === 'client_server';
+    const copyNotReady =
+        environment.kind === 'sandbox' &&
+        copyState !== null &&
+        environment.status !== 'active';
 
     // Penyiapan gagal dipulangkan sebagai galat validasi bernama `provision`, bukan sebagai prop
     // tersendiri. Karena `router.post` dipakai di sini alih-alih `useForm`, tidak ada objek
@@ -383,9 +387,11 @@ export default function Show({
                     <CardHeader>
                         <CardTitle>Aplikasi di lingkungan ini</CardTitle>
                         <span className="text-xs text-muted-foreground">
-                            {modulesError
-                                ? 'Belum terbaca'
-                                : `${modules.length} aplikasi`}
+                            {copyNotReady
+                                ? 'Belum tersedia'
+                                : modulesError
+                                  ? 'Belum terbaca'
+                                  : `${modules.length} aplikasi`}
                         </span>
                     </CardHeader>
                     <CardContent className="space-y-3">
@@ -394,7 +400,12 @@ export default function Show({
                             tenant dapat berbeda dengan aplikasi yang sudah
                             terpasang.
                         </p>
-                        {modulesError ? (
+                        {copyNotReady ? (
+                            <p className="text-sm text-muted-foreground">
+                                Daftar aplikasi akan tersedia setelah penyalinan
+                                selesai.
+                            </p>
+                        ) : modulesError ? (
                             <FormErrorHeader
                                 message={modulesError}
                                 operation="Daftar aplikasi belum dapat dibaca"
