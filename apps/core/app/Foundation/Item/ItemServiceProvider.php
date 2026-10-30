@@ -20,4 +20,3 @@ final class ItemServiceProvider extends ServiceProvider
         $this->loadRoutesFrom(__DIR__.'/routes.php');
     }
 }
-

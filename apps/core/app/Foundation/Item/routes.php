@@ -18,4 +18,3 @@ Route::middleware(['web', 'auth'])->group(function (): void {
         Route::delete('{item}', [ItemController::class, 'destroy'])->name('destroy');
     });
 });
-

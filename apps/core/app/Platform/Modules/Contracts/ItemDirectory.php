@@ -31,4 +31,3 @@ interface ItemDirectory
      */
     public function active(string $tenantId, ?string $type = null): array;
 }
-

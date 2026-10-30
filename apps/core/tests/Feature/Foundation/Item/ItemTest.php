@@ -316,4 +316,3 @@ class ItemTest extends TestCase
         return Tenant::create(['client_id' => $client->id, 'name' => 'Tenant uji', 'slug' => $slug, 'status' => 'active']);
     }
 }
-
