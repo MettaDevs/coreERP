@@ -115,8 +115,8 @@ class Show extends Controller
         };
 
         return [
-            'sourceId' => $source?->id ?? (string) $row->source_environment_id,
-            'targetId' => $target?->id, 'name' => $target?->name ?? '',
+            'sourceId' => $source->id ?? (string) $row->source_environment_id,
+            'targetId' => $target?->id, 'name' => $target->name ?? '',
             'canRequest' => $reason === null && ! $pending,
             'pending' => $pending, 'status' => $status,
             'reason' => $reason ?? ($target?->status === 'degraded' ? $operation?->failure_message : null),

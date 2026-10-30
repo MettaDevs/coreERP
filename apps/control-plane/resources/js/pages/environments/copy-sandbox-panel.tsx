@@ -65,7 +65,7 @@ export default function CopySandboxPanel({
                 <p className="text-muted-foreground">{copy.reason}</p>
             )}
             <FormErrorHeader
-                message={copyError}
+                message={copyError ?? form.errors.name}
                 operation="Sandbox belum dapat diantrekan"
             />
             <div className="flex flex-wrap gap-2">
@@ -106,9 +106,9 @@ export default function CopySandboxPanel({
                             riwayat.
                         </DialogDescription>
                     </DialogHeader>
-                    <form onSubmit={submit} className="space-y-4">
+                    <form noValidate onSubmit={submit} className="space-y-4">
                         <FormErrorHeader
-                            message={copyError}
+                            message={copyError ?? form.errors.name}
                             operation="Sandbox belum dapat diantrekan"
                         />
                         <FormControl error={form.errors.name}>

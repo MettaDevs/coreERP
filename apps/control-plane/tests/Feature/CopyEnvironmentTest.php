@@ -44,6 +44,7 @@ class CopyEnvironmentTest extends TestCase
         return Environment::create(['tenant_id' => $source->tenant_id, 'kind' => 'sandbox', 'name' => 'Salinan uji', 'slug' => 'salinan-uji', 'source_environment_id' => $source->id, 'status' => $status, 'outbound_allowed' => false]);
     }
 
+    /** @return array{source_environment_id:string,target_environment_id:string,tenant_id:string,queued:bool,status:string} */
     private function accepted(Environment $source, Environment $target): array
     {
         return ['source_environment_id' => $source->id, 'target_environment_id' => $target->id, 'tenant_id' => $source->tenant_id, 'queued' => true, 'status' => $target->status];
