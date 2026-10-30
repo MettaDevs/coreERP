@@ -45,6 +45,24 @@ class ModuleMigratorTest extends TestCase
         $this->assertCount(count($pertama), $migrator->ran($module));
     }
 
+    public function test_module_migration_lock_survives_until_the_callers_transaction_ends(): void
+    {
+        $module = $this->app->make(ModuleRegistry::class)->find('contoh-a');
+        $this->assertNotNull($module);
+        $this->app->make(ModuleMigrator::class)->migrate($module);
+
+        $other = DB::connection('pgsql_test_secondary');
+        $key = 'module-migrations:'.$module->id;
+
+        try {
+            $lock = $other->selectOne('select pg_try_advisory_lock(hashtextextended(?, 0)) as acquired', [$key]);
+
+            $this->assertFalse($lock->acquired, 'Koneksi lain harus menunggu sampai transaksi pemasang selesai.');
+        } finally {
+            $other->select('select pg_advisory_unlock(hashtextextended(?, 0))', [$key]);
+        }
+    }
+
     public function test_riwayat_module_tidak_menambah_tabel_migrations_milik_core(): void
     {
         $module = $this->app->make(ModuleRegistry::class)->find('contoh-a');

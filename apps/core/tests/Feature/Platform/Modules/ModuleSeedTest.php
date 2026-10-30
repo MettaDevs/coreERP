@@ -11,6 +11,7 @@ use App\Platform\Modules\Support\ModuleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Tests\TestCase;
 
 /**
@@ -117,6 +118,36 @@ class ModuleSeedTest extends TestCase
             'Tanpa catatan pemasangan, tidak ada yang bisa menandai bahwa data awal sudah diisi.'
         );
         $this->assertSame(0, $this->jumlahBaris('contoh_a_m_barang'));
+    }
+
+    public function test_failed_seed_rolls_back_partial_data_and_can_be_retried(): void
+    {
+        $this->catatPemasangan('contoh-a');
+        $injected = false;
+        DB::listen(function ($query) use (&$injected): void {
+            if (! $injected && str_starts_with($query->sql, 'insert into "contoh_a_m_barang"')) {
+                $injected = true;
+
+                throw new RuntimeException('Pengisian data awal terputus setelah baris pertama.');
+            }
+        });
+
+        try {
+            $this->isiDataAwal('contoh-a');
+            $this->fail('Kegagalan pengisian harus diteruskan ke pemanggil.');
+        } catch (RuntimeException $error) {
+            $this->assertSame('Pengisian data awal terputus setelah baris pertama.', $error->getMessage());
+        }
+
+        $this->assertTrue($injected);
+        $this->assertSame(0, $this->jumlahBaris('contoh_a_m_barang'));
+        $this->assertNull(ModuleInstallation::query()
+            ->where('tenant_id', $this->tenantId)
+            ->where('module_id', 'contoh-a')
+            ->firstOrFail()->seeded_at);
+        $this->assertTrue($this->isiDataAwal('contoh-a'));
+        $this->assertSame(2, $this->jumlahBaris('contoh_a_m_barang'));
+        $this->assertFalse($this->isiDataAwal('contoh-a'));
     }
 
     private function isiDataAwal(string $moduleId): bool
