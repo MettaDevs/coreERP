@@ -23,7 +23,7 @@ try {
     await panel.getByRole('button', { name: 'Buat sandbox dari production', exact: true }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('button', { name: 'Buat sandbox', exact: true }).click();
-    await dialog.getByText('Isi nama sandbox.', { exact: true }).first().waitFor();
+    await dialog.getByText(/Isi nama sandbox/).first().waitFor();
     await dialog.getByLabel('Nama sandbox', { exact: true }).fill('Sandbox uji browser');
     await page.screenshot({ path: path.join(out, 'copy-dialog.png') });
     await dialog.getByRole('button', { name: 'Buat sandbox', exact: true }).click();
@@ -44,7 +44,7 @@ try {
     }
     if (worker.exitCode !== 0) throw new Error(`Worker exit ${worker.exitCode}`);
     if (errors.length) throw new Error(errors.join('\n'));
-    fs.writeFileSync(path.join(out, 'browser-proof.json'), JSON.stringify({ sourceId: fixture.source_id, targetId, loggedInThroughUi: true, clickedCopyButton: true, serverValidationShown: true, realCoreApi: true, realQueueWorker: true, activeObservedThroughPolling: true, pageErrors: errors }, null, 2));
+    fs.writeFileSync(path.join(out, 'browser-proof.json'), JSON.stringify({ sourceId: fixture.source_id, targetId, loggedInThroughUi: true, clickedCopyButton: true, formValidationShown: true, realCoreApi: true, realQueueWorker: true, activeObservedThroughPolling: true, pageErrors: errors }, null, 2));
     console.log('Browser click, validation, queued target, real worker and active polling passed.');
 } catch (error) {
     await page.screenshot({ path: path.join(out, 'failure.png'), fullPage: true });
