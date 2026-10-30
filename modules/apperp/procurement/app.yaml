@@ -1,6 +1,6 @@
 id: procurement
 name: Procurement
-description: Kerangka aplikasi pengadaan. Fitur bisnis belum tersedia.
+description: Dokumentasi dan sistem pengadaan barang dan jasa, rekanan, dan manajemen pengadaan.
 publisher: apperp
 version: 0.1.0
 kind: business-app
@@ -8,28 +8,236 @@ requires:
   core: ^0.1
 dependsOn: {}
 table_prefix: procurement_
-ui: {}
+ui:
+  navigation:
+    rail:
+      - id: dashboard
+        label: Dashboard
+      - id: master
+        label: Master data
+      - id: manajemen-pengadaan
+        label: Manajemen pengadaan
+      - id: laporan
+        label: Laporan
+    sidebar:
+      dashboard:
+        - id: ringkasan-pengadaan
+          label: Ringkasan pengadaan
+          permission: procurement.dashboard.read
+      master:
+        - id: vendor
+          label: Vendor/Supplier
+          permission: procurement.vendor.read
+        - id: prakualifikasi
+          label: Prakualifikasi
+          permission: procurement.prakualifikasi.read
+        - id: kualifikasi
+          label: Kualifikasi
+          permission: procurement.kualifikasi.read
+        - id: harga-perkiraan
+          label: Harga Perkiraan
+          permission: procurement.harga-perkiraan.read
+        - id: kategori-pengadaan
+          label: Kategori Pengadaan
+          permission: procurement.kategori-pengadaan.read
+        - id: jenis-vendor
+          label: Jenis Vendor/Supplier
+          permission: procurement.jenis-vendor.read
+        - id: metode-pembayaran
+          label: Metode Pembayaran
+          permission: procurement.metode-pembayaran.read
+        - id: termin-pembayaran
+          label: Termin Pembayaran
+          permission: procurement.termin-pembayaran.read
+        - id: item-jasa
+          label: Item Jasa
+          permission: procurement.item-jasa.read
+        - id: item-subkont
+          label: Item Subkont
+          permission: procurement.item-subkont.read
+      manajemen-pengadaan:
+        - id: permintaan-pembelian
+          label: Permintaan pembelian
+          permission: procurement.permintaan-pembelian.read
+        - id: permintaan-penawaran
+          label: Permintaan penawaran
+          permission: procurement.permintaan-penawaran.read
+        - id: pesanan-pembelian
+          label: Pesanan pembelian
+          permission: procurement.pesanan-pembelian.read
+        - id: penerimaan-barang
+          label: Penerimaan barang
+          permission: procurement.penerimaan-barang.read
+      laporan:
+        - id: laporan-pengadaan
+          label: Laporan pengadaan
+          permission: procurement.laporan-pengadaan.read
 
-# Contoh deklarasi bawaan template; belum terhubung ke halaman atau endpoint.
-# Katalog mewajibkan empat lapis keamanan meskipun module belum memiliki UI.
-# Ganti dengan resource dan tindakan yang disetujui saat fitur pertama dibuat.
 security:
   entry_points:
-    - code: procurement.example.form
-      name: Contoh entry point template
-      type: form
+    - { code: procurement.dashboard.form, name: Layar dashboard pengadaan, type: form }
+    - { code: procurement.vendor.form, name: Layar vendor/supplier, type: form }
+    - { code: procurement.prakualifikasi.form, name: Layar prakualifikasi vendor, type: form }
+    - { code: procurement.kualifikasi.form, name: Layar kualifikasi vendor, type: form }
+    - { code: procurement.harga-perkiraan.form, name: Layar harga perkiraan, type: form }
+    - { code: procurement.kategori-pengadaan.form, name: Layar kategori pengadaan, type: form }
+    - { code: procurement.jenis-vendor.form, name: Layar jenis vendor/supplier, type: form }
+    - { code: procurement.metode-pembayaran.form, name: Layar metode pembayaran, type: form }
+    - { code: procurement.termin-pembayaran.form, name: Layar termin pembayaran, type: form }
+    - { code: procurement.item-jasa.form, name: Layar item jasa, type: form }
+    - { code: procurement.item-subkont.form, name: Layar item subkont, type: form }
+    - { code: procurement.permintaan-pembelian.form, name: Layar permintaan pembelian, type: form }
+    - { code: procurement.permintaan-penawaran.form, name: Layar permintaan penawaran, type: form }
+    - { code: procurement.pesanan-pembelian.form, name: Layar pesanan pembelian, type: form }
+    - { code: procurement.penerimaan-barang.form, name: Layar penerimaan barang, type: form }
+    - { code: procurement.laporan-pengadaan.form, name: Layar laporan pengadaan, type: form }
+
   permissions:
-    - code: procurement.example.read
-      entry_point: procurement.example.form
-      access: read
-      name: Contoh permission template
+    - { code: procurement.dashboard.read, name: Lihat dashboard pengadaan, entry_point: procurement.dashboard.form, access: read }
+    - { code: procurement.vendor.read, name: Lihat vendor/supplier, entry_point: procurement.vendor.form, access: read }
+    - { code: procurement.prakualifikasi.read, name: Lihat prakualifikasi, entry_point: procurement.prakualifikasi.form, access: read }
+    - { code: procurement.kualifikasi.read, name: Lihat kualifikasi, entry_point: procurement.kualifikasi.form, access: read }
+    - { code: procurement.harga-perkiraan.read, name: Lihat harga perkiraan, entry_point: procurement.harga-perkiraan.form, access: read }
+    - { code: procurement.kategori-pengadaan.read, name: Lihat kategori pengadaan, entry_point: procurement.kategori-pengadaan.form, access: read }
+    - { code: procurement.jenis-vendor.read, name: Lihat jenis vendor/supplier, entry_point: procurement.jenis-vendor.form, access: read }
+    - { code: procurement.metode-pembayaran.read, name: Lihat metode pembayaran, entry_point: procurement.metode-pembayaran.form, access: read }
+    - { code: procurement.termin-pembayaran.read, name: Lihat termin pembayaran, entry_point: procurement.termin-pembayaran.form, access: read }
+    - { code: procurement.item-jasa.read, name: Lihat item jasa, entry_point: procurement.item-jasa.form, access: read }
+    - { code: procurement.item-subkont.read, name: Lihat item subkont, entry_point: procurement.item-subkont.form, access: read }
+    - { code: procurement.permintaan-pembelian.read, name: Lihat permintaan pembelian, entry_point: procurement.permintaan-pembelian.form, access: read }
+    - { code: procurement.permintaan-penawaran.read, name: Lihat permintaan penawaran, entry_point: procurement.permintaan-penawaran.form, access: read }
+    - { code: procurement.pesanan-pembelian.read, name: Lihat pesanan pembelian, entry_point: procurement.pesanan-pembelian.form, access: read }
+    - { code: procurement.penerimaan-barang.read, name: Lihat penerimaan barang, entry_point: procurement.penerimaan-barang.form, access: read }
+    - { code: procurement.laporan-pengadaan.read, name: Lihat laporan pengadaan, entry_point: procurement.laporan-pengadaan.form, access: read }
+
   privileges:
-    - code: procurement.example.view
-      name: Contoh privilege template
+    - code: procurement.dashboard.view
+      name: Buka dashboard pengadaan
       permissions:
-        - procurement.example.read
+        - procurement.dashboard.read
+    - code: procurement.vendor.view
+      name: Lihat vendor/supplier
+      permissions:
+        - procurement.vendor.read
+    - code: procurement.prakualifikasi.view
+      name: Lihat prakualifikasi vendor
+      permissions:
+        - procurement.prakualifikasi.read
+    - code: procurement.kualifikasi.view
+      name: Lihat kualifikasi vendor
+      permissions:
+        - procurement.kualifikasi.read
+    - code: procurement.harga-perkiraan.view
+      name: Lihat harga perkiraan
+      permissions:
+        - procurement.harga-perkiraan.read
+    - code: procurement.kategori-pengadaan.view
+      name: Lihat kategori pengadaan
+      permissions:
+        - procurement.kategori-pengadaan.read
+    - code: procurement.jenis-vendor.view
+      name: Lihat jenis vendor/supplier
+      permissions:
+        - procurement.jenis-vendor.read
+    - code: procurement.metode-pembayaran.view
+      name: Lihat metode pembayaran
+      permissions:
+        - procurement.metode-pembayaran.read
+    - code: procurement.termin-pembayaran.view
+      name: Lihat termin pembayaran
+      permissions:
+        - procurement.termin-pembayaran.read
+    - code: procurement.item-jasa.view
+      name: Lihat item jasa
+      permissions:
+        - procurement.item-jasa.read
+    - code: procurement.item-subkont.view
+      name: Lihat item subkont
+      permissions:
+        - procurement.item-subkont.read
+    - code: procurement.permintaan-pembelian.view
+      name: Lihat permintaan pembelian
+      permissions:
+        - procurement.permintaan-pembelian.read
+    - code: procurement.permintaan-penawaran.view
+      name: Lihat permintaan penawaran
+      permissions:
+        - procurement.permintaan-penawaran.read
+    - code: procurement.pesanan-pembelian.view
+      name: Lihat pesanan pembelian
+      permissions:
+        - procurement.pesanan-pembelian.read
+    - code: procurement.penerimaan-barang.view
+      name: Lihat penerimaan barang
+      permissions:
+        - procurement.penerimaan-barang.read
+    - code: procurement.laporan-pengadaan.view
+      name: Lihat laporan pengadaan
+      permissions:
+        - procurement.laporan-pengadaan.read
+
   duties:
-    - code: procurement.example.access
-      name: Contoh duty template
+    - code: procurement.dashboard.inquire
+      name: Lihat dashboard pengadaan
       privileges:
-        - procurement.example.view
+        - procurement.dashboard.view
+    - code: procurement.vendor.inquire
+      name: Lihat data vendor/supplier
+      privileges:
+        - procurement.vendor.view
+    - code: procurement.prakualifikasi.inquire
+      name: Lihat prakualifikasi vendor
+      privileges:
+        - procurement.prakualifikasi.view
+    - code: procurement.kualifikasi.inquire
+      name: Lihat kualifikasi vendor
+      privileges:
+        - procurement.kualifikasi.view
+    - code: procurement.harga-perkiraan.inquire
+      name: Lihat harga perkiraan
+      privileges:
+        - procurement.harga-perkiraan.view
+    - code: procurement.kategori-pengadaan.inquire
+      name: Lihat kategori pengadaan
+      privileges:
+        - procurement.kategori-pengadaan.view
+    - code: procurement.jenis-vendor.inquire
+      name: Lihat jenis vendor/supplier
+      privileges:
+        - procurement.jenis-vendor.view
+    - code: procurement.metode-pembayaran.inquire
+      name: Lihat metode pembayaran
+      privileges:
+        - procurement.metode-pembayaran.view
+    - code: procurement.termin-pembayaran.inquire
+      name: Lihat termin pembayaran
+      privileges:
+        - procurement.termin-pembayaran.view
+    - code: procurement.item-jasa.inquire
+      name: Lihat item jasa
+      privileges:
+        - procurement.item-jasa.view
+    - code: procurement.item-subkont.inquire
+      name: Lihat item subkont
+      privileges:
+        - procurement.item-subkont.view
+    - code: procurement.permintaan-pembelian.inquire
+      name: Lihat permintaan pembelian
+      privileges:
+        - procurement.permintaan-pembelian.view
+    - code: procurement.permintaan-penawaran.inquire
+      name: Lihat permintaan penawaran
+      privileges:
+        - procurement.permintaan-penawaran.view
+    - code: procurement.pesanan-pembelian.inquire
+      name: Lihat pesanan pembelian
+      privileges:
+        - procurement.pesanan-pembelian.view
+    - code: procurement.penerimaan-barang.inquire
+      name: Lihat penerimaan barang
+      privileges:
+        - procurement.penerimaan-barang.view
+    - code: procurement.laporan-pengadaan.inquire
+      name: Lihat laporan pengadaan
+      privileges:
+        - procurement.laporan-pengadaan.view
