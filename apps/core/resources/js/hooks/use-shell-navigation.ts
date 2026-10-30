@@ -277,6 +277,12 @@ export function useShellNavigation() {
                         permission: 'core.reference-data.read',
                     },
                     {
+                        label: 'Item / jasa',
+                        icon: Package,
+                        href: '/settings/service-items',
+                        permission: 'core.reference-data.read',
+                    },
+                    {
                         label: 'Daftar akun',
                         icon: BookOpen,
                         href: '/settings/finance-accounts',

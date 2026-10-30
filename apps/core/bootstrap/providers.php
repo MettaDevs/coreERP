@@ -4,6 +4,7 @@ use App\Foundation\Currency\CurrencyServiceProvider;
 use App\Foundation\FinancePosting\FinancePostingServiceProvider;
 use App\Foundation\FiscalCalendar\FiscalCalendarServiceProvider;
 use App\Foundation\FundingSource\FundingSourceServiceProvider;
+use App\Foundation\Item\ItemServiceProvider;
 use App\Foundation\NumberSequence\NumberSequenceServiceProvider;
 use App\Foundation\PaymentMethod\PaymentMethodServiceProvider;
 use App\Foundation\PaymentTerm\PaymentTermServiceProvider;
@@ -27,6 +28,7 @@ return [
     FinancePostingServiceProvider::class,
     FiscalCalendarServiceProvider::class,
     FundingSourceServiceProvider::class,
+    ItemServiceProvider::class,
     PaymentMethodServiceProvider::class,
     PaymentTermServiceProvider::class,
     PlanningYearServiceProvider::class,

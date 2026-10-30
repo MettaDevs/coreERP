@@ -136,7 +136,7 @@ export default function App({
         case 'termin-pembayaran':
             return <PaymentTermPage permissions={permissions} />;
         case 'item-jasa':
-            return <ServiceItemPage />;
+            return <ServiceItemPage permissions={permissions} />;
         case 'item-subkont':
             return <SubcontractItemPage />;
 
