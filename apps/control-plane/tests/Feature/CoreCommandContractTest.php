@@ -97,6 +97,11 @@ class CoreCommandContractTest extends TestCase
         );
     }
 
+    public function test_the_copy_address_is_in_the_contract(): void
+    {
+        $this->assertContains('/environments/{environment}/copy', $this->contract['paths']);
+    }
+
     public function test_the_environment_provisioning_address_is_in_the_contract(): void
     {
         $this->assertContains(

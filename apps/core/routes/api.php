@@ -7,6 +7,7 @@ use App\Foundation\NumberSequence\Http\Controllers\InternalNumberSequenceControl
 use App\Foundation\UnitOfMeasure\Http\Controllers\Internal\UnitOfMeasureDirectoryController;
 use App\Foundation\Vendor\Http\Controllers\Internal\VendorDirectoryController;
 use App\Foundation\Workflow\Http\Controllers\Internal\InternalWorkflowInstanceController;
+use App\Platform\ControlPlane\Http\Controllers\Internal\EnvironmentCopyController;
 use App\Platform\ControlPlane\Http\Controllers\Internal\EnvironmentCreationController;
 use App\Platform\ControlPlane\Http\Controllers\Internal\EnvironmentProvisioningController;
 use App\Platform\ControlPlane\Http\Controllers\Internal\FleetController;
@@ -100,6 +101,7 @@ Route::prefix('internal/v1')->middleware(['throttle:30,1', 'control-plane'])->gr
     // Dibaca admin.erp saat menerbitkan lisensi situs; lihat TenantEntitlementController.
     Route::get('tenants/{tenant}/entitlements', [TenantEntitlementController::class, 'show']);
     Route::post('environments/{environment}/provision', [EnvironmentProvisioningController::class, 'store']);
+    Route::post('environments/{environment}/copy', [EnvironmentCopyController::class, 'store']);
     Route::get('fleet', [FleetController::class, 'index']);
     Route::post('environments/upgrade', [FleetController::class, 'upgrade']);
     Route::post('environments/{environment}/upgrade', [FleetController::class, 'upgrade']);

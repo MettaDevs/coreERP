@@ -341,3 +341,37 @@ Customer produk disimpan pada tabel pusat `product_customers` berdasarkan issuer
 Respons customer selalu tanpa password owner, password metta, maupun kredensial database. Saat membuka aplikasi, Core memeriksa kepemilikan tenant, status siap dan tenggat, lalu menerbitkan tiket RS256 maksimal 60 detik dengan audience tenant dan challenge peramban. Username lokal awal adalah owner yang dibuat bootstrap, bukan metta. Kunci privat berada terenkripsi pada console_settings. `php artisan product-registration:signing-key --create` menyiapkan sekali dan hanya menampilkan kid, public_key_b64 dan issuer untuk konfigurasi worker/tenant.
 
 Logout back-channel penyedia mencabut session customer dan menulis pending_sso_revocation per tenant dalam transaksi yang sama. Worker menerima pencabutan lewat API privat. Bila pengiriman belum berhasil, `product-tenants:reconcile` mencoba lagi termasuk untuk tenant siap. Payload baru tidak boleh terhapus oleh konfirmasi pengiriman payload lama. Aplikasi legacy memeriksa marker ini pada session SSO; session password dukungan tetap terpisah. Pengujian memakai JWT RSA yang benar-benar ditandatangani, database PostgreSQL khusus tes, bukti negatif lintas customer, serta replay callback/email/tiket.
+
+## Salin production menjadi sandbox dari tombol operator
+
+Operator membuka rincian production di admin.erp lalu memilih **Buat sandbox dari production**.
+Isi nama sandbox dan kirim. Core mencatat sasaran dan audit permintaan, mengantrekan copy, lalu
+konsol membuka rincian sandbox. Status dan riwayat dimuat ulang selama antrean/proses berlangsung;
+respons 202 belum berarti sandbox siap.
+
+Sumber harus production aktif di server kita dengan database sendiri. Database bersama dan server
+klien ditolak. Sasaran tetap milik tenant yang sama dan sambungan keluarnya mati. Sandbox aktif
+atau sandbox yang bukan salinan sumber ini tidak ditimpa. Pengguna tenant belum mempunyai tombol ini.
+
+Bila copy gagal, tombolnya **Lanjutkan penyalinan**, memakai sumber dan nama yang sama. **Siapkan**
+tidak berlaku untuk target yang memiliki `source_environment_id`, baik pada UI, API maupun CLI.
+Jalur copy tetap melucuti event, ekspor, reservasi, job, kredensial dan registry sebelum memeriksa
+hasil dan mengaktifkan sandbox. Retry sesudah restore tidak mengambil snapshot production terbaru.
+Jumlah module pembanding disimpan pada `environment_operations.detail.snapshot_module_count`
+setelah restore dan dipakai lagi saat retry; perubahan sumber sesudah snapshot tidak dianggap
+kerusakan restore. Riwayat lama tanpa acuan mengambil baseline dari hasil restore yang sudah ada.
+
+Endpoint operator adalah `POST /api/internal/v1/environments/{environment}/copy`, dikontrakkan
+pada akar `pusat-admin`. Penulis registry/audit tetap Core; konsol mengirim perintah melalui HTTP.
+Permintaan ulang yang masih mengantre tidak membuat sasaran atau job kedua. Worker memakai
+reservasi unik per sumber dan middleware `WithoutOverlapping`; visibility timeout pendek tidak
+boleh menjalankan copy kedua. Pelepasan karena overlap mempunyai batas retry tetap; error copy
+pertama dicatat sebagai gagal dan dilanjutkan operator setelah sebabnya diperbaiki.
+
+Keputusan penemuan fitur: pemiliknya coordinator Core dan konsol operator, data per tenant/sumber
+lingkungan, tanpa legal entity atau unit organisasi. Tidak memerlukan nomor bisnis baru, workflow
+approval, atau SoD baru. Audit operator berada dalam transaksi registry/permintaan. Pola ini
+mengadaptasi [aksi Copy Business Central](https://learn.microsoft.com/en-us/dynamics365/business-central/dev-itpro/administration/tenant-admin-center-environments-copy),
+tanpa mengklaim kesetaraan produk. Demo tetap lingkungan evaluasi bertanggal akhir; sandbox bisa
+baru dari data awal atau berasal dari salinan production. Sandbox bukan pilihan lingkungan pertama
+pada form pembuatan tenant.

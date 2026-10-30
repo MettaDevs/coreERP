@@ -37,6 +37,7 @@ paths:
   /tenants: { $ref: 'paths/tenants.yaml' }
   /tenants/{tenant}/entitlements: { $ref: 'paths/tenants_tenant_entitlements.yaml' }
   /environments/{environment}/provision: { $ref: 'paths/environments_environment_provision.yaml' }
+  /environments/{environment}/copy: { $ref: 'paths/environments_environment_copy.yaml' }
   /fleet: { $ref: 'paths/fleet.yaml' }
   /environments/upgrade: { $ref: 'paths/environments_upgrade.yaml' }
   /environments/{environment}/upgrade: { $ref: 'paths/environments_environment_upgrade.yaml' }
