@@ -279,7 +279,7 @@ jobs:
         # Flag diulang, bukan dipisah koma. PHPUnit 12 membaca `--exclude-group=serial,lambat` sebagai
         # SATU grup bernama "serial,lambat" — diukur: 795 test ikut, keempat kelas serial di dalamnya,
         # dan run paralel buntu di `ProvisionEnvironmentTest` sampai tenggat 10 menit habis.
-        run: php artisan test --parallel --exclude-group=serial ${{ github.event_name == 'pull_request' && '--exclude-group=lambat' || '' }}
+        run: php artisan test --parallel --exclude-group=serial
 
       # Satu proses, tanpa `--parallel`. Yang dijaga di sini bukan kecepatan melainkan
       # kepemilikan: tiap kelas membuat databasenya sendiri dan membuangnya lagi di `tearDown`.
