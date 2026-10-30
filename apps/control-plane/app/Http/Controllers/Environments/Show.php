@@ -104,7 +104,7 @@ class Show extends Controller
             ? EnvironmentOperation::query()->where('environment_id', $target->id)->where('operation', 'copy')->latest('id')->first()
             : null;
         $expired = $operation?->status === 'running' && $operation->lease_until !== null && $operation->lease_until->isPast();
-        $pending = $target?->status === 'copying' && ! $expired;
+        $pending = ($target?->status === 'copying' || $operation?->status === 'running') && ! $expired;
         $status = match (true) {
             $target?->status === 'active' => 'Sandbox aktif',
             $expired => 'Penyalinan terhenti',
