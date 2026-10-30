@@ -25,7 +25,7 @@ use Illuminate\Database\UniqueConstraintViolationException;
  */
 final class ReleaseRegistry
 {
-    private const RELEASE = '/^\d+(\.\d+){1,3}$/';
+    private const RELEASE = '/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/D';
 
     private const DIGEST = '/^sha256:[a-f0-9]{64}$/';
 
@@ -131,7 +131,7 @@ final class ReleaseRegistry
         $configDigest = is_string($manifest['config_digest'] ?? null) ? $manifest['config_digest'] : '';
         $companions = $manifest['pendamping'] ?? null;
 
-        if (preg_match(self::RELEASE, $release) !== 1 || preg_match('/^[a-f0-9]{40}$/', $commit) !== 1) {
+        if (strlen($release) > 40 || preg_match(self::RELEASE, $release) !== 1 || preg_match('/^[a-f0-9]{40}$/', $commit) !== 1) {
             throw new SiteRejected('manifest_invalid', 'manifest v2 harus menyebut nomor rilis bertitik dan SHA commit sumbernya.');
         }
 

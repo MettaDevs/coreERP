@@ -51,7 +51,7 @@ export default function CopyButton({
                 className="text-muted-foreground hover:text-foreground"
             >
                 {state === 'copied' ? (
-                    <Check className="text-emerald-600" />
+                    <Check className="text-success" />
                 ) : (
                     <Copy />
                 )}

@@ -145,6 +145,7 @@ final class AssetProcurementReport implements ReportDefinition
             'filter_unit' => ['Filter unit organisasi', null],
             'filter_status' => ['Filter status', null],
             'jumlah_baris' => ['Jumlah baris', 'number'],
+            'jumlah_baris_belum_diestimasi' => ['Baris rencana belum diestimasi', 'number'],
             'total_nilai_rencana' => ['Total nilai rencana', 'money'],
             'total_nilai_diterima' => ['Total nilai diterima', 'money'],
             'dicetak_pada' => ['Tanggal cetak', 'datetime'],
@@ -153,6 +154,7 @@ final class AssetProcurementReport implements ReportDefinition
             'nomor' => ['No.', null],
             'no_rencana' => ['No. rencana', null],
             'tanggal_rencana' => ['Tanggal rencana', 'date'],
+            'tanggal_kebutuhan' => ['Tanggal kebutuhan', 'date'],
             'tahun_anggaran' => ['Tahun anggaran', null],
             'sumber_dana' => ['Sumber dana', null],
             'item_aset' => ['Item aset', null],
@@ -220,13 +222,14 @@ final class AssetProcurementReport implements ReportDefinition
                 'row' => [
                     'no_rencana' => $plan->rencana_kode,
                     'tanggal_rencana' => self::date($plan->planned_on),
+                    'tanggal_kebutuhan' => $plan->needed_on === null ? null : self::date($plan->needed_on),
                     'tahun_anggaran' => (string) $plan->planning_year,
-                    'sumber_dana' => $plan->funding_source ?: '—',
+                    'sumber_dana' => $plan->funding_source_name ?: ($plan->funding_source ?: '—'),
                     'item_aset' => $plan->nama_aset,
                     'spesifikasi' => $plan->requested_specification ?: '—',
                     'satuan' => $plan->unit ?: '—',
                     'jumlah_rencana' => self::quantity($plan->quantity),
-                    'nilai_rencana' => (string) BigDecimal::of((string) $plan->estimated_total_price)->toScale(2),
+                    'nilai_rencana' => ($plan->estimate_pending && BigDecimal::of((string) $plan->estimated_unit_price)->isZero()) ? null : (string) BigDecimal::of((string) $plan->estimated_total_price)->toScale(2),
                 ],
                 'requests' => $requests,
                 'planned' => BigDecimal::of((string) $plan->quantity),
@@ -239,6 +242,7 @@ final class AssetProcurementReport implements ReportDefinition
                 'row' => [
                     'no_rencana' => '—',
                     'tanggal_rencana' => null,
+                    'tanggal_kebutuhan' => null,
                     'tahun_anggaran' => '—',
                     'sumber_dana' => '—',
                     'item_aset' => $request->nama_aset,
@@ -257,6 +261,7 @@ final class AssetProcurementReport implements ReportDefinition
         $statusFilter = self::ids($parameters['status'] ?? null);
         $table = [];
         $totalPlanned = BigDecimal::zero();
+        $unestimatedCount = 0;
         $totalReceived = BigDecimal::zero();
         foreach ($needs as $need) {
             /** @var Collection<int, stdClass> $requests */
@@ -297,6 +302,8 @@ final class AssetProcurementReport implements ReportDefinition
             $planned = $need['planned'];
             if ($need['row']['nilai_rencana'] !== null) {
                 $totalPlanned = $totalPlanned->plus($need['row']['nilai_rencana']);
+            } elseif ($planned !== null) {
+                $unestimatedCount++;
             }
             $totalReceived = $totalReceived->plus($receivedValue);
             $requestDates = array_map(static fn (stdClass $request): string => self::date($request->requested_on), $requests->all());
@@ -330,6 +337,7 @@ final class AssetProcurementReport implements ReportDefinition
                 'filter_status' => $this->filterNames($parameters['status'] ?? null, static fn (string $status): ?string => self::STATUSES[$status] ?? null),
                 'jumlah_baris' => count($table),
                 'total_nilai_rencana' => (string) $totalPlanned->toScale(2),
+                'jumlah_baris_belum_diestimasi' => $unestimatedCount,
                 'total_nilai_diterima' => (string) $totalReceived->toScale(2),
                 'dicetak_pada' => now('UTC')->toIso8601ZuluString(),
             ],
@@ -359,7 +367,7 @@ final class AssetProcurementReport implements ReportDefinition
 
         return $query->toBase()->get([
             "{$lines}.id", "{$lines}.line_number", "{$lines}.nama_aset", "{$lines}.unit", "{$lines}.quantity",
-            "{$lines}.requested_specification", "{$lines}.estimated_total_price",
+            "{$lines}.requested_specification", "{$lines}.estimated_unit_price", "{$lines}.estimated_total_price", "{$lines}.estimate_pending", "{$lines}.needed_on", "{$lines}.funding_source_name",
             'rencana.kode as rencana_kode', 'rencana.planned_on', 'rencana.planning_year', 'rencana.funding_source',
             'rencana.planning_org_unit_id',
         ]);

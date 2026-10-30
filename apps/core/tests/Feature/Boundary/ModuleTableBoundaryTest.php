@@ -81,11 +81,8 @@ class ModuleTableBoundaryTest extends TestCase
 
             $sebelum = $inspector->currentTables($connection);
 
-            Artisan::call('migrate', [
-                '--path' => $module['migrations'],
-                '--realpath' => true,
-                '--force' => true,
-            ]);
+            DB::table('core_module_migrations')->where('module_id', $module['id'])->delete();
+            Artisan::call('module:migrate', ['module' => $module['id']]);
             $keluaranMigrate = Artisan::output();
 
             $sesudah = $inspector->currentTables($connection);

@@ -44,15 +44,12 @@ import { Head, router } from '@inertiajs/react';
 import { Download, FileUp, Search } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { FormErrorHeader } from '@/components/form-error-header';
 import Heading from '@/components/heading';
 import { RecordListScroll } from '@/components/record-list-scroll';
 import { useDateTimeFormat } from '@/hooks/use-date-time';
-import {
-    apiJson,
-    CoreApiError,
-    errorText,
-    toastSaveError,
-} from '@/lib/core-api';
+import { useSaveFeedback } from '@/hooks/use-save-feedback';
+import { apiJson, CoreApiError, errorText } from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
 
 type AccountType = 'balance_sheet' | 'profit_loss';
@@ -169,6 +166,7 @@ function Filters({
 
     return (
         <form
+            noValidate
             className="flex flex-col gap-3 sm:flex-row sm:items-end"
             onSubmit={(event) => {
                 event.preventDefault();
@@ -353,6 +351,9 @@ function ImportSheet({
     const [file, setFile] = useState<File | null>(null);
     const [report, setReport] = useState<Report | null>(null);
     const [error, setError] = useState('');
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>(
+        {},
+    );
     const [busy, setBusy] = useState(false);
 
     const send = async (apply: boolean) => {
@@ -366,6 +367,7 @@ function ImportSheet({
         body.append('apply', apply ? '1' : '0');
         setBusy(true);
         setError('');
+        setFieldErrors({});
 
         try {
             const result = await apiJson<{ data: Report }>(
@@ -380,6 +382,10 @@ function ImportSheet({
                 onClose();
             }
         } catch (caught) {
+            if (caught instanceof CoreApiError) {
+                setFieldErrors(caught.errors);
+            }
+
             setError(
                 caught instanceof CoreApiError
                     ? caught.message
@@ -401,6 +407,11 @@ function ImportSheet({
                         jadi nomor dan nama boleh berubah.
                     </SheetDescription>
                 </SheetHeader>
+                <FormErrorHeader
+                    message={error}
+                    errors={fieldErrors}
+                    operation="Impor akun belum berhasil"
+                />
                 <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-5">
                     <FieldGroup>
                         <Field>
@@ -429,7 +440,10 @@ function ImportSheet({
                                 memakai daftar akun sendiri di aplikasi finance.
                             </FieldDescription>
                         </Field>
-                        <Field data-invalid={Boolean(error)}>
+                        <Field
+                            data-error-field="file"
+                            data-invalid={Boolean(fieldErrors.file)}
+                        >
                             <FieldLabel htmlFor="berkas-akun">
                                 Berkas CSV
                             </FieldLabel>
@@ -445,7 +459,9 @@ function ImportSheet({
                             <FieldDescription>
                                 Pemisah koma atau titik koma, paling besar 2 MB.
                             </FieldDescription>
-                            <FieldError>{error}</FieldError>
+                            <FieldError>
+                                {fieldErrors.file?.join(' ')}
+                            </FieldError>
                         </Field>
                     </FieldGroup>
                     {report && <ReportView report={report} />}
@@ -491,6 +507,12 @@ export default function FinanceAccounts({
     header,
 }: Props) {
     const formatDateTime = useDateTimeFormat();
+    const {
+        report: saveReport,
+        clear: saveClear,
+        summary: saveSummary,
+        scopeRef: saveScopeRef,
+    } = useSaveFeedback<HTMLDivElement>();
     const [importing, setImporting] = useState(false);
     const scopeName = (id: string | null) =>
         id === null
@@ -498,6 +520,8 @@ export default function FinanceAccounts({
             : (legalEntities.find((entity) => entity.id === id)?.name ?? id);
 
     const toggle = async (account: Account) => {
+        saveClear();
+
         try {
             await apiJson(`/api/v1/finance-reference-accounts/${account.id}`, {
                 method: 'PATCH',
@@ -511,7 +535,7 @@ export default function FinanceAccounts({
             );
             router.reload({ only: ['accounts'] });
         } catch (caught) {
-            toastSaveError(caught, 'Status akun belum dapat diubah.');
+            saveReport(caught, 'Status akun belum dapat diubah.');
         }
     };
 
@@ -523,6 +547,7 @@ export default function FinanceAccounts({
                     title="Daftar akun"
                     description="Akun milik aplikasi finance, dipakai untuk memetakan posting dari CoreERP."
                 />
+                <div ref={saveScopeRef}>{saveSummary}</div>
                 <Card>
                     <CardHeader>
                         <CardTitle>Akun referensi</CardTitle>

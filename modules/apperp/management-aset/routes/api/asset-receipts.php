@@ -8,6 +8,7 @@ use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PenerimaanAset\Pene
 // `ringkasan` dan `aset` didahulukan dari `{id}` supaya keduanya tidak ditelan
 // parameter — urutan yang sama seperti `aset/{id}/history`.
 Route::get('penerimaan-aset', [PenerimaanAsetController::class, 'index']);
+Route::get('penerimaan-aset/attachment-limits', [PenerimaanAsetController::class, 'attachmentLimits']);
 // Pemilih vendor milik Core untuk penerimaan (TODO 9.3.1); didahulukan dari `{id}`.
 Route::get('penerimaan-aset/vendor', [PenerimaanAsetController::class, 'vendor']);
 // Buku per group untuk isian saldo awal per buku (TODO 10.1.1); didahulukan dari `{id}`.

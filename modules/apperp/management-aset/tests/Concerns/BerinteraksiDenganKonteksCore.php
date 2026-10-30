@@ -439,11 +439,7 @@ trait BerinteraksiDenganKonteksCore
             return;
         }
 
-        Artisan::call('migrate', [
-            '--path' => dirname(__DIR__, 2).'/database/migrations',
-            '--realpath' => true,
-            '--force' => true,
-        ]);
+        Artisan::call('module:migrate', ['module' => 'management-aset']);
     }
 
     private function pastikanTenantAda(string $tenantId): string

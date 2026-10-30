@@ -51,4 +51,17 @@ class ProviderIdentityMonitorTest extends TestCase
         $this->actingAs($owner)->get('/control/identities')->assertForbidden();
         $this->assertDatabaseCount('provider_access', 0);
     }
+
+    public function test_monitor_rejects_array_and_oversized_search_before_querying(): void
+    {
+        config()->set('coreerp.provider.password', 'LocalProviderPassword!123');
+        $this->seed(AppCatalogSeeder::class);
+        $this->seed(ProviderAdminSeeder::class);
+        $provider = User::where('email', 'provider@coreerp.local')->firstOrFail();
+
+        $this->actingAs($provider)->getJson('/control/identities?search[]=invalid')
+            ->assertUnprocessable()->assertJsonValidationErrors('search');
+        $this->getJson('/control/identities?search='.str_repeat('x', 201))
+            ->assertUnprocessable()->assertJsonValidationErrors('search');
+    }
 }

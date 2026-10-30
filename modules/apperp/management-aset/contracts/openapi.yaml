@@ -227,6 +227,37 @@ paths:
           description: Daftar anggota dengan nama dan email
         '403':
           description: Pengguna tidak memegang satu pun izin layar yang memakai daftar ini
+  /api/modules/management-aset/v1/reference-data/funding-sources:
+    get:
+      tags:
+      - Reference data
+      operationId: listAssetPlanningFundingSources
+      summary: Pilihan sumber dana Foundation untuk perencanaan aset
+      description: |
+        Memerlukan izin lihat perencanaan. Pencarian dan sort dijalankan server dengan
+        cursor bertahap. record_ids[] memuat pilihan tersimpan yang tidak aktif agar nama
+        dokumen lama tetap terbaca. Pembuatan memakai form dan izin Foundation asli.
+      parameters:
+      - name: q
+        in: query
+        schema:
+          type: string
+      - name: cursor
+        in: query
+        schema:
+          type: string
+      - name: record_ids[]
+        in: query
+        schema:
+          type: array
+          items:
+            $ref: '#/components/schemas/Ulid'
+      responses:
+        '200':
+          description: Batch data berisi id, name, description, active, version, dan next_cursor. Kode sumber dana lama tidak
+            menjadi field input atau pilihan baru.
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /api/v1/analisa-maintenance:
     get:
       tags:
@@ -4466,6 +4497,11 @@ paths:
       - Perencanaan aset
       operationId: createAsetPlan
       summary: Membuat header dan rincian perencanaan aset; spesifikasi adalah snapshot pada rincian transaksi
+      description: |
+        Pembuatan dapat memilih perusahaan dan unit pengusul di luar perusahaan aktif bila
+        keduanya termasuk hibah kebijakan data pengguna pada tenant yang sama. Ini jalur
+        pemilihan eksplisit perencanaan; daftar dan pembacaan biasa tetap mengikuti perusahaan aktif.
+        Tahun dipilih melalui planning_year_id milik perusahaan dokumen.
       parameters:
       - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
       requestBody:
@@ -4513,12 +4549,97 @@ paths:
                         type: boolean
         '403':
           $ref: '#/components/responses/Forbidden'
+  /api/modules/management-aset/v1/perencanaan-aset/planning-years:
+    get:
+      tags:
+      - Perencanaan aset
+      operationId: listAssetPlanningYears
+      summary: Pilihan master Tahun Rencana perusahaan yang diizinkan
+      description: |
+        Memerlukan salah satu izin read, create, atau update perencanaan. Perusahaan diperiksa
+        terhadap tenant dan kebijakan data. Pilihan baru hanya tahun aktif; record_ids[] dapat
+        memulihkan tahun yang tersimpan. Search dan cursor dibatasi server.
+      parameters:
+      - name: legal_entity_id
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      - name: q
+        in: query
+        schema:
+          type: string
+      - name: cursor
+        in: query
+        schema:
+          type: string
+      - name: record_ids[]
+        in: query
+        schema:
+          type: array
+          items:
+            $ref: '#/components/schemas/Ulid'
+      responses:
+        '200':
+          description: Batch data berisi id, legal_entity_id, year, active, version, dan next_cursor
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /api/modules/management-aset/v1/perencanaan-aset/organizations:
+    get:
+      tags:
+      - Perencanaan aset
+      operationId: listAssetPlanningOrganizations
+      summary: Pilihan perusahaan atau unit pengusul sesuai akses perencanaan
+      description: |
+        Memerlukan salah satu izin read, create, atau update perencanaan. kind legal_entities
+        memuat perusahaan yang dijangkau kebijakan data. kind operating_units mewajibkan
+        legal_entity_id dan membatasi unit pada hibah untuk perusahaan itu. record_ids[] tidak
+        memperluas hibah; data tenant lain tetap tidak terbaca. Hasil dimuat lewat cursor.
+      parameters:
+      - name: kind
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+          - legal_entities
+          - operating_units
+      - name: legal_entity_id
+        in: query
+        schema:
+          $ref: '#/components/schemas/Ulid'
+      - name: q
+        in: query
+        schema:
+          type: string
+      - name: cursor
+        in: query
+        schema:
+          type: string
+      - name: record_ids[]
+        in: query
+        schema:
+          type: array
+          items:
+            $ref: '#/components/schemas/Ulid'
+      responses:
+        '200':
+          description: Batch data berisi id, nama, kode, display_label, dan next_cursor
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /api/modules/management-aset/v1/perencanaan-aset/{id}:
     get:
       tags:
       - Perencanaan aset
       operationId: showAsetPlan
       summary: Menampilkan satu rencana aset beserta rinciannya
+      description: |
+        Header membawa tanggal dokumen, planning_year_id, angka tahun kalender rencana
+        sebagai snapshot, dan penanggung jawab.
+        Rincian membawa needed_on, funding_source_id, funding_source_name, dan estimasi
+        yang boleh null. needed_on pada data lama boleh null sampai dokumen dilengkapi.
+        planning_type dan funding_source header lama dipertahankan sebagai data historis,
+        tidak menjadi input baseline baru.
       parameters:
       - $ref: '#/components/parameters/RecordId'
       responses:
@@ -4538,6 +4659,8 @@ paths:
       - Perencanaan aset
       operationId: updateAsetPlan
       summary: Mengubah rencana draf dengan version saat ini
+      description: Perusahaan dokumen tersimpan tidak dapat dipindahkan. Unit pengusul tetap harus berada dalam akses pengguna
+        pada perusahaan itu; pembacaan dan perubahan mengikuti perusahaan aktif.
       parameters:
       - $ref: '#/components/parameters/RecordId'
       - $ref: '#/components/parameters/IfMatch'
@@ -4793,8 +4916,23 @@ paths:
         `responsible_org_unit_id` boleh kosong bila `lokasi_aset_id` punya unit kerja bawaan
         (milik sendiri atau warisan lokasi induk terdekat); unit itulah yang dipakai. Bila keduanya
         kosong, 422 pada `responsible_org_unit_id`. Aturan yang sama berlaku pada `PATCH`.
+
+        Lampiran draf dapat dikirim bersama dokumen melalui multipart: `payload` berisi JSON
+        dokumen dan `attachments[]` berisi berkas. Hak ubah penerimaan diperlukan untuk
+        melampirkan berkas. Kepala, rincian, dan metadata lampiran disimpan dalam satu transaksi;
+        kegagalan membatalkan semuanya dan membersihkan berkas baru. Replay idempotensi tidak
+        membuat lampiran atau dokumen ganda. Batas unggah dibaca dari `attachment-limits`.
       parameters:
       - $ref: '#/components/parameters/IdempotencyKeyTransaksi'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AssetReceiptMultipartInput'
       responses:
         '200':
           description: 'Permintaan ulang dengan kunci idempotensi yang sama; header `Idempotent-Replayed: true`'
@@ -4815,6 +4953,35 @@ paths:
             legal lain, mata uang yang presisinya belum disetel, harga satuan atau PPN per unit
             yang lebih halus dari presisi harga satuannya, dan pelanggaran aturan saldo awal di atas
             (kuncinya menunjuk baris dan bukunya, misalnya `details.0.saldo_awal_buku.1.buku_id`).
+  /api/v1/penerimaan-aset/attachment-limits:
+    get:
+      tags:
+      - Penerimaan aset
+      operationId: getAssetReceiptAttachmentLimits
+      summary: Membaca batas unggah sebelum draf penerimaan disimpan
+      responses:
+        '200':
+          description: Batas unggah Core; memerlukan izin baca penerimaan.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      max_kb:
+                        type: integer
+                      max_total_kb:
+                        type: integer
+                      max_files:
+                        type: integer
+                      extensions:
+                        type: array
+                        items:
+                          type: string
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /api/v1/penerimaan-aset/vendor:
     get:
       tags:
@@ -4943,7 +5110,10 @@ paths:
 
         `purchase_order_reference` berisi nomor PO manual atau null. Lampiran dokumen memakai
         record Core `aset_tr_penerimaan_aset` dengan ID penerimaan, mengikuti izin baca/ubah
-        Penerimaan dan lingkup organisasi yang sama. Lampiran tidak disalin per aset atau bulan.
+        Penerimaan dan lingkup organisasi yang sama. Saat penerimaan diselesaikan, metadata dan
+        referensi berkas diteruskan ke aset hasilnya tanpa menyalin isi berkas. Lampiran kepala
+        berlaku untuk seluruh aset; lampiran baris hanya untuk aset dari baris tersebut.
+        Penambahan lampiran setelah penyelesaian tetap berada pada dokumen asal.
 
         `vendor` berisi `{id, number, name, status}` vendor Core, atau `null`. `posting` berisi
         keadaan jurnalnya di feed posting finance sesudah diselesaikan — jurnal perolehan, atau
@@ -4975,6 +5145,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/VersionInput'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AssetReceiptMultipartInput'
       responses:
         '200':
           description: Penerimaan setelah diubah
@@ -6807,6 +6980,95 @@ paths:
           $ref: '#/components/responses/StaleVersion'
         '422':
           description: Hanya work order draf atau yang sudah dibatalkan yang dapat diarsipkan
+        '428':
+          $ref: '#/components/responses/VersionRequired'
+  /api/v1/pemeliharaan-aset/{id}/execution:
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    put:
+      tags:
+      - Pemeliharaan aset
+      operationId: saveWorkOrderExecutionBatch
+      summary: Menyimpan seluruh hasil pekerjaan dan checklist sekaligus secara atomik. Checklist hanya boleh diubah saat
+        dikerjakan; hasil pekerjaan juga boleh diubah saat selesai.
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - jobs
+              properties:
+                version:
+                  $ref: '#/components/schemas/VersionField'
+                jobs:
+                  type: array
+                  minItems: 1
+                  maxItems: 200
+                  items:
+                    type: object
+                    properties:
+                      aktual_jam:
+                        type: number
+                        minimum: 0
+                        maximum: 999999.99
+                        nullable: true
+                      sebab_kerusakan_id:
+                        allOf:
+                        - $ref: '#/components/schemas/Ulid'
+                        nullable: true
+                      tindakan_perbaikan_id:
+                        allOf:
+                        - $ref: '#/components/schemas/Ulid'
+                        nullable: true
+                      sebab_kerusakan_keterangan:
+                        type: string
+                        maxLength: 1000
+                        nullable: true
+                        description: Wajib bila sebab kerusakan yang dipilih meminta keterangan.
+                      tindakan_perbaikan_keterangan:
+                        type: string
+                        maxLength: 1000
+                        nullable: true
+                        description: Wajib bila tindakan perbaikan yang dipilih meminta keterangan.
+                      id:
+                        $ref: '#/components/schemas/Ulid'
+                      checklist:
+                        type: array
+                        maxItems: 200
+                        items:
+                          type: object
+                          required:
+                          - id
+                          properties:
+                            id:
+                              $ref: '#/components/schemas/Ulid'
+                            nilai:
+                              type: string
+                              maxLength: 255
+                              nullable: true
+                            tidak_berlaku:
+                              type: boolean
+                            catatan_teknisi:
+                              type: string
+                              maxLength: 2000
+                              nullable: true
+                    required:
+                    - id
+      responses:
+        '200':
+          description: Seluruh perubahan tersimpan; data memuat work order dengan version terbaru.
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          description: Status, baris pekerjaan, atau checklist tidak sah; seluruh perubahan dibatalkan.
         '428':
           $ref: '#/components/responses/VersionRequired'
   /api/v1/jenis-counter:
@@ -9648,7 +9910,13 @@ components:
       - satuan_id
       - quantity
       - requested_specification
+      - needed_on
+      - funding_source_id
       properties:
+        id:
+          allOf:
+          - $ref: '#/components/schemas/Ulid'
+          description: ID baris tersimpan saat mengubah dokumen; baris baru tidak mengirim ID.
         jenis_aset_id:
           $ref: '#/components/schemas/Ulid'
         satuan_id:
@@ -9665,14 +9933,25 @@ components:
         estimated_unit_price:
           type: number
           minimum: 0
+          nullable: true
+          description: Kosong berarti belum diestimasi; nol berarti estimasi memang nol.
+        needed_on:
+          type: string
+          format: date
+          description: Tanggal kebutuhan dalam tahun kalender planning_year; terpisah dari tanggal dokumen.
+        funding_source_id:
+          allOf:
+          - $ref: '#/components/schemas/Ulid'
+          description: Referensi sumber dana aktif milik Foundation pada tenant yang sama. Nama disimpan sebagai snapshot
+            baris.
     AsetPlanningWrite:
       type: object
       required:
       - legal_entity_id
       - planning_org_unit_id
       - planned_on
-      - planning_year
-      - planning_type
+      - planning_year_id
+      - responsible_user_id
       - details
       properties:
         kode:
@@ -9688,19 +9967,16 @@ components:
         planned_on:
           type: string
           format: date
-        planning_year:
-          type: integer
-          minimum: 2000
-          maximum: 2100
-        planning_type:
+          description: Tanggal dokumen; boleh berada sebelum tahun kebutuhan.
+        planning_year_id:
+          allOf:
+          - $ref: '#/components/schemas/Ulid'
+          description: ID master Tahun Rencana milik perusahaan dokumen. Angka planning_year pada jawaban berasal dari master
+            ini, bukan input bebas. Tahun nonaktif hanya boleh dipertahankan oleh dokumen yang sudah menunjuknya.
+        responsible_user_id:
           type: string
-          enum:
-          - regular
-          - additional
-        funding_source:
-          type: string
-          maxLength: 250
-          nullable: true
+          description: ID pengguna dari anggota aktif tenant, bukan ID keanggotaan. Akses perusahaan dan unit dokumen tetap
+            diperiksa terpisah.
         description:
           type: string
           maxLength: 2000
@@ -10744,6 +11020,8 @@ components:
     MasterPatch:
       type: object
       properties:
+        details:
+          $ref: '#/components/schemas/MasterDraftDetails'
         version:
           $ref: '#/components/schemas/VersionField'
         nama:
@@ -10928,6 +11206,16 @@ components:
       allOf:
       - $ref: '#/components/schemas/MasterPatch'
       - $ref: '#/components/schemas/GroupAsetFields'
+      - type: object
+        properties:
+          details:
+            description: Matriks buku yang diganti bersama data grup dalam satu transaksi. Versi memakai version pada kiriman
+              induk.
+            type: object
+            additionalProperties: false
+            properties:
+              books:
+                $ref: '#/components/schemas/GroupBukuPenyusutanReplace'
     GroupAsetResponse:
       type: object
       required:
@@ -13581,7 +13869,59 @@ components:
       - nama
       - nomor_polis
       - berlaku_mulai
+      description: POST dan PATCH menyimpan kartu polis serta coverage_operations dalam satu transaksi. Operasi diterapkan
+        berurutan, memakai versi polis dan mempertahankan riwayat pertanggungan. Satu operasi gagal membatalkan seluruh penyimpanan.
+        Replay POST membandingkan kepala dan seluruh operasi; perubahan isi pada Idempotency-Key yang sama ditolak 409 idempotency_conflict.
       properties:
+        coverage_operations:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            required:
+            - kind
+            properties:
+              kind:
+                type: string
+                enum:
+                - add
+                - end
+                - replace
+                - archive
+              coverage_id:
+                type: string
+                format: ulid
+                description: Wajib untuk end
+                replace: null
+                archive; harus milik polis dan aset dalam jangkauan pengguna.: null
+              creation_key:
+                type: string
+                maxLength: 140
+                pattern: ^[A-Za-z0-9._:-]+$
+                description: Wajib untuk add; tetap sama saat mencoba ulang.
+              aset_id:
+                type: string
+                format: ulid
+                description: Wajib untuk add.
+              nilai_pertanggungan:
+                type: number
+                exclusiveMinimum: 0
+                description: Wajib untuk add dan replace.
+              berlaku_mulai:
+                type: string
+                format: date
+                description: Wajib untuk add dan replace.
+              berlaku_sampai:
+                type:
+                - string
+                - 'null'
+                format: date
+                description: Wajib untuk end.
+              keterangan:
+                type:
+                - string
+                - 'null'
+                maxLength: 2000
         legal_entity_id:
           $ref: '#/components/schemas/Ulid'
         nama:
@@ -14489,16 +14829,20 @@ components:
       type: object
       additionalProperties: false
       description: |
-        Rincian master baru dikirim bersama POST pemiliknya. Nomor, pemilik, dan seluruh
+        Rincian master dikirim bersama POST atau PATCH pemiliknya. Nomor, pemilik, dan seluruh
         rincian disimpan dalam satu transaksi; satu rincian tidak sah membatalkan semuanya.
-        Kiriman ulang dengan Idempotency-Key yang sama tidak menambahkan baris lagi.
+        Kiriman ulang dengan Idempotency-Key dan isi kepala/rincian yang sama tidak menambahkan baris lagi.
+        Isi berbeda pada kunci yang sama ditolak 409 idempotency_conflict.
         Tiap seksi tetap memerlukan izin yang sama dengan endpoint rincian tersendiri.
         Seksi yang diterima bergantung resource: pabrikan-aset models; jenis-aset attributes,
         models, conditions, counters, job_types; group-aset books; tipe-atribut values;
         maintenance-job-types variants dan asset_types; maintenance-checklist-variables values;
         maintenance-checklist-templates lines; rencana-pemeliharaan lines dan targets.
         Baris baru tidak memakai id sementara sebagai id database. Versi rincian berasal dari
-        pemilik yang baru dibuat. Rincian ini tidak diterapkan lagi pada replay yang sukses.
+        pemilik yang disimpan dan diperbarui untuk setiap seksi. Rincian ini tidak diterapkan lagi pada replay POST yang sukses.
+        Pada PATCH, seksi yang tidak dikirim tidak diubah; array kosong menghapus semua
+        rincian dalam seksi penggantian. Models pabrikan dan variants memakai operasi
+        per baris; rincian yang tidak dikirim tetap ada (daftar dapat dipaginasi).
       properties:
         attributes:
           $ref: '#/components/schemas/JenisAsetAtributReplace'
@@ -14573,6 +14917,10 @@ components:
                 $ref: '#/components/schemas/MaintenancePlanTargetWrite'
     MasterDraftChildRows:
       type: object
+      description: |
+        PATCH memakai id dan version untuk baris yang diubah, creation_key stabil untuk
+        baris baru, serta deleted untuk arsip. Semua baris wajib milik pemilik aktif.
+        creation_key wajib pada baris baru saat PATCH; POST awal boleh mengabaikannya.
       required:
       - rows
       properties:
@@ -14584,6 +14932,14 @@ components:
             required:
             - nama
             properties:
+              id:
+                $ref: '#/components/schemas/Ulid'
+              version:
+                $ref: '#/components/schemas/VersionField'
+              creation_key:
+                type: string
+                maxLength: 133
+                pattern: ^[A-Za-z0-9._:-]+$
               kode:
                 type:
                 - string
@@ -14606,6 +14962,38 @@ components:
                 - string
                 - 'null'
                 format: ulid
+        deleted:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            required:
+            - id
+            - version
+            properties:
+              id:
+                $ref: '#/components/schemas/Ulid'
+              version:
+                $ref: '#/components/schemas/VersionField'
+    AssetReceiptMultipartInput:
+      type: object
+      required:
+      - payload
+      properties:
+        payload:
+          type: string
+          description: JSON kepala dan rincian penerimaan, termasuk version untuk pembaruan.
+        attachments:
+          type: array
+          description: Berkas baru; ukuran, jumlah, dan jenis mengikuti attachment-limits.
+          items:
+            type: string
+            format: binary
+        _method:
+          type: string
+          enum:
+          - PATCH
+          description: Untuk pembaruan multipart, kirim POST dengan override PATCH.
     MasterDraftAssetTypeIds:
       type: object
       required:

@@ -18,11 +18,13 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
+import { FormControl } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { PageDialog, PageDialogContent } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
 import { requestListExport } from '../../listExport';
 import { useRecordList } from '../../use-record-list';
 import type { RecordCardState } from '../_shared/record-card';
@@ -57,32 +59,34 @@ export default function AsetListPage({
     >(null);
     const [cardBusy, setCardBusy] = useState(false);
     const [cardDirty, setCardDirty] = useState(false);
-    const discardChanges = () =>
-        !cardDirty || window.confirm('Buang perubahan yang belum disimpan?');
+    const {
+        request: requestChangesTransition,
+        confirmation: changesTransitionConfirmation,
+    } = useRecordTransition(cardDirty, cardBusy);
     const closeCard = () => {
-        if (!cardBusy && discardChanges()) {
+        requestChangesTransition(() => {
             setCard(null);
             setCardDirty(false);
             list.reload();
-        }
+        });
     };
     const [cardRevision, setCardRevision] = useState(0);
     const cardContentRef = useRef<HTMLDivElement>(null);
     const bukaAset = (id: string) => {
-        if (!cardBusy && discardChanges()) {
+        requestChangesTransition(() => {
             setCard({ kind: 'asset', mode: 'view', id });
-        }
+        });
     };
     const bukaAsetUbah = (id: string) => {
-        if (!cardBusy && discardChanges()) {
+        requestChangesTransition(() => {
             setCard({ kind: 'asset', mode: 'edit', id });
-        }
+        });
     };
     const createReceipt = () => {
-        if (!cardBusy && discardChanges()) {
+        requestChangesTransition(() => {
             setCardDirty(false);
             setCard({ kind: 'receipt', record: { mode: 'create' } });
-        }
+        });
     };
 
     const { workspace } = usePage<{ workspace: Workspace }>().props;
@@ -253,6 +257,7 @@ export default function AsetListPage({
 
     return (
         <>
+            {changesTransitionConfirmation}
             <ListPageLayout
                 header={
                     <RecordActionBar title="Inventarisasi aset">
@@ -304,15 +309,17 @@ export default function AsetListPage({
                                 : ''}
                         </p>
                         <div className="w-full sm:w-72">
-                            <Input
-                                label="Cari"
-                                type="search"
-                                placeholder="Kode, nama, atau nomor seri"
-                                value={search}
-                                onChange={(event) =>
-                                    setSearch(event.target.value)
-                                }
-                            />
+                            <FormControl>
+                                <Input
+                                    label="Cari"
+                                    type="search"
+                                    placeholder="Kode, nama, atau nomor seri"
+                                    value={search}
+                                    onChange={(event) =>
+                                        setSearch(event.target.value)
+                                    }
+                                />
+                            </FormControl>
                         </div>
                     </div>
                 }
@@ -488,20 +495,20 @@ export default function AsetListPage({
                                     list.reload();
                                 }}
                                 onRequestView={(id) => {
-                                    if (!cardBusy && discardChanges()) {
+                                    requestChangesTransition(() => {
                                         setCard({
                                             kind: 'receipt',
                                             record: { mode: 'view', id },
                                         });
-                                    }
+                                    });
                                 }}
                                 onRequestEdit={(id) => {
-                                    if (!cardBusy && discardChanges()) {
+                                    requestChangesTransition(() => {
                                         setCard({
                                             kind: 'receipt',
                                             record: { mode: 'edit', id },
                                         });
-                                    }
+                                    });
                                 }}
                                 onDirtyChange={setCardDirty}
                             />

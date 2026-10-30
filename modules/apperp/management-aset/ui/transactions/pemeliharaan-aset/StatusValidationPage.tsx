@@ -17,10 +17,12 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
+import { FormControl } from '@apperp/ui/form-control';
 import { Select } from '@apperp/ui/select';
 import { Switch } from '@apperp/ui/switch';
 
-import { api, errorMessage } from '../../api';
+import { api, ApiError, errorMessage } from '../../api';
+import { useSaveFeedback } from '../../use-save-feedback';
 
 type Aturan = {
     id: string;
@@ -60,6 +62,11 @@ export default function StatusValidationPage({
     const [aturan, setAturan] = useState<Aturan[]>([]);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
+    const [validationErrors, setValidationErrors] = useState<
+        Record<string, string[]>
+    >({});
+    const { scopeRef, feedbackSummary, reportSaveError, clearSaveFeedback } =
+        useSaveFeedback();
 
     // Effect adalah satu-satunya pemilik pengambilan data. Pemuatan ulang setelah
     // simpan dinyatakan dengan menaikkan penanda ini, bukan dengan memanggil ulang
@@ -111,6 +118,8 @@ export default function StatusValidationPage({
 
     const simpan = async () => {
         setSaving(true);
+        setValidationErrors({});
+        clearSaveFeedback();
 
         try {
             await api('/validasi-status-work-order', {
@@ -125,11 +134,14 @@ export default function StatusValidationPage({
                 }),
             });
             setVersiMuat((versi) => versi + 1);
+            clearSaveFeedback();
             toast.success('Aturan validasi tersimpan.');
         } catch (caught) {
-            toast.error(
-                errorMessage(caught, 'Aturan validasi belum dapat disimpan.'),
-            );
+            if (caught instanceof ApiError) {
+                setValidationErrors(caught.validationErrors);
+            }
+
+            reportSaveError(caught, 'Aturan validasi belum dapat disimpan.');
         } finally {
             setSaving(false);
         }
@@ -143,9 +155,14 @@ export default function StatusValidationPage({
             baris: aturan.filter((item) => item.status === status),
         }))
         .filter((kelompok) => kelompok.baris.length > 0);
+    const ruleField = (id: string, field: 'aktif' | 'keparahan') =>
+        `aturan.${aturan.findIndex((row) => row.id === id)}.${field}`;
 
     return (
-        <Card className="min-h-full rounded-none border-0 shadow-none">
+        <Card
+            ref={scopeRef}
+            className="min-h-full rounded-none border-0 shadow-none"
+        >
             <CardHeader className="border-b">
                 <CardTitle>Validasi status work order</CardTitle>
                 {canUpdate && (
@@ -160,6 +177,9 @@ export default function StatusValidationPage({
                     </CardAction>
                 )}
             </CardHeader>
+            {feedbackSummary && (
+                <div className="px-5 pt-4">{feedbackSummary}</div>
+            )}
             <CardContent className="space-y-6 px-5 py-4">
                 <p className="text-muted-foreground text-sm">
                     Aturan melekat pada status tujuan, sehingga pemeriksaan yang
@@ -209,7 +229,15 @@ export default function StatusValidationPage({
                                         header: 'Diperiksa',
                                         width: 128,
                                         cell: ({ baris }) => (
-                                            <>
+                                            <FormControl
+                                                data-error-field={ruleField(
+                                                    baris.id,
+                                                    'aktif',
+                                                )}
+                                                error={validationErrors[
+                                                    ruleField(baris.id, 'aktif')
+                                                ]?.join(' ')}
+                                            >
                                                 <Switch
                                                     aria-label={`Periksa ${ATURAN[baris.aturan]} saat ${STATUS[kelompok.status]}`}
                                                     checked={baris.aktif}
@@ -222,7 +250,7 @@ export default function StatusValidationPage({
                                                         })
                                                     }
                                                 />
-                                            </>
+                                            </FormControl>
                                         ),
                                     } satisfies DataTableColumn<
                                         (typeof sdkRows)[number]
@@ -238,37 +266,55 @@ export default function StatusValidationPage({
                                                         Tidak diperiksa
                                                     </span>
                                                 ) : canUpdate ? (
-                                                    <Select
-                                                        items={KEPARAHAN.map(
-                                                            (item) =>
-                                                                item.label,
+                                                    <FormControl
+                                                        data-error-field={ruleField(
+                                                            baris.id,
+                                                            'keparahan',
                                                         )}
-                                                        value={
-                                                            KEPARAHAN.find(
+                                                        error={validationErrors[
+                                                            ruleField(
+                                                                baris.id,
+                                                                'keparahan',
+                                                            )
+                                                        ]?.join(' ')}
+                                                    >
+                                                        <Select
+                                                            items={KEPARAHAN.map(
                                                                 (item) =>
-                                                                    item.kode ===
-                                                                    baris.keparahan,
-                                                            )?.label ?? null
-                                                        }
-                                                        ariaLabel={`Keparahan ${ATURAN[baris.aturan]} saat ${STATUS[kelompok.status]}`}
-                                                        onValueChange={(
-                                                            value,
-                                                        ) => {
-                                                            const dipilih =
+                                                                    item.label,
+                                                            )}
+                                                            value={
                                                                 KEPARAHAN.find(
                                                                     (item) =>
-                                                                        item.label ===
-                                                                        value,
-                                                                );
-
-                                                            if (dipilih) {
-                                                                ubah(baris.id, {
-                                                                    keparahan:
-                                                                        dipilih.kode,
-                                                                });
+                                                                        item.kode ===
+                                                                        baris.keparahan,
+                                                                )?.label ?? null
                                                             }
-                                                        }}
-                                                    />
+                                                            ariaLabel={`Keparahan ${ATURAN[baris.aturan]} saat ${STATUS[kelompok.status]}`}
+                                                            onValueChange={(
+                                                                value,
+                                                            ) => {
+                                                                const dipilih =
+                                                                    KEPARAHAN.find(
+                                                                        (
+                                                                            item,
+                                                                        ) =>
+                                                                            item.label ===
+                                                                            value,
+                                                                    );
+
+                                                                if (dipilih) {
+                                                                    ubah(
+                                                                        baris.id,
+                                                                        {
+                                                                            keparahan:
+                                                                                dipilih.kode,
+                                                                        },
+                                                                    );
+                                                                }
+                                                            }}
+                                                        />
+                                                    </FormControl>
                                                 ) : (
                                                     <span className="text-sm">
                                                         {KEPARAHAN.find(

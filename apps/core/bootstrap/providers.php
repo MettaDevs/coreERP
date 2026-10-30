@@ -3,7 +3,12 @@
 use App\Foundation\Currency\CurrencyServiceProvider;
 use App\Foundation\FinancePosting\FinancePostingServiceProvider;
 use App\Foundation\FiscalCalendar\FiscalCalendarServiceProvider;
+use App\Foundation\FundingSource\FundingSourceServiceProvider;
+use App\Foundation\Item\ItemServiceProvider;
 use App\Foundation\NumberSequence\NumberSequenceServiceProvider;
+use App\Foundation\PaymentMethod\PaymentMethodServiceProvider;
+use App\Foundation\PaymentTerm\PaymentTermServiceProvider;
+use App\Foundation\PlanningYear\PlanningYearServiceProvider;
 use App\Foundation\UnitOfMeasure\UnitOfMeasureServiceProvider;
 use App\Foundation\Vendor\VendorServiceProvider;
 use App\Foundation\Workflow\WorkflowServiceProvider;
@@ -22,6 +27,11 @@ return [
     CurrencyServiceProvider::class,
     FinancePostingServiceProvider::class,
     FiscalCalendarServiceProvider::class,
+    FundingSourceServiceProvider::class,
+    ItemServiceProvider::class,
+    PaymentMethodServiceProvider::class,
+    PaymentTermServiceProvider::class,
+    PlanningYearServiceProvider::class,
     NumberSequenceServiceProvider::class,
     UnitOfMeasureServiceProvider::class,
     VendorServiceProvider::class,

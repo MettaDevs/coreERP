@@ -26,12 +26,12 @@ Mengubah module tanpa menjalankannya berarti CI yang menemukan masalahnya, bukan
 
 Semua di atas, plus:
 
-- [ ] Container runtime **dibuat ulang** lewat `.\start.ps1 -Build`
-- [ ] Layar yang diubah dibuka di `http://localhost:8000` dan artifact barunya benar-benar tampil
-- [ ] Health check stack selesai
+- [ ] Jika HotReload aktif, source UI diperbarui lewat HMR tanpa rebuild container atau reload halaman setelah setiap perubahan.
+- [ ] Jika HotReload tidak aktif, atau Dockerfile/dependency container berubah, runtime dibangun ulang lewat `.\start.ps1 -Build` dan health check selesai.
+- [ ] Jika user/developer melaporkan HMR tidak memperbarui layar, penyebabnya diperiksa dan fallback runtime yang diperlukan diverifikasi. Jangan membuka UI bila user meminta memeriksanya sendiri.
 
 ::: warning
-Build lokal lulus **bukan** bukti perubahan UI sudah tayang. Jangan melaporkan selesai berdasarkan type-check saja.
+Build lokal lulus sendiri tidak membuktikan HMR aktif. Pastikan status runtime yang digunakan; saat HMR aktif tidak perlu rebuild atau reload manual untuk setiap perubahan source.
 :::
 
 Kalau kamu mengubah navigasi atau security di `app.yaml` atau di folder `manifest/`, tambahan:

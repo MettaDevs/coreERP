@@ -46,6 +46,35 @@ class VendorTest extends TestCase
         $this->le = $this->legalEntity('PT Metta Sehat', 'META');
     }
 
+    public function test_vendor_creation_context_is_scoped_to_requested_company_and_core_permissions(): void
+    {
+        $this->legalEntity('Second context company', 'CTX2');
+        $this->actingAs($this->owner)->getJson('/api/v1/vendors/create-context?legal_entity_id='.$this->le)
+            ->assertOk()->assertJsonCount(1, 'data.legalEntities')
+            ->assertJsonPath('data.legalEntities.0.id', $this->le)
+            ->assertJsonPath('data.automaticNumbers', true)
+            ->assertJsonPath('data.canReadAddressBook', true)
+            ->assertJsonPath('data.canManageAddressBook', true);
+        $manager = User::factory()->create();
+        $membership = TenantMembership::query()->create(['tenant_id' => $this->membership->tenant_id, 'user_id' => $manager->id, 'status' => 'active']);
+        $this->grantDuties($membership, ['core.vendor.manage']);
+        $this->actingAs($manager)->getJson('/api/v1/vendors/create-context?legal_entity_id='.$this->le)
+            ->assertOk()->assertJsonPath('data.canReadAddressBook', false)->assertJsonPath('data.canManageAddressBook', false);
+        $reader = User::factory()->create();
+        $readerMembership = TenantMembership::query()->create(['tenant_id' => $this->membership->tenant_id, 'user_id' => $reader->id, 'status' => 'active']);
+        $this->grantDuties($readerMembership, ['core.vendor.inquire']);
+        $this->actingAs($reader)->getJson('/api/v1/vendors/create-context?legal_entity_id='.$this->le)->assertForbidden();
+    }
+
+    public function test_vendor_creation_context_rejects_foreign_missing_and_invalid_companies(): void
+    {
+        $other = $this->pemilik('vendor-context-other@example.test', 'Context other tenant');
+        $foreignCompany = $this->legalEntity('Foreign context company', 'FRNC', $other);
+        $this->actingAs($this->owner)->getJson('/api/v1/vendors/create-context?legal_entity_id='.$foreignCompany)->assertNotFound();
+        $this->getJson('/api/v1/vendors/create-context?legal_entity_id='.(string) Str::ulid())->assertNotFound();
+        $this->getJson('/api/v1/vendors/create-context?legal_entity_id=invalid')->assertUnprocessable();
+    }
+
     public function test_vendor_card_query_opens_exact_record_outside_first_batch_in_read_only_mode(): void
     {
         $target = $this->buat(['party_name' => 'Requested vendor'])->assertCreated()->json('data');

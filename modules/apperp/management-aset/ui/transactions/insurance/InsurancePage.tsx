@@ -3,10 +3,12 @@ import { toast } from 'sonner';
 import { useToday } from '@/hooks/use-work-date';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
+import { Button } from '@apperp/ui/button';
 
 import { Checkbox } from '@apperp/ui/checkbox';
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
+import { DatePicker } from '@apperp/ui/date-picker';
 import {
     DialogClose,
     Dialog,
@@ -22,7 +24,8 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
-import { Field, FieldDescription } from '@apperp/ui/field';
+import { FieldError } from '@apperp/ui/field';
+import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import {
     PageDialog,
@@ -32,29 +35,46 @@ import {
     PageDialogClose,
 } from '@apperp/ui/page-dialog';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
-import { Select } from '@apperp/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@apperp/ui/tabs';
 import { Textarea } from '@apperp/ui/textarea';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
+import { useRecordTransition } from '@apperp/ui/use-record-transition';
 import { day, money } from '../../_shared/format';
+import { RecordLookup } from '../../_shared/RecordLookup';
 import type { Vendor } from '../../_shared/useVendors';
 import { useVendors } from '../../_shared/useVendors';
-import {
-    ApiError,
-    api,
-    errorMessage,
-    newIdempotencyKey,
-    toastSaveError,
-} from '../../api';
+import { ApiError, api, errorMessage, newIdempotencyKey } from '../../api';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
 import { useRecordList } from '../../use-record-list';
+import { useSaveFeedback } from '../../use-save-feedback';
 import { RecordCardHeader, recordQueryUrl } from '../_shared/record-card';
 import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
 import { useRecordQueryTarget } from '../_shared/use-record-query-target';
 import type { Coverage, Policy } from './insurance';
 import InsuranceSummary from './InsuranceSummary';
 
+type CoverageOperation =
+    | {
+          kind: 'add';
+          creation_key: string;
+          aset_id: string;
+          nilai_pertanggungan: number;
+          berlaku_mulai: string;
+          berlaku_sampai: string | null;
+          keterangan: string | null;
+      }
+    | { kind: 'end'; coverage_id: string; berlaku_sampai: string }
+    | {
+          kind: 'replace';
+          coverage_id: string;
+          nilai_pertanggungan: number;
+          berlaku_mulai: string;
+          keterangan: string | null;
+      }
+    | { kind: 'archive'; coverage_id: string };
+
 type PolicyDraft = {
+    coverage_operations: CoverageOperation[];
     nama: string;
     nomor_polis: string;
     jenis_asuransi_id: string;
@@ -79,6 +99,7 @@ type CoverageAction = {
 };
 
 const emptyPolicy = (today: string): PolicyDraft => ({
+    coverage_operations: [],
     nama: '',
     nomor_polis: '',
     jenis_asuransi_id: '',
@@ -105,6 +126,17 @@ export default function InsurancePage({
     context: { legal_entity_id: string | null };
     permissions: string[];
 }) {
+    const {
+        scopeRef: pageFeedbackScopeRef,
+        feedbackSummary: pageFeedbackSummary,
+        reportSaveError: pageFeedbackReportSaveError,
+        clearSaveFeedback: pageFeedbackClearSaveFeedback,
+    } = useSaveFeedback();
+    const pageFeedback = {
+        reportSaveError: pageFeedbackReportSaveError,
+        clearSaveFeedback: pageFeedbackClearSaveFeedback,
+    };
+
     const canCreate = permissions.includes(
         'management-aset.polis-asuransi.create',
     );
@@ -120,6 +152,10 @@ export default function InsurancePage({
     const [opened, setOpened] = useState<Policy | null>(null);
     const [editing, setEditing] = useState<{
         id: string | null;
+        version: number | null;
+        legalEntityId: string | null;
+        creationKey: string;
+        coverages: Coverage[];
         draft: PolicyDraft;
     } | null>(null);
     const [action, setAction] = useState<CoverageAction | null>(null);
@@ -134,7 +170,26 @@ export default function InsurancePage({
         editing ? context.legal_entity_id : null,
     );
     const editRef = useRef<HTMLDivElement>(null);
+    const {
+        feedbackSummary: editFeedbackSummary,
+        reportSaveError: editFeedbackReportSaveError,
+        clearSaveFeedback: editFeedbackClearSaveFeedback,
+    } = useSaveFeedback(editRef, editing ? 'editing' : 'closed');
+    const editFeedback = {
+        reportSaveError: editFeedbackReportSaveError,
+        clearSaveFeedback: editFeedbackClearSaveFeedback,
+    };
+
     const actionRef = useRef<HTMLDivElement>(null);
+    const {
+        feedbackSummary: actionFeedbackSummary,
+
+        clearSaveFeedback: actionFeedbackClearSaveFeedback,
+    } = useSaveFeedback(actionRef, action?.kind ?? 'closed');
+    const actionFeedback = {
+        clearSaveFeedback: actionFeedbackClearSaveFeedback,
+    };
+
     const vendors = vendorsSource.options;
     const message = (field: string) => errors[field]?.[0];
 
@@ -173,11 +228,18 @@ export default function InsurancePage({
     const shown = opened && opened.id === openId ? opened : null;
 
     function startEdit(policy: Policy | null) {
+        editFeedback.clearSaveFeedback();
+
         setErrors({});
         setEditing({
             id: policy?.id ?? null,
+            version: policy?.version ?? null,
+            legalEntityId: policy?.legal_entity_id ?? context.legal_entity_id,
+            creationKey: newIdempotencyKey(),
+            coverages: policy?.pertanggungan ?? [],
             draft: policy
                 ? {
+                      coverage_operations: [],
                       nama: policy.nama,
                       nomor_polis: policy.nomor_polis,
                       jenis_asuransi_id: policy.jenis_asuransi_id ?? '',
@@ -199,14 +261,13 @@ export default function InsurancePage({
         }
 
         const { id, draft } = editing;
-        const legalEntity = id
-            ? shown?.legal_entity_id
-            : context.legal_entity_id;
+        const legalEntity = editing.legalEntityId;
         setBusy(true);
         setErrors({});
 
         try {
             const body = {
+                coverage_operations: draft.coverage_operations,
                 legal_entity_id: legalEntity,
                 nama: draft.nama,
                 nomor_polis: draft.nomor_polis,
@@ -230,14 +291,15 @@ export default function InsurancePage({
                       method: 'PATCH',
                       body: JSON.stringify({
                           ...body,
-                          version: shown?.version,
+                          version: editing.version,
                       }),
                   })
                 : await api<{ data: Policy }>('/polis-asuransi', {
                       method: 'POST',
-                      headers: { 'Idempotency-Key': newIdempotencyKey() },
+                      headers: { 'Idempotency-Key': editing.creationKey },
                       body: JSON.stringify(body),
                   });
+            editFeedback.clearSaveFeedback();
             toast.success(id ? 'Polis disimpan.' : 'Polis dibuat.');
             setEditing(null);
             setOpened(result.data);
@@ -248,7 +310,7 @@ export default function InsurancePage({
                 setErrors(caught.validationErrors);
             }
 
-            toastSaveError(caught, 'Polis belum dapat disimpan.');
+            editFeedback.reportSaveError(caught, 'Polis belum dapat disimpan.');
         } finally {
             setBusy(false);
         }
@@ -262,103 +324,185 @@ export default function InsurancePage({
                 method: 'DELETE',
                 body: JSON.stringify({ version: policy.version }),
             });
+            pageFeedback.clearSaveFeedback();
             toast.success('Polis diarsipkan.');
             clearRecordTarget();
             setOpenId(null);
             refresh();
         } catch (caught) {
-            toastSaveError(caught, 'Polis belum dapat diarsipkan.');
+            pageFeedback.reportSaveError(
+                caught,
+                'Polis belum dapat diarsipkan.',
+            );
         } finally {
             setBusy(false);
         }
     }
 
-    async function runAction() {
-        if (!action || !shown) {
+    function runAction() {
+        if (busy || !action || !editing) {
             return;
         }
 
-        const base = `/polis-asuransi/${shown.id}/pertanggungan`;
-        const request: {
-            path: string;
-            headers: Record<string, string>;
-            body: Record<string, unknown>;
-        } =
+        const draftKey = action.coverage?.id.startsWith('draft:add:')
+            ? action.coverage.id.slice(10)
+            : null;
+        const key = draftKey ?? newIdempotencyKey();
+        const values = {
+            nilai_pertanggungan: Number(action.nilai),
+            berlaku_mulai: action.mulai,
+            keterangan: action.keterangan || null,
+        };
+        const operation: CoverageOperation =
             action.kind === 'tambah'
                 ? {
-                      path: base,
-                      headers: { 'Idempotency-Key': newIdempotencyKey() },
-                      body: {
-                          aset_id: action.aset_id,
-                          nilai_pertanggungan: Number(action.nilai),
-                          berlaku_mulai: action.mulai,
-                          berlaku_sampai: action.sampai || null,
-                          keterangan: action.keterangan || null,
-                      },
+                      kind: 'add',
+                      creation_key: key,
+                      aset_id: action.aset_id,
+                      ...values,
+                      berlaku_sampai: action.sampai || null,
                   }
                 : action.kind === 'akhiri'
                   ? {
-                        path: `${base}/${action.coverage?.id}/akhiri`,
-                        headers: {},
-                        body: { berlaku_sampai: action.sampai },
+                        kind: 'end',
+                        coverage_id: action.coverage?.id ?? '',
+                        berlaku_sampai: action.sampai,
                     }
                   : {
-                        path: `${base}/${action.coverage?.id}/ganti-nilai`,
-                        headers: {},
-                        body: {
-                            nilai_pertanggungan: Number(action.nilai),
-                            berlaku_mulai: action.mulai,
-                            keterangan: action.keterangan || null,
-                        },
+                        kind: 'replace',
+                        coverage_id: action.coverage?.id ?? '',
+                        ...values,
                     };
-
-        setBusy(true);
-        setErrors({});
-
-        try {
-            const result = await api<{ data: Policy }>(request.path, {
-                method: 'POST',
-                headers: request.headers,
-                body: JSON.stringify({
-                    ...request.body,
-                    version: shown.version,
-                }),
-            });
-            setOpened(result.data);
-            setAction(null);
-            refresh();
-            toast.success('Pertanggungan disimpan.');
-        } catch (caught) {
-            if (caught instanceof ApiError) {
-                setErrors(caught.validationErrors);
-            }
-
-            toastSaveError(caught, 'Pertanggungan belum dapat disimpan.');
-        } finally {
-            setBusy(false);
-        }
+        const operations = editing.draft.coverage_operations.filter((item) =>
+            operation.kind === 'add'
+                ? item.kind !== 'add' ||
+                  item.creation_key !== operation.creation_key
+                : item.kind === 'add' ||
+                  item.coverage_id !== operation.coverage_id,
+        );
+        setEditing({
+            ...editing,
+            draft: {
+                ...editing.draft,
+                coverage_operations: [...operations, operation],
+            },
+        });
+        setAction(null);
+        actionFeedback.clearSaveFeedback();
     }
 
-    async function archiveCoverage(coverage: Coverage) {
-        if (!shown) {
+    function archiveCoverage(coverage: Coverage) {
+        if (busy || !editing) {
             return;
         }
 
-        try {
-            const result = await api<{ data: Policy }>(
-                `/polis-asuransi/${shown.id}/pertanggungan/${coverage.id}`,
-                {
-                    method: 'DELETE',
-                    body: JSON.stringify({ version: shown.version }),
-                },
+        let operations = editing.draft.coverage_operations;
+
+        if (coverage.id.startsWith('draft:add:')) {
+            operations = operations.filter(
+                (item) =>
+                    item.kind !== 'add' ||
+                    item.creation_key !== coverage.id.slice(10),
             );
-            setOpened(result.data);
-            refresh();
-            toast.success('Pertanggungan diarsipkan.');
-        } catch (caught) {
-            toastSaveError(caught, 'Pertanggungan belum dapat diarsipkan.');
+        } else if (coverage.id.startsWith('draft:replace:')) {
+            operations = operations.filter(
+                (item) =>
+                    item.kind === 'add' ||
+                    item.coverage_id !== coverage.id.slice(14),
+            );
+        } else {
+            operations = [
+                ...operations.filter(
+                    (item) =>
+                        item.kind === 'add' || item.coverage_id !== coverage.id,
+                ),
+                { kind: 'archive', coverage_id: coverage.id },
+            ];
         }
+
+        setEditing({
+            ...editing,
+            draft: { ...editing.draft, coverage_operations: operations },
+        });
     }
+
+    const coveragePreview = (() => {
+        let rows = editing?.coverages ?? [];
+
+        for (const operation of editing?.draft.coverage_operations ?? []) {
+            if (operation.kind === 'add') {
+                const asset = assets.find(
+                    (item) => item.id === operation.aset_id,
+                );
+                rows = [
+                    ...rows,
+                    {
+                        id: 'draft:add:' + operation.creation_key,
+                        aset_id: operation.aset_id,
+                        aset_kode: asset?.kode ?? operation.aset_id,
+                        aset_nama: asset?.nama ?? null,
+                        nilai_pertanggungan: String(
+                            operation.nilai_pertanggungan,
+                        ),
+                        berlaku_mulai: operation.berlaku_mulai,
+                        berlaku_sampai: operation.berlaku_sampai,
+                        keterangan: operation.keterangan,
+                        berjalan: true,
+                    },
+                ];
+                continue;
+            }
+
+            if (operation.kind === 'archive') {
+                rows = rows.filter((row) => row.id !== operation.coverage_id);
+                continue;
+            }
+
+            if (operation.kind === 'end') {
+                rows = rows.map((row) =>
+                    row.id === operation.coverage_id
+                        ? { ...row, berlaku_sampai: operation.berlaku_sampai }
+                        : row,
+                );
+                continue;
+            }
+
+            const original = rows.find(
+                (row) => row.id === operation.coverage_id,
+            );
+            const previousDay = new Date(
+                operation.berlaku_mulai + 'T12:00:00Z',
+            );
+            previousDay.setUTCDate(previousDay.getUTCDate() - 1);
+            rows = rows.map((row) =>
+                row.id === operation.coverage_id
+                    ? {
+                          ...row,
+                          berlaku_sampai: previousDay
+                              .toISOString()
+                              .slice(0, 10),
+                      }
+                    : row,
+            );
+
+            if (original) {
+                rows = [
+                    ...rows,
+                    {
+                        ...original,
+                        id: 'draft:replace:' + original.id,
+                        nilai_pertanggungan: String(
+                            operation.nilai_pertanggungan,
+                        ),
+                        berlaku_mulai: operation.berlaku_mulai,
+                        keterangan: operation.keterangan,
+                    },
+                ];
+            }
+        }
+
+        return rows;
+    })();
 
     const policyColumns: DataTableColumn<Policy>[] = [
         { id: 'kode', header: 'No.', cell: (row) => row.kode, width: 130 },
@@ -465,22 +609,25 @@ export default function InsurancePage({
     }
 
     const setDraft = (change: Partial<PolicyDraft>) =>
+        !busy &&
         editing &&
         setEditing({ ...editing, draft: { ...editing.draft, ...change } });
 
-    const discardPolicy = () =>
-        !policyDirty || window.confirm('Buang perubahan yang belum disimpan?');
+    const {
+        request: requestPolicyTransition,
+        confirmation: policyTransitionConfirmation,
+    } = useRecordTransition(policyDirty, busy);
     const newPolicy = () => {
-        if (!busy && discardPolicy()) {
+        requestPolicyTransition(() => {
             clearRecordTarget();
             startEdit(null);
-        }
+        });
     };
     const closePolicyEdit = () => {
-        if (!busy && discardPolicy()) {
+        requestPolicyTransition(() => {
             clearRecordTarget();
             setEditing(null);
-        }
+        });
     };
     useRecordCardDirty({
         value: editing?.draft,
@@ -515,8 +662,12 @@ export default function InsurancePage({
     });
 
     return (
-        <Tabs defaultValue="polis">
-            <RecordActionBar title="Asuransi aset">
+        <Tabs ref={pageFeedbackScopeRef} defaultValue="polis">
+            {policyTransitionConfirmation}
+            <RecordActionBar
+                feedback={pageFeedbackSummary}
+                title="Asuransi aset"
+            >
                 {canCreate && (
                     <ActionButton
                         action="create"
@@ -651,85 +802,13 @@ export default function InsurancePage({
                             {shown.keterangan && (
                                 <p className="text-sm">{shown.keterangan}</p>
                             )}
-                            <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-medium">
-                                    Aset yang ditanggung
-                                </span>
-                                {canUpdate && !shown.diblokir && (
-                                    <ActionButton
-                                        action="add"
-                                        type="button"
-                                        onClick={() => {
-                                            setErrors({});
-                                            setAction({
-                                                kind: 'tambah',
-                                                coverage: null,
-                                                aset_id: '',
-                                                nilai: '',
-                                                mulai:
-                                                    today > shown.berlaku_mulai
-                                                        ? today
-                                                        : shown.berlaku_mulai,
-                                                sampai: '',
-                                                keterangan: '',
-                                            });
-                                        }}
-                                    />
-                                )}
-                            </div>
-                            {(shown.pertanggungan ?? []).length === 0 ? (
-                                <p className="text-muted-foreground text-sm">
-                                    Polis ini belum menanggung aset.
-                                </p>
-                            ) : (
-                                <DataTable
-                                    columns={coverageColumns}
-                                    data={shown.pertanggungan ?? []}
-                                    getRowKey={(row) => row.id}
-                                    getRowLabel={(row) => row.aset_kode}
-                                    actions={
-                                        canUpdate
-                                            ? [
-                                                  {
-                                                      id: 'ganti-nilai',
-                                                      label: 'Ganti nilai mulai tanggal',
-                                                  },
-                                                  {
-                                                      id: 'akhiri',
-                                                      label: 'Akhiri pertanggungan',
-                                                  },
-                                                  {
-                                                      id: 'arsip',
-                                                      label: 'Delete',
-                                                      destructive: true,
-                                                  },
-                                              ]
-                                            : []
-                                    }
-                                    onRowAction={(id, row) => {
-                                        setErrors({});
-
-                                        if (id === 'arsip') {
-                                            void archiveCoverage(row);
-
-                                            return;
-                                        }
-
-                                        setAction({
-                                            kind:
-                                                id === 'akhiri'
-                                                    ? 'akhiri'
-                                                    : 'ganti-nilai',
-                                            coverage: row,
-                                            aset_id: row.aset_id,
-                                            nilai: '',
-                                            mulai: today,
-                                            sampai: today,
-                                            keterangan: '',
-                                        });
-                                    }}
-                                />
-                            )}
+                            <p className="font-medium">Aset yang ditanggung</p>
+                            <DataTable
+                                columns={coverageColumns}
+                                data={shown.pertanggungan ?? []}
+                                getRowKey={(row) => row.id}
+                                getRowLabel={(row) => row.aset_kode}
+                            />
                         </PageDialogBody>
                     )}
                 </PageDialogContent>
@@ -794,160 +873,334 @@ export default function InsurancePage({
                             <ActionButton action="cancel" type="button" />
                         </PageDialogClose>
                     </PageDialogToolbar>
+                    {editFeedbackSummary}
                     {editing && (
-                        <PageDialogBody className="space-y-4">
-                            <Input
-                                label="Nama polis"
-                                required
-                                maxLength={150}
-                                value={editing.draft.nama}
-                                onChange={(event) =>
-                                    setDraft({ nama: event.target.value })
-                                }
-                            />
-                            <Field>
-                                <Input
-                                    label="Nomor polis"
-                                    required
-                                    maxLength={60}
-                                    value={editing.draft.nomor_polis}
-                                    onChange={(event) =>
-                                        setDraft({
-                                            nomor_polis: event.target.value,
-                                        })
-                                    }
-                                />
-                                <FieldDescription>
-                                    {message('nomor_polis') ??
-                                        'Nomor yang tertera pada dokumen polis dari perusahaan asuransi.'}
-                                </FieldDescription>
-                            </Field>
-                            <Field>
-                                <Select
-                                    {...vendorsSource.selectProps}
-                                    label="Penanggung"
-                                    items={vendorChoices}
-                                    value={editing.draft.vendor_id || null}
-                                    placeholder="Pilih perusahaan asuransi"
-                                    searchPlaceholder="Cari nomor atau nama vendor"
-                                    ariaLabel="Penanggung"
-                                    portalContainer={editRef}
-                                    onValueChange={(value) =>
-                                        setDraft({ vendor_id: value ?? '' })
-                                    }
-                                />
-                                {message('vendor_id') && (
-                                    <FieldDescription>
-                                        {message('vendor_id')}
-                                    </FieldDescription>
-                                )}
-                            </Field>
-                            <Select
-                                {...types.selectProps}
-                                label="Jenis asuransi"
-                                items={types.options.map((option) => ({
-                                    value: option.id,
-                                    label: optionLabel(option),
-                                }))}
-                                value={editing.draft.jenis_asuransi_id || null}
-                                placeholder="Pilih jenis asuransi"
-                                ariaLabel="Jenis asuransi"
-                                portalContainer={editRef}
-                                onValueChange={(value) =>
-                                    setDraft({ jenis_asuransi_id: value ?? '' })
-                                }
-                            />
-                            <div className="grid grid-cols-2 gap-3">
-                                <Input
-                                    label="Berlaku mulai"
-                                    type="date"
-                                    required
-                                    value={editing.draft.berlaku_mulai}
-                                    onChange={(event) =>
-                                        setDraft({
-                                            berlaku_mulai: event.target.value,
-                                        })
-                                    }
-                                />
-                                <Input
-                                    label="Berlaku sampai"
-                                    type="date"
-                                    value={editing.draft.berlaku_sampai}
-                                    onChange={(event) =>
-                                        setDraft({
-                                            berlaku_sampai: event.target.value,
-                                        })
-                                    }
-                                />
-                            </div>
-                            {(message('berlaku_mulai') ??
-                                message('berlaku_sampai')) && (
-                                <p className="text-destructive text-sm">
-                                    {message('berlaku_mulai') ??
-                                        message('berlaku_sampai')}
-                                </p>
-                            )}
-                            <div className="grid grid-cols-2 gap-3">
-                                <Input
-                                    label="Premi tahunan"
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    value={editing.draft.premi_tahunan}
-                                    onChange={(event) =>
-                                        setDraft({
-                                            premi_tahunan: event.target.value,
-                                        })
-                                    }
-                                />
-                                <Field>
+                        <PageDialogBody>
+                            <fieldset disabled={busy} className="space-y-4">
+                                <FormControl data-error-field="draft">
                                     <Input
-                                        label="Nilai pertanggungan polis"
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        value={
-                                            editing.draft.nilai_pertanggungan
-                                        }
+                                        label="Nama polis"
+                                        required
+                                        maxLength={150}
+                                        value={editing.draft.nama}
                                         onChange={(event) =>
                                             setDraft({
-                                                nilai_pertanggungan:
-                                                    event.target.value,
+                                                nama: event.target.value,
                                             })
                                         }
                                     />
-                                    <FieldDescription>
-                                        Batas tanggungan polis, dibandingkan
-                                        dengan jumlah nilai aset yang
-                                        ditanggungnya.
-                                    </FieldDescription>
-                                </Field>
-                            </div>
-                            <label className="flex items-start gap-2 text-sm">
-                                <Checkbox
-                                    checked={editing.draft.diblokir}
-                                    onCheckedChange={(checked) =>
-                                        setDraft({ diblokir: checked === true })
+                                </FormControl>
+                                <FormControl
+                                    data-error-field="draft"
+                                    error={message('nomor_polis')}
+                                    hint={
+                                        'Nomor yang tertera pada dokumen polis dari perusahaan asuransi.'
                                     }
-                                />
-                                <span>
-                                    Blokir polis
-                                    <span className="text-muted-foreground block">
-                                        Polis yang diblokir tidak dapat
-                                        menanggung aset baru. Aset yang sudah
-                                        ditanggung tetap ditanggung.
+                                >
+                                    <Input
+                                        label="Nomor polis"
+                                        required
+                                        maxLength={60}
+                                        value={editing.draft.nomor_polis}
+                                        onChange={(event) =>
+                                            setDraft({
+                                                nomor_polis: event.target.value,
+                                            })
+                                        }
+                                    />
+                                </FormControl>
+                                <FormControl data-error-field="draft">
+                                    <RecordLookup
+                                        source={vendorsSource}
+                                        label="Penanggung"
+                                        items={vendorChoices}
+                                        value={editing.draft.vendor_id || null}
+                                        placeholder="Pilih perusahaan asuransi"
+                                        searchPlaceholder="Cari nomor atau nama vendor"
+                                        ariaLabel="Penanggung"
+                                        portalContainer={editRef}
+                                        onValueChange={(value) =>
+                                            setDraft({ vendor_id: value ?? '' })
+                                        }
+                                    />
+                                    {message('vendor_id') && (
+                                        <FieldError>
+                                            {message('vendor_id')}
+                                        </FieldError>
+                                    )}
+                                </FormControl>
+                                <FormControl data-error-field="draft">
+                                    <RecordLookup
+                                        source={types}
+                                        label="Jenis asuransi"
+                                        items={types.options.map((option) => ({
+                                            value: option.id,
+                                            label: optionLabel(option),
+                                        }))}
+                                        value={
+                                            editing.draft.jenis_asuransi_id ||
+                                            null
+                                        }
+                                        placeholder="Pilih jenis asuransi"
+                                        ariaLabel="Jenis asuransi"
+                                        portalContainer={editRef}
+                                        onValueChange={(value) =>
+                                            setDraft({
+                                                jenis_asuransi_id: value ?? '',
+                                            })
+                                        }
+                                    />
+                                </FormControl>
+                                <FormGrid>
+                                    <FormControl data-error-field="draft">
+                                        <DatePicker
+                                            portalContainer={editRef}
+                                            label="Berlaku mulai"
+
+                                            required
+                                            value={editing.draft.berlaku_mulai}
+                                            onValueChange={(value) =>
+                                                setDraft({
+                                                    berlaku_mulai: value,
+                                                })
+                                            }
+                                        />
+                                    </FormControl>
+                                    <FormControl data-error-field="draft">
+                                        <DatePicker
+                                            portalContainer={editRef}
+                                            label="Berlaku sampai"
+
+                                            value={editing.draft.berlaku_sampai}
+                                            onValueChange={(value) =>
+                                                setDraft({
+                                                    berlaku_sampai: value,
+                                                })
+                                            }
+                                        />
+                                    </FormControl>
+                                </FormGrid>
+                                {(message('berlaku_mulai') ??
+                                    message('berlaku_sampai')) && (
+                                    <p className="text-destructive text-sm">
+                                        {message('berlaku_mulai') ??
+                                            message('berlaku_sampai')}
+                                    </p>
+                                )}
+                                <FormGrid>
+                                    <FormControl data-error-field="draft">
+                                        <Input
+                                            label="Premi tahunan"
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={editing.draft.premi_tahunan}
+                                            onChange={(event) =>
+                                                setDraft({
+                                                    premi_tahunan:
+                                                        event.target.value,
+                                                })
+                                            }
+                                        />
+                                    </FormControl>
+                                    <FormControl
+                                        data-error-field="draft"
+                                        hint={
+                                            <>
+                                                Batas tanggungan polis,
+                                                dibandingkan dengan jumlah nilai
+                                                aset yang ditanggungnya.
+                                            </>
+                                        }
+                                    >
+                                        <Input
+                                            label="Nilai pertanggungan polis"
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={
+                                                editing.draft
+                                                    .nilai_pertanggungan
+                                            }
+                                            onChange={(event) =>
+                                                setDraft({
+                                                    nilai_pertanggungan:
+                                                        event.target.value,
+                                                })
+                                            }
+                                        />
+                                    </FormControl>
+                                </FormGrid>
+                                <label className="flex items-start gap-2 text-sm">
+                                    <Checkbox
+                                        checked={editing.draft.diblokir}
+                                        onCheckedChange={(checked) =>
+                                            setDraft({
+                                                diblokir: checked === true,
+                                            })
+                                        }
+                                    />
+                                    <span>
+                                        Blokir polis
+                                        <span className="text-muted-foreground block">
+                                            Polis yang diblokir tidak dapat
+                                            menanggung aset baru. Aset yang
+                                            sudah ditanggung tetap ditanggung.
+                                        </span>
                                     </span>
-                                </span>
-                            </label>
-                            <Textarea
-                                rows={2}
-                                maxLength={2000}
-                                placeholder="Keterangan"
-                                value={editing.draft.keterangan}
-                                onChange={(event) =>
-                                    setDraft({ keterangan: event.target.value })
-                                }
-                            />
+                                </label>
+                                <FormControl data-error-field="draft">
+                                    <Textarea
+                                        rows={2}
+                                        maxLength={2000}
+                                        placeholder="Keterangan"
+                                        value={editing.draft.keterangan}
+                                        onChange={(event) =>
+                                            setDraft({
+                                                keterangan: event.target.value,
+                                            })
+                                        }
+                                    />
+                                </FormControl>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="font-medium">
+                                        Aset yang ditanggung
+                                    </span>
+                                    {canUpdate && !editing.draft.diblokir && (
+                                        <ActionButton
+                                            action="add"
+                                            type="button"
+                                            disabled={busy}
+                                            onClick={() => {
+                                                setErrors({});
+                                                setAction({
+                                                    kind: 'tambah',
+                                                    coverage: null,
+                                                    aset_id: '',
+                                                    nilai: '',
+                                                    mulai:
+                                                        today >
+                                                        editing.draft
+                                                            .berlaku_mulai
+                                                            ? today
+                                                            : editing.draft
+                                                                  .berlaku_mulai,
+                                                    sampai: '',
+                                                    keterangan: '',
+                                                });
+                                            }}
+                                        />
+                                    )}
+                                </div>
+                                {coveragePreview.length === 0 ? (
+                                    <p className="text-muted-foreground text-sm">
+                                        Polis ini belum menanggung aset.
+                                    </p>
+                                ) : (
+                                    <DataTable
+                                        columns={coverageColumns}
+                                        data={coveragePreview}
+                                        getRowKey={(row) => row.id}
+                                        getRowLabel={(row) => row.aset_kode}
+                                        actions={
+                                            canUpdate
+                                                ? [
+                                                      {
+                                                          id: 'ganti-nilai',
+                                                          label: 'Ganti nilai mulai tanggal',
+                                                      },
+                                                      {
+                                                          id: 'akhiri',
+                                                          label: 'Akhiri pertanggungan',
+                                                      },
+                                                      {
+                                                          id: 'arsip',
+                                                          label: 'Delete',
+                                                          destructive: true,
+                                                      },
+                                                  ]
+                                                : []
+                                        }
+                                        onRowAction={(id, row) => {
+                                            if (busy) {
+                                                return;
+                                            }
+
+                                            setErrors({});
+
+                                            if (id === 'arsip') {
+                                                void archiveCoverage(row);
+
+                                                return;
+                                            }
+
+                                            if (
+                                                row.id.startsWith('draft:add:')
+                                            ) {
+                                                setAction({
+                                                    kind: 'tambah',
+                                                    coverage: row,
+                                                    aset_id: row.aset_id,
+                                                    nilai: row.nilai_pertanggungan,
+                                                    mulai: row.berlaku_mulai,
+                                                    sampai:
+                                                        row.berlaku_sampai ??
+                                                        '',
+                                                    keterangan:
+                                                        row.keterangan ?? '',
+                                                });
+
+                                                return;
+                                            }
+
+                                            if (
+                                                row.id.startsWith(
+                                                    'draft:replace:',
+                                                )
+                                            ) {
+                                                const original =
+                                                    editing.coverages.find(
+                                                        (item) =>
+                                                            item.id ===
+                                                            row.id.slice(14),
+                                                    );
+
+                                                if (!original) {
+                                                    return;
+                                                }
+
+                                                setAction({
+                                                    kind: 'ganti-nilai',
+                                                    coverage: original,
+                                                    aset_id: row.aset_id,
+                                                    nilai: row.nilai_pertanggungan,
+                                                    mulai: row.berlaku_mulai,
+                                                    sampai:
+                                                        row.berlaku_sampai ??
+                                                        '',
+                                                    keterangan:
+                                                        row.keterangan ?? '',
+                                                });
+
+                                                return;
+                                            }
+
+                                            setAction({
+                                                kind:
+                                                    id === 'akhiri'
+                                                        ? 'akhiri'
+                                                        : 'ganti-nilai',
+                                                coverage: row,
+                                                aset_id: row.aset_id,
+                                                nilai: '',
+                                                mulai: today,
+                                                sampai: today,
+                                                keterangan: '',
+                                            });
+                                        }}
+                                    />
+                                )}
+                            </fieldset>
                         </PageDialogBody>
                     )}
                 </PageDialogContent>
@@ -967,12 +1220,13 @@ export default function InsurancePage({
                                   : 'Ganti nilai pertanggungan'}
                         </DialogTitle>
                     </DialogHeader>
+                    {actionFeedbackSummary}
                     {action && (
                         <DialogBody className="space-y-4">
                             {action.kind === 'tambah' ? (
-                                <Field>
-                                    <Select
-                                        {...assetSource.selectProps}
+                                <FormControl data-error-field="aset_id">
+                                    <RecordLookup
+                                        source={assetSource}
                                         label="Aset"
                                         required
                                         items={assets.map((asset) => ({
@@ -992,11 +1246,11 @@ export default function InsurancePage({
                                         }
                                     />
                                     {message('aset_id') && (
-                                        <FieldDescription>
+                                        <FieldError>
                                             {message('aset_id')}
-                                        </FieldDescription>
+                                        </FieldError>
                                     )}
-                                </Field>
+                                </FormControl>
                             ) : (
                                 <p className="text-sm">
                                     {action.coverage?.aset_kode} ·{' '}
@@ -1007,75 +1261,79 @@ export default function InsurancePage({
                                 </p>
                             )}
                             {action.kind !== 'akhiri' && (
-                                <Input
-                                    label={
-                                        action.kind === 'tambah'
-                                            ? 'Nilai pertanggungan'
-                                            : 'Nilai baru'
-                                    }
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    required
-                                    value={action.nilai}
-                                    onChange={(event) =>
-                                        setAction({
-                                            ...action,
-                                            nilai: event.target.value,
-                                        })
-                                    }
-                                />
+                                <FormControl>
+                                    <Input
+                                        label={
+                                            action.kind === 'tambah'
+                                                ? 'Nilai pertanggungan'
+                                                : 'Nilai baru'
+                                        }
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        required
+                                        value={action.nilai}
+                                        onChange={(event) =>
+                                            setAction({
+                                                ...action,
+                                                nilai: event.target.value,
+                                            })
+                                        }
+                                    />
+                                </FormControl>
                             )}
-                            <div className="grid grid-cols-2 gap-3">
+                            <FormGrid>
                                 {action.kind !== 'akhiri' && (
-                                    <Field>
-                                        <Input
+                                    <FormControl
+                                        hint={
+                                            action.kind === 'ganti-nilai'
+                                                ? 'Nilai lama berakhir sehari sebelumnya dan tetap tercatat.'
+                                                : undefined
+                                        }
+                                    >
+                                        <DatePicker
+                                            portalContainer={actionRef}
                                             label={
                                                 action.kind === 'tambah'
                                                     ? 'Berlaku mulai'
                                                     : 'Nilai baru berlaku mulai'
                                             }
-                                            type="date"
+
                                             required
                                             value={action.mulai}
-                                            onChange={(event) =>
+                                            onValueChange={(value) =>
                                                 setAction({
                                                     ...action,
-                                                    mulai: event.target.value,
+                                                    mulai: value,
                                                 })
                                             }
                                         />
-                                        {action.kind === 'ganti-nilai' && (
-                                            <FieldDescription>
-                                                Nilai lama berakhir sehari
-                                                sebelumnya dan tetap tercatat.
-                                            </FieldDescription>
-                                        )}
-                                    </Field>
+                                    </FormControl>
                                 )}
                                 {action.kind !== 'ganti-nilai' && (
-                                    <Field>
-                                        <Input
+                                    <FormControl
+                                        hint={
+                                            action.kind === 'tambah'
+                                                ? 'Kosongkan untuk mengikuti masa berlaku polis.'
+                                                : undefined
+                                        }
+                                    >
+                                        <DatePicker
+                                            portalContainer={actionRef}
                                             label="Berlaku sampai"
-                                            type="date"
+
                                             required={action.kind === 'akhiri'}
                                             value={action.sampai}
-                                            onChange={(event) =>
+                                            onValueChange={(value) =>
                                                 setAction({
                                                     ...action,
-                                                    sampai: event.target.value,
+                                                    sampai: value,
                                                 })
                                             }
                                         />
-                                        {action.kind === 'tambah' && (
-                                            <FieldDescription>
-                                                Kosongkan untuk mengikuti masa
-                                                berlaku polis.
-                                            </FieldDescription>
-                                        )}
-                                    </Field>
+                                    </FormControl>
                                 )}
-                            </div>
+                            </FormGrid>
                             {(message('berlaku_mulai') ??
                                 message('berlaku_sampai') ??
                                 message('nilai_pertanggungan')) && (
@@ -1086,35 +1344,39 @@ export default function InsurancePage({
                                 </p>
                             )}
                             {action.kind !== 'akhiri' && (
-                                <Input
-                                    label="Keterangan"
-                                    maxLength={2000}
-                                    value={action.keterangan}
-                                    onChange={(event) =>
-                                        setAction({
-                                            ...action,
-                                            keterangan: event.target.value,
-                                        })
-                                    }
-                                />
+                                <FormControl>
+                                    <Input
+                                        label="Keterangan"
+                                        maxLength={2000}
+                                        value={action.keterangan}
+                                        onChange={(event) =>
+                                            setAction({
+                                                ...action,
+                                                keterangan: event.target.value,
+                                            })
+                                        }
+                                    />
+                                </FormControl>
                             )}
                         </DialogBody>
                     )}
                     <DialogFooter>
-                        <ActionButton
-                            action="save"
+                        <Button
                             type="button"
                             disabled={
                                 busy ||
                                 (action?.kind === 'tambah' &&
-                                    (!action.aset_id || action.nilai === '')) ||
+                                    (!action.aset_id ||
+                                        action.nilai === '' ||
+                                        !action.mulai)) ||
                                 (action?.kind === 'ganti-nilai' &&
-                                    action.nilai === '') ||
+                                    (action.nilai === '' || !action.mulai)) ||
                                 (action?.kind === 'akhiri' && !action.sampai)
                             }
                             onClick={() => void runAction()}
-                            pending={busy}
-                        />
+                        >
+                            {action?.kind === 'tambah' ? 'Tambah' : 'Selesai'}
+                        </Button>
                         <DialogClose asChild>
                             <ActionButton action="cancel" type="button" />
                         </DialogClose>

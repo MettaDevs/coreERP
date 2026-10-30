@@ -149,7 +149,7 @@ export function InlineLookup<T>({
     return (
         <>
             <div className="w-full min-w-0">
-                <div className="min-w-0 space-y-2">
+                <div className="min-w-0">
                     <Combobox
                         items={sortedItems}
                         value={value}

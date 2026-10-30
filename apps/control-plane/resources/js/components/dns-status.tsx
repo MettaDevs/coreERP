@@ -1,3 +1,4 @@
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
 import { Spinner } from '@apperp/ui/spinner';
@@ -32,6 +33,9 @@ export default function DnsStatus({
     serverAddress: string | null;
     revoked?: boolean;
 }) {
+    const { wrapRouter: wrapRouterRequest, summary: routerRequestSummary } =
+        useInertiaFeedback();
+
     const [syncing, setSyncing] = useState(false);
     const error = usePage().props.errors.dns;
 
@@ -39,35 +43,35 @@ export default function DnsStatus({
         dns.state === 'synced'
             ? {
                   label: 'Menunjuk server ini',
-                  className:
-                      'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200',
+                  className: 'border-success/30 bg-success/10 text-success   ',
               }
             : dns.state === 'outdated'
               ? {
                     label: 'Belum mengikuti alamat server',
                     className:
-                        'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200',
+                        'border-warning/30 bg-warning/10 text-warning   ',
                 }
               : {
                     label: 'Dibuat saat perintah pasang',
                     className:
-                        'border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300',
+                        'border-border bg-muted text-muted-foreground   ',
                 };
 
     function sync() {
         router.post(
             `/situs/${siteId}/dns`,
             {},
-            {
+            wrapRouterRequest({
                 preserveScroll: true,
                 onStart: () => setSyncing(true),
                 onFinish: () => setSyncing(false),
-            },
+            }),
         );
     }
 
     return (
         <div className="space-y-2" data-test="dns-status">
+            {routerRequestSummary}
             {appUrl && (
                 <a
                     href={appUrl}

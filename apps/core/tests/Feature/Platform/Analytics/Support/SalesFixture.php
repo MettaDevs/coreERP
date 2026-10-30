@@ -30,11 +30,7 @@ trait SalesFixture
 
     protected function migrateSalesModule(): void
     {
-        Artisan::call('migrate', [
-            '--path' => dirname(__DIR__, 4).'/Fixtures/modules/apperp/contoh-a/database/migrations',
-            '--realpath' => true,
-            '--force' => true,
-        ]);
+        Artisan::call('module:migrate', ['module' => 'contoh-a']);
     }
 
     /** Tenant baru dengan module contoh terpasang. */

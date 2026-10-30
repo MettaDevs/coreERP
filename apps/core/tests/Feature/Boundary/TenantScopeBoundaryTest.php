@@ -40,11 +40,7 @@ class TenantScopeBoundaryTest extends TestCase
     {
         parent::setUp();
 
-        Artisan::call('migrate', [
-            '--path' => dirname(__DIR__, 2).'/Fixtures/modules/apperp/contoh-a/database/migrations',
-            '--realpath' => true,
-            '--force' => true,
-        ]);
+        Artisan::call('module:migrate', ['module' => 'contoh-a']);
 
         $this->tenantSatu = (string) Str::ulid();
         $this->tenantDua = (string) Str::ulid();

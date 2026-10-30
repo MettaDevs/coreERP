@@ -10,6 +10,7 @@ use App\Platform\Environment\Models\EnvironmentOperation;
 use App\Platform\Identity\Models\User;
 use App\Platform\Tenant\Models\Tenant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
@@ -196,5 +197,20 @@ final class EnvironmentProvisioningApiTest extends TestCase
             'expires_at' => $kind === 'demo' ? now()->addDays(30) : null,
             'outbound_allowed' => $kind === 'production',
         ]);
+    }
+
+    public function test_a_module_database_failure_is_explicit_after_successful_provisioning(): void
+    {
+        $environment = $this->environment('provisioning');
+        $environment->forceFill(['database_name' => 'console_audit_missing_database'])->save();
+        Artisan::shouldReceive('call')->once()->andReturnUsing(function () use ($environment): int {
+            $environment->forceFill(['status' => 'active'])->save();
+
+            return 0;
+        });
+        Artisan::shouldReceive('output')->once()->andReturn('');
+        $this->withToken(self::TOKEN)->postJson('/api/internal/v1/environments/'.$environment->id.'/provision')
+            ->assertOk()->assertJsonPath('status', 'active')->assertJsonPath('modules', [])
+            ->assertJsonPath('modules_error', fn ($error): bool => is_string($error) && str_contains($error, 'belum dapat dibaca'));
     }
 }

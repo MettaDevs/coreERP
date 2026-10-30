@@ -13,7 +13,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@apperp/ui/tabs';
 import { router, usePage } from '@inertiajs/react';
 import { RefreshCw } from 'lucide-react';
 import { useState, useSyncExternalStore } from 'react';
-import { toast } from 'sonner';
 import { analysisColumnTools } from '@/components/analytics/analysis-column-tools';
 import { AnalysisDragSettings } from '@/components/analytics/analysis-drag-settings';
 import { AnalysisTreeGrid } from '@/components/analytics/analysis-tree-grid';
@@ -25,6 +24,7 @@ import {
     queryErrorPlacement,
     useQueryPreview,
 } from '@/components/analytics/use-query-preview';
+import { FormErrorHeader } from '@/components/form-error-header';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
     formatDimensionValue,
@@ -421,6 +421,7 @@ export function AdHocAnalysis({
     };
 
     const [settingsOpen, setSettingsOpen] = useState(true);
+    const [localSaveError, setLocalSaveError] = useState<string | null>(null);
     const isMobile = useIsMobile();
     const [refresh, setRefresh] = useState(0);
     type Workspace = {
@@ -512,8 +513,11 @@ export function AdHocAnalysis({
                 }),
             );
             window.dispatchEvent(new Event('storage'));
+            setLocalSaveError(null);
         } catch {
-            toast.error('Tampilan belum dapat disimpan di peramban ini.');
+            setLocalSaveError(
+                'Tampilan belum dapat disimpan di peramban ini. Perubahan masih terlihat selama halaman terbuka, tetapi belum tersimpan untuk kunjungan berikutnya. Coba simpan tampilan lagi.',
+            );
         }
     };
     const change = (next: Layout) =>
@@ -598,6 +602,21 @@ export function AdHocAnalysis({
             }
             filters={
                 <div className="flex flex-col gap-2 px-5">
+                    <FormErrorHeader
+                        message={localSaveError}
+                        operation="Tampilan belum disimpan"
+                    />
+                    {localSaveError && (
+                        <div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => commit(current)}
+                            >
+                                Simpan tampilan lagi
+                            </Button>
+                        </div>
+                    )}
                     {layout.mode === 'analysis' && (
                         <AnalysisViewTabs
                             names={current.tabs.map((tab) => tab.name)}
@@ -632,10 +651,6 @@ export function AdHocAnalysis({
                                             tab.name !== name,
                                     )
                                 ) {
-                                    toast.error(
-                                        'Gunakan nama tampilan yang belum dipakai.',
-                                    );
-
                                     return false;
                                 }
 

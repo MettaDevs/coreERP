@@ -180,6 +180,48 @@ class AssetInsuranceTest extends TestCase
         $this->assertNotNull(app(AttachmentRecordTypes::class)->for('aset_m_polis_asuransi'));
     }
 
+    public function test_policy_creation_retry_compares_header_and_coverages_and_returns_a_full_policy(): void
+    {
+        $asset = $this->seedAsset($this->jenisAset, 'RETRY-01');
+        $operations = [['kind' => 'add', 'creation_key' => 'retry-coverage', 'aset_id' => $asset, 'nilai_pertanggungan' => 1000, 'berlaku_mulai' => '2026-01-01']];
+        $created = $this->createPolicy(['coverage_operations' => $operations], 'hashed-policy')->assertCreated()->json('data');
+        $this->createPolicy(['coverage_operations' => $operations], 'hashed-policy')->assertOk()->assertJsonPath('data.id', $created['id'])->assertJsonPath('data.nama', $created['nama'])->assertJsonCount(1, 'data.pertanggungan');
+        $this->createPolicy(['nama' => 'Changed header', 'coverage_operations' => $operations], 'hashed-policy')->assertConflict()->assertJsonPath('error.code', 'idempotency_conflict');
+        $this->createPolicy(['coverage_operations' => [[...$operations[0], 'nilai_pertanggungan' => 2000]]], 'hashed-policy')->assertConflict()->assertJsonPath('error.code', 'idempotency_conflict');
+        $this->assertSame(1, DB::table('aset_tr_pertanggungan_asuransi')->where('polis_asuransi_id', $created['id'])->count());
+        $this->assertSame(1, DB::table('number_sequence_issues')->where('idempotency_key', 'polis-asuransi:hashed-policy')->count());
+        $this->as(self::MANAGER)->patchJson(self::URL.'/'.$created['id'], $this->policyPayload(['version' => $created['version'], 'coverage_operations' => [$operations[0], [...$operations[0], 'nilai_pertanggungan' => 2000]]]))->assertUnprocessable()->assertJsonValidationErrors('coverage_operations.0.creation_key');
+        DB::table('aset_m_polis_asuransi')->where('id', $created['id'])->update(['creation_payload_hash' => null]);
+        $this->createPolicy(['coverage_operations' => $operations], 'hashed-policy')->assertConflict();
+    }
+
+    public function test_global_policy_save_preserves_history_and_rolls_back_every_operation_on_failure(): void
+    {
+        $asset = $this->seedAsset($this->jenisAset, 'GLOBAL-01');
+        $add = ['kind' => 'add', 'creation_key' => 'global-first', 'aset_id' => $asset, 'nilai_pertanggungan' => 1000, 'berlaku_mulai' => '2026-01-01'];
+        $this->createPolicy(['nama' => 'Rollback policy', 'coverage_operations' => [$add, [...$add, 'creation_key' => 'invalid', 'nilai_pertanggungan' => 0]]], 'rollback-global')
+            ->assertUnprocessable()->assertJsonValidationErrors('coverage_operations.1.nilai_pertanggungan');
+        $this->assertDatabaseMissing('aset_m_polis_asuransi', ['nama' => 'Rollback policy']);
+        $this->assertDatabaseMissing('aset_tr_pertanggungan_asuransi', ['creation_key' => 'global-first']);
+        $this->assertDatabaseMissing('number_sequence_issues', ['idempotency_key' => 'polis-asuransi:rollback-global']);
+        $policy = $this->createPolicy(['coverage_operations' => [$add]])->assertCreated()->assertJsonCount(1, 'data.pertanggungan')->json('data');
+        $coverage = $policy['pertanggungan'][0]['id'];
+        $replace = ['kind' => 'replace', 'coverage_id' => $coverage, 'nilai_pertanggungan' => 2000, 'berlaku_mulai' => '2026-06-01'];
+        $this->as(self::MANAGER)->patchJson(self::URL.'/'.$policy['id'], $this->policyPayload(['version' => $policy['version'], 'nama' => 'Must roll back', 'coverage_operations' => [$replace, [...$add, 'creation_key' => 'invalid', 'nilai_pertanggungan' => 0]]]))
+            ->assertUnprocessable()->assertJsonValidationErrors('coverage_operations.1.nilai_pertanggungan');
+        $this->assertDatabaseHas('aset_m_polis_asuransi', ['id' => $policy['id'], 'nama' => $policy['nama'], 'version' => $policy['version']]);
+        $this->assertDatabaseHas('aset_tr_pertanggungan_asuransi', ['id' => $coverage, 'nilai_pertanggungan' => 1000, 'berlaku_sampai' => null]);
+        $saved = $this->as(self::MANAGER)->patchJson(self::URL.'/'.$policy['id'], $this->policyPayload(['version' => $policy['version'], 'coverage_operations' => [$replace]]))->assertOk()->assertJsonCount(2, 'data.pertanggungan')->json('data');
+        $this->assertDatabaseHas('aset_tr_pertanggungan_asuransi', ['id' => $coverage, 'nilai_pertanggungan' => 1000, 'berlaku_sampai' => '2026-05-31']);
+        $replacement = DB::table('aset_tr_pertanggungan_asuransi')->where('polis_asuransi_id', $policy['id'])->where('nilai_pertanggungan', 2000)->value('id');
+        $ended = $this->as(self::MANAGER)->patchJson(self::URL.'/'.$policy['id'], $this->policyPayload(['version' => $saved['version'], 'coverage_operations' => [['kind' => 'end', 'coverage_id' => $replacement, 'berlaku_sampai' => '2026-10-01']]]))->assertOk()->json('data');
+        $this->assertDatabaseHas('aset_tr_pertanggungan_asuransi', ['id' => $replacement, 'berlaku_sampai' => '2026-10-01']);
+        $this->as(self::MANAGER)->patchJson(self::URL.'/'.$policy['id'], $this->policyPayload(['version' => $ended['version'], 'coverage_operations' => [['kind' => 'archive', 'coverage_id' => $replacement]]]))->assertOk()->assertJsonCount(1, 'data.pertanggungan');
+        $this->assertNotNull(DB::table('aset_tr_pertanggungan_asuransi')->where('id', $replacement)->value('deleted_at'));
+        $this->as(self::MANAGER)->patchJson(self::URL.'/'.$policy['id'], $this->policyPayload(['version' => $policy['version'], 'coverage_operations' => [$add]]))->assertConflict();
+        $this->as(['management-aset.polis-asuransi.read'])->patchJson(self::URL.'/'.$policy['id'], $this->policyPayload(['version' => $this->version($policy['id']), 'coverage_operations' => [$add]]))->assertForbidden();
+    }
+
     /**
      * @param  array<string, mixed>  $overrides
      * @return array<string, mixed>

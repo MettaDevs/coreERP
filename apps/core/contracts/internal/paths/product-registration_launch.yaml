@@ -1,0 +1,58 @@
+post:
+  tags:
+  - Product registration
+  operationId: internal.productRegistration.launch
+  summary: Terbitkan bukti login terikat tenant dan peramban
+  security:
+  - productRegistrationGateway: []
+    productRegistrationSession: []
+  responses:
+    '200':
+      description: Permintaan berhasil.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+            - ticket
+            - public_url
+            properties:
+              ticket:
+                type: string
+                description: JWT RS256 dengan masa berlaku maksimal 60 detik; hanya
+                  dikirim ke tenant lewat POST.
+              public_url:
+                type: string
+                format: uri
+    '401':
+      description: Sesi atau kredensial bridge tidak berlaku.
+    '422':
+      description: Isian belum sesuai atau verifikasi belum selesai.
+    '429':
+      description: Batas permintaan tercapai.
+    '503':
+      description: Penyedia atau konfigurasi belum tersedia.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+          - tenant_id
+          - browser_challenge
+          - state
+          properties:
+            tenant_id:
+              type: string
+              format: uuid
+              description: Referensi registry produk eksternal milik customer; bukan
+                tenant_id bisnis CoreERP.
+            browser_challenge:
+              type: string
+              pattern: ^[a-f0-9]{64}$
+            state:
+              type: string
+              minLength: 32
+              maxLength: 128
+              pattern: ^[A-Za-z0-9_-]+$

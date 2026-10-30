@@ -3,6 +3,8 @@
 namespace Tests\Feature\Foundation\WorkingCalendar;
 
 use App\Foundation\WorkingCalendar\Models\WorkingTimeTemplate;
+use App\Platform\Access\Models\AppDataPolicy;
+use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\ControlPlane\Models\Client;
 use App\Platform\Identity\Models\User;
 use App\Platform\Organization\Models\Organization;
@@ -58,6 +60,17 @@ class WorkingTimeTemplateTest extends TestCase
             'company_code' => 'USMF',
             'country_code' => 'ID',
         ]);
+        if ($owner) {
+            AppDataPolicy::firstOrCreate(['code' => 'test.working-calendar.organizations'], [
+                'app_id' => CoreSecurityCatalog::APP_ID, 'name' => 'Akses organisasi uji', 'protected_permissions' => [],
+                'requires_legal_entity' => false, 'requires_operating_unit' => false, 'allows_descendants' => false,
+            ]);
+            $membership->roleAssignments()->firstOrFail()->dataPolicyScopes()->create([
+                'tenant_id' => $tenant->id, 'policy_code' => 'test.working-calendar.organizations',
+                'include_descendants' => false, 'valid_from' => now(),
+            ]);
+            $this->withSession(['workspace.legal_entity_id' => $org->id]);
+        }
 
         return [$user, $tenant, $org, $membership];
     }
@@ -156,6 +169,55 @@ class WorkingTimeTemplateTest extends TestCase
             ]);
 
         $response->assertForbidden();
+    }
+
+    public function test_commands_cannot_target_another_company_in_the_same_tenant(): void
+    {
+        [$user, $tenant, $company] = $this->createTenantUser();
+        $otherCompany = Organization::create(['tenant_id' => $tenant->id, 'classification' => 'legal_entity', 'name' => 'Perusahaan lain', 'status' => 'active']);
+        $template = WorkingTimeTemplate::create(['tenant_id' => $tenant->id, 'legal_entity_id' => $otherCompany->id, 'code' => 'OTHER', 'name' => 'Tidak berubah', 'is_active' => true]);
+        $this->actingAs($user)->withSession(['workspace.legal_entity_id' => $company->id]);
+        $url = "/settings/working-time-templates/{$template->id}";
+
+        $this->putJson($url, ['code' => 'OTHER', 'name' => 'Ditimpa', 'version' => 1])->assertNotFound();
+        $this->putJson("{$url}/lines", ['lines' => [], 'version' => 1])->assertNotFound();
+        $this->postJson("{$url}/copy", ['code' => 'COPY', 'name' => 'Salinan'])->assertNotFound();
+        $this->deleteJson($url, ['version' => 1])->assertNotFound();
+        $this->postJson('/settings/working-time-templates', ['code' => 'NEW', 'name' => 'Baru', 'legal_entity_id' => $otherCompany->id])
+            ->assertUnprocessable()->assertJsonValidationErrors('legal_entity_id');
+
+        $this->assertSame('Tidak berubah', $template->refresh()->name);
+        $this->assertSame(1, $template->version);
+        $this->assertNull($template->deleted_at);
+        $this->assertDatabaseMissing('working_time_templates', ['code' => 'COPY']);
+        $this->postJson('/settings/working-time-templates', ['code' => 'OWN', 'name' => 'Perusahaan aktif'])
+            ->assertCreated()->assertJsonPath('data.legal_entity_id', $company->id);
+    }
+
+    public function test_no_company_access_does_not_fall_back_to_an_arbitrary_organization(): void
+    {
+        [$user, $tenant, $company, $membership] = $this->createTenantUser(owner: false);
+        $this->grantDuties($membership, ['core.reference-data.manage']);
+        WorkingTimeTemplate::create(['tenant_id' => $tenant->id, 'legal_entity_id' => $company->id, 'code' => 'HIDDEN', 'name' => 'Pola perusahaan', 'is_active' => true]);
+        $this->actingAs($user)->getJson('/settings/working-time-templates')->assertOk()->assertJsonCount(0, 'data');
+        $this->postJson('/settings/working-time-templates', ['code' => 'NEW', 'name' => 'Baru', 'legal_entity_id' => $company->id])
+            ->assertUnprocessable()->assertJsonValidationErrors('legal_entity_id');
+        $this->assertDatabaseMissing('working_time_templates', ['code' => 'NEW']);
+    }
+
+    public function test_json_requests_cannot_bypass_the_bounded_header_list(): void
+    {
+        [$user, $tenant, $company] = $this->createTenantUser();
+        foreach (range(1, 45) as $number) {
+            WorkingTimeTemplate::create(['tenant_id' => $tenant->id, 'legal_entity_id' => $company->id, 'code' => sprintf('SHIFT-%03d', $number), 'name' => 'Shift '.$number, 'is_active' => true]);
+        }
+        $this->actingAs($user)->withSession(['workspace.legal_entity_id' => $company->id]);
+        $first = $this->getJson('/settings/working-time-templates')->assertOk()
+            ->assertJsonCount(40, 'data')->assertJsonMissingPath('data.0.lines');
+        $this->getJson('/settings/working-time-templates?cursor='.urlencode($first->json('next_cursor')))
+            ->assertOk()->assertJsonCount(5, 'data')->assertJsonPath('next_cursor', null);
+        $this->getJson('/settings/working-time-templates?per_page=100000')
+            ->assertUnprocessable()->assertJsonValidationErrors('per_page');
     }
 
     public function test_user_can_create_new_template_with_empty_inputs(): void

@@ -1,3 +1,5 @@
+import { useInertiaFeedback } from '@/hooks/use-inertia-feedback';
+import { FormErrorHeader } from '@/components/form-error-header';
 import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Button } from '@apperp/ui/button';
@@ -29,6 +31,12 @@ type Props = {
 } /* @chisel-2fa */ & ManageTwoFactorProps /* @end-chisel-2fa */;
 
 export default function Security(props: Props) {
+    const { wrapRouter: wrapRouterRequest, summary: routerRequestSummary } =
+        useInertiaFeedback();
+
+    const { wrap: wrapFormResponse1, summary: formResponse1Summary } =
+        useInertiaFeedback();
+
     const passwordInput = useRef<HTMLInputElement>(null);
     const currentPasswordInput = useRef<HTMLInputElement>(null);
 
@@ -37,6 +45,7 @@ export default function Security(props: Props) {
             <Head title="Security settings" />
 
             <main className="mx-auto flex w-full max-w-3xl flex-col gap-12 p-6">
+                {routerRequestSummary}
                 <h1 className="sr-only">Security settings</h1>
 
                 <div className="flex flex-col gap-6">
@@ -47,10 +56,11 @@ export default function Security(props: Props) {
                     />
 
                     <Form
+                        noValidate
                         {...SecurityController.update.form()}
-                        options={{
+                        options={wrapFormResponse1({
                             preserveScroll: true,
-                        }}
+                        })}
                         resetOnError={[
                             'password',
                             'password_confirmation',
@@ -79,8 +89,15 @@ export default function Security(props: Props) {
                                         data-test="update-password-button"
                                     />
                                 </RecordActionBar>
+                                <>
+                                    {formResponse1Summary}
+                                    <FormErrorHeader errors={errors} />
+                                </>
 
-                                <div className="grid gap-2">
+                                <div
+                                    className="grid gap-2"
+                                    data-error-field={'current_password'}
+                                >
                                     <PasswordInput
                                         id="current_password"
                                         label="Current password"
@@ -95,7 +112,10 @@ export default function Security(props: Props) {
                                     />
                                 </div>
 
-                                <div className="grid gap-2">
+                                <div
+                                    className="grid gap-2"
+                                    data-error-field={'password'}
+                                >
                                     <PasswordInput
                                         id="password"
                                         label="New password"
@@ -109,7 +129,10 @@ export default function Security(props: Props) {
                                     <InputError message={errors.password} />
                                 </div>
 
-                                <div className="grid gap-2">
+                                <div
+                                    className="grid gap-2"
+                                    data-error-field={'password_confirmation'}
+                                >
                                     <PasswordInput
                                         id="password_confirmation"
                                         label="Confirm password"
@@ -169,9 +192,12 @@ export default function Security(props: Props) {
                                     variant="outline"
                                     data-test="sso-disconnect-button"
                                     onClick={() =>
-                                        router.delete('/sso/hubungkan', {
-                                            preserveScroll: true,
-                                        })
+                                        router.delete(
+                                            '/sso/hubungkan',
+                                            wrapRouterRequest({
+                                                preserveScroll: true,
+                                            }),
+                                        )
                                     }
                                 >
                                     Putuskan
@@ -182,7 +208,11 @@ export default function Security(props: Props) {
                                 <Button
                                     data-test="sso-connect-button"
                                     onClick={() =>
-                                        router.post('/sso/hubungkan')
+                                        router.post(
+                                            '/sso/hubungkan',
+                                            {},
+                                            wrapRouterRequest(),
+                                        )
                                     }
                                 >
                                     Hubungkan SSO

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Platform\Modules\Contracts\AuditColumns;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -15,11 +16,12 @@ return new class extends Migration
             $blueprint->ulid('id')->primary();
             $blueprint->ulid('tenant_id')->index();
             $blueprint->string('creation_key', 160)->nullable();
+            $blueprint->char('creation_payload_hash', 64)->nullable();
             $blueprint->string('nomor_prakualifikasi', 100);
             $blueprint->date('tanggal_prakualifikasi');
 
-            // Relasi / Snapshot data vendor rekanan
-            $blueprint->ulid('vendor_id')->nullable();
+            // Relasi & snapshot identitas vendor rekanan dari Core
+            $blueprint->ulid('vendor_id');
             $blueprint->string('kode_vendor', 100);
             $blueprint->string('nama_vendor', 255);
             $blueprint->string('jenis_vendor', 100)->nullable();
@@ -33,7 +35,7 @@ return new class extends Migration
             // Evaluasi legalitas & operasional rekanan
             $blueprint->string('status_vendor', 100)->default('Vendor Resmi');
             $blueprint->string('status_badan_hukum', 50)->default('Badan Hukum');
-            $blueprint->string('status_kualifikasi', 50)->default('Lolos');
+            $blueprint->string('status_kualifikasi', 50)->default('Dalam Proses');
             $blueprint->string('waktu_kesediaan_item', 100)->nullable();
             $blueprint->integer('jumlah_karyawan')->nullable();
             $blueprint->text('catatan')->nullable();
@@ -42,31 +44,38 @@ return new class extends Migration
             $blueprint->softDeletes();
             $blueprint->timestamps();
 
-            // Composite uniqueness and foreign key support
             $blueprint->unique(['tenant_id', 'id']);
-            $blueprint->unique(['tenant_id', 'nomor_prakualifikasi']);
+            $blueprint->unique(['tenant_id', 'creation_key']);
+            $blueprint->index(['tenant_id', 'vendor_id']);
             $blueprint->index(['tenant_id', 'kode_vendor']);
             $blueprint->index(['tenant_id', 'status_kualifikasi']);
             $blueprint->index(['tenant_id', 'tanggal_prakualifikasi']);
         });
 
+        DB::statement(
+            'CREATE UNIQUE INDEX procurement_prakualifikasi_nomor_unique '.
+            'ON procurement_prakualifikasi (tenant_id, nomor_prakualifikasi) WHERE deleted_at IS NULL'
+        );
+
         Schema::create('procurement_prakualifikasi_dokumen', function (Blueprint $blueprint): void {
             $blueprint->ulid('id')->primary();
             $blueprint->ulid('tenant_id')->index();
             $blueprint->ulid('prakualifikasi_id');
-            $blueprint->string('kategori', 50)->default('wajib'); // wajib / tambahan
+            $blueprint->string('kategori', 50)->default('wajib');
             $blueprint->integer('urutan')->default(0);
             $blueprint->string('nama_dokumen', 255);
             $blueprint->boolean('ada')->default(false);
             $blueprint->string('keterangan', 255)->nullable();
 
             AuditColumns::add($blueprint);
+            $blueprint->softDeletes();
             $blueprint->timestamps();
 
+            $blueprint->index(['tenant_id', 'prakualifikasi_id']);
             $blueprint->foreign(['tenant_id', 'prakualifikasi_id'])
                 ->references(['tenant_id', 'id'])
                 ->on('procurement_prakualifikasi')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
         });
 
         Schema::create('procurement_prakualifikasi_item', function (Blueprint $blueprint): void {
@@ -82,12 +91,14 @@ return new class extends Migration
             $blueprint->text('keterangan')->nullable();
 
             AuditColumns::add($blueprint);
+            $blueprint->softDeletes();
             $blueprint->timestamps();
 
+            $blueprint->index(['tenant_id', 'prakualifikasi_id']);
             $blueprint->foreign(['tenant_id', 'prakualifikasi_id'])
                 ->references(['tenant_id', 'id'])
                 ->on('procurement_prakualifikasi')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
         });
 
         AuditColumns::attach('procurement_prakualifikasi');

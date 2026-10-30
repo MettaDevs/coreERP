@@ -46,11 +46,7 @@ class DatasetValidatorTest extends TestCase
         parent::setUp();
 
         // Tabel module contoh dibuat test-nya sendiri, seperti penjaga batas lain (`TenantScopeBoundaryTest`).
-        Artisan::call('migrate', [
-            '--path' => dirname(__DIR__, 3).'/Fixtures/modules/apperp/contoh-a/database/migrations',
-            '--realpath' => true,
-            '--force' => true,
-        ]);
+        Artisan::call('module:migrate', ['module' => 'contoh-a']);
     }
 
     public function test_the_fixture_dataset_compiles_into_qualified_classified_and_labelled_fields(): void
