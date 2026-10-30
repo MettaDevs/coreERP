@@ -42,8 +42,12 @@ export default function CopySandboxPanel({
     );
 
     useEffect(() => {
-        if (copy.pending) start();
-        else stop();
+        if (copy.pending) {
+            start();
+        } else {
+            stop();
+        }
+
         return stop;
     }, [copy.pending, start, stop]);
 

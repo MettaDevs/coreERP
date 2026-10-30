@@ -21,12 +21,12 @@ import {
 import Shell from '@/components/shell';
 import { labelFor, operationLabels, resultLabels } from '@/lib/display';
 import ClientServerPanel from '@/pages/environments/client-server-panel';
-import CopySandboxPanel from '@/pages/environments/copy-sandbox-panel';
-import type { CopyState } from '@/pages/environments/copy-sandbox-panel';
 import type {
     InstallCommand,
     ServerClient,
 } from '@/pages/environments/client-server-panel';
+import CopySandboxPanel from '@/pages/environments/copy-sandbox-panel';
+import type { CopyState } from '@/pages/environments/copy-sandbox-panel';
 
 type Environment = {
     id: string;
