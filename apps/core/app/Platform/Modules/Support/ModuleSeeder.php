@@ -7,6 +7,7 @@ namespace App\Platform\Modules\Support;
 use App\Platform\Modules\Models\ModuleInstallation;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Mengisi data awal sebuah module untuk satu tenant, tepat sekali seumur pemasangan.
@@ -29,40 +30,43 @@ final class ModuleSeeder
      */
     public function run(ModuleManifest $module, string $tenantId): bool
     {
-        $installation = ModuleInstallation::query()
-            ->where('tenant_id', $tenantId)
-            ->where('module_id', $module->id)
-            ->first();
+        return DB::transaction(function () use ($module, $tenantId): bool {
+            $installation = ModuleInstallation::query()
+                ->where('tenant_id', $tenantId)
+                ->where('module_id', $module->id)
+                ->lockForUpdate()
+                ->first();
 
-        if ($installation === null || $installation->isSeeded()) {
-            return false;
-        }
-
-        $class = $this->seederClass($module);
-
-        // Tenant aktif dipasang selama seed berjalan supaya model module tersaring seperti
-        // biasa. Tanpa ini, TenantScope membatalkan setiap query — dan memang harus begitu.
-        $previous = $this->container->bound(TenantScope::KEY) ? $this->container->make(TenantScope::KEY) : null;
-        $this->container->instance(TenantScope::KEY, $tenantId);
-
-        try {
-            foreach ($class as $name) {
-                /** @var Seeder $seeder */
-                $seeder = $this->container->make($name);
-                $seeder->setContainer($this->container)->__invoke();
+            if ($installation === null || $installation->isSeeded()) {
+                return false;
             }
-        } finally {
-            if (is_string($previous)) {
-                $this->container->instance(TenantScope::KEY, $previous);
+
+            $class = $this->seederClass($module);
+
+            // Tenant aktif dipasang selama seed berjalan supaya model module tersaring seperti
+            // biasa. Tanpa ini, TenantScope membatalkan setiap query — dan memang harus begitu.
+            $previous = $this->container->bound(TenantScope::KEY) ? $this->container->make(TenantScope::KEY) : null;
+            $this->container->instance(TenantScope::KEY, $tenantId);
+
+            try {
+                foreach ($class as $name) {
+                    /** @var Seeder $seeder */
+                    $seeder = $this->container->make($name);
+                    $seeder->setContainer($this->container)->__invoke();
+                }
+            } finally {
+                if (is_string($previous)) {
+                    $this->container->instance(TenantScope::KEY, $previous);
+                }
             }
-        }
 
-        ModuleInstallation::query()
-            ->where('tenant_id', $tenantId)
-            ->where('module_id', $module->id)
-            ->update(['seeded_at' => now(), 'updated_at' => now()]);
+            ModuleInstallation::query()
+                ->where('tenant_id', $tenantId)
+                ->where('module_id', $module->id)
+                ->update(['seeded_at' => now(), 'updated_at' => now()]);
 
-        return true;
+            return true;
+        });
     }
 
     /**

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Platform\Modules\Support;
 
 use App\Platform\ChangeLog\Support\ChangeLogSwitch;
+use Closure;
+use Illuminate\Database\Connection;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Filesystem\Filesystem;
@@ -35,19 +37,55 @@ final class ModuleMigrator
      */
     public function migrate(ModuleManifest $module, ?string $connection = null): array
     {
+        $database = $this->database->connection($connection);
+
         $migrator = $this->migrator($module, $connection);
 
         if (! $migrator->repositoryExists()) {
-            $migrator->getRepository()->createRepository();
+            // Riwayat dipakai semua module; lock ini diambil sebelum lock module agar urutannya tetap.
+            $this->withLock($database, 'module-migration-repository', function () use ($module, $connection): void {
+                $repository = $this->migrator($module, $connection)->getRepository();
+
+                if (! $repository->repositoryExists()) {
+                    $repository->createRepository();
+                }
+            });
         }
 
-        $before = $migrator->getRepository()->getRan();
-        // Migrator ini dibuat tanpa dispatcher, jadi event migrasi yang mematikan log di migrate Core tidak
-        // menyala di sini; log perubahan dimatikan langsung.
-        ChangeLogSwitch::pausedOn($connection, fn () => $migrator->run([$module->migrationFolder()]));
-        $after = $migrator->getRepository()->getRan();
+        return $this->withLock($database, 'module-migrations:'.$module->id, function () use ($module, $connection, $migrator): array {
+            $before = $migrator->getRepository()->getRan();
+            // Migrator ini dibuat tanpa dispatcher, jadi event migrasi yang mematikan log di migrate Core tidak
+            // menyala di sini; log perubahan dimatikan langsung.
+            ChangeLogSwitch::pausedOn($connection, fn () => $migrator->run([$module->migrationFolder()]));
+            $after = $migrator->getRepository()->getRan();
 
-        return array_values(array_diff($after, $before));
+            return array_values(array_diff($after, $before));
+        });
+    }
+
+    /**
+     * Lock PostgreSQL terpisah per database. Jangan sertakan tenant: schema module dipakai bersama.
+     * Transaksi pemanggil belum tentu sudah commit saat migrate() kembali, jadi lock-nya ikut transaksi itu.
+     * Di luar transaksi, lock sesi mempertahankan transaksi per migration dan selalu dilepas saat gagal.
+     *
+     * @template T
+     *
+     * @param  Closure(): T  $callback
+     * @return T
+     */
+    private function withLock(Connection $database, string $key, Closure $callback): mixed
+    {
+        $transactional = $database->transactionLevel() > 0;
+        $lock = $transactional ? 'pg_advisory_xact_lock' : 'pg_advisory_lock';
+        $database->select('select '.$lock.'(hashtextextended(?, 0))', [$key]);
+
+        try {
+            return $callback();
+        } finally {
+            if (! $transactional) {
+                $database->select('select pg_advisory_unlock(hashtextextended(?, 0))', [$key]);
+            }
+        }
     }
 
     /**
