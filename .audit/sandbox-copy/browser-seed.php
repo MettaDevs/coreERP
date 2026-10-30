@@ -16,6 +16,7 @@ $app = require getcwd().'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 $location = DB::selectOne('select current_database() as db, current_schema() as schema');
 if ($location->db !== 'core_erp_test' || $location->schema !== 'coreerp_test') throw new RuntimeException('Browser fixture may only use isolated CI database');
+if (Artisan::call('migrate', ['--database' => (string) config('database.default'), '--force' => true]) !== 0) throw new RuntimeException(Artisan::output());
 $slug = 'browser-'.strtolower((string) Str::ulid());
 $operator = User::create(['name' => 'Operator browser', 'email' => $slug.'@example.test', 'password' => bcrypt((string) getenv('COPY_BROWSER_PASSWORD'))]);
 DB::table('provider_access')->insert(['user_id' => $operator->id, 'role' => 'provider_admin', 'created_at' => now(), 'updated_at' => now()]);
