@@ -87,8 +87,27 @@ class CopyEnvironmentTest extends TestCase
         Http::fake(['*' => Http::response([], 503)]);
         $source = $this->source();
         $target = $this->target($source, 'degraded');
+        DB::table('core_module_installations')->insert([
+            'tenant_id' => $source->tenant_id, 'module_id' => 'central-fixture', 'version' => '1.0.0',
+            'status' => 'installed', 'installed_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
         $this->actingAs($this->operator())->get('/lingkungan/'.$target->id)->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->component('environments/show')->where('canProvision', false)->where('copyState.canRequest', true)->where('copyState.sourceId', $source->id)->where('copyState.targetId', $target->id));
+            ->component('environments/show')->where('modules', [])->where('canProvision', false)->where('copyState.canRequest', true)->where('copyState.sourceId', $source->id)->where('copyState.targetId', $target->id));
+    }
+
+    public function test_a_running_cli_retry_is_shown_as_running_even_if_the_target_was_degraded(): void
+    {
+        Http::fake(['*' => Http::response([], 503)]);
+        $source = $this->source();
+        $target = $this->target($source, 'degraded');
+        DB::table('environment_operations')->insert([
+            'id' => (string) Str::ulid(), 'environment_id' => $target->id,
+            'source_environment_id' => $source->id, 'operation' => 'copy', 'status' => 'running',
+            'step' => 'restore', 'started_at' => now(), 'lease_until' => now()->addMinutes(30),
+        ]);
+        $this->actingAs($this->operator())->get('/lingkungan/'.$target->id)->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('environments/show')->where('canProvision', false)->where('copyState.canRequest', false)
+            ->where('copyState.pending', true)->where('copyState.status', 'Sedang menyalin'));
     }
 
     public function test_active_sandbox_is_visible_but_never_offered_for_overwrite(): void

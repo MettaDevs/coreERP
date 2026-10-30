@@ -13,8 +13,8 @@ import {
 import { FormControl } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
 import { Spinner } from '@apperp/ui/spinner';
-import { Link, useForm, usePage, usePoll } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
+import { Link, router, useForm, usePage, usePoll } from '@inertiajs/react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 
 export type CopyState = {
@@ -36,6 +36,7 @@ export default function CopySandboxPanel({
 }) {
     const [open, setOpen] = useState(false);
     const form = useForm({ name: copy.name });
+    const wasPending = useRef(copy.pending);
     const copyError = usePage().props.errors.copy;
     const { start, stop } = usePoll(
         3000,
@@ -48,7 +49,15 @@ export default function CopySandboxPanel({
             start();
         } else {
             stop();
+
+            if (wasPending.current) {
+                router.reload({
+                    only: ['modules', 'modulesError', 'installedRelease'],
+                });
+            }
         }
+
+        wasPending.current = copy.pending;
 
         return stop;
     }, [copy.pending, start, stop]);
