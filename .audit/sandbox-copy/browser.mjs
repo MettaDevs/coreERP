@@ -22,6 +22,7 @@ try {
     await page.screenshot({ path: path.join(out, 'production-copy-button.png'), fullPage: true });
     await panel.getByRole('button', { name: 'Buat sandbox dari production', exact: true }).click();
     const dialog = page.getByRole('dialog');
+    await page.screenshot({ path: path.join(out, 'copy-dialog-clean.png') });
     await dialog.getByRole('button', { name: 'Buat sandbox', exact: true }).click();
     await dialog.getByText(/Isi nama sandbox/).first().waitFor();
     await dialog.getByLabel('Nama sandbox', { exact: true }).fill('Sandbox uji browser');
@@ -30,11 +31,13 @@ try {
     await page.waitForURL(url => url.pathname.startsWith('/lingkungan/') && !url.pathname.endsWith(fixture.source_id));
     const targetId = new URL(page.url()).pathname.split('/').pop();
     await page.getByRole('region', { name: 'Salin production menjadi sandbox' }).getByText('Menunggu giliran', { exact: true }).waitFor();
+    await page.getByText('Daftar aplikasi akan tersedia setelah penyalinan selesai.', { exact: true }).waitFor();
     await page.screenshot({ path: path.join(out, 'sandbox-queued.png'), fullPage: true });
     const stdout = fs.openSync(path.join(out, 'worker.log'), 'w');
     worker = spawn('php', ['artisan', 'queue:work', '--once', '--tries=1', '--no-interaction'], { cwd: path.join(process.env.GITHUB_WORKSPACE, 'apps/core'), env: process.env, stdio: ['ignore', stdout, stdout] });
     fs.closeSync(stdout);
     await page.getByRole('region', { name: 'Salin production menjadi sandbox' }).getByText('Sandbox aktif', { exact: true }).waitFor({ timeout: 180000 });
+    await page.getByText('Belum ada aplikasi yang terpasang di lingkungan ini.', { exact: true }).waitFor();
     await page.screenshot({ path: path.join(out, 'sandbox-active.png'), fullPage: true });
     if (worker.exitCode === null) {
         await new Promise((resolve, reject) => {
