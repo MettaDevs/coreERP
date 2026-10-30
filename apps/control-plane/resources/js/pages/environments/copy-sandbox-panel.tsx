@@ -3,6 +3,8 @@ import { Button } from '@apperp/ui/button';
 import {
     Dialog,
     DialogContent,
+    DialogBody,
+    DialogAction,
     DialogHeader,
     DialogTitle,
     DialogDescription,
@@ -99,7 +101,7 @@ export default function CopySandboxPanel({
                 )}
             </div>
             <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent>
+                <DialogContent size="compact">
                     <DialogHeader>
                         <DialogTitle>
                             {copy.targetId
@@ -113,25 +115,38 @@ export default function CopySandboxPanel({
                             riwayat.
                         </DialogDescription>
                     </DialogHeader>
-                    <form noValidate onSubmit={submit} className="space-y-4">
-                        <FormErrorHeader
-                            message={copyError ?? form.errors.name}
-                            operation="Sandbox belum dapat diantrekan"
-                        />
-                        <FormControl error={form.errors.name}>
-                            <Input
-                                id="copy-sandbox-name"
-                                label="Nama sandbox"
-                                value={form.data.name}
-                                onChange={(event) =>
-                                    form.setData('name', event.target.value)
-                                }
-                                readOnly={copy.targetId !== null}
-                                required
-                                maxLength={100}
+                    <form noValidate onSubmit={submit}>
+                        <DialogBody className="space-y-4">
+                            <FormErrorHeader
+                                message={copyError ?? form.errors.name}
+                                operation="Sandbox belum dapat diantrekan"
                             />
-                        </FormControl>
+                            <FormControl error={form.errors.name}>
+                                <Input
+                                    id="copy-sandbox-name"
+                                    label="Nama sandbox"
+                                    value={form.data.name}
+                                    onChange={(event) =>
+                                        form.setData('name', event.target.value)
+                                    }
+                                    readOnly={copy.targetId !== null}
+                                    required
+                                    maxLength={100}
+                                />
+                            </FormControl>
+                        </DialogBody>
                         <DialogFooter>
+                            <DialogAction
+                                type="submit"
+                                disabled={form.processing}
+                            >
+                                {form.processing && <Spinner />}
+                                {form.processing
+                                    ? 'Mengantrekan…'
+                                    : copy.targetId
+                                      ? 'Lanjutkan penyalinan'
+                                      : 'Buat sandbox'}
+                            </DialogAction>
                             <Button
                                 type="button"
                                 variant="ghost"
@@ -139,14 +154,6 @@ export default function CopySandboxPanel({
                                 disabled={form.processing}
                             >
                                 Batal
-                            </Button>
-                            <Button type="submit" disabled={form.processing}>
-                                {form.processing && <Spinner />}
-                                {form.processing
-                                    ? 'Mengantrekan…'
-                                    : copy.targetId
-                                      ? 'Lanjutkan penyalinan'
-                                      : 'Buat sandbox'}
                             </Button>
                         </DialogFooter>
                     </form>
