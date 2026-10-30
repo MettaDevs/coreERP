@@ -1217,7 +1217,7 @@ final class CopyEnvironment extends Command
                 ->whereNotNull('detail->snapshot_module_count')
                 ->orderByDesc('id')
                 ->first(['detail']);
-            $value = $previous?->detail['snapshot_module_count'] ?? null;
+            $value = $previous->detail['snapshot_module_count'] ?? null;
 
             if (is_int($value)) {
                 $expected = $value;
