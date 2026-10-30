@@ -60,6 +60,7 @@ final class Item extends Model
         ];
     }
 
+    /** @return BelongsTo<UnitOfMeasure, $this> */
     public function unitOfMeasure(): BelongsTo
     {
         return $this->belongsTo(UnitOfMeasure::class, 'unit_of_measure_id');

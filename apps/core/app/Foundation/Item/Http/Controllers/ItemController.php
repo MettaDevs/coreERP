@@ -59,9 +59,11 @@ final class ItemController extends Controller
             defaultDirection: 'asc',
         );
 
+        /** @var list<string> $uomIds */
         $uomIds = collect($batch['data'])
             ->pluck('unit_of_measure_id')
             ->filter()
+            ->map(fn (mixed $id): string => (string) $id)
             ->unique()
             ->values()
             ->all();
