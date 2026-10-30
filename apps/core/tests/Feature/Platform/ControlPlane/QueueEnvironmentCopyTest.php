@@ -135,6 +135,27 @@ class QueueEnvironmentCopyTest extends TestCase
         $this->assertSame('active', $target->refresh()->status);
     }
 
+    public function test_rejection_before_operation_start_keeps_the_real_reason_in_history(): void
+    {
+        $source = $this->source();
+        $target = $this->sandbox($source, 'copying');
+        $job = new CopyEnvironmentJob($source->id, $target->id, $target->name, $this->operator->id);
+        $source->update(['status' => 'maintenance']);
+
+        try {
+            $job->handle();
+            $this->fail('Sumber yang tidak lagi aktif harus ditolak.');
+        } catch (RuntimeException $error) {
+            $this->assertStringContainsString('Hanya yang aktif', $error->getMessage());
+            $job->failed($error);
+        }
+
+        $operation = EnvironmentOperation::query()->where('environment_id', $target->id)->sole();
+        $this->assertSame('failed', $operation->status);
+        $this->assertStringContainsString('Hanya yang aktif', $operation->failure_message);
+        $this->assertSame('degraded', $target->refresh()->status);
+    }
+
     public function test_overlap_middleware_blocks_a_second_worker_and_allows_it_after_release(): void
     {
         $source = $this->source();

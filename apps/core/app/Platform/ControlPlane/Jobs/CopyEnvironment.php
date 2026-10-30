@@ -74,13 +74,17 @@ final class CopyEnvironment implements ShouldBeUnique, ShouldQueue
             '--name' => $this->name,
             '--requested-by' => $this->requestedBy,
         ]) !== 0) {
-            throw new RuntimeException('Penyalinan berhenti. Periksa riwayat lingkungan sebelum melanjutkan.');
+            $recorded = EnvironmentOperation::query()->where('environment_id', $this->targetId)
+                ->where('operation', 'copy')->where('started_at', '>=', Carbon::parse($this->queuedAt))->exists();
+            $reason = ! $recorded ? trim(Artisan::output()) : '';
+
+            throw new RuntimeException($reason !== '' ? mb_substr($reason, 0, 2000) : 'Penyalinan berhenti. Periksa riwayat lingkungan sebelum melanjutkan.');
         }
     }
 
     public function failed(?Throwable $error): void
     {
-        DB::transaction(function (): void {
+        DB::transaction(function () use ($error): void {
             $target = Environment::query()->whereKey($this->targetId)->whereNull('deleted_at')->lockForUpdate()->first();
 
             if (! $target instanceof Environment || $target->status === 'active' || $target->source_environment_id !== $this->sourceId) {
@@ -94,11 +98,13 @@ final class CopyEnvironment implements ShouldBeUnique, ShouldQueue
                 return;
             }
 
+            $reason = trim($error?->getMessage() ?? '');
+
             EnvironmentOperation::query()->create([
                 'environment_id' => $target->id, 'source_environment_id' => $this->sourceId,
                 'operation' => 'copy', 'status' => 'failed', 'step' => 'antre',
                 'requested_by' => $this->requestedBy, 'started_at' => now(), 'finished_at' => now(),
-                'failure_message' => 'Penyalinan tidak sempat dimulai. Periksa keadaan sumber lalu lanjutkan penyalinan.',
+                'failure_message' => $reason !== '' ? mb_substr($reason, 0, 2000) : 'Penyalinan tidak sempat dimulai. Periksa keadaan sumber lalu lanjutkan penyalinan.',
             ]);
             $target->update(['status' => 'degraded']);
         });
