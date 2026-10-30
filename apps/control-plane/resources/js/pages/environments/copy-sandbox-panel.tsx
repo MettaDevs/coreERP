@@ -60,7 +60,10 @@ export default function CopySandboxPanel({
     }
 
     return (
-        <section className="space-y-3 rounded-md border px-4 py-3 text-sm">
+        <section
+            aria-label="Salin production menjadi sandbox"
+            className="space-y-3 rounded-md border px-4 py-3 text-sm"
+        >
             <div className="flex flex-wrap items-center gap-2 font-medium">
                 {copy.pending && <Spinner />}
                 {copy.status}

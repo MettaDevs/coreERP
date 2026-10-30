@@ -25,6 +25,13 @@ final class EnvironmentCopyController extends Controller
         $input = $request->validate([
             'name' => ['required', 'string', 'max:100'],
             'requested_by' => ['required', 'integer', 'exists:users,id'],
+        ], [
+            'name.required' => 'Isi nama sandbox.',
+            'name.string' => 'Nama sandbox harus berupa teks.',
+            'name.max' => 'Nama sandbox paling panjang 100 karakter.',
+            'requested_by.required' => 'Identitas operator harus disertakan.',
+            'requested_by.integer' => 'Identitas operator tidak valid.',
+            'requested_by.exists' => 'Akun operator sudah tidak tersedia.',
         ]);
         $slug = Str::slug($input['name']);
         abort_if($slug === '' || mb_strlen($slug) > 120, 422, 'Nama sandbox harus berisi huruf atau angka.');
