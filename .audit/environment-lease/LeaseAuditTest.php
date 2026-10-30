@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Audit;
 
 use App\Platform\ControlPlane\Console\Concerns\HoldsEnvironmentOperation;
+use App\Platform\ControlPlane\Console\CopyEnvironment;
 use App\Platform\ControlPlane\Console\ProvisionEnvironment;
 use App\Platform\ControlPlane\Models\Client;
 use App\Platform\Environment\Models\Environment;
@@ -100,19 +101,48 @@ final class LeaseAuditTest extends TestCase
 
     public function test_a_renewal_after_the_expiry_read_prevents_takeover(): void
     {
-        $environment = $this->fixture();
-        $old = $this->operation($environment, true);
+        $source = $this->fixture();
+        $source->update(['status' => 'active']);
+        $environment = Environment::create([
+            'tenant_id' => $source->tenant_id,
+            'kind' => 'sandbox',
+            'name' => 'Audit copy',
+            'slug' => 'audit-copy',
+            'source_environment_id' => $source->id,
+            'status' => 'copying',
+            'outbound_allowed' => false,
+        ]);
+        $old = EnvironmentOperation::create([
+            'environment_id' => $environment->id,
+            'source_environment_id' => $source->id,
+            'operation' => 'copy',
+            'status' => 'running',
+            'step' => 'restore',
+            'started_at' => now()->subMinutes(35),
+            'lease_until' => now()->subMinute(),
+        ]);
+        $copy = $this->app->make(CopyEnvironment::class);
+        (new \ReflectionProperty(CopyEnvironment::class, 'operation'))->setValue($copy, $old);
         $renewed = false;
-        DB::listen(function (QueryExecuted $query) use ($old, &$renewed): void {
+        $futureLeaseWritten = false;
+        DB::listen(function (QueryExecuted $query) use ($old, $copy, &$renewed, &$futureLeaseWritten): void {
             if (! $renewed && str_starts_with($query->sql, 'select') && str_contains($query->sql, '"environment_operations"') && str_contains($query->sql, '"lease_until" <')) {
                 $renewed = true;
-                EnvironmentOperation::query()->whereKey($old->id)->update(['lease_until' => now()->addMinutes(30)]);
+                (new ReflectionMethod(CopyEnvironment::class, 'renewLease'))->invoke($copy);
+                $futureLeaseWritten = $old->fresh()->lease_until->isFuture();
             }
         });
         $taken = $this->probe()->reclaim($environment);
         $old->refresh();
-        $this->proof('lease-renewal-race', ['renewal_happened_after_select' => $renewed, 'taken_over' => $taken, 'status_after' => $old->status, 'lease_after' => $old->lease_until]);
+        $this->proof('lease-renewal-race', [
+            'renewal_happened_after_select' => $renewed,
+            'real_copy_heartbeat_wrote_future_lease' => $futureLeaseWritten,
+            'taken_over' => $taken,
+            'status_after' => $old->status,
+            'lease_after' => $old->lease_until,
+        ]);
         $this->assertTrue($renewed, 'Hook tidak mencapai SELECT lease kedaluwarsa.');
+        $this->assertTrue($futureLeaseWritten, 'Heartbeat copy tidak menulis lease yang masih hidup.');
         $this->assertFalse($taken, 'Lease yang sudah diperpanjang sebelum UPDATE tetap direbut.');
         $this->assertSame('running', $old->status);
     }
