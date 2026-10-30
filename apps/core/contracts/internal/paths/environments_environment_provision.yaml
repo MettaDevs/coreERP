@@ -22,6 +22,9 @@ post:
     kedua yang datang selagi yang pertama masih berjalan ditolak oleh kunci operasinya,
     bukan dilayani sebagai penyiapan kedua di atas yang pertama.
 
+    Target yang berasal dari salinan (source_environment_id terisi) ditolak dengan 409.
+    Recovery copy wajib memakai jalur copy supaya pelucutan dan pemeriksaan salinan tidak dilewati.
+
     Balasannya tanpa envelope `data`, dengan alasan yang sama seperti `/tenants`.
   security:
     - controlPlaneToken: []

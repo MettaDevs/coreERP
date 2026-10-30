@@ -11,16 +11,21 @@ use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Models\EnvironmentOperation;
 use App\Platform\Environment\Support\ActiveEnvironment;
 use App\Platform\Environment\Support\OutboundRefused;
+use App\Platform\Identity\Models\User;
+use App\Platform\Modules\Actions\InstallModule;
 use App\Platform\Tenant\Models\Tenant;
 use Illuminate\Console\Command;
 use Illuminate\Database\Connection;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Group;
+use RuntimeException;
 use Tests\Concerns\DropsTestDatabases;
 use Tests\TestCase;
 
@@ -676,5 +681,99 @@ class CopyEnvironmentTest extends TestCase
         }
 
         DB::purge('test_maintenance');
+    }
+
+    /** @return array{Environment, Environment, Connection, array{event:string,ekspor:string,reservasi:string,modul:int}} */
+    private function partialCopy(string $table): array
+    {
+        $source = $this->realProduction();
+        $seed = $this->seedSource($source);
+        $injected = false;
+        DB::listen(function (QueryExecuted $query) use ($table, &$injected): void {
+            if (! $injected && $query->connectionName === 'environment_copy' && str_starts_with($query->sql, 'update "'.$table.'"')) {
+                $injected = true;
+                throw new RuntimeException('Audit: proses terputus setelah sebagian pelucutan tersimpan.');
+            }
+        });
+        $exit = $this->artisan('environment:copy', ['source' => $source->id, '--name' => 'Kotak Uji'])->run();
+        $sandbox = $this->lastSandbox();
+        $copy = $this->connectionTo(ProvisionEnvironment::databaseName($sandbox), 'test_copy');
+        $this->assertTrue($injected, 'Kegagalan harus terjadi setelah SQL pelucutan pada database salinan asli.');
+        $this->assertSame(Command::FAILURE, $exit);
+        $this->assertSame('degraded', $sandbox->status);
+        $this->assertTrue($copy->getSchemaBuilder()->hasTable('migrations'));
+
+        return [$source, $sandbox, $copy, $seed];
+    }
+
+    public function test_partial_pool_release_is_safe_to_retry(): void
+    {
+        [$source, $sandbox, $copy, $seed] = $this->partialCopy('number_sequence_continuous_pool');
+        $this->assertSame('available', $copy->table('number_sequence_continuous_pool')->value('status'));
+        $this->assertSame('reserved', $copy->table('number_sequence_reservations')->where('id', $seed['reservasi'])->value('status'));
+        $this->assertCopySucceeded($source);
+        $after = [
+            'sandbox_status' => $sandbox->refresh()->status,
+            'pending_events' => $copy->table('outbox_events')->whereNull('published_at')->count(),
+            'jobs' => $copy->table('jobs')->count(),
+            'credentials' => $copy->table('app_service_credentials')->count(),
+            'outbound_registry' => $copy->table('environments')->where('outbound_allowed', true)->count(),
+            'reservation_status' => $copy->table('number_sequence_reservations')->where('id', $seed['reservasi'])->value('status'),
+            'pool_status' => $copy->table('number_sequence_continuous_pool')->value('status'),
+        ];
+
+        $this->assertSame('active', $after['sandbox_status']);
+        foreach (['pending_events', 'jobs', 'credentials', 'outbound_registry'] as $key) {
+            $this->assertSame(0, $after[$key]);
+        }
+        $this->assertSame('cancelled', $after['reservation_status']);
+        $this->assertSame('available', $after['pool_status']);
+        $production = $this->connectionTo((string) $source->database_name, 'test_source');
+        $this->assertSame('reserved', $production->table('number_sequence_reservations')->where('id', $seed['reservasi'])->value('status'));
+        $this->assertSame(1, $production->table('jobs')->count());
+    }
+
+    public function test_retry_checks_the_restored_snapshot_not_the_later_live_source(): void
+    {
+        [$source, $sandbox, $copy] = $this->partialCopy('outbox_events');
+        $snapshotCount = $copy->table('core_module_installations')->count();
+        $this->app->make(InstallModule::class)->handle('contoh-a', $source->tenant_id, $source);
+        $production = $this->connectionTo((string) $source->database_name, 'test_source');
+        $liveCount = $production->table('core_module_installations')->count();
+        $this->assertGreaterThan($snapshotCount, $liveCount, 'Operasi pemasangan nyata harus mengubah jumlah module di sumber sesudah snapshot.');
+        $exit = $this->artisan('environment:copy', ['source' => $source->id, '--name' => 'Kotak Uji'])->run();
+
+        $this->assertSame(Command::SUCCESS, $exit, 'Salinan snapshot yang lengkap ditolak karena sumber berubah setelah restore pertama.');
+    }
+
+    public function test_prepare_api_refuses_a_partially_disarmed_copy(): void
+    {
+        [$source, $sandbox, $copy] = $this->partialCopy('outbox_events');
+        config()->set('coreerp.control_plane_token', 'audit-copy-provision-token');
+        $response = $this->withToken('audit-copy-provision-token')->postJson('/api/internal/v1/environments/'.$sandbox->id.'/provision');
+        $response->assertStatus(409);
+        $sandbox->refresh();
+        $this->assertSame('degraded', $sandbox->status);
+        $danger = [
+            'jobs' => $copy->table('jobs')->count(),
+            'credentials' => $copy->table('app_service_credentials')->count(),
+            'outbound_registry' => $copy->table('environments')->where('outbound_allowed', true)->count(),
+        ];
+
+        $this->assertGreaterThan(0, array_sum($danger), 'Penolakan harus terjadi sebelum copy yang gagal diubah.');
+        $operator = User::create([
+            'name' => 'Operator copy uji', 'email' => Str::ulid().'@example.test', 'password' => bcrypt('test'),
+        ]);
+        Queue::fake();
+        $this->withToken('audit-copy-provision-token')->postJson('/api/internal/v1/environments/'.$source->id.'/copy', [
+            'name' => $sandbox->name, 'requested_by' => $operator->id,
+        ])->assertAccepted()->assertJsonPath('target_environment_id', $sandbox->id);
+        $job = Queue::pushed(\App\Platform\ControlPlane\Jobs\CopyEnvironment::class)->first();
+        $this->assertInstanceOf(\App\Platform\ControlPlane\Jobs\CopyEnvironment::class, $job);
+        $job->handle();
+        $this->assertSame('active', $sandbox->refresh()->status);
+        $this->assertSame(0, $copy->table('jobs')->count());
+        $this->assertSame(0, $copy->table('app_service_credentials')->count());
+        $this->assertSame(0, $copy->table('environments')->where('outbound_allowed', true)->count());
     }
 }

@@ -33,6 +33,7 @@ use Illuminate\Support\Carbon;
  * @property string $kind
  * @property string $name
  * @property string $slug
+ * @property ?string $source_environment_id
  * @property ?string $database_name
  * @property string $status
  * @property string $hosting

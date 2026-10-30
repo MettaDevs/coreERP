@@ -637,6 +637,9 @@ paths:
         kedua yang datang selagi yang pertama masih berjalan ditolak oleh kunci operasinya,
         bukan dilayani sebagai penyiapan kedua di atas yang pertama.
 
+        Target yang berasal dari salinan (source_environment_id terisi) ditolak dengan 409.
+        Recovery copy wajib memakai jalur copy supaya pelucutan dan pemeriksaan salinan tidak dilewati.
+
         Balasannya tanpa envelope `data`, dengan alasan yang sama seperti `/tenants`.
       security:
       - controlPlaneToken: []
@@ -753,6 +756,90 @@ paths:
                 $ref: '#/components/schemas/Error'
         '429':
           $ref: '#/components/responses/RateLimited'
+  /environments/{environment}/copy:
+    post:
+      tags:
+      - Pusat admin
+      operationId: internal.environments.copy
+      summary: Antrekan salinan production menjadi sandbox atau lanjutkan copy yang gagal
+      description: |
+        Hanya untuk operator admin.erp melalui token pusat admin. Sumber harus production aktif
+        di server kita dengan database sendiri. Sasaran selalu sandbox tenant yang sama.
+        Sandbox aktif, sandbox lain, server klien dan database bersama tidak ditimpa/disalin.
+        Nama yang sama hanya melanjutkan target copying/degraded dari sumber yang sama.
+        Registry dan audit permintaan ditulis dalam satu transaksi. Respons 202 berarti diantrekan,
+        bukan selesai. Worker menjalankan restore, pelucutan, migration dan pemeriksaan salinan
+        sebelum active. Retry memakai snapshot yang sudah direstore, termasuk acuan jumlah module.
+        Reservasi unik per sumber mencegah job ganda dari klik ulang; WithoutOverlapping mencegah
+        worker bertabrakan ketika visibility timeout antrean lebih pendek dari durasi copy.
+        Status dan riwayat operasi dibaca dari registry pusat. Tidak tersedia untuk pengguna tenant.
+      security:
+      - controlPlaneToken: []
+      parameters:
+      - name: environment
+        in: path
+        required: true
+        schema:
+          type: string
+          format: ulid
+        description: Id production sumber.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - name
+              - requested_by
+              properties:
+                name:
+                  type: string
+                  maxLength: 100
+                requested_by:
+                  type: integer
+                  description: Id operator pada users pusat.
+      responses:
+        '202':
+          description: Copy diantrekan atau permintaan yang sama sudah mengantre.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - source_environment_id
+                - target_environment_id
+                - tenant_id
+                - status
+                - queued
+                properties:
+                  source_environment_id:
+                    type: string
+                    format: ulid
+                  target_environment_id:
+                    type: string
+                    format: ulid
+                  tenant_id:
+                    type: string
+                    format: ulid
+                  status:
+                    type: string
+                    enum:
+                    - copying
+                    - degraded
+                  queued:
+                    type: boolean
+                    const: true
+        '401':
+          description: Token pusat admin tidak sah.
+        '404':
+          description: Sumber tidak ditemukan atau sudah dihapus lunak.
+        '409':
+          description: Keadaan sumber/sasaran atau nama tidak mengizinkan copy.
+        '422':
+          description: Nama atau operator tidak valid.
+        '503':
+          description: Antrean latar belum tersedia.
   /fleet:
     get:
       tags:

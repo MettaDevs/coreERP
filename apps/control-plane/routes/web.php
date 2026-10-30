@@ -6,6 +6,7 @@ use ControlPlane\Http\Controllers\Account;
 use ControlPlane\Http\Controllers\Customers\Index as CustomerIndex;
 use ControlPlane\Http\Controllers\Customers\Store as CustomerStore;
 use ControlPlane\Http\Controllers\Environments\ClientServer;
+use ControlPlane\Http\Controllers\Environments\Copy as EnvironmentCopy;
 use ControlPlane\Http\Controllers\Environments\Index as EnvironmentIndex;
 use ControlPlane\Http\Controllers\Environments\Provision as EnvironmentProvision;
 use ControlPlane\Http\Controllers\Environments\Show as EnvironmentShow;
@@ -84,6 +85,7 @@ Route::middleware(['auth', 'operator'])->group(function (): void {
     Route::post('/lingkungan', EnvironmentStore::class)->name('environments.store');
     Route::get('/lingkungan/{lingkungan}', EnvironmentShow::class)->name('environments.show');
     Route::post('/lingkungan/{lingkungan}/siapkan', EnvironmentProvision::class)->name('environments.provision');
+    Route::post('/lingkungan/{lingkungan}/salin', EnvironmentCopy::class)->name('environments.copy');
 
     /*
      * Panel "Server klien" di halaman lingkungan produksi yang berjalan di server klien — lihat
