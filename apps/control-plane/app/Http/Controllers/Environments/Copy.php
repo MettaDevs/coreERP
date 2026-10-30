@@ -16,7 +16,11 @@ final class Copy extends Controller
 {
     public function __invoke(Request $request, string $environment, CopyViaCore $copy): RedirectResponse
     {
-        $input = $request->validate(['name' => ['required', 'string', 'max:100']]);
+        $input = $request->validate(['name' => ['required', 'string', 'max:100']], [
+            'name.required' => 'Isi nama sandbox.',
+            'name.string' => 'Nama sandbox harus berupa teks.',
+            'name.max' => 'Nama sandbox paling panjang 100 karakter.',
+        ]);
         $operator = $request->user();
         abort_unless($operator instanceof User, 403);
         $source = Environment::query()->whereKey($environment)->whereNull('deleted_at')->firstOrFail();
