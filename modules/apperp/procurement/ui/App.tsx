@@ -138,7 +138,7 @@ export default function App({
         case 'item-jasa':
             return <ServiceItemPage permissions={permissions} />;
         case 'item-subkont':
-            return <SubcontractItemPage />;
+            return <SubcontractItemPage permissions={permissions} />;
 
         // Manajemen Pengadaan (Transaksi)
         case 'permintaan-pembelian':
