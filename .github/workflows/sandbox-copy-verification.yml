@@ -72,6 +72,60 @@ jobs:
         run: php vendor/phpunit/phpunit/phpunit tests/Feature/Platform/ControlPlane/QueueEnvironmentCopyTest.php
       - name: Real copy and failure-retry regression tests
         run: php vendor/phpunit/phpunit/phpunit tests/Feature/Platform/ControlPlane/CopyEnvironmentTest.php
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with: { node-version: '22' }
+      - name: Prepare browser environment
+        working-directory: .
+        run: |
+          password=$(openssl rand -hex 24)
+          token=$(openssl rand -hex 32)
+          echo "::add-mask::$password"
+          echo "::add-mask::$token"
+          echo "COPY_BROWSER_PASSWORD=$password" >> "$GITHUB_ENV"
+          echo "COREERP_CONTROL_PLANE_TOKEN=$token" >> "$GITHUB_ENV"
+          echo "CONTROL_PLANE_TOKEN=$token" >> "$GITHUB_ENV"
+          echo "COREERP_URL=http://127.0.0.1:8124" >> "$GITHUB_ENV"
+          echo "DB_CONNECTION=pgsql_test" >> "$GITHUB_ENV"
+          echo "APP_ENV=local" >> "$GITHUB_ENV"
+          echo "CACHE_STORE=file" >> "$GITHUB_ENV"
+          echo "SESSION_DRIVER=file" >> "$GITHUB_ENV"
+          echo "SESSION_SECURE_COOKIE=false" >> "$GITHUB_ENV"
+          echo "CONSOLE_PASSWORD_LOGIN=true" >> "$GITHUB_ENV"
+          echo "AUDIT_BROWSER_DIR=$RUNNER_TEMP/copy-browser" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/copy-browser" "$RUNNER_TEMP/browser"
+          npm ci
+          NODE_OPTIONS=--max-old-space-size=3072 npm run build --workspace @coreerp/control-plane
+          cd apps/control-plane
+          composer install --no-interaction --prefer-dist --optimize-autoloader
+          cp .env.example .env
+          php artisan key:generate
+      - name: Install ephemeral browser and seed fixture
+        working-directory: .
+        run: |
+          npm install --prefix "$RUNNER_TEMP/browser" --no-audit --no-fund playwright@1.64.1
+          node "$RUNNER_TEMP/browser/node_modules/playwright/cli.js" install --with-deps chromium
+          cp .audit/sandbox-copy/browser.mjs "$RUNNER_TEMP/browser/browser.mjs"
+          cd apps/core
+          php ../../.audit/sandbox-copy/browser-seed.php
+      - name: Click copy in real operator browser and run worker
+        working-directory: .
+        run: |
+          cd apps/core
+          php artisan serve --host=127.0.0.1 --port=8124 > "$AUDIT_BROWSER_DIR/core-server.log" 2>&1 &
+          cd ../control-plane
+          php artisan serve --host=127.0.0.1 --port=8123 > "$AUDIT_BROWSER_DIR/console-server.log" 2>&1 &
+          cd ../..
+          for attempt in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8123/login >/dev/null; then break; fi
+            sleep 1
+          done
+          node "$RUNNER_TEMP/browser/browser.mjs"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: sandbox-copy-browser
+          path: ${{ runner.temp }}/copy-browser
+          retention-days: 7
   documentation:
     runs-on: ubuntu-24.04
     timeout-minutes: 8
