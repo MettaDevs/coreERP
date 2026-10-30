@@ -23,6 +23,7 @@ use App\Platform\Modules\Contracts\CurrencyRounding;
 use App\Platform\Modules\Contracts\FinancePostingSettings;
 use App\Platform\Modules\Contracts\FiscalCalendarDirectory;
 use App\Platform\Modules\Contracts\FundingSourceDirectory;
+use App\Platform\Modules\Contracts\ItemDirectory;
 use App\Platform\Modules\Contracts\LinkedWorkerResolvers;
 use App\Platform\Modules\Contracts\ListExportSources;
 use App\Platform\Modules\Contracts\ModuleReportProviders;
@@ -107,6 +108,7 @@ final class CoreServices
         NumberSequenceIssuer::class,
         FiscalCalendarDirectory::class,
         FundingSourceDirectory::class,
+        ItemDirectory::class,
         PaymentMethodDirectory::class,
         PaymentTermDirectory::class,
         PlanningYearDirectory::class,
