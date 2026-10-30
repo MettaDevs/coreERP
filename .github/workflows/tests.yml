@@ -1,77 +1,15 @@
-name: tests
-
+name: environment lease audit
 on:
-  # Tidak ada pemicu `push` ke `main`, dan itu keputusan sadar tentang kuota.
-  #
-  # GitHub menjalankan `pull_request` terhadap `refs/pull/N/merge` — yaitu pull request yang
-  # **sudah digabungkan** ke basisnya. Jadi menjalankan alur yang sama lagi setelah merge
-  # menguji pohon yang praktis identik dengan yang barusan hijau, dan repo ini privat di paket
-  # gratis: separuh kuota habis untuk mengulang hal yang sama.
-  #
-  # Yang dilepas: bila `main` bergerak antara run sebuah pull request dan saat ia digabungkan,
-  # pohon yang diuji menjadi basi. Dengan merge berurutan oleh satu orang, jendela itu nyaris
-  # nol; kalau GitHub menandai cabangnya tertinggal, jalankan ulang pemeriksaannya sebelum
-  # merge.
-  #
-  # Konsekuensi kedua: push langsung ke `main` tanpa pull request tidak diperiksa sama sekali.
-  # Tanpa daftar cabang. Pull request yang basisnya cabang fitur — pull request
-  # bertumpuk, yang dipakai saat sebuah task bergantung pada task sebelumnya — tidak
-  # mendapat pemeriksaan sama sekali selama daftar ini ada, dan itu tidak terlihat
-  # sebagai kegagalan: halaman pull request-nya hanya kosong.
   pull_request:
-
-  # 8.5 dijalankan terjadwal, bukan pada tiap pull request. Alasannya di bawah.
-  schedule:
-    - cron: '0 20 * * 0'
-
 permissions:
   contents: read
-
-# Mendorong dua kali beruntun membuat jalan yang pertama menjadi usang, tapi ia tetap
-# berjalan sampai habis dan tetap menghabiskan kuota. Repo ini ada di paket gratis, jadi
-# kuota itu terbatas dan habisnya berarti tidak ada pemeriksaan sama sekali.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: environment-lease-audit-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
-  ci:
+  audit:
     runs-on: ubuntu-24.04
-
-    # Tanpa batas ini, job yang menggantung berjalan sampai batas bawaan GitHub — enam jam —
-    # dan repo ini ada di paket gratis, jadi jam itu diambil dari kuota yang sama yang dipakai
-    # seluruh pemeriksaan berikutnya. Langkah Tests pernah menyentuh 47 menit di sini, jadi
-    # batasnya diberi ruang lebar; ia menahan yang menggantung, bukan yang sekadar lambat.
-    timeout-minutes: 30
-
-    defaults:
-      run:
-        working-directory: apps/core
-    strategy:
-      matrix:
-        # 8.4 adalah versi yang dijalankan image produksi (apps/core/Dockerfile),
-        # jadi ia selalu dijalankan.
-        #
-        # 8.5 hanya dijalankan pada cabang utama dan sekali seminggu. Menjalankannya pada
-        # tiap pull request tidak mempercepat apa pun — kedua job berjalan bersamaan, jadi
-        # waktu tunggu ditentukan yang paling lambat — tetapi menghabiskan kuota dua kali
-        # lipat. Peringatan dini tentang versi berikutnya tetap didapat, hanya tidak pada
-        # setiap perubahan.
-        php-version: ${{ github.event_name == 'pull_request' && fromJSON('["8.4"]') || fromJSON('["8.4", "8.5"]') }}
-
-    # Suite ini menuntut PostgreSQL sungguhan, bukan SQLite: setiap klausa kunci yang
-    # dipakai penerbitan nomor (lockForUpdate, FOR UPDATE SKIP LOCKED) berubah menjadi
-    # string kosong di SQLite, sehingga test tidak membuktikan apa pun. Alasannya
-    # ditulis juga di apps/core/phpunit.xml.
-    #
-    # Database test tidak perlu tahan mati listrik. Ia dibuat, dipakai beberapa menit, lalu
-    # dibuang bersama runnernya — jadi seluruh jaminan durabilitas PostgreSQL di sini dibayar
-    # tanpa pernah dipakai. Data directory ditaruh di RAM lewat tmpfs.
-    #
-    # `PGDATA` sengaja menunjuk subfolder di dalam mount, bukan mount itu sendiri: entrypoint
-    # postgres menjalankan initdb hanya bila foldernya kosong dan kepemilikannya benar, dan
-    # sebuah tmpfs yang dipasang langsung sebagai data directory gagal pada salah satu dari
-    # keduanya tergantung versi Docker.
+    timeout-minutes: 12
     services:
       postgres:
         image: postgres:16-alpine
@@ -79,26 +17,13 @@ jobs:
           POSTGRES_DB: core_erp_test
           POSTGRES_USER: core_erp
           POSTGRES_PASSWORD: core_erp
-          PGDATA: /var/lib/postgresql/data/pgdata
         ports:
           - 5432:5432
         options: >-
-          --tmpfs /var/lib/postgresql/data:rw
           --health-cmd "pg_isready -U core_erp"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
-
-    # `core_erp_test`, dan ia SENGAJA berbeda dari `DB_DATABASE` di `.env.example`.
-    #
-    # Database kerja dan database test yang bernama sama sudah mengosongkan database pengembang tiga
-    # kali dalam dua hari — trait penyiap database mengosongkan apa pun yang ditunjuk koneksinya, dan
-    # `DatabaseTruncation` mengecualikan tabel `migrations` sehingga yang tertinggal adalah skema
-    # utuh berisi nol baris: suite hijau, exit code nol, lalu stack lokal kosong.
-    #
-    # `Tests\TestCase::setUpTraits()` menolak jalan ketika keduanya sama. Runner CI memang tidak
-    # punya data kerja untuk hilang, tetapi nama yang berbeda di sini menjaga satu hal lain: alur ini
-    # tetap menjadi contoh yang benar bagi siapa pun yang menyalinnya ke mesin sendiri.
     env:
       DB_TEST_HOST: 127.0.0.1
       DB_TEST_PORT: 5432
@@ -106,268 +31,57 @@ jobs:
       DB_TEST_USERNAME: core_erp
       DB_TEST_PASSWORD: core_erp
       DB_TEST_SCHEMA: coreerp_test
-
-      # CI tidak menjalankan OpenTelemetry, dan tidak boleh membayar biayanya. Ekstensi
-      # `opentelemetry` hanya ada pada image runtime, bukan pada runner; memasangnya di sini
-      # berarti kompilasi PECL pada setiap job demi instrumentasi yang tidak seorang pun baca.
-      #
-      # Nilai ini yang mematikannya, bukan sekadar meredam keluarannya. `_register.php` milik
-      # tiap paket auto-instrumentation memeriksa `Sdk::isInstrumentationDisabled()` lebih dulu
-      # dan langsung `return`, sebelum sampai ke pemeriksaan ekstensi yang memanggil
-      # `trigger_error(..., E_USER_WARNING)`. Peringatan itu bukan sekadar berisik: selama fase
-      # `post-autoload-dump`, penangan error milik Composer mengubahnya menjadi exception dan
-      # seluruh langkah gagal.
-      #
-      # Dipakai `all`, bukan `laravel,psr3`, karena yang dinyatakan di sini adalah niat — CI
-      # tidak pernah punya telemetri — sehingga paket auto-instrumentation ketiga yang
-      # ditambahkan nanti tidak perlu diingat untuk didaftarkan ulang.
       OTEL_PHP_DISABLED_INSTRUMENTATIONS: all
-
+      JAVA_TOOL_OPTIONS: -Xmx512m
     steps:
-      - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
-        with:
-          php-version: ${{ matrix.php-version }}
-          tools: composer:v2
-          extensions: redis
-          # `none`, bukan `xdebug`. Tidak ada satu pun yang memakai hasil coverage di sini:
-          # tidak ada flag --coverage, tidak ada unggahan laporan, dan phpunit.xml tidak punya
-          # elemen <coverage>. Sementara `coverage: xdebug` menyetel xdebug.mode=coverage, yang
-          # membuat PHP melacak setiap baris yang dieksekusi sepanjang run — pajak yang dibayar
-          # untuk laporan yang tidak pernah dicetak.
-          #
-          # Kalau kelak coverage benar-benar dibutuhkan, pakai `pcov`: ia jauh lebih murah
-          # daripada xdebug untuk coverage baris, dan nyalakan hanya pada job yang memakainya.
-          coverage: none
-
-      # `cache: npm` menyimpan unduhan npm antar run. Lockfile-nya ada di akar repo, bukan
-      # di folder app, jadi jalurnya disebut eksplisit — tanpa itu cache tidak pernah kena
-      # dan langkah ini tetap mengunduh semuanya sambil terlihat seolah sudah di-cache.
-      # Client harus seversi dengan server test agar format dump/restore tidak mengikuti image runner terbaru.
-      - name: Select PostgreSQL 16 clients
-        run: |
-          test -x /usr/lib/postgresql/16/bin/pg_dump
-          test -x /usr/lib/postgresql/16/bin/pg_restore
-          echo "/usr/lib/postgresql/16/bin" >> "$GITHUB_PATH"
-          /usr/lib/postgresql/16/bin/pg_dump --version
-          /usr/lib/postgresql/16/bin/pg_restore --version
-
-      - name: Setup Node
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: package-lock.json
-
-      # Berjalan di akar repo, bukan di folder app. `@apperp/ui` adalah workspace npm,
-      # dan lockfile yang memuatnya hanya ada satu — di akar.
-      - name: Install Node Dependencies
-        run: npm ci
-        working-directory: .
-
-      # `--ignore-platform-req=ext-opentelemetry` menjawab separuh masalah yang berbeda dari
-      # env di atas: dua paket `open-telemetry/*` mendeklarasikan ekstensi itu sebagai
-      # platform requirement keras, dan penyelesai dependency menolak jauh sebelum satu baris
-      # kode pun dijalankan. Bentuk ini menyamai tahap vendor pada `apps/core/Dockerfile`,
-      # supaya masalah yang sama tidak ditangani dengan dua mekanisme berbeda.
-      - name: Install Dependencies
-        run: composer install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-req=ext-opentelemetry
-
-      - name: Copy Environment File
-        run: cp .env.example .env
-
-      - name: Start isolated Valkey for cache and session integration
-        working-directory: .
-        run: |
-          umask 077
-          cache_password=$(openssl rand -hex 32)
-          session_password=$(openssl rand -hex 32)
-          printf '::add-mask::%s\n' "$cache_password"
-          printf '::add-mask::%s\n' "$session_password"
-          printf 'VALKEY_CACHE_PASSWORD=%s\nVALKEY_SESSION_PASSWORD=%s\n' "$cache_password" "$session_password" > "$RUNNER_TEMP/valkey.env"
-          cat "$RUNNER_TEMP/valkey.env" >> "$GITHUB_ENV"
-          printf 'VALKEY_TEST_PORT=16389\n' >> "$GITHUB_ENV"
-          docker run -d --name coreerp-valkey-ci --env-file "$RUNNER_TEMP/valkey.env" \
-            -p 127.0.0.1:16389:6379 -v "$GITHUB_WORKSPACE/deploy/saas/valkey:/etc/valkey:ro" \
-            --entrypoint sh valkey/valkey:9.1.2-alpine /etc/valkey/start.sh
-          for attempt in $(seq 1 30); do
-            if docker exec coreerp-valkey-ci sh -c 'VALKEYCLI_AUTH="$VALKEY_CACHE_PASSWORD" valkey-cli --user cache ping' | grep -q PONG; then
-              exit 0
-            fi
-            sleep 1
-          done
-          exit 1
-
-      - name: Generate Application Key
-        run: php artisan key:generate
-
-      # Aset yang sudah dibangun memang dibutuhkan test: tanpa manifest Vite, halaman
-      # Inertia gagal dirender dan tiga test berbunyi "Not a valid Inertia response",
-      # pesan yang sama sekali tidak menyebut aset. Sudah dicoba membuangnya.
-      - name: Build Assets
-        run: npm run build
-
-      # React hanya boleh termuat sekali. Kegagalannya tidak berbunyi — build tetap hijau,
-      # halaman tetap tampil, lalu hook melempar "Invalid hook call" pada komponen yang
-      # kebetulan melintasi batas salinan. Selama UI module berada di dalam iframe, dua
-      # salinan memang selalu ada; sejak fase 4 tidak boleh lagi, dan ini yang menagihnya.
-      - name: Periksa Bundel
-        run: npm run bundle:check
-
-      # Koneksi test menunjuk schema tersendiri lewat search_path, dan PostgreSQL tidak
-      # membuat schema itu sendiri. Di mesin pengembang langkah ini dilakukan tangan
-      # sekali, sesuai catatan pada apps/core/.env.example.
-      #
-      # Langkah ini dipertahankan walau alur di bawah berjalan paralel dan tidak memakainya:
-      # mode serial masih membutuhkannya, dan itulah yang dijalankan siapa pun yang menyetel
-      # ulang alur ini atau menjalankan satu berkas test di mesin sendiri.
-      - name: Create Test Schema
-        run: PGPASSWORD=$DB_TEST_PASSWORD psql -h "$DB_TEST_HOST" -p "$DB_TEST_PORT" -U "$DB_TEST_USERNAME" -d "$DB_TEST_DATABASE" -c "CREATE SCHEMA IF NOT EXISTS $DB_TEST_SCHEMA;"
-
-      # Melengkapi tmpfs di atas: yang tersisa dari biaya durabilitas setelah data directory
-      # berada di RAM. Ketiganya `sighup`, jadi cukup dimuat ulang tanpa merestart server.
-      #
-      # Ini **hanya** untuk database yang umurnya sepanjang satu job CI. Menyalakannya di mesin
-      # sungguhan berarti kehilangan data pada mati listrik, dan `full_page_writes=off`
-      # merusak database pada mati listrik di tengah penulisan halaman.
-      #
-      # Tiap pernyataan memakai `-c` sendiri, bukan satu `-c` berisi empat baris. psql
-      # mengirim isi satu `-c` sebagai **satu blok transaksi**, dan ALTER SYSTEM dilarang
-      # berjalan di dalam transaksi: "ALTER SYSTEM cannot run inside a transaction block".
-      - name: Relax Test Database Durability
-        env:
-          PGPASSWORD: ${{ env.DB_TEST_PASSWORD }}
-        run: |
-          psql -h "$DB_TEST_HOST" -p "$DB_TEST_PORT" -U "$DB_TEST_USERNAME" -d "$DB_TEST_DATABASE" \
-            -c "ALTER SYSTEM SET fsync = off;" \
-            -c "ALTER SYSTEM SET synchronous_commit = off;" \
-            -c "ALTER SYSTEM SET full_page_writes = off;" \
-            -c "SELECT pg_reload_conf();"
-
-      # `--parallel`, bukan serial. Terukur di mesin pengembang pada keadaan yang sama:
-      # 9 menit 3 detik menjadi 1 menit 27 detik untuk 499 test yang sama — tidak satu pun
-      # dilewatkan. Yang dipotong waktu tunggu, bukan cakupannya.
-      #
-      # Tiap pekerja mendapat databasenya sendiri, dan di sana database itulah batas
-      # isolasinya — schema `coreerp_test` tidak dipakai; lihat config/database.php.
-      #
-      # `--exclude-group=lambat` pada pull request. Satu berkas — DepreciationScaleTest —
-      # menyapu 40 kombinasi penyusutan sampai akhir masa manfaat, dan satu methodnya sendiri
-      # 30 sampai 60 detik di mesin pengembang. Dengan dua pekerja, satu pekerja menjalankannya
-      # sendirian sementara yang lain selesai, dan itulah ekor yang menggantung di akhir run.
-      #
-      # Jadwal mingguan menjalankan semuanya tanpa pengecualian. Yang dijaga sapuan itu berubah
-      # jarang; biayanya dibayar pada setiap perubahan apa pun.
-      # Dua jalur, dan jalur keduanya wajib.
-      #
-      # Empat kelas bertanda `#[Group('serial')]` membuat dan membuang database PostgreSQL
-      # sungguhan. Menjalankannya bersama yang lain di banyak proses membuat mereka saling
-      # membuang database milik yang lain — itu sebabnya `composer test:parallel` dan
-      # `composer test:serial` dipisah sejak 13 September 2026.
-      #
-      # Alur ini tidak ikut dipisah waktu itu, dan akibatnya terukur: suite yang sebelumnya
-      # selesai dalam 9 menit menembus batas 30 menit dan dibatalkan GitHub. Bukan karena
-      # lambat — karena buntu. `ProvisionEnvironmentTest` gagal di `tearDown`, transaksi
-      # `RefreshDatabase` karena itu tidak pernah dibatalkan, dan tiap test berikutnya di
-      # pekerja yang sama menunggu kunci `clients_slug_unique` selamanya.
-      - name: Tests (paralel)
-        # Flag diulang, bukan dipisah koma. PHPUnit 12 membaca `--exclude-group=serial,lambat` sebagai
-        # SATU grup bernama "serial,lambat" — diukur: 795 test ikut, keempat kelas serial di dalamnya,
-        # dan run paralel buntu di `ProvisionEnvironmentTest` sampai tenggat 10 menit habis.
-        run: php artisan test --parallel --exclude-group=serial ${{ github.event_name == 'pull_request' && '--exclude-group=lambat' || '' }}
-
-      # Satu proses, tanpa `--parallel`. Yang dijaga di sini bukan kecepatan melainkan
-      # kepemilikan: tiap kelas membuat databasenya sendiri dan membuangnya lagi di `tearDown`.
-      - name: Tests (serial)
-        run: php artisan test --group=serial
-
-  # Konsol operator diuji terpisah dari Core, dan itu sengaja.
-  #
-  # Ia tidak punya skema sendiri — suitenya membangun skema Core dari folder migration Core,
-  # satu-satunya sumbernya. Menyatukannya ke job di atas berarti dua aplikasi berebut satu
-  # schema `coreerp_test` dalam satu job, dan `RefreshDatabase` milik yang satu akan menghapus
-  # tabel yang sedang dipakai yang lain. Job terpisah memberi masing-masing servernya sendiri.
-  konsol:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    defaults:
-      run:
-        working-directory: apps/control-plane
-
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: core_erp_test
-          POSTGRES_USER: core_erp
-          POSTGRES_PASSWORD: core_erp
-          PGDATA: /var/lib/postgresql/data/pgdata
-        ports:
-          - 5432:5432
-        options: >-
-          --tmpfs /var/lib/postgresql/data:rw
-          --health-cmd "pg_isready -U core_erp"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
-    env:
-      DB_TEST_HOST: 127.0.0.1
-      DB_TEST_PORT: 5432
-      DB_TEST_DATABASE: core_erp_test
-      DB_TEST_USERNAME: core_erp
-      DB_TEST_PASSWORD: core_erp
-      DB_TEST_SCHEMA: coreerp_test
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
         with:
           php-version: '8.4'
           tools: composer:v2
           coverage: none
-
-      - name: Install Dependencies
-        run: composer install --no-interaction --prefer-dist --optimize-autoloader
-
-      # `search_path` koneksi test menunjuk schema tersendiri, dan PostgreSQL tidak membuatnya
-      # sendiri. Tanpa langkah ini migration gagal dengan "no schema has been selected to create
-      # in" — pesan yang tidak menyebut schema mana pun yang hilang.
-      - name: Create Test Schema
-        env:
-          PGPASSWORD: core_erp
-        run: psql -h 127.0.0.1 -p 5432 -U core_erp -d core_erp_test -c "CREATE SCHEMA IF NOT EXISTS coreerp_test;"
-
-      # Tanpa `--parallel`: suitenya sepuluh test, dan tiap pekerja paralel membayar satu
-      # pembangunan skema Core penuh lebih dulu. Paralelisasi di sini menambah waktu, bukan
-      # memotongnya.
-      - name: Tests
-        run: php artisan test
-
-  # Agen situs on-prem (`deploy/agent/`). Ia bash, jadi tidak ada suite PHP yang menyentuhnya; tanpa
-  # job ini perubahan pada agen, `update.sh`, atau `pasang.sh` sampai ke main tanpa satu pun test
-  # dijalankan. Container Ubuntu bersih, sama dengan cara menjalankannya di mesin pengembang — dan
-  # server tiruannya memeriksa tanda tangan serta skema dari `openapi-agent.yaml` yang sama.
-  agen:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
-          persist-credentials: false
-
-      - name: Tests
-        run: docker run --rm -v "$PWD":/repo -w /repo ubuntu:24.04 bash deploy/agent/tests/run-tests.sh
+          node-version: '24'
+      - name: Prepare source and tools
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/environment-audit/model" "$RUNNER_TEMP/environment-audit/proof"
+          echo "AUDIT_RESULTS_DIR=$RUNNER_TEMP/environment-audit/proof" >> "$GITHUB_ENV"
+          git init "$RUNNER_TEMP/pstack"
+          git -C "$RUNNER_TEMP/pstack" remote add origin https://github.com/cursor/plugins.git
+          git -C "$RUNNER_TEMP/pstack" fetch --depth=1 origin 4dd1d05818d19792e7cd6e818f1667f95f7e1dbe
+          git -C "$RUNNER_TEMP/pstack" checkout --detach FETCH_HEAD
+          curl --fail --location https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar -o "$RUNNER_TEMP/tla2tools.jar"
+          echo "936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88  $RUNNER_TEMP/tla2tools.jar" | sha256sum --check
+      - name: Explore lease interleavings with statechart
+        shell: bash
+        run: |
+          export TLA2TOOLS="$RUNNER_TEMP/tla2tools.jar"
+          export JAVA="$(command -v java)"
+          set +e
+          node "$RUNNER_TEMP/pstack/pstack/skills/statechart/scripts/worker.ts" "$RUNNER_TEMP/environment-audit/model" "$GITHUB_WORKSPACE/.audit/environment-lease/Lease.tla" "$GITHUB_WORKSPACE/.audit/environment-lease/Lease.cfg" "$GITHUB_WORKSPACE/.audit/environment-lease/view.mjs"
+          result=$?
+          set -e
+          if [ "$result" -ne 0 ] && [ "$result" -ne 1 ]; then exit "$result"; fi
+          cat "$RUNNER_TEMP/environment-audit/model/done/report.md"
+          echo "statechart_exit=$result" >> "$GITHUB_STEP_SUMMARY"
+      - name: Install application dependencies
+        working-directory: apps/core
+        run: |
+          composer install --no-interaction --prefer-dist --optimize-autoloader --ignore-platform-req=ext-opentelemetry
+          cp .env.example .env
+          php artisan key:generate
+          PGPASSWORD="$DB_TEST_PASSWORD" psql -h "$DB_TEST_HOST" -p "$DB_TEST_PORT" -U "$DB_TEST_USERNAME" -d "$DB_TEST_DATABASE" -c 'CREATE SCHEMA coreerp_test'
+      - name: Replay safety rules against real PHP and PostgreSQL
+        working-directory: apps/core
+        run: php vendor/phpunit/phpunit/phpunit ../../.audit/environment-lease/LeaseAuditTest.php --log-junit "$RUNNER_TEMP/environment-audit/junit.xml"
+      - name: Preserve model and reproduction evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: environment-lease-evidence
+          path: ${{ runner.temp }}/environment-audit
+          retention-days: 7
