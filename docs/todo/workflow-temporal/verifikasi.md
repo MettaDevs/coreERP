@@ -1,38 +1,39 @@
 # Verifikasi, failure, dan keputusan lanjut
 
 Test harus membuktikan efek bisnis, bukan hanya status engine. Database bisnis adalah oracle
-jumlah aset, nomor, nilai, dan posting. Temporal history membuktikan jalur eksekusi; keduanya
+jumlah aset, nomor, nilai, dan posting. History/task/job Flowable membuktikan jalur eksekusi; keduanya
 harus cocok. Semua pengujian menggunakan fixture percobaan, bukan data sistem lama.
 
-[Pilot Flowable vs Temporal](./pemilihan-engine) memakai fixture dan invariant sama. Replay
-khusus Temporal; Flowable menguji deployment/lifecycle, job retry/binding dan versi proses lama.
-Gate model/client/schema berlaku pada keduanya.
+[Flowable sudah dipilih](./pemilihan-engine). Pilot menguji deployment/lifecycle, job retry/binding,
+deduplikasi start dan instance versi lama. Tidak ada kewajiban replay SDK dari engine lain.
+Pemilihan engine tidak mencentang bukti integrasi atau gate model/tenant/schema.
 
 ## Matriks wajib
 
-| Skenario | Bukti hasil yang diharapkan |
-| --- | --- |
-| Penyelesaian normal, baris berjumlah lebih dari satu unit | Aset sejumlah unit; nilai buku/perolehan dan jurnal konsisten |
-| Klik/retry HTTP berulang dengan intent sama | Satu operasi dan workflow; hasil yang sama |
-| Dua worker/dua instance API memproses dokumen sama | Satu commit bisnis; pihak kalah membaca hasil atau konflik yang tepat |
-| Worker mati sebelum commit bisnis | Tidak ada aset/posting parsial; retry melanjutkan |
-| Worker mati setelah commit sebelum ack activity | Retry mengembalikan hasil existing; nol nomor/aset/posting tambahan |
-| Dispatcher mati setelah workflow start sebelum ack outbox | Start ulang tidak membuat workflow kedua |
-| Temporal tidak tersedia saat submit | Intent/outbox tidak hilang; respons sesuai keputusan produk |
-| Validasi permanen gagal: versi, vendor, scope, baris | Tidak ada efek bisnis; retry tidak tanpa batas |
-| Mapping akun belum lengkap | Penerimaan selesai, posting held sesuai existing; bukan otomatis dibalik |
-| Hak pengaju dicabut, module berubah, draft diedit | Hasil sesuai keputusan area 0, akses tidak melebar |
-| Tenant/environment A → B → A pada worker sama, termasuk exception | Tidak ada koneksi/konteks tenant sebelumnya tertinggal |
-| Cancel beradu dengan completion | Salah satu outcome sah; tidak ada aset dihapus fisik |
-| Worker baru membaca history lama; graph client sudah diubah | Replay kompatibel, instance tetap versi awal |
-| Backup/restore dan restart tanpa jaringan luar | Recovery teruji; self-host tidak membutuhkan Temporal Cloud |
-| Pengguna tanpa hak membuka status/retry atau payload tenant lain | Ditolak; history/status tidak membocorkan data |
-| Model dibuat renderer lama, dibaca/ditulis renderer baru tanpa edit semantik | ID dan data tidak berubah/hilang, rencana executable sama |
-| Hanya posisi/warna/label presentasi berubah | Fingerprint semantik tidak berubah dan instance tidak dimulai ulang |
-| Model memuat gateway/message/subprocess yang belum didukung | Publish executable ditolak dengan node penyebab; tidak menjadi no-op |
-| Template bawaan diperbarui, tenant punya salinan sendiri | Salinan tenant tetap, update pilihan menghasilkan versi baru |
-| Downgrade tidak mendukung capability versi model aktif | Aktivasi ditolak sebelum menghilangkan langkah proses |
-| XML seperti export trial: process non-executable, task unbound, timer/condition tidak lengkap | Hanya deskriptif atau ditolak; tidak start workflow/tindakan bisnis |
+| Skenario                                                                                      | Bukti hasil yang diharapkan                                                           |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Penyelesaian normal, baris berjumlah lebih dari satu unit                                     | Aset sejumlah unit; nilai buku/perolehan dan jurnal konsisten                         |
+| Klik/retry HTTP berulang dengan intent sama                                                   | Satu operasi dan instance; business key saja tidak dianggap bukti deduplikasi         |
+| Dua worker/dua instance API memproses dokumen sama                                            | Satu commit bisnis; pihak kalah membaca hasil atau konflik yang tepat                 |
+| Worker mati sebelum commit bisnis                                                             | Tidak ada aset/posting parsial; retry melanjutkan                                     |
+| Worker mati setelah commit sebelum ack job                                                    | Retry mengembalikan hasil existing; nol nomor/aset/posting tambahan                   |
+| Dispatcher mati setelah workflow start sebelum ack outbox                                     | Start ulang tidak membuat workflow kedua                                              |
+| Flowable tidak tersedia saat submit                                                           | Intent/outbox tidak hilang; respons sesuai keputusan produk                           |
+| Validasi permanen gagal: versi, vendor, scope, baris                                          | Tidak ada efek bisnis; retry tidak tanpa batas                                        |
+| Mapping akun belum lengkap                                                                    | Penerimaan selesai, posting held sesuai existing; bukan otomatis dibalik              |
+| Hak pengaju dicabut, module berubah, draft diedit                                             | Hasil sesuai keputusan area 0, akses tidak melebar                                    |
+| Tenant/environment A → B → A pada worker sama, termasuk exception                             | Tidak ada koneksi/konteks tenant sebelumnya tertinggal                                |
+| Cancel beradu dengan completion                                                               | Salah satu outcome sah; tidak ada aset dihapus fisik                                  |
+| Adapter/worker baru memproses job instance lama; graph tenant sudah diubah                    | Instance tetap definition/binding/rules versi awal atau migrasi eksplisit yang teruji |
+| Subprocess/rules baru diterbitkan saat instance menunggu                                      | Pemanggilan tidak mengikuti latest diam-diam; versi/hasil keputusan dapat ditelusuri  |
+| Backup/restore dan restart tanpa jaringan luar                                                | Recovery teruji; engine lokal tidak membutuhkan cloud vendor                          |
+| Pengguna tanpa hak membuka status/retry atau payload tenant lain                              | Ditolak; history/status tidak membocorkan data                                        |
+| Model dibuat renderer lama, dibaca/ditulis renderer baru tanpa edit semantik                  | ID dan data tidak berubah/hilang, rencana executable sama                             |
+| Hanya posisi/warna/label presentasi berubah                                                   | Fingerprint semantik tidak berubah dan instance tidak dimulai ulang                   |
+| Model memuat gateway/message/subprocess yang belum didukung                                   | Publish executable ditolak dengan node penyebab; tidak menjadi no-op                  |
+| Template bawaan diperbarui, tenant punya salinan sendiri                                      | Salinan tenant tetap, update pilihan menghasilkan versi baru                          |
+| Downgrade tidak mendukung capability versi model aktif                                        | Aktivasi ditolak sebelum menghilangkan langkah proses                                 |
+| XML seperti export trial: process non-executable, task unbound, timer/condition tidak lengkap | Hanya deskriptif atau ditolak; tidak start workflow/tindakan bisnis                   |
 
 ## Gate pemodelan mengikuti Signavio
 
@@ -42,7 +43,7 @@ publish backend dengan batas UI; server tidak mempercayai ikon yang dapat digamb
 Konvensi layout tidak menjadi authorization atau alasan mengubah hasil bisnis.
 
 Untuk tambahan gateway nanti, buktikan XOR hanya mengambil cabang terpilih, AND join menunggu
-cabang yang diwajibkan, merge tidak menggandakan activity, dan deadlock salah kombinasi ditolak.
+cabang yang diwajibkan, merge tidak menggandakan tindakan, dan deadlock salah kombinasi ditolak.
 Subprocess harus terikat versi, punya pemetaan input/output, menolak reference cycle, serta
 mempunyai perilaku cancel/failure yang diuji. Ini gate sebelum capability aktif, bukan scope
 implementasi serial pertama. XML interoperability memerlukan fixture SAP/OMG dan test round-trip;
@@ -66,7 +67,7 @@ ia gagal, lalu bersihkan fixture dengan prosedur test. Dua checker identik yang 
 
 ## Perintah dan lapisan test
 
-Gunakan composer/npm scripts existing. Test terarah dapat memakai filter; test Temporal nyata
+Gunakan composer/npm scripts existing. Test terarah dapat memakai filter; test Flowable nyata
 harus memerlukan service dan melaporkan ketidaktersediaan sebagai belum terverifikasi, bukan pass.
 Nama filter baru ditulis setelah test ada, bukan command khayalan di rencana.
 
@@ -78,8 +79,8 @@ php artisan test --group=serial
 ```
 
 Untuk putaran cepat saja, boleh tambahkan `--exclude-group=lambat`. Test DB Core memakai database
-per proses; namespace/task queue fixture Temporal harus terisolasi per run/proses juga. Lifecycle
-Temporal penuh dapat diberi grup serial bila benar-benar tidak dapat diisolasi, dengan alasan.
+per proses; tenant/definition/business key/topic fixture engine juga terisolasi per run/proses.
+Lifecycle engine penuh dapat diberi grup serial bila tidak dapat diisolasi, dengan alasan.
 
 Jika route/contract berubah, dari `apps/core`:
 
@@ -96,14 +97,14 @@ mengikuti AGENTS.md.
 ## Beban dan performa
 
 Target gate repository dipakai untuk flow ini: 1000+ VU, 100+ tenant, 2+ instance API di belakang
-load balancer, PostgreSQL asli, dan 90 detik pada beban penuh. Worker Temporal nyata ikut berjalan.
-Pisahkan submit latency, durasi sampai hasil bisnis, throughput activity, retry rate, dan queue lag.
+load balancer, PostgreSQL asli, dan 90 detik pada beban penuh. Engine Flowable dan worker PHP nyata ikut berjalan.
+Pisahkan submit latency, durasi sampai hasil bisnis, throughput job, retry rate, dan queue lag.
 Kebenaran diperiksa dengan SQL setelah run: nol kebocoran tenant, nomor ganda, eskalasi hak, atau
 5xx aplikasi. Timeout transport yang tidak mewakili commit juga diuji recovery-nya.
 
 Ambil baseline sinkron existing pada fixture/hardware yang sama. Latensi dinilai pada concurrency
 yang masih tertahan; jangan menjadikan titik jenuh SLA. Angka p95/batas resource perlu diputuskan
-sebelum gate akhir, bukan diisi agar hasil tampak lulus. Tidak ada jaminan Temporal mempercepat
+sebelum gate akhir, bukan diisi agar hasil tampak lulus. Tidak ada jaminan engine mempercepat
 panggilan fungsi langsung. Ukur server/worker RSS, CPU, DB IO/koneksi, pertumbuhan history, dan
 biaya setiap pemasangan on-prem.
 

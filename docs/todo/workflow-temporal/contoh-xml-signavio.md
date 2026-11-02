@@ -16,15 +16,15 @@ Halaman model yang dibuka di browser juga menampilkan atribut **Is executable: F
 Published pada Collaboration Hub berarti model telah diterbitkan untuk dibaca, bukan workflow
 bisnisnya sedang mengeksekusi pembelian.
 
-| Yang terlihat pada model | Yang disimpan XML | Yang belum diberikan |
-| --- | --- | --- |
-| Check stock, Place order, Place order by e-mail | Elemen `task` generik, nama dan documentation | Binding fungsi/API, input/output executable, hak pelaku |
-| Cabang stok tersedia/tidak | XOR gateway dan nama sequence flow | `conditionExpression` executable atau default branch |
-| 5 days | Nama intermediate event dan `timerEventDefinition` kosong | `timeDuration`, `timeDate`, atau `timeCycle` |
-| Receipt of work equipment | Message events dan message flows | Skema pesan, endpoint, correlation, authentication |
-| ERP-System | Text annotation bertipe IT system melalui extension dan association | Credential/API atau koneksi database |
-| Supplier | Pool peserta tanpa processRef | Implementasi proses pemasok |
-| Dictionary, posisi, warna | Extension Signavio, BPMN DI, bounds/waypoints | Resolusi dictionary tenant tujuan dan action runtime |
+| Yang terlihat pada model                        | Yang disimpan XML                                                   | Yang belum diberikan                                    |
+| ----------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------- |
+| Check stock, Place order, Place order by e-mail | Elemen `task` generik, nama dan documentation                       | Binding fungsi/API, input/output executable, hak pelaku |
+| Cabang stok tersedia/tidak                      | XOR gateway dan nama sequence flow                                  | `conditionExpression` executable atau default branch    |
+| 5 days                                          | Nama intermediate event dan `timerEventDefinition` kosong           | `timeDuration`, `timeDate`, atau `timeCycle`            |
+| Receipt of work equipment                       | Message events dan message flows                                    | Skema pesan, endpoint, correlation, authentication      |
+| ERP-System                                      | Text annotation bertipe IT system melalui extension dan association | Credential/API atau koneksi database                    |
+| Supplier                                        | Pool peserta tanpa processRef                                       | Implementasi proses pemasok                             |
+| Dictionary, posisi, warna                       | Extension Signavio, BPMN DI, bounds/waypoints                       | Resolusi dictionary tenant tujuan dan action runtime    |
 
 Ketiadaan binding itu tidak melarang model diperkaya nanti. Tetapi mengubah atribut menjadi
 true saja tetap tidak memberi durasi, kondisi, tindakan, atau akses yang belum ada. Dokumentasi
@@ -44,11 +44,11 @@ Ada batas relevan untuk pilihan CoreERP: [Developer Guide Governance](https://he
 menyatakan integrasi melalui Trigger API/actions, tetapi tidak menyediakan API interaksi tasks/cases
 untuk menjadikannya embedded process engine aplikasi sendiri. Ini memperjelas keputusan: kita
 mencontoh fondasi pemodelan Signavio, tidak memasukkan runtime Signavio ke CoreERP. Runtime
-yang akan digunakan dipilih melalui pilot dan tetap memakai tindakan module sendiri.
+yang dipilih adalah Flowable; pilot membuktikan integrasi tindakan module sendiri.
 
-**Perkembangan keputusan:** setelah membandingkan produk executable, runtime CoreERP belum
-dikunci; [Flowable dibandingkan dengan Temporal](./pemilihan-engine). Temuan XML non-executable
-dan kebutuhan binding tetap berlaku pada kedua kandidat.
+**Keputusan pemilik, 31 Oktober 2026:** runtime proses bisnis memakai
+[Flowable](./pemilihan-engine). Temuan XML non-executable dan kebutuhan binding tetap berlaku;
+pilihan engine tidak otomatis membuat export trial dapat dijalankan.
 
 ## Konsekuensi untuk importer dan publish CoreERP
 
