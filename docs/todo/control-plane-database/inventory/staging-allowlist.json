@@ -1,0 +1,24 @@
+{
+    "paths": [
+        ".github/workflows/cpdb-inventory.yml",
+        "docs/.vitepress/config.ts",
+        "docs/todo/control-plane-database/CPDB-01.md",
+        "docs/todo/control-plane-database/HANDOFF.md",
+        "docs/todo/control-plane-database/TODO.md",
+        "docs/todo/control-plane-database/inventory/.gitattributes",
+        "docs/todo/control-plane-database/inventory/contracts.json",
+        "docs/todo/control-plane-database/inventory/decisions.tsv",
+        "docs/todo/control-plane-database/inventory/field-partitions.json",
+        "docs/todo/control-plane-database/inventory/manifest.json",
+        "docs/todo/control-plane-database/inventory/migrations.json",
+        "docs/todo/control-plane-database/inventory/ownership-rules.json",
+        "docs/todo/control-plane-database/inventory/runtime-dev1.json",
+        "docs/todo/control-plane-database/inventory/source-references.json",
+        "docs/todo/control-plane-database/inventory/staging-allowlist.json",
+        "docs/todo/control-plane-database/inventory/verification.json",
+        "scripts/cpdb-inventory.py",
+        "scripts/cpdb-runtime.py",
+        "scripts/cpdb-runtime.sql",
+        "scripts/test_cpdb_inventory.py"
+    ]
+}

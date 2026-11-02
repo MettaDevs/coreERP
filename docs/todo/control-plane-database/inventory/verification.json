@@ -1,0 +1,87 @@
+{
+    "recorded_at": "2026-11-02T05:19:20.351175+00:00",
+    "scope": "CPDB-01 inventory and target contracts only",
+    "source_baseline": "08366c35547632c6bcf9c7b643ef2455df4fc1bb",
+    "local_checks": [
+        {
+            "command": "python -m unittest discover -s scripts -p test_cpdb_inventory.py -v",
+            "result": "PASS",
+            "tests": 8
+        },
+        {
+            "command": "python scripts/cpdb-inventory.py --check",
+            "result": "PASS",
+            "consecutive_clean_runs": 2
+        },
+        {
+            "command": "Mutation of without_down to original suffix-truncation logic",
+            "result": "Expected regression failure; restored scanner passes"
+        },
+        {
+            "command": "node scripts/check-healthcare-domain-neutrality.mjs",
+            "result": "PASS"
+        },
+        {
+            "command": "Prettier --check on changed Markdown, handwritten JSON and workflow",
+            "result": "PASS",
+            "tool": "Existing repository Prettier; generated JSON uses generator formatting"
+        },
+        {
+            "command": "npm --prefix docs run docs:build",
+            "result": "PASS",
+            "dead_links": 0,
+            "warnings": [
+                "AL highlighting fallback",
+                "outdated browser metadata",
+                "Tailwind content configuration",
+                "chunk size"
+            ]
+        },
+        {
+            "command": "git diff --check",
+            "result": "PASS"
+        },
+        {
+            "command": "Audit output inspection",
+            "result": "No credential values, key material or patient/transaction identifiers captured"
+        }
+    ],
+    "review": {
+        "kind": "same-model independent subagent",
+        "verdict": "No remaining blocking findings for inventory/contracts; does not verify split runtime or final CI"
+    },
+    "github_ci": {
+        "status": "Pending PR creation; never waived"
+    },
+    "not_executed": [
+        "Migration/database creation/data copy",
+        "Application behavior tests on two split databases",
+        "Negative database privilege tests",
+        "Fault injection/revoke/restore",
+        "On-prem offline verification",
+        "dev-windows1 or legacy production access/writes",
+        "Deploy/merge/enrollment activation"
+    ],
+    "input_sha256": {
+        ".github/workflows/cpdb-inventory.yml": "c40f354c6c11b76791e7401c5416df95110d509b22e3d6ded5c55130472b4365",
+        "docs/.vitepress/config.ts": "f942c41b6d8e0399b4f6bba5756c2f7971350ffd141accbd7d474ea6adaaabf1",
+        "docs/todo/control-plane-database/CPDB-01.md": "bc7f5dac69941bcf94f87c0fd9c8181fa732980e8f135aebd213325b1bf4d756",
+        "docs/todo/control-plane-database/HANDOFF.md": "d0d0a8fb63373779b00ad33810bc9c1b1178edba3773d1c7972908856f648001",
+        "docs/todo/control-plane-database/TODO.md": "130fd4d77ac887e0ef4f5d9f8dcbf202b19f2d82797ffcb8f304ef519ac9cc3b",
+        "docs/todo/control-plane-database/inventory/.gitattributes": "48faf7a93c986c1d309cba957c908c75541c25ff0ac78bacc8120ce6dedbf2ca",
+        "docs/todo/control-plane-database/inventory/contracts.json": "6d4be7ad80b6cfb0d367995c1cf3d2fd4dc62adeb83b6a4f9ffe38d272b4edbf",
+        "docs/todo/control-plane-database/inventory/decisions.tsv": "b86c81d8b5382df63f5128b37da89d1c6852b2b9e326728e56d67ba41fe3a2f8",
+        "docs/todo/control-plane-database/inventory/field-partitions.json": "3000635eeb2bfee8d77297b4695213f59b50a420093cacb19b02b5ef492d5db7",
+        "docs/todo/control-plane-database/inventory/manifest.json": "66b5eefd295cbb53ef20d83a20224a8ab9906a76b48bc5812d8938aa246ce817",
+        "docs/todo/control-plane-database/inventory/migrations.json": "cc4afc52330bfa1107a3f7d0db165e7afca6c8b73fab4c6117ed593b0cb4f4e3",
+        "docs/todo/control-plane-database/inventory/ownership-rules.json": "4287165188ad8646a74bafdf10514d4e147dfd24ec00fbf306250672daeffb40",
+        "docs/todo/control-plane-database/inventory/runtime-dev1.json": "a58e68fa0fdd9a3517468d08e924f526eee8b84e7cf08a4d16b1d186862e1b36",
+        "docs/todo/control-plane-database/inventory/source-references.json": "c74bcc13f3e194c02c331e69adc405090b6e95aae13a48beee52ae2ad8eeff22",
+        "docs/todo/control-plane-database/inventory/staging-allowlist.json": "e32bfa587bbd133506e0ae94c57c98ac6290e82cc11983b1a71f978bccbb7302",
+        "scripts/cpdb-inventory.py": "61734e07e35a2f652bbd36e226f30b3b2fa16df3cdcd03f9a38d9bc5b7c2a8b7",
+        "scripts/cpdb-runtime.py": "57eba0f80b1d652c1b65fe13746f5047da426d80b8ce4c77aae325f2ca5db114",
+        "scripts/cpdb-runtime.sql": "a2b0b677298f298467f114bb83639d538e55afa0166503c3e62364bfd423ca67",
+        "scripts/test_cpdb_inventory.py": "cea4237607221411483dbc5ef8a91be3e2fee2851bbddf5bcf8ec388f2c1050f"
+    },
+    "hash_normalization": "UTF-8 text with LF, matching committed Git blobs"
+}
