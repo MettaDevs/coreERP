@@ -15,9 +15,21 @@ use PHPUnit\Framework\TestCase;
  */
 class StatusAsetTest extends TestCase
 {
-    public function test_hanya_tiga_status_yang_dikenal(): void
+    public function test_lifecycle_catalog_includes_budgeted_assets(): void
     {
-        $this->assertSame(['received', 'decommissioned', 'disposed'], StatusAset::semua());
+        $this->assertSame(['budgeted', 'received', 'decommissioned', 'disposed'], StatusAset::semua());
+    }
+
+    public function test_budgeted_assets_cannot_enter_actual_operations(): void
+    {
+        $status = StatusAset::BUDGETED;
+        $this->assertFalse(StatusAset::bolehDibuatkanWorkOrder($status));
+        $this->assertFalse(StatusAset::bolehDimutasi($status));
+        $this->assertFalse(StatusAset::bolehDidekomisioning($status));
+        $this->assertFalse(StatusAset::bolehDilepas($status));
+        $this->assertFalse(StatusAset::bolehDikoreksi($status));
+        $this->assertFalse(StatusAset::expectedOnSite($status));
+        $this->assertSame('Rencana', StatusAset::label($status));
     }
 
     public function test_aset_yang_diterima_boleh_dikerjakan_dan_dipindahkan(): void
@@ -56,10 +68,10 @@ class StatusAsetTest extends TestCase
         $this->assertFalse(StatusAset::bolehDikoreksi($status));
     }
 
-    public function test_dua_status_yang_tidak_lagi_beredar(): void
+    public function test_non_circulating_states_include_budgeted_assets(): void
     {
         $this->assertSame(
-            [StatusAset::DIHENTIKAN, StatusAset::DILEPAS],
+            [StatusAset::BUDGETED, StatusAset::DIHENTIKAN, StatusAset::DILEPAS],
             StatusAset::tidakLagiBeredar(),
         );
     }
