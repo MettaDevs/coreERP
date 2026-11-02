@@ -169,6 +169,8 @@ class TenantScopeBoundaryTest extends TestCase
         $allowedRawQueries = [
             'modules/apperp/management-aset/src/Services/FixedAssetLedgerBackfill.php memakai DB::table(',
             'modules/apperp/management-aset/src/Services/FixedAssetLedgerContext.php memakai DB::select(',
+            // Advisory lock tidak membaca tabel; key menyertakan tenant tepercaya dan Idempotency-Key.
+            'modules/apperp/management-aset/src/Http/Controllers/transaksi/InventarisasiAset/BudgetedAssetController.php memakai DB::select(',
         ];
         foreach ($allowedRawQueries as $allowed) {
             $this->assertContains($allowed, $pelanggaran, 'Pengecualian query mentah sudah tidak dipakai; hapus dari penjaga.');
