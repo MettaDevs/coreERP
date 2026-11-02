@@ -18,6 +18,10 @@ export default withMermaid({
     'apps/_template/**',
   ],
   cleanUrls: true,
+  markdown: {
+    // Shiki belum menyediakan AL; tampilkan contoh Business Central sebagai teks biasa.
+    languages: [{ name: 'al', scopeName: 'source.al', patterns: [] }],
+  },
 
   // Tanggal "terakhir diperbarui" dibaca dari git log. Build image memakai
   // context `docs/` yang tidak membawa `.git`, jadi dimatikan di sana lewat
