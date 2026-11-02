@@ -2,7 +2,6 @@ import { FileOutput } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { ActionButton } from '@apperp/ui/action-button';
-import { Button } from '@apperp/ui/button';
 import { DataTable } from '@apperp/ui/data-table';
 import type {
     DataTableColumn,
@@ -15,13 +14,11 @@ import {
     EmptyTitle,
 } from '@apperp/ui/empty';
 import { FormControl } from '@apperp/ui/form-control';
-import { Input } from '@apperp/ui/input';
-import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { PageDialog, PageDialogContent } from '@apperp/ui/page-dialog';
-import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
 import { useRecordTransition } from '@apperp/ui/use-record-transition';
+import RecordListPage from '../../_shared/RecordListPage';
 import { requestPrint } from '../../print';
 import { useRecordList } from '../../use-record-list';
 import type { RecordCardState } from '../_shared/record-card';
@@ -191,78 +188,79 @@ export default function MutasiListPage({
     return (
         <>
             {changesTransitionConfirmation}
-            <ListPageLayout
-                header={
-                    <RecordActionBar title="Mutasi aset">
-                        {can('create') && (
-                            <ActionButton
-                                action="create"
-                                type="button"
-                                onClick={() => {
-                                    requestChangesTransition(() => {
-                                        setCard({ mode: 'create' });
-                                    });
-                                }}
-                            />
-                        )}
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() =>
-                                requestPrint({
-                                    report: 'daftar-mutasi-aset',
-                                    title: 'Ekspor daftar mutasi aset',
-                                    parameters: status ? { status } : {},
-                                })
-                            }
-                        >
-                            <FileOutput />
-                            Ekspor daftar
-                        </Button>
-                    </RecordActionBar>
-                }
-                filters={
-                    <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end">
-                        <div className="w-full sm:w-72">
-                            <FormControl>
-                                <Input
-                                    label="Cari"
-                                    type="search"
-                                    placeholder="Nomor bukti, alasan, atau lokasi"
-                                    value={search}
-                                    onChange={(event) =>
-                                        setSearch(event.target.value)
-                                    }
+            <RecordListPage
+                toolbar={{
+                    groups: [
+                        {
+                            id: 'home',
+                            label: 'Home',
+                            actions: [
+                                {
+                                    id: 'export',
+                                    label: 'Ekspor daftar',
+                                    icon: <FileOutput />,
+                                    onSelect: () =>
+                                        requestPrint({
+                                            report: 'daftar-mutasi-aset',
+                                            title: 'Ekspor daftar mutasi aset',
+                                            parameters: status
+                                                ? { status }
+                                                : {},
+                                        }),
+                                },
+                            ],
+                        },
+                    ],
+                    title: 'Mutasi aset',
+                    search: {
+                        value: search,
+                        onValueChange: setSearch,
+                        label: 'Cari',
+                        placeholder: 'Nomor bukti, alasan, atau lokasi',
+                    },
+                    children: (
+                        <>
+                            {can('create') && (
+                                <ActionButton
+                                    action="create"
+                                    type="button"
+                                    onClick={() => {
+                                        requestChangesTransition(() => {
+                                            setCard({ mode: 'create' });
+                                        });
+                                    }}
                                 />
-                            </FormControl>
-                        </div>
-                        <div className="w-full sm:w-52">
-                            <FormControl>
-                                <Select
-                                    label="Status"
-                                    items={PILIHAN_STATUS.map(
-                                        (pilihan) => pilihan.label,
-                                    )}
-                                    value={
+                            )}
+                        </>
+                    ),
+                }}
+                filters={
+                    <>
+                        <FormControl>
+                            <Select
+                                label="Status"
+                                items={PILIHAN_STATUS.map(
+                                    (pilihan) => pilihan.label,
+                                )}
+                                value={
+                                    PILIHAN_STATUS.find(
+                                        (pilihan) => pilihan.value === status,
+                                    )?.label ?? null
+                                }
+                                ariaLabel="Saring berdasarkan status"
+                                onValueChange={(value) =>
+                                    setStatus(
                                         PILIHAN_STATUS.find(
                                             (pilihan) =>
-                                                pilihan.value === status,
-                                        )?.label ?? null
-                                    }
-                                    ariaLabel="Saring berdasarkan status"
-                                    onValueChange={(value) =>
-                                        setStatus(
-                                            PILIHAN_STATUS.find(
-                                                (pilihan) =>
-                                                    pilihan.label === value,
-                                            )?.value ?? '',
-                                        )
-                                    }
-                                />
-                            </FormControl>
-                        </div>
-                    </div>
+                                                pilihan.label === value,
+                                        )?.value ?? '',
+                                    )
+                                }
+                            />
+                        </FormControl>
+                    </>
                 }
+                filtersActive={Boolean(status)}
             >
                 {!memuat && !terlihat.length ? (
                     <Empty>
@@ -316,7 +314,7 @@ export default function MutasiListPage({
                         }}
                     />
                 )}
-            </ListPageLayout>
+            </RecordListPage>
             {card && (
                 <PageDialog
                     open

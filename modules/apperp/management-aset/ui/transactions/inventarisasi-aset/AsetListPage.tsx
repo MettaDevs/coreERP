@@ -17,11 +17,11 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
-import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { PageDialog, PageDialogContent } from '@apperp/ui/page-dialog';
-import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
 import { useRecordTransition } from '@apperp/ui/use-record-transition';
+import RecordListPage from '../../_shared/RecordListPage';
+import { api, errorMessage } from '../../api';
 import { requestListExport } from '../../listExport';
 import { useRecordList } from '../../use-record-list';
 import type { RecordCardState } from '../_shared/record-card';
@@ -29,6 +29,8 @@ import type { Aset, Context } from './aset';
 import { LIFECYCLE, money } from './aset';
 import AsetDetailPage from './AsetDetailPage';
 import AssetPicture from './AssetPicture';
+import type { BudgetedAsset } from './BudgetedAssetCard';
+import BudgetedAssetCard from './BudgetedAssetCard';
 import { printAssetLabels } from './labels';
 import { izin } from './penerimaan';
 import PenerimaanDetailPage from './PenerimaanDetailPage';
@@ -49,6 +51,19 @@ export default function AsetListPage({
     canUpdate: boolean;
     permissions: string[];
 }) {
+    const [budgetedAsset, setBudgetedAsset] = useState<
+        BudgetedAsset | null | undefined
+    >();
+    const openBudgetedAsset = async (id: string) => {
+        try {
+            const result = await api<{ data: BudgetedAsset }>(`/aset/${id}`);
+            setBudgetedAsset(result.data);
+        } catch (caught) {
+            toast.error(
+                errorMessage(caught, 'Aset rencana belum dapat dibuka.'),
+            );
+        }
+    };
     const [card, setCard] = useState<
         | { kind: 'asset'; mode: 'view' | 'edit'; id: string }
         | { kind: 'receipt'; record: Exclude<RecordCardState, null> }
@@ -73,11 +88,23 @@ export default function AsetListPage({
     const [cardRevision, setCardRevision] = useState(0);
     const cardContentRef = useRef<HTMLDivElement>(null);
     const bukaAset = (id: string) => {
+        if (list.items.find((asset) => asset.id === id)?.is_budgeted) {
+            void openBudgetedAsset(id);
+
+            return;
+        }
+
         requestChangesTransition(() => {
             setCard({ kind: 'asset', mode: 'view', id });
         });
     };
     const bukaAsetUbah = (id: string) => {
+        if (list.items.find((asset) => asset.id === id)?.is_budgeted) {
+            void openBudgetedAsset(id);
+
+            return;
+        }
+
         requestChangesTransition(() => {
             setCard({ kind: 'asset', mode: 'edit', id });
         });
@@ -192,7 +219,12 @@ export default function AsetListPage({
         {
             id: 'nilai',
             header: 'Nilai perolehan',
-            cell: (aset) => money(aset.acquisition_value, aset.currency_code),
+            cell: (aset) =>
+                aset.is_budgeted
+                    ? 'Belum diperoleh'
+                    : aset.currency_code
+                      ? money(aset.acquisition_value, aset.currency_code)
+                      : '—',
             sortValue: (aset) => Number(aset.acquisition_value),
             align: 'right',
             width: 170,
@@ -201,7 +233,9 @@ export default function AsetListPage({
             id: 'status',
             header: 'Status',
             cell: (aset) => {
-                const state = LIFECYCLE[aset.lifecycle_state] ?? {
+                const state = (aset.is_budgeted
+                    ? { label: 'Rencana', variant: 'secondary' as const }
+                    : LIFECYCLE[aset.lifecycle_state]) ?? {
                     label: aset.lifecycle_state,
                     variant: 'secondary' as const,
                 };
@@ -259,66 +293,75 @@ export default function AsetListPage({
     return (
         <>
             {changesTransitionConfirmation}
-            <ListPageLayout
-                header={
-                    <RecordActionBar
-                        title="Inventarisasi aset"
-                        search={{
-                            value: search,
-                            onValueChange: setSearch,
-                            label: 'Cari aset',
-                            placeholder: 'Cari aset...',
-                        }}
-                        preferenceKey={
-                            auth.membership
-                                ? `management-aset.inventory:${auth.membership.tenant_id}:${auth.user.id}`
-                                : undefined
-                        }
-                        groups={[
-                            {
-                                id: 'home',
-                                label: 'Home',
-                                actions: [
-                                    {
-                                        id: 'labels',
-                                        label: selected.length
-                                            ? `Cetak label (${selected.length})`
-                                            : `Cetak label (${visible.length})`,
-                                        icon: <QrCode />,
-                                        disabled: memuat || !visible.length,
-                                        onSelect: printLabels,
-                                    },
-                                    {
-                                        id: 'export',
-                                        label: 'Ekspor ke Excel',
-                                        icon: <FileSpreadsheet />,
-                                        disabled: memuat,
-                                        onSelect: exportList,
-                                    },
-                                ],
-                            },
-                        ]}
-                        trailing={
-                            <div
-                                ref={setFactBoxToolbar}
-                                className="flex items-center gap-1"
-                            />
-                        }
-                    >
-                        {izin(permissions)('create') && (
-                            <ActionButton
-                                action="create"
-                                type="button"
-                                onClick={createReceipt}
-                            />
-                        )}
-                    </RecordActionBar>
-                }
+            <RecordListPage
+                toolbar={{
+                    title: 'Inventarisasi aset',
+                    search: {
+                        value: search,
+                        onValueChange: setSearch,
+                        label: 'Cari aset',
+                        placeholder: 'Cari aset...',
+                    },
+                    preferenceKey: auth.membership
+                        ? `management-aset.inventory:${auth.membership.tenant_id}:${auth.user.id}`
+                        : undefined,
+                    groups: [
+                        {
+                            id: 'home',
+                            label: 'Home',
+                            actions: [
+                                ...(izin(permissions)('create') &&
+                                context.legal_entity_id
+                                    ? [
+                                          {
+                                              id: 'budgeted',
+                                              label: 'Aset sebagai perencanaan',
+                                              onSelect: () =>
+                                                  setBudgetedAsset(null),
+                                          },
+                                      ]
+                                    : []),
+                                {
+                                    id: 'labels',
+                                    label: selected.length
+                                        ? `Cetak label (${selected.length})`
+                                        : `Cetak label (${visible.length})`,
+                                    icon: <QrCode />,
+                                    disabled: memuat || !visible.length,
+                                    onSelect: printLabels,
+                                },
+                                {
+                                    id: 'export',
+                                    label: 'Ekspor ke Excel',
+                                    icon: <FileSpreadsheet />,
+                                    disabled: memuat,
+                                    onSelect: exportList,
+                                },
+                            ],
+                        },
+                    ],
+                    trailing: (
+                        <div
+                            ref={setFactBoxToolbar}
+                            className="flex items-center gap-1"
+                        />
+                    ),
+                    children: (
+                        <>
+                            {izin(permissions)('create') && (
+                                <ActionButton
+                                    action="create"
+                                    type="button"
+                                    onClick={createReceipt}
+                                />
+                            )}
+                        </>
+                    ),
+                }}
             >
                 <RecordFactBox
                     toolbarContainer={factBoxToolbar}
                     fillHeight
-                    className="pt-3"
                     recordType="aset_tr_aset"
                     recordId={activeAsset?.id}
                     details={
@@ -393,7 +436,24 @@ export default function AsetListPage({
                         />
                     )}
                 </RecordFactBox>
-            </ListPageLayout>
+            </RecordListPage>
+            {budgetedAsset !== undefined && context.legal_entity_id && (
+                <BudgetedAssetCard
+                    key={budgetedAsset?.id ?? 'new'}
+                    asset={budgetedAsset ?? undefined}
+                    companyId={
+                        budgetedAsset?.legal_entity_id ??
+                        context.legal_entity_id
+                    }
+                    unitId={context.org_unit_id}
+                    permissions={permissions}
+                    onClose={() => setBudgetedAsset(undefined)}
+                    onSaved={() => {
+                        setBudgetedAsset(undefined);
+                        list.reload();
+                    }}
+                />
+            )}
             {card && (
                 <PageDialog
                     open

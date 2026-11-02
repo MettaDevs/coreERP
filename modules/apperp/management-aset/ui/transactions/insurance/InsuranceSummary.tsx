@@ -14,6 +14,7 @@ import {
 import { FormControl } from '@apperp/ui/form-control';
 import { Select } from '@apperp/ui/select';
 import { money } from '../../_shared/format';
+import RecordListPage from '../../_shared/RecordListPage';
 import { api, errorMessage } from '../../api';
 import type { InsuranceStatus } from './insurance';
 import { STATUS_LABELS } from './insurance';
@@ -150,9 +151,10 @@ export default function InsuranceSummary() {
     ];
 
     return (
-        <div>
-            <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
-                <div className="w-full sm:w-72">
+        <RecordListPage
+            toolbar={{ title: 'Belum dan kurang diasuransikan' }}
+            filters={
+                <>
                     <FormControl>
                         <Select
                             label="Tampilkan"
@@ -164,8 +166,7 @@ export default function InsuranceSummary() {
                             }
                         />
                     </FormControl>
-                </div>
-                <div className="w-full sm:w-48">
+
                     <FormControl>
                         <DatePicker
                             label="Per tanggal"
@@ -174,13 +175,17 @@ export default function InsuranceSummary() {
                             onValueChange={(value) => setDate(value)}
                         />
                     </FormControl>
-                </div>
-                {current?.cut && (
+                </>
+            }
+            filtersActive={Boolean(date || status !== 'bermasalah')}
+            notice={
+                current?.cut && (
                     <p className="text-muted-foreground text-sm">
                         Hanya 2.000 aset pertama yang ditampilkan.
                     </p>
-                )}
-            </div>
+                )
+            }
+        >
             {current && current.rows.length === 0 ? (
                 <Empty>
                     <EmptyHeader>
@@ -199,6 +204,6 @@ export default function InsuranceSummary() {
                     getRowLabel={(row) => row.kode}
                 />
             )}
-        </div>
+        </RecordListPage>
     );
 }

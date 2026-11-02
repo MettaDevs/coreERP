@@ -4,11 +4,13 @@ namespace Modules\Apperp\ManagementAset\Tests\Feature;
 
 use App\Platform\Modules\Contracts\PlanningYearDirectory;
 use App\Platform\Modules\Contracts\RowVersion;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Tests\Concerns\BerinteraksiDenganKonteksCore;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
@@ -104,7 +106,7 @@ class PerencanaanAsetTest extends TestCase
         $this->assertNotSame($first['id'], $second['id']);
     }
 
-    public function test_planning_uses_aset_type_lookup_and_saves_specification_on_transaction_detail(): void
+    public function test_planning_uses_one_asset_lookup_and_saves_specification_on_transaction_detail(): void
     {
         $jenis = $this->jenis($this->tenantId);
         $response = $this->create($jenis)->assertCreated()->assertJsonPath('data.kode', 'PLNA-000001');
@@ -115,7 +117,7 @@ class PerencanaanAsetTest extends TestCase
             'responsible_user_id' => $this->responsibleUserId,
         ]);
         $this->assertDatabaseHas('aset_tr_perencanaan_aset_details', [
-            'planning_id' => $planId, 'jenis_aset_id' => $jenis, 'nama_aset' => 'Laptop kerja',
+            'planning_id' => $planId, 'jenis_aset_id' => $jenis, 'nama_aset' => 'Aset uji untuk perencanaan',
             'requested_specification' => 'RAM 16 GB, SSD 512 GB', 'quantity' => 2,
         ]);
         // Dulu memeriksa entitas legal yang dikirim ke Core lewat kabel; sekarang memeriksa
@@ -127,12 +129,14 @@ class PerencanaanAsetTest extends TestCase
             ->assertOk()->assertJsonPath('data.details.0.jenis_aset_nama', 'Laptop kerja');
     }
 
-    public function test_rejects_aset_type_from_another_tenant_before_issuing_a_number(): void
+    public function test_rejects_an_asset_from_another_tenant_before_issuing_a_number(): void
     {
-        $otherTenantType = $this->jenis((string) Str::ulid());
-        $this->create($otherTenantType)->assertUnprocessable()->assertJsonValidationErrors('details');
-        $this->assertDatabaseCount('aset_tr_perencanaan_aset', 0);
-        $this->assertSame(0, $this->jumlahNomorTerbit(), 'Ada nomor yang terbit padahal seharusnya tidak.');
+        $otherTenant = $this->buatTenantUji();
+        $payload = $this->payload($this->jenis($this->tenantId));
+        $payload['details'][0]['planned_asset_id'] = $this->planningAsset($otherTenant, $this->legalEntityId, $this->orgUnitId);
+        $this->headers(['management-aset.perencanaan-aset.create'])->withHeader('Idempotency-Key', 'foreign-asset')
+            ->postJson('/api/modules/management-aset/v1/perencanaan-aset', $payload)->assertUnprocessable()->assertJsonValidationErrors('details.0.planned_asset_id');
+        $this->assertSame(0, $this->jumlahNomorTerbit());
     }
 
     public function test_update_and_archive_require_their_own_permissions_and_current_version(): void
@@ -429,8 +433,9 @@ class PerencanaanAsetTest extends TestCase
         $payload = $this->payload($this->jenis($this->tenantId));
         $payload['legal_entity_id'] = $otherCompany;
         $payload['planning_org_unit_id'] = $otherUnit;
+        $payload['details'][0]['planned_asset_id'] = $this->planningAsset($this->tenantId, $otherCompany, $otherUnit);
         $payload['planning_year_id'] = app(PlanningYearDirectory::class)->importLegacy($this->tenantId, $otherCompany, 2026)['id'];
-        $this->sebagaiPenggunaBernama('planning-author', $this->tenantId, ['management-aset.perencanaan-aset.read', 'management-aset.perencanaan-aset.create'], [
+        $this->sebagaiPenggunaBernama('planning-author', $this->tenantId, ['management-aset.perencanaan-aset.read', 'management-aset.perencanaan-aset.create', 'management-aset.aset.read'], [
             ['policy_code' => 'management-aset.asset-responsibility', 'legal_entity_id' => $this->legalEntityId, 'organization_id' => $this->orgUnitId],
             ['policy_code' => 'management-aset.asset-responsibility', 'legal_entity_id' => $otherCompany, 'organization_id' => $otherUnit],
         ]);
@@ -458,6 +463,115 @@ class PerencanaanAsetTest extends TestCase
         $this->assertDatabaseHas('aset_tr_perencanaan_aset', ['id' => $plan['id'], 'legal_entity_id' => $this->legalEntityId]);
     }
 
+    public function test_budgeted_asset_is_created_in_inventory_and_selected_as_the_only_planning_identity(): void
+    {
+        $asset = $this->createBudgetedAsset();
+        $this->assertDatabaseHas('aset_tr_aset', ['id' => $asset['id'], 'is_budgeted' => true, 'lifecycle_state' => 'budgeted', 'acquisition_value' => 0, 'acquired_on' => null]);
+        $this->assertFalse(Aset::query()->whereKey($asset['id'])->exists());
+        $this->headers(['management-aset.aset.read'])->getJson('/api/modules/management-aset/v1/aset?record_ids[]='.$asset['id'])
+            ->assertOk()->assertJsonPath('data.0.is_budgeted', true);
+        $payload = $this->payload($this->jenis($this->tenantId));
+        $payload['details'][0]['planned_asset_id'] = $asset['id'];
+        $payload['details'][0]['jenis_aset_id'] = (string) Str::ulid();
+        $plan = $this->headers(['management-aset.perencanaan-aset.create'])->withHeader('Idempotency-Key', 'planned-asset-choice')
+            ->postJson('/api/modules/management-aset/v1/perencanaan-aset', $payload)->assertCreated()->json('data');
+        $this->headers(['management-aset.perencanaan-aset.read'])->getJson('/api/modules/management-aset/v1/perencanaan-aset/'.$plan['id'])
+            ->assertOk()->assertJsonPath('data.details.0.planned_asset_id', $asset['id'])
+            ->assertJsonPath('data.details.0.jenis_aset_id', $asset['jenis_aset_id'])->assertJsonPath('data.details.0.nama_aset', $asset['nama']);
+        $this->assertDatabaseMissing('aset_tr_buku_aset', ['aset_id' => $asset['id']]);
+        $this->assertDatabaseMissing('aset_tr_ledger_aset', ['aset_id' => $asset['id']]);
+        $this->assertDatabaseMissing('aset_tr_penempatan_aset', ['aset_id' => $asset['id']]);
+    }
+
+    public function test_budgeted_asset_replay_returns_the_same_inventory_record(): void
+    {
+        $asset = $this->createBudgetedAsset('same-budgeted-key');
+        $issued = $this->jumlahNomorTerbit();
+        $this->postJson('/api/modules/management-aset/v1/aset', [])->assertOk()
+            ->assertHeader('Idempotent-Replayed', 'true')->assertJsonPath('data.id', $asset['id']);
+        $this->assertSame($issued, $this->jumlahNomorTerbit());
+    }
+
+    public function test_budgeted_asset_rejects_actual_values_and_cannot_become_actual_on_update(): void
+    {
+        $asset = $this->createBudgetedAsset();
+        $this->headers(['management-aset.aset.update'])->patchJson('/api/modules/management-aset/v1/aset/'.$asset['id'], ['version' => $asset['version'], 'acquisition_value' => 100])
+            ->assertNotFound();
+        $payload = array_intersect_key($asset, array_flip(['nama', 'legal_entity_id', 'responsible_org_unit_id', 'group_aset_id', 'jenis_aset_id']));
+        $this->patchJson('/api/modules/management-aset/v1/aset/'.$asset['id'].'/planning', [...$payload, 'version' => $asset['version'], 'is_budgeted' => false])
+            ->assertUnprocessable()->assertJsonValidationErrors('is_budgeted');
+        $this->patchJson('/api/modules/management-aset/v1/aset/'.$asset['id'].'/planning', [...$payload, 'version' => $asset['version'], 'is_budgeted' => true, 'acquisition_value' => 100])
+            ->assertUnprocessable()->assertJsonValidationErrors('acquisition_value');
+        $this->patchJson('/api/modules/management-aset/v1/aset/'.$asset['id'].'/planning', [...$payload, 'nama' => 'Nama rencana diperbarui', 'version' => $asset['version'], 'is_budgeted' => true])
+            ->assertOk()->assertJsonPath('data.nama', 'Nama rencana diperbarui')->assertJsonPath('data.is_budgeted', true);
+    }
+
+    public function test_database_rejects_depreciation_books_and_actual_ledger_entries_for_budgeted_assets(): void
+    {
+        $asset = $this->createBudgetedAsset();
+        foreach (['aset_tr_buku_aset', 'aset_tr_ledger_aset'] as $table) {
+            try {
+                DB::transaction(fn () => DB::table($table)->insert(['id' => $table === 'aset_tr_ledger_aset' ? (string) Str::uuid() : (string) Str::ulid(), 'tenant_id' => $this->tenantId, 'aset_id' => $asset['id']]));
+                $this->fail('Penulisan aktual untuk aset rencana seharusnya ditolak.');
+            } catch (QueryException $failure) {
+                $this->assertStringContainsString('Aset sebagai perencanaan tidak dapat disusutkan atau diposting', $failure->getMessage());
+            }
+        }
+        try {
+            DB::transaction(fn () => DB::table('aset_tr_aset')->where('id', $asset['id'])->update(['is_budgeted' => false, 'lifecycle_state' => 'received']));
+            $this->fail('Aset rencana tidak boleh diubah menjadi aset aktual melalui update.');
+        } catch (QueryException $failure) {
+            $this->assertStringContainsString('Jenis aset rencana/aktual tidak dapat diubah', $failure->getMessage());
+        }
+    }
+
+    public function test_asset_lookup_for_planning_keeps_company_and_permission_boundaries(): void
+    {
+        $asset = $this->createBudgetedAsset();
+        $otherCompany = (string) Str::ulid();
+        $this->pastikanOrganisasiAda($this->tenantId, $otherCompany, 'legal_entity');
+        $other = $this->planningAsset($this->tenantId, $otherCompany, $this->orgUnitId);
+        $this->headers(['management-aset.perencanaan-aset.create']);
+        $base = '/api/modules/management-aset/v1/aset?planning_company_id='.$this->legalEntityId;
+        $this->getJson($base.'&record_ids[]='.$asset['id'])->assertOk()->assertJsonPath('data.0.id', $asset['id']);
+        $this->getJson($base.'&record_ids[]='.$other)->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson('/api/modules/management-aset/v1/aset?planning_company_id='.$otherCompany.'&record_ids[]='.$other)->assertOk()->assertJsonPath('data.0.id', $other);
+        $this->sebagaiPenggunaBernama('planning-author', $this->tenantId, ['management-aset.perencanaan-aset.create']);
+        $this->getJson($base)->assertForbidden();
+    }
+
+    /** @return array<string, mixed> */
+    private function createBudgetedAsset(?string $key = null): array
+    {
+        $actual = $this->planningAsset($this->tenantId, $this->legalEntityId, $this->orgUnitId);
+        $source = DB::table('aset_tr_aset')->where('id', $actual)->first();
+
+        return $this->headers(['management-aset.aset.create', 'management-aset.aset.read'])->withHeader('Idempotency-Key', $key ?? 'budgeted-'.Str::ulid())
+            ->postJson('/api/modules/management-aset/v1/aset', [
+                'nama' => 'Aset baru yang direncanakan', 'legal_entity_id' => $this->legalEntityId,
+                'responsible_org_unit_id' => $this->orgUnitId, 'group_aset_id' => $source->group_aset_id,
+                'jenis_aset_id' => $source->jenis_aset_id, 'is_budgeted' => true,
+            ])->assertCreated()->json('data');
+    }
+
+    private function planningAsset(string $tenantId, string $companyId, string $unitId, ?string $typeId = null): string
+    {
+        $id = (string) Str::ulid();
+        $group = (string) Str::ulid();
+        DB::table('aset_m_group_aset')->insert([
+            'id' => $group, 'tenant_id' => $tenantId, 'creation_key' => 'reference-'.Str::ulid(),
+            'kode' => 'G'.Str::random(6), 'nama' => 'Group uji', 'aktif' => true, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        DB::table('aset_tr_aset')->insert([
+            'id' => $id, 'tenant_id' => $tenantId, 'creation_key' => 'reference-'.Str::ulid(),
+            'kode' => 'REF'.Str::random(6), 'nama' => 'Aset uji untuk perencanaan', 'legal_entity_id' => $companyId, 'responsible_org_unit_id' => $unitId,
+            'group_aset_id' => $group, 'jenis_aset_id' => $typeId ?? $this->jenis($tenantId), 'acquired_on' => '2026-01-01',
+            'acquisition_value' => 1000000, 'currency_code' => 'IDR', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        return $id;
+    }
+
     /** @return TestResponse<Response> */
     private function create(string $jenis): TestResponse
     {
@@ -469,6 +583,10 @@ class PerencanaanAsetTest extends TestCase
     /** @param  list<string>  $permissions */
     private function headers(array $permissions): static
     {
+        if (in_array('management-aset.perencanaan-aset.create', $permissions, true) || in_array('management-aset.perencanaan-aset.update', $permissions, true)) {
+            $permissions[] = 'management-aset.aset.read';
+        }
+
         return $this->sebagaiPenggunaBernama('planning-author', $this->tenantId, $permissions);
     }
 
@@ -480,7 +598,7 @@ class PerencanaanAsetTest extends TestCase
             'planned_on' => '2026-07-30', 'planning_year_id' => $this->planningYear(2026),
             'responsible_user_id' => $this->responsibleUserId, 'description' => 'Perangkat tim pengembangan',
             'details' => [[
-                'jenis_aset_id' => $jenis, 'satuan_id' => $this->unitId, 'quantity' => 2,
+                'planned_asset_id' => $this->planningAsset($this->tenantId, $this->legalEntityId, $this->orgUnitId, $jenis), 'satuan_id' => $this->unitId, 'quantity' => 2,
                 'requested_specification' => 'RAM 16 GB, SSD 512 GB', 'estimated_unit_price' => 15000000,
                 'needed_on' => '2026-10-01', 'funding_source_id' => $this->fundingSourceId,
             ]],

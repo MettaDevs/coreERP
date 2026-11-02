@@ -4,7 +4,6 @@ import { toast } from 'sonner';
 import { useToday } from '@/hooks/use-work-date';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
-import { Button } from '@apperp/ui/button';
 import { DataTable } from '@apperp/ui/data-table';
 import type {
     DataTableColumn,
@@ -30,8 +29,8 @@ import {
 } from '@apperp/ui/empty';
 import { FormControl } from '@apperp/ui/form-control';
 import { RadioGroup, RadioGroupItem } from '@apperp/ui/radio-group';
-import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
+import RecordListPage from '../../_shared/RecordListPage';
 import { RecordLookup } from '../../_shared/RecordLookup';
 import { api } from '../../api';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
@@ -350,91 +349,106 @@ export default function MaintenanceSchedulePage({
     const selectable = status === 'usulan' && canCreateWorkOrder;
 
     return (
-        <div ref={pageFeedbackScopeRef} className="space-y-0">
-            <RecordActionBar
-                feedback={pageFeedbackSummary}
-                title="Jadwal pemeliharaan"
+        <div
+            ref={pageFeedbackScopeRef}
+            className="h-full min-h-0 overflow-hidden"
+        >
+            <RecordListPage
+                toolbar={{
+                    feedback: pageFeedbackSummary,
+                    title: 'Jadwal pemeliharaan',
+                    groups: [
+                        {
+                            id: 'home',
+                            label: 'Home',
+                            actions: [
+                                ...(canRun
+                                    ? [
+                                          {
+                                              id: 'calculate',
+                                              label: 'Hitung jadwal',
+                                              onSelect: () => setRunning(true),
+                                          },
+                                      ]
+                                    : []),
+                                ...(selectable
+                                    ? [
+                                          {
+                                              id: 'work-order',
+                                              label: `Buat work order${selected.length > 0 ? ` (${selected.length})` : ''}`,
+                                              disabled: selected.length === 0,
+                                              onSelect: () =>
+                                                  setConverting(true),
+                                          },
+                                      ]
+                                    : []),
+                            ],
+                        },
+                    ].filter((group) => group.actions.length > 0),
+                }}
+                filters={
+                    <>
+                        <FormControl>
+                            <Select
+                                label="Status"
+                                items={STATUS_FILTER}
+                                value={status}
+                                ariaLabel="Saring berdasarkan status"
+                                onValueChange={(value) => {
+                                    setStatus(value ?? 'usulan');
+                                }}
+                            />
+                        </FormControl>
+                    </>
+                }
+                filtersActive={status !== 'usulan'}
             >
-                {canRun && (
-                    <Button type="button" onClick={() => setRunning(true)}>
-                        Hitung jadwal
-                    </Button>
-                )}
-                {selectable && (
-                    <Button
-                        type="button"
-                        variant="outline"
-                        disabled={selected.length === 0}
-                        onClick={() => setConverting(true)}
-                    >
-                        Buat work order
-                        {selected.length > 0 ? ` (${selected.length})` : ''}
-                    </Button>
-                )}
-            </RecordActionBar>
-
-            <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end">
-                <div className="w-full sm:w-52">
-                    <FormControl>
-                        <Select
-                            label="Status"
-                            items={STATUS_FILTER}
-                            value={status}
-                            ariaLabel="Saring berdasarkan status"
-                            onValueChange={(value) => {
-                                setStatus(value ?? 'usulan');
-                            }}
-                        />
-                    </FormControl>
-                </div>
-            </div>
-
-            {!loading && rows.length === 0 && !list.error ? (
-                <Empty>
-                    <EmptyHeader>
-                        <EmptyTitle>Tidak ada usulan jadwal</EmptyTitle>
-                        <EmptyDescription>
-                            Usulan muncul setelah jadwal dihitung dari rencana
-                            pemeliharaan yang aktif.
-                        </EmptyDescription>
-                    </EmptyHeader>
-                </Empty>
-            ) : (
-                <DataTable
-                    columns={columns}
-                    incremental={list}
-                    sort={list.sort}
-                    onSortChange={list.onSortChange}
-                    data={rows}
-                    getRowKey={(row) => row.id}
-                    getRowLabel={(row) =>
-                        `${row.aset_kode ?? ''} ${showDate(row.jatuh_tempo)}`
-                    }
-                    actions={actions}
-                    selection={
-                        selectable
-                            ? {
-                                  selectedKeys: selected,
-                                  onSelectedKeysChange: setSelected,
-                              }
-                            : undefined
-                    }
-                    onRowAction={(action, row) => {
-                        if (action === 'discard') {
-                            if (row.status !== 'usulan') {
-                                toast.error(
-                                    'Hanya usulan yang belum dibuatkan work order yang dapat diabaikan.',
-                                );
-
-                                return;
-                            }
-
-                            setDiscarding(row);
+                {!loading && rows.length === 0 && !list.error ? (
+                    <Empty>
+                        <EmptyHeader>
+                            <EmptyTitle>Tidak ada usulan jadwal</EmptyTitle>
+                            <EmptyDescription>
+                                Usulan muncul setelah jadwal dihitung dari
+                                rencana pemeliharaan yang aktif.
+                            </EmptyDescription>
+                        </EmptyHeader>
+                    </Empty>
+                ) : (
+                    <DataTable
+                        columns={columns}
+                        incremental={list}
+                        sort={list.sort}
+                        onSortChange={list.onSortChange}
+                        data={rows}
+                        getRowKey={(row) => row.id}
+                        getRowLabel={(row) =>
+                            `${row.aset_kode ?? ''} ${showDate(row.jatuh_tempo)}`
                         }
-                    }}
-                />
-            )}
+                        actions={actions}
+                        selection={
+                            selectable
+                                ? {
+                                      selectedKeys: selected,
+                                      onSelectedKeysChange: setSelected,
+                                  }
+                                : undefined
+                        }
+                        onRowAction={(action, row) => {
+                            if (action === 'discard') {
+                                if (row.status !== 'usulan') {
+                                    toast.error(
+                                        'Hanya usulan yang belum dibuatkan work order yang dapat diabaikan.',
+                                    );
 
+                                    return;
+                                }
+
+                                setDiscarding(row);
+                            }
+                        }}
+                    />
+                )}
+            </RecordListPage>
             <Dialog open={running} onOpenChange={setRunning}>
                 <DialogContent size="compact" ref={runRef}>
                     <DialogHeader>

@@ -11,6 +11,7 @@ import {
     AlertDialogTitle,
 } from '@apperp/ui/alert-dialog';
 import { MasterDetailLayout } from '@apperp/ui/master-detail-layout';
+import { Separator } from '@apperp/ui/separator';
 import { api, errorMessage } from '../../api';
 import { useRecordQueryTarget } from '../../transactions/_shared/use-record-query-target';
 import { useRecordList } from '../../use-record-list';
@@ -186,7 +187,17 @@ export default function MasterDetailPage({
             className="flex h-full min-h-0 flex-col overflow-hidden"
         >
             <div className="bg-background sticky top-0 z-20 flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2">
-                <span className="mr-2 font-semibold">{config.title}</span>
+                <span className="font-semibold">{config.title}</span>
+                {(editing ||
+                    can('update') ||
+                    can('create') ||
+                    can('archive')) && (
+                    <Separator
+                        orientation="vertical"
+                        decorative
+                        className="mx-1 self-center data-[orientation=vertical]:h-5"
+                    />
+                )}
                 {editing ? (
                     <>
                         <ActionButton

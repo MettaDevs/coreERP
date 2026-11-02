@@ -3,6 +3,7 @@
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\InventarisasiAset;
 
 use App\Platform\Modules\Contracts\ChangeHistory;
+use App\Platform\Modules\Contracts\DataPolicyFilter;
 use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\OrganizationDirectory;
 use App\Platform\Modules\Contracts\RowVersion;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
+use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PerencanaanAset\PlanningOrganizationScope;
 use Modules\Apperp\ManagementAset\Models\master\ModelAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\AtributAset;
@@ -43,7 +45,18 @@ class AsetController extends Controller
             'lifecycle_state' => ['nullable', Rule::in(array_keys(StatusAset::LABELS))],
             'exclude_state' => ['nullable', Rule::in(array_keys(StatusAset::LABELS))],
         ]);
-        $query = app(OrganizationScope::class)->asetQuery(Aset::query(), $request);
+        if ($request->filled('planning_company_id')) {
+            $permissions = $request->attributes->get('coreerp.permissions', []);
+            abort_unless(in_array('management-aset.perencanaan-aset.create', $permissions, true)
+                || in_array('management-aset.perencanaan-aset.update', $permissions, true), 403);
+            $company = $request->validate(['planning_company_id' => ['required', 'ulid']])['planning_company_id'];
+            app(PlanningOrganizationScope::class)->require($request, $company);
+            $query = DataPolicyFilter::apply(Aset::withoutGlobalScope('actual')->where('legal_entity_id', $company),
+                $request->attributes->get('coreerp.data_policies', [])['management-aset.asset-responsibility'] ?? ['all' => false, 'scope_grants' => []],
+                'legal_entity_id', 'responsible_org_unit_id');
+        } else {
+            $query = app(OrganizationScope::class)->asetQuery(Aset::withoutGlobalScope('actual'), $request);
+        }
         if (! empty($data['lifecycle_state'])) {
             $query->where('lifecycle_state', $data['lifecycle_state']);
         }
@@ -76,7 +89,7 @@ class AsetController extends Controller
     public function show(Request $request, string $id): JsonResponse
     {
         $this->requirePermission($request, 'read');
-        $aset = app(OrganizationScope::class)->asetQuery(Aset::query(), $request)->findOrFail($id);
+        $aset = app(OrganizationScope::class)->asetQuery(Aset::withoutGlobalScope('actual'), $request)->findOrFail($id);
 
         return response()->json(['data' => [
             ...$this->present($aset),
@@ -558,6 +571,6 @@ class AsetController extends Controller
     /** @return array<string, mixed> */
     private function present(Aset $aset): array
     {
-        return $aset->only(['id', 'kode', 'nama', 'legal_entity_id', 'responsible_org_unit_id', 'group_aset_id', 'kelompok_harta_fiskal_id', 'jenis_aset_id', 'kondisi_aset_id', 'pabrikan_aset_id', 'model_aset_id', 'induk_aset_id', 'lokasi_aset_id', 'financial_dimension_org_unit_id', 'serial_number', 'model_number', 'acquired_on', 'placed_in_service_on', 'acquisition_value', 'currency_code', 'lifecycle_state', 'keterangan', 'version']);
+        return $aset->only(['id', 'kode', 'nama', 'legal_entity_id', 'responsible_org_unit_id', 'group_aset_id', 'kelompok_harta_fiskal_id', 'jenis_aset_id', 'kondisi_aset_id', 'pabrikan_aset_id', 'model_aset_id', 'induk_aset_id', 'lokasi_aset_id', 'financial_dimension_org_unit_id', 'serial_number', 'model_number', 'acquired_on', 'placed_in_service_on', 'acquisition_value', 'currency_code', 'lifecycle_state', 'is_budgeted', 'keterangan', 'version']);
     }
 }

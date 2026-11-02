@@ -34,12 +34,12 @@ import {
     PageDialogBody,
     PageDialogClose,
 } from '@apperp/ui/page-dialog';
-import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@apperp/ui/tabs';
 import { Textarea } from '@apperp/ui/textarea';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
 import { useRecordTransition } from '@apperp/ui/use-record-transition';
 import { day, money } from '../../_shared/format';
+import RecordListPage from '../../_shared/RecordListPage';
 import { RecordLookup } from '../../_shared/RecordLookup';
 import type { Vendor } from '../../_shared/useVendors';
 import { useVendors } from '../../_shared/useVendors';
@@ -662,57 +662,74 @@ export default function InsurancePage({
     });
 
     return (
-        <Tabs ref={pageFeedbackScopeRef} defaultValue="polis">
+        <Tabs
+            ref={pageFeedbackScopeRef}
+            defaultValue="polis"
+            className="h-full min-h-0 overflow-hidden"
+        >
             {policyTransitionConfirmation}
-            <RecordActionBar
-                feedback={pageFeedbackSummary}
-                title="Asuransi aset"
+            <RecordListPage
+                toolbar={{
+                    feedback: pageFeedbackSummary,
+                    title: 'Asuransi aset',
+                    children: (
+                        <>
+                            {canCreate && (
+                                <ActionButton
+                                    action="create"
+                                    type="button"
+                                    disabled={!context.legal_entity_id}
+                                    onClick={() => startEdit(null)}
+                                />
+                            )}
+                            <TabsList>
+                                <TabsTrigger value="polis">Polis</TabsTrigger>
+                                <TabsTrigger value="ringkasan">
+                                    Belum dan kurang diasuransikan
+                                </TabsTrigger>
+                            </TabsList>
+                        </>
+                    ),
+                }}
             >
-                {canCreate && (
-                    <ActionButton
-                        action="create"
-                        type="button"
-                        disabled={!context.legal_entity_id}
-                        onClick={() => startEdit(null)}
-                    />
-                )}
-                <TabsList>
-                    <TabsTrigger value="polis">Polis</TabsTrigger>
-                    <TabsTrigger value="ringkasan">
-                        Belum dan kurang diasuransikan
-                    </TabsTrigger>
-                </TabsList>
-            </RecordActionBar>
+                <TabsContent
+                    value="polis"
+                    className="min-h-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col"
+                >
+                    {!loading && policies.length === 0 && !list.error ? (
+                        <Empty>
+                            <EmptyHeader>
+                                <EmptyTitle>
+                                    Belum ada polis asuransi
+                                </EmptyTitle>
+                                <EmptyDescription>
+                                    Catat polis dari perusahaan asuransi, lalu
+                                    tambahkan aset yang ditanggungnya beserta
+                                    nilainya.
+                                </EmptyDescription>
+                            </EmptyHeader>
+                        </Empty>
+                    ) : (
+                        <DataTable
+                            columns={policyColumns}
+                            incremental={list}
+                            sort={list.sort}
+                            onSortChange={list.onSortChange}
+                            data={policies}
+                            getRowKey={(row) => row.id}
+                            getRowLabel={(row) => `${row.kode} ${row.nama}`}
+                            onRowClick={(row) => setOpenId(row.id)}
+                        />
+                    )}
+                </TabsContent>
 
-            <TabsContent value="polis">
-                {!loading && policies.length === 0 && !list.error ? (
-                    <Empty>
-                        <EmptyHeader>
-                            <EmptyTitle>Belum ada polis asuransi</EmptyTitle>
-                            <EmptyDescription>
-                                Catat polis dari perusahaan asuransi, lalu
-                                tambahkan aset yang ditanggungnya beserta
-                                nilainya.
-                            </EmptyDescription>
-                        </EmptyHeader>
-                    </Empty>
-                ) : (
-                    <DataTable
-                        columns={policyColumns}
-                        incremental={list}
-                        sort={list.sort}
-                        onSortChange={list.onSortChange}
-                        data={policies}
-                        getRowKey={(row) => row.id}
-                        getRowLabel={(row) => `${row.kode} ${row.nama}`}
-                        onRowClick={(row) => setOpenId(row.id)}
-                    />
-                )}
-            </TabsContent>
-
-            <TabsContent value="ringkasan">
-                <InsuranceSummary />
-            </TabsContent>
+                <TabsContent
+                    value="ringkasan"
+                    className="min-h-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col"
+                >
+                    <InsuranceSummary />
+                </TabsContent>
+            </RecordListPage>
 
             <PageDialog
                 open={openId !== null}

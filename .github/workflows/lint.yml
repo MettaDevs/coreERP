@@ -149,6 +149,10 @@ jobs:
       - name: Check Frontend Types
         run: npm run types:check
 
+      - name: Check Asset List Composition
+        working-directory: .
+        run: node scripts/check-asset-list-pages.mjs && node modules/apperp/management-aset/ui/_shared/RecordListPage.test.mjs
+
       # Dipindah ke sini dari alur test. Analisa tipe PHP tidak bergantung versi PHP, jadi
       # menjalankannya di dalam matriks berarti mengerjakan hal yang sama dua kali dengan
       # hasil yang pasti sama. Pembangunan aset TIDAK ikut pindah: test membutuhkannya.

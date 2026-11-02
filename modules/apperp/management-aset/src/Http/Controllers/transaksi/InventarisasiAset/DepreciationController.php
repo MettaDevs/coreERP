@@ -63,6 +63,7 @@ class DepreciationController extends Controller
             $join->on('profile.id', '=', 'aset_tr_buku_aset.depreciation_profile_id')->on('profile.tenant_id', '=', 'aset_tr_buku_aset.tenant_id');
         })->where('aset_tr_buku_aset.status', 'active');
         app(OrganizationScope::class)->asetQuery($query, $request, 'aset');
+        $query->where('aset.is_budgeted', false);
         $books = $query->select('aset_tr_buku_aset.*', 'aset.kode as aset_code', 'aset.currency_code', 'profile.nama as profile_name', 'profile.method', 'profile.frequency')->orderBy('aset.kode')->toBase()->get();
 
         return response()->json(['data' => $books]);
@@ -82,6 +83,7 @@ class DepreciationController extends Controller
                 $join->on('aset.id', '=', 'aset_tr_buku_aset.aset_id')->on('aset.tenant_id', '=', 'aset_tr_buku_aset.tenant_id');
             })->where('aset_tr_buku_aset.id', $data['buku_aset_id']);
             app(OrganizationScope::class)->asetQuery($query, $request, 'aset');
+            $query->where('aset.is_budgeted', false);
             $book = $query->select(
                 'aset_tr_buku_aset.*',
                 'profile.method', 'profile.frequency', 'profile.rate_percent', 'profile.manual_schedule',
@@ -165,6 +167,7 @@ class DepreciationController extends Controller
                 // ratusan baris terlewat.
                 ->where('profile.method', '!=', 'consumption');
             app(OrganizationScope::class)->asetQuery($query, $request, 'aset');
+            $query->where('aset.is_budgeted', false);
             foreach (['group_aset_id' => 'aset.group_aset_id', 'buku_id' => 'aset_tr_buku_aset.buku_id'] as $input => $column) {
                 if ($data[$input] ?? null) {
                     $query->where($column, $data[$input]);

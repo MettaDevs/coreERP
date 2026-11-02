@@ -26,7 +26,7 @@ VersionInput:
 AsetPlanningDetailWrite:
   type: object
   required:
-  - jenis_aset_id
+  - planned_asset_id
   - satuan_id
   - quantity
   - requested_specification
@@ -37,8 +37,10 @@ AsetPlanningDetailWrite:
       allOf:
       - $ref: '#/components/schemas/Ulid'
       description: ID baris tersimpan saat mengubah dokumen; baris baru tidak mengirim ID.
-    jenis_aset_id:
-      $ref: '#/components/schemas/Ulid'
+    planned_asset_id:
+      allOf:
+      - $ref: '#/components/schemas/Ulid'
+      description: Satu aset yang dipilih dari register, aktual atau aset rencana. Jenis dan nama berasal dari aset, bukan pilihan kedua pada baris perencanaan. Harus satu tenant, perusahaan dokumen, dan lolos kebijakan tanggung jawab aset; memerlukan aset.read.
     satuan_id:
       allOf:
       - $ref: '#/components/schemas/Ulid'
@@ -3529,3 +3531,22 @@ MasterDraftAssetTypeIds:
                 uniqueItems: true,
                 items: { $ref: '#/components/schemas/Ulid' },
             }
+
+BudgetedAssetWrite:
+  type: object
+  required: [nama, legal_entity_id, responsible_org_unit_id, group_aset_id, jenis_aset_id, is_budgeted]
+  properties:
+    nama: {type: string, maxLength: 255}
+    legal_entity_id:
+      $ref: '#/components/schemas/Ulid'
+    responsible_org_unit_id:
+      $ref: '#/components/schemas/Ulid'
+    group_aset_id:
+      $ref: '#/components/schemas/Ulid'
+    jenis_aset_id:
+      $ref: '#/components/schemas/Ulid'
+    is_budgeted:
+      type: boolean
+      enum: [true]
+      description: Aset sebagai perencanaan. Tidak dapat diubah menjadi aset aktual melalui kartu.
+    keterangan: {type: string, nullable: true, maxLength: 2000}

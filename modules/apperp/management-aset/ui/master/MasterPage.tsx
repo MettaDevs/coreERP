@@ -2,13 +2,6 @@ import { useMemo, useState } from 'react';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
-import {
-    Card,
-    CardAction,
-    CardContent,
-    CardHeader,
-    CardTitle,
-} from '@apperp/ui/card';
 import { DataTable } from '@apperp/ui/data-table';
 import type {
     DataTableColumn,
@@ -20,10 +13,11 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
-import { Input } from '@apperp/ui/input';
+import { FormControl } from '@apperp/ui/form-control';
 import { Select } from '@apperp/ui/select';
 import { useConfirmation } from '@apperp/ui/use-confirmation';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
+import RecordListPage from '../_shared/RecordListPage';
 import { ApiError, api, errorMessage } from '../api';
 import { useRecordQueryTarget } from '../transactions/_shared/use-record-query-target';
 import { useRecordList } from '../use-record-list';
@@ -327,171 +321,171 @@ export default function MasterPage({
         <div ref={mutationScopeRef} className="h-full min-h-0 overflow-hidden">
             {actionConfirmation}
 
-            <Card
-                aria-labelledby="list-title"
-                className="flex h-full min-h-0 flex-col overflow-hidden rounded-none border-0 shadow-none"
-            >
-                <CardHeader className="min-h-0 shrink-0 border-b">
-                    <CardTitle id="list-title">{config.title}</CardTitle>
-                    {mutationFeedback}
-                    {can('create') && (
-                        <CardAction>
-                            <ActionButton
-                                action="create"
-                                onClick={() => setEditing(null)}
-                            />
-                        </CardAction>
-                    )}
-                </CardHeader>
-
-                <CardContent className="flex min-h-0 flex-1 flex-col px-0">
-                    <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end sm:justify-between">
-                        <div className="space-y-1">
-                            <p className="font-semibold">
-                                Daftar {config.singular}
-                            </p>
-                            <p className="text-muted-foreground text-sm">
-                                {items.length} data dimuat
-                            </p>
-                        </div>
-                        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-                            <Input
-                                className="sm:w-70 w-full"
-                                type="search"
-                                placeholder="Cari kode atau nama"
-                                aria-label={`Cari ${config.singular}`}
-                                value={search}
-                                onChange={(event) => {
-                                    setSearch(event.target.value);
-                                    // Nomor halaman disetel ulang di tempat filternya
-                                    // diubah, bukan lewat effect susulan.
+            <RecordListPage
+                aria-label={config.title}
+                footer={
+                    <p
+                        role="status"
+                        className="text-muted-foreground border-t px-5 py-2 text-sm"
+                    >
+                        {items.length} data dimuat
+                    </p>
+                }
+                toolbar={{
+                    title: config.title,
+                    feedback: mutationFeedback,
+                    trailing:
+                        selectedIds.length > 0 ? (
+                            <span
+                                role="status"
+                                className="text-muted-foreground text-sm"
+                            >
+                                {selectedIds.length} data dipilih
+                            </span>
+                        ) : undefined,
+                    search: {
+                        value: search,
+                        onValueChange: setSearch,
+                        label: `Cari ${config.singular}`,
+                        placeholder: 'Cari kode atau nama',
+                    },
+                    children: (
+                        <>
+                            {can('create') && (
+                                <ActionButton
+                                    action="create"
+                                    onClick={() => setEditing(null)}
+                                />
+                            )}
+                            {selectedIds.length > 0 && can('archive') && (
+                                <ActionButton
+                                    action="archive"
+                                    onClick={archiveSelected}
+                                />
+                            )}
+                        </>
+                    ),
+                }}
+                filters={
+                    <>
+                        {parents.map((parent) => (
+                            <FormControl key={parent.field}>
+                                <MasterSelect
+                                    resource={parent.resource}
+                                    label={parent.label}
+                                    value={
+                                        parentFilter[parent.field] === 'semua'
+                                            ? ''
+                                            : (parentFilter[parent.field] ?? '')
+                                    }
+                                    emptyLabel={allLabel(parent.label)}
+                                    onValueChange={(id) =>
+                                        setParentFilter((current) => ({
+                                            ...current,
+                                            [parent.field]: id || 'semua',
+                                        }))
+                                    }
+                                />
+                            </FormControl>
+                        ))}
+                        <FormControl>
+                            <Select
+                                label="Status"
+                                items={['Semua status', 'Aktif', 'Tidak aktif']}
+                                value={
+                                    activeFilter === 'true'
+                                        ? 'Aktif'
+                                        : activeFilter === 'false'
+                                          ? 'Tidak aktif'
+                                          : 'Semua status'
+                                }
+                                searchPlaceholder="Cari status"
+                                emptyMessage="Status tidak ditemukan."
+                                ariaLabel="Saring berdasarkan status"
+                                onValueChange={(item) => {
+                                    setActiveFilter(
+                                        item === 'Aktif'
+                                            ? 'true'
+                                            : item === 'Tidak aktif'
+                                              ? 'false'
+                                              : 'semua',
+                                    );
                                 }}
                             />
-                            {parents.map((parent) => (
-                                <div
-                                    key={parent.field}
-                                    className="w-full sm:w-52"
-                                >
-                                    <MasterSelect
-                                        resource={parent.resource}
-                                        label={parent.label}
-                                        value={
-                                            parentFilter[parent.field] ===
-                                            'semua'
-                                                ? ''
-                                                : (parentFilter[parent.field] ??
-                                                  '')
-                                        }
-                                        emptyLabel={allLabel(parent.label)}
-                                        onValueChange={(id) =>
-                                            setParentFilter((current) => ({
-                                                ...current,
-                                                [parent.field]: id || 'semua',
-                                            }))
-                                        }
-                                    />
-                                </div>
-                            ))}
-                            <div className="w-full sm:w-44">
-                                <Select
-                                    items={[
-                                        'Semua status',
-                                        'Aktif',
-                                        'Tidak aktif',
-                                    ]}
-                                    value={
-                                        activeFilter === 'true'
-                                            ? 'Aktif'
-                                            : activeFilter === 'false'
-                                              ? 'Tidak aktif'
-                                              : 'Semua status'
-                                    }
-                                    searchPlaceholder="Cari status"
-                                    emptyMessage="Status tidak ditemukan."
-                                    ariaLabel="Saring berdasarkan status"
-                                    onValueChange={(item) => {
-                                        setActiveFilter(
-                                            item === 'Aktif'
-                                                ? 'true'
-                                                : item === 'Tidak aktif'
-                                                  ? 'false'
-                                                  : 'semua',
-                                        );
-                                    }}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                    {selectedIds.length > 0 && (
-                        <div className="bg-muted/40 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b px-5 py-2 text-sm">
-                            <span>{selectedIds.length} data dipilih</span>
-                            <div className="flex gap-2">
-                                {can('archive') && (
-                                    <ActionButton
-                                        action="archive"
-                                        onClick={archiveSelected}
-                                    />
-                                )}
-                            </div>
-                        </div>
-                    )}
-                    {error ? (
-                        <Empty>
-                            <EmptyHeader>
-                                <EmptyTitle>
-                                    Data belum dapat ditampilkan
-                                </EmptyTitle>
-                                <EmptyDescription>
-                                    {error || list.error}
-                                </EmptyDescription>
-                            </EmptyHeader>
-                            <Button variant="outline" onClick={load}>
-                                Coba lagi
-                            </Button>
-                        </Empty>
-                    ) : loading && !items.length ? (
-                        <Empty>
+                        </FormControl>
+                    </>
+                }
+                filtersActive={
+                    activeFilter !== 'semua' ||
+                    parents.some((parent) =>
+                        Boolean(
+                            parentFilter[parent.field] &&
+                            parentFilter[parent.field] !== 'semua',
+                        ),
+                    )
+                }
+            >
+                {error ? (
+                    <Empty>
+                        <EmptyHeader>
+                            <EmptyTitle>
+                                Data belum dapat ditampilkan
+                            </EmptyTitle>
                             <EmptyDescription>
-                                Memuat {config.singular}…
+                                {error || list.error}
                             </EmptyDescription>
-                        </Empty>
-                    ) : items.length === 0 ? (
-                        <Empty>
-                            <EmptyHeader>
-                                <EmptyTitle>
-                                    Belum ada {config.singular}
-                                </EmptyTitle>
-                                <EmptyDescription>
-                                    Tambahkan data pertama agar pilihan pada
-                                    bagian lain sudah tersedia.
-                                </EmptyDescription>
-                            </EmptyHeader>
-                        </Empty>
-                    ) : (
-                        <DataTable
-                            scrollMode="viewport"
-                            className="min-h-0 flex-1"
-                            columns={columns}
-                            incremental={list}
-                            sort={list.sort}
-                            onSortChange={list.onSortChange}
-                            data={items}
-                            getRowKey={(item) => item.id}
-                            getRowLabel={(item) => item.nama}
-                            actions={rowActions}
-                            onRowAction={(action, item) => {
-                                if (action === 'edit') {
-                                    setEditing(item);
-                                }
+                        </EmptyHeader>
+                        <Button variant="outline" onClick={load}>
+                            Coba lagi
+                        </Button>
+                    </Empty>
+                ) : loading && !items.length ? (
+                    <Empty>
+                        <EmptyDescription>
+                            Memuat {config.singular}…
+                        </EmptyDescription>
+                    </Empty>
+                ) : items.length === 0 ? (
+                    <Empty>
+                        <EmptyHeader>
+                            <EmptyTitle>Belum ada {config.singular}</EmptyTitle>
+                            <EmptyDescription>
+                                Tambahkan data pertama agar pilihan pada bagian
+                                lain sudah tersedia.
+                            </EmptyDescription>
+                        </EmptyHeader>
+                    </Empty>
+                ) : (
+                    <DataTable
+                        columns={columns}
+                        incremental={list}
+                        sort={list.sort}
+                        onSortChange={list.onSortChange}
+                        data={items}
+                        getRowKey={(item) => item.id}
+                        getRowLabel={(item) => item.nama}
+                        selection={
+                            can('archive')
+                                ? {
+                                      selectedKeys: selectedIds,
+                                      onSelectedKeysChange: (keys) =>
+                                          setPicked(keys.map(String)),
+                                  }
+                                : undefined
+                        }
+                        actions={rowActions}
+                        onRowAction={(action, item) => {
+                            if (action === 'edit') {
+                                setEditing(item);
+                            }
 
-                                if (action === 'archive') {
-                                    archive(item);
-                                }
-                            }}
-                        />
-                    )}
-                </CardContent>
-            </Card>
+                            if (action === 'archive') {
+                                archive(item);
+                            }
+                        }}
+                    />
+                )}
+            </RecordListPage>
 
             {editing !== undefined && (
                 <MasterForm
