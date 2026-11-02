@@ -102,14 +102,14 @@ Kedua sisi memakai tindakan domain yang sama untuk pembuatan tenant, undangan, f
 
 Pemeriksaan ini berdasarkan checkout CoreERP `c814b01ed9608b09b13a9dfe637d6094c723ea6a` dan source SSO yang dibaca pada penyusunan rencana. Ini bukan audit runtime terbaru.
 
-| Keadaan yang ditemukan                                          | Sumber dan dampak                                                                                                                                                 |
-| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Tenant, membership, dan environment sudah ada.                  | `apps/core/app/Platform/Tenant/Models/` dan `Platform/Environment/Models/`. Pakai konsep kanonik tersebut.                                                        |
-| Pembuatan tenant masih membuat User dan menjalankan proses ERP. | `Platform/Tenant/Actions/RegisterBusiness.php`. Pisahkan fondasi organisasi dari pemasangan ERP.                                                                  |
-| Faskes dimiliki langsung oleh satu `ProductCustomer`.           | `Platform/ControlPlane/Products/ProductRegistration.php`. Session mengambil satu instance terakhir dan launch menargetkan `owner`.                                |
-| Jalur operator dan public Faskes memakai creator bersama.       | `Platform/ControlPlane/Products/CreateProductTenant.php`. Pertahankan aturan domain bersama saat migrasi.                                                         |
-| Kuota Faskes masih satu trial per orang dan produk.             | Creator serta migration `2026_10_25_100000_add_product_customer_registration.php`. Ubah bersamaan dengan aturan anti-penyalahgunaan, bukan cukup menghapus index. |
-| SSO didesain untuk autentikasi global.                          | Repository SSO, `AGENTS.md` dan migration `2026_08_24_160800_remove_tenants_and_tenant_id_columns.php`. Tidak perlu membangun direktori organisasi SSO baru.      |
+| Keadaan yang ditemukan                                                    | Sumber dan dampak                                                                                                                                                 |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tenant, membership, dan environment sudah ada.                            | `apps/core/app/Platform/Tenant/Models/` dan `Platform/Environment/Models/`. Pakai konsep kanonik tersebut.                                                        |
+| Penciptaan tenant kanonik telah dipisahkan dari bootstrap ERP pada PF-01. | [Implementasi dan batas bukti PF-01](PF-01.md). Jalur registrasi ERP tetap memasang ERP secara eksplisit; runtime server belum dideploy.                          |
+| Faskes dimiliki langsung oleh satu `ProductCustomer`.                     | `Platform/ControlPlane/Products/ProductRegistration.php`. Session mengambil satu instance terakhir dan launch menargetkan `owner`.                                |
+| Jalur operator dan public Faskes memakai creator bersama.                 | `Platform/ControlPlane/Products/CreateProductTenant.php`. Pertahankan aturan domain bersama saat migrasi.                                                         |
+| Kuota Faskes masih satu trial per orang dan produk.                       | Creator serta migration `2026_10_25_100000_add_product_customer_registration.php`. Ubah bersamaan dengan aturan anti-penyalahgunaan, bukan cukup menghapus index. |
+| SSO didesain untuk autentikasi global.                                    | Repository SSO, `AGENTS.md` dan migration `2026_08_24_160800_remove_tenants_and_tenant_id_columns.php`. Tidak perlu membangun direktori organisasi SSO baru.      |
 
 ## Pisahkan database sebelum memperluas portal
 

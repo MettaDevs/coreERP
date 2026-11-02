@@ -209,7 +209,7 @@ try {
             $tenantIds = $tenants->pluck('id')->all();
             $tenantOnlyIds = $tenants->reject(fn (object $tenant): bool => $tenant->name === $prefix.'-erp')->pluck('id')->all();
             $customers = $connection->select(
-                'SELECT c.id, substring(c.name from ?) AS label, c.user_id, '
+                'SELECT c.id, substring(c.name from CAST(? AS integer)) AS label, c.user_id, '
                 .'(SELECT count(*) FROM external_identities i WHERE i.issuer = c.issuer AND i.subject = c.subject AND i.deleted_at IS NULL) AS identity_count, '
                 .'(SELECT min(i.user_id) FROM external_identities i WHERE i.issuer = c.issuer AND i.subject = c.subject AND i.deleted_at IS NULL) AS identity_user_id '
                 .'FROM product_customers c WHERE c.name LIKE ? ORDER BY c.name',

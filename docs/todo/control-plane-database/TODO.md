@@ -35,12 +35,12 @@ CPDB-01 juga mencakup rincian berikut sebelum schema final dibuat.
 - [x] CPDB-01h. Kunci kontrak domain group pasien, clinical-record grants, obat, jasa, pricing/availability dan inventory source. [Kontrak policy/profile](CPDB-01.md#policy-group-profile-custody-dan-pembayaran) dan `inventory/contracts.json` mencakup assignment kelompok, authority katalog, process version, legacy mapping, satu write binding, revision/effective date, capability dan data shared lama.
 - [x] CPDB-01i. Tambahkan binding custody serta procurement, clinical org, stock owner, lokasi/custodian, seller, beneficiary, collector dan settlement reference pada kontrak. Bukti berada pada bagian custody `inventory/contracts.json`. Legal eligibility, ledger dan pembayaran tidak dinyatakan berjalan; mode titipan tetap mengikuti SH-06/CD.
 
-Centang CPDB-01 membuktikan keluaran inventaris/kontrak yang diminta, bukan acceptance split atau rehearsal. Owner integrasi adalah Codex pada branch `codex/cpdb-01-evidence-20261102`, source baseline `08366c35547632c6bcf9c7b643ef2455df4fc1bb`. Hasil diserahkan melalui [PR #372](https://github.com/MettaDevs/coreERP/pull/372), dengan bukti lokal pada `inventory/verification.json` dan status CI pada head PR tersebut. PF-01 mempunyai input kontrak; tidak dikerjakan dalam PR CPDB-01 ini.
+Centang CPDB-01 membuktikan keluaran inventaris/kontrak yang diminta, bukan acceptance split atau rehearsal. Owner integrasi adalah Codex pada branch `codex/cpdb-01-evidence-20261102`, source baseline `08366c35547632c6bcf9c7b643ef2455df4fc1bb`. Hasil diserahkan melalui [PR #372](https://github.com/MettaDevs/coreERP/pull/372), dengan bukti lokal pada `inventory/verification.json` dan status CI pada head PR tersebut. PF-01 memakai hasil tersebut dan implementasinya dicatat terpisah pada [laporan PF-01](../metta-platform-portal/PF-01.md).
 
 ## PF-01. Gunakan pekerjaan fondasi yang sudah direncanakan
 
-- [ ] Laksanakan PF-01a sampai PF-01d pada [TODO portal](../metta-platform-portal/TODO.md). Jangan membuat creator tenant kedua untuk proyek database.
-- [ ] Buktikan tenant/membership pusat lahir tanpa entitas ERP atau environment otomatis. Catat pengganti transaksi campuran sebelum koneksi dipisah.
+- [x] Implementasi PF-01a sampai PF-01d tersedia untuk review pada [TODO portal](../metta-platform-portal/TODO.md). Jangan membuat creator tenant kedua untuk proyek database.
+- [x] Tenant/membership kanonik tanpa bootstrap ERP dibuktikan pada fixture HTTP/SQL [PF-01](../metta-platform-portal/PF-01.md). Transaksi campuran ERP lama tetap satu database; durable adapter boundary dua database masih CPDB-03.
 
 ## CPDB-02. Pisahkan koneksi dan migration
 

@@ -1,0 +1,161 @@
+{
+  "recorded_at": "2026-11-02T08:17:48.855183+00:00",
+  "base_sha": "cdab80be96ab309f88dbcc939e16f9c81f03b1d0",
+  "tested_backend_sha": "a4f331ddca684b1cc0b69b49b0271e5544b2d221",
+  "scope": "PF01 source implementation and isolated synthetic fixtures only; no deploy, database split or analytics changes",
+  "checks": [
+    {
+      "name": "Core scoped Tenant/Boundary/Identity/SSO/ProductRegistration/on-prem",
+      "result": "pass",
+      "tests": 372,
+      "assertions": 1753,
+      "skipped": 4,
+      "limits": "Four Valkey integration cases skipped because VALKEY_TEST_PORT was not configured locally. This is not the entire Core suite."
+    },
+    {
+      "name": "Console CreateCustomer/CreateOrganizationTenant clients",
+      "result": "pass",
+      "tests": 22,
+      "assertions": 89
+    },
+    {
+      "name": "After UUID canonicalization: canonical endpoints + DTO",
+      "result": "pass",
+      "tests": 16,
+      "assertions": 90
+    },
+    {
+      "name": "Independent identity boundary probes",
+      "result": "pass",
+      "tests": 3,
+      "assertions": 52
+    },
+    {
+      "name": "Signed SSO ordinary login creates zero User",
+      "result": "pass",
+      "tests": 1,
+      "assertions": 15
+    },
+    {
+      "name": "Independent lifecycle/rollback probes",
+      "result": "pass",
+      "tests": 2,
+      "assertions": 35
+    },
+    {
+      "name": "Equivalent UUID spellings concurrency regression after fix",
+      "result": "pass",
+      "tests": 1,
+      "assertions": 10,
+      "limits": "Actual app subprocesses and PostgreSQL, not HTTP. The HTTP probe separately observed one201/one200 for mixed-case UUID."
+    },
+    {
+      "name": "PHPStan Core and console",
+      "result": "pass"
+    },
+    {
+      "name": "Pint changed PHP and verifier",
+      "result": "pass"
+    },
+    {
+      "name": "Internal contract bundle and framework coverage",
+      "result": "pass",
+      "routes": 43
+    },
+    {
+      "name": "Offline verifier rejection tests, guards and PHP syntax",
+      "result": "pass"
+    },
+    {
+      "name": "HTTP baseline and head acceptance",
+      "result": "pass",
+      "lanes": 10,
+      "requests": 179
+    },
+    {
+      "name": "Relevant serial group",
+      "result": "not_applicable",
+      "limits": "No serial-labelled test exists in the changed Tenant/Boundary/Identity/ProductRegistration/on-prem selection."
+    },
+    {
+      "name": "VitePress docs build",
+      "result": "pass",
+      "limits": "No dead link. Nonblocking AL highlighting, browser metadata, Tailwind content and chunk warnings."
+    }
+  ],
+  "performance": {
+    "claim": "Absolute sequential HTTP latency for committed tenant-only creation by existing principals on this isolated fixture.",
+    "concurrency": 1,
+    "samples": 150,
+    "errors": 0,
+    "p95_ms": 509.47,
+    "p95_budget_ms": 1000,
+    "sql_delta": {
+      "clients": 150,
+      "tenants": 150,
+      "users": 0,
+      "external_identities": 0,
+      "product_customers": 0,
+      "tenant_memberships": 150,
+      "tenant_creation_requests": 150,
+      "operator_audit_events": 150,
+      "organizations": 0,
+      "legal_entities": 0,
+      "operating_units": 0,
+      "tenant_app_entitlements": 0,
+      "environments": 0,
+      "environment_members": 0,
+      "roles": 0,
+      "role_assignments": 0,
+      "units_of_measure": 0,
+      "uom_classes": 0,
+      "uom_systems": 0,
+      "uom_translations": 0,
+      "uom_conversions": 0,
+      "uom_external_codes": 0,
+      "tenant_number_sequences": 0,
+      "number_sequence_profiles": 0,
+      "number_sequence_counters": 0,
+      "number_sequence_allocations": 0,
+      "number_sequence_reservations": 0,
+      "number_sequence_reusable_numbers": 0,
+      "number_sequence_issues": 0,
+      "number_sequence_audit_events": 0,
+      "number_sequence_continuous_pool": 0,
+      "core_module_installations": 0,
+      "managed_product_tenants": 0
+    },
+    "limits": "PHP development server and Docker test fixture. Machine load, resource observations and limiter profiling must accompany any performance interpretation. This is not a production capacity measurement."
+  },
+  "runtime": {
+    "storage": "Immutable Git snapshots on Linux Docker volumes; version hashes checked against Git blobs",
+    "php_image": "coreerp-pf01-test:local",
+    "php_image_id": "sha256:25260e58a7f63195e88ab9e1f5dd784bdc3e7eff4075057e5cc0cef4ef803888",
+    "php": "8.4.27",
+    "postgres": "16.14",
+    "app_cpus": 4,
+    "app_memory": "4GiB",
+    "db_cpus": 2,
+    "db_memory": "2GiB",
+    "server": "PHP development server, 4 configured workers plus listener; process inventory observed",
+    "before_probe_observation": "App CPU0.05%, database CPU0%, no other fixture test workers. Existing UI stack was left running.",
+    "limits": "No throughput, saturation, production SLO or speedup claim. No external SSO provider or UI browser flow measured."
+  },
+  "review": {
+    "kind": "same-model independent source and targeted actual-code probes",
+    "findings_fixed": [
+      "Sealed ControlPlane package boundary through neutral TenantRegistrar",
+      "UUID request identity canonicalized before lock and receipt",
+      "Verifier baseline/source match, principal oracle and published-port target binding"
+    ],
+    "source_only": [
+      "Query-count growth and extreme payload volume unmeasured; no UI lists/forms changed"
+    ]
+  },
+  "github_ci": "Authoritative status on the final PR head. Known main analytics time-test failure remains held; previous PR372 merge exception is not reused.",
+  "not_verified": [
+    "Two database authority split, durable adapter receipt, revoke/staleness, backup/restore and RPO/RTO",
+    "Platform management chain, invitations, grants/revoke and Faskes binding of PF02+",
+    "Production capacity and real external-provider login"
+  ]
+}

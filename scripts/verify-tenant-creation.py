@@ -188,7 +188,7 @@ def created(reply: Reply, expected_status: int = 201) -> dict[str, Any]:
     require(set(reply.result) == set(RESULT_FIELDS), f"{reply.label} returned an incomplete creation result.")
     require(type(reply.result["principal_id"]) is int, f"{reply.label} returned an invalid principal ID.")
     for key in ("tenant_id", "membership_id"):
-        require(isinstance(reply.result[key], str) and re.fullmatch(r"[0-9A-HJKMNP-TV-Z]{26}", reply.result[key]) is not None, f"{reply.label} returned an invalid {key}.")
+        require(isinstance(reply.result[key], str) and re.fullmatch(r"[0-9A-HJKMNP-TV-Z]{26}", reply.result[key], re.IGNORECASE | re.ASCII) is not None, f"{reply.label} returned an invalid {key}.")
     require(reply.result["replayed"] is (expected_status == 200), f"{reply.label} returned an incorrect replay flag.")
     return reply.result
 

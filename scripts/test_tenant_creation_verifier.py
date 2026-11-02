@@ -134,6 +134,14 @@ def reject_wrong_http_target(module: types.ModuleType) -> None:
             raise AssertionError("The verified listener was not pinned before HTTP use.")
 
 
+def accept_model_ulid_spellings(module: types.ModuleType) -> None:
+    for value in ("01m6dmk5ytbyfy3zdr8aw05pmz", "01M6DMK5YTBYFY3ZDR8AW05PMZ"):
+        result = dict(tenant_id=value, membership_id=value, principal_id=1, replayed=False)
+        observed = module.created(module.Reply("model-ulid", 201, 1.0, result, {}))
+        if observed["tenant_id"] != value:
+            raise AssertionError("ULID validation changed the model's stored identifier.")
+
+
 def reject_unsafe_configuration() -> None:
     prefix = PHP_SOURCE.read_text(encoding="utf-8").split(
         "    require $corePath.'/vendor/autoload.php';", 1,
@@ -182,6 +190,7 @@ def main() -> int:
         ("reject_false_baseline", lambda: reject_false_baseline(module)),
         ("reject_wrong_performance_owner", lambda: reject_wrong_performance_owner(module)),
         ("reject_wrong_http_target", lambda: reject_wrong_http_target(module)),
+        ("accept_model_ulid_spellings", lambda: accept_model_ulid_spellings(module)),
         ("reject_unsafe_configuration", reject_unsafe_configuration),
     )
     for label, check in checks:

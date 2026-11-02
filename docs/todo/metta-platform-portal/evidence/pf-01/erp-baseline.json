@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "run_id": "c7443c42eed74cf39db234d20abf0f1b",
+  "started_at": "2026-11-02T07:24:31.062381+00:00",
+  "scope": "ERP baseline only. Actual HTTP registration with first_environment=none and independent SQL observations. This does not verify the tenant-only endpoints.",
+  "lanes": [],
+  "status": "passed",
+  "source_hashes": {
+    "scripts/verify-tenant-creation.py": "d46e5c1966698aed3f35953240cfa0a0d0c814dda6527c7acf4ce998692f6533",
+    "scripts/tenant-creation-fixture.php": "fa58f91688614ad5321783e836890e7d457f92c0e5a35704d1597e72f8b518ce"
+  },
+  "driver_source_revision": "cdab80be96ab309f88dbcc939e16f9c81f03b1d0",
+  "source_revision": "cdab80be96ab309f88dbcc939e16f9c81f03b1d0",
+  "driver_worktree_dirty": true,
+  "database": {
+    "database": "core_erp_pf01_test_baseline",
+    "schema": "coreerp_test",
+    "postgres_version": "16.14",
+    "source_hashes": {
+      "app/Platform/Tenant/Actions/RegisterBusiness.php": "55d7bd63305ab8868a4f0c44330b6801a0360d8f3c5d7e85c40f5da12c7c61df",
+      "app/Foundation/UnitOfMeasure/Listeners/ProvisionUnitsForNewTenant.php": "87893a5c5537d9db5d60c6665d533a5998c0fb39ac7a3e07154fb5db069b3305"
+    }
+  },
+  "kind": "pf01-erp-registration",
+  "backend_source_hashes": {
+    "app/Platform/Tenant/Actions/RegisterBusiness.php": "55d7bd63305ab8868a4f0c44330b6801a0360d8f3c5d7e85c40f5da12c7c61df",
+    "app/Foundation/UnitOfMeasure/Listeners/ProvisionUnitsForNewTenant.php": "87893a5c5537d9db5d60c6665d533a5998c0fb39ac7a3e07154fb5db069b3305"
+  },
+  "http_status": 201,
+  "first_environment": "none",
+  "app_id": "pf01-3cfdc0b606dbb6f2",
+  "observed": {
+    "tenant_id": "01m6djaj2f9ye37h9e1nj44h6n",
+    "tenant_status": "active",
+    "principal_id": 3,
+    "membership_id": "01m6djaj6tqx9w24z560ffdsr6",
+    "membership_principal_id": 3,
+    "membership_status": "active",
+    "membership_count": 1,
+    "owner_role_count": 1,
+    "owner_assignment_count": 1,
+    "units_count": 21,
+    "entitlement_app_ids": [
+      "pf01-3cfdc0b606dbb6f2"
+    ],
+    "environment_count": 0,
+    "module_installation_count": 0,
+    "operator_membership_count": 0,
+    "operator_principal_id": 2,
+    "must_change_password": true,
+    "temporary_password_matches": true
+  },
+  "sql_delta": {
+    "clients": 1,
+    "tenants": 1,
+    "users": 1,
+    "tenant_memberships": 1,
+    "roles": 1,
+    "role_assignments": 1,
+    "units_of_measure": 21,
+    "tenant_app_entitlements": 1,
+    "environments": 0,
+    "environment_members": 0,
+    "core_module_installations": 0
+  },
+  "requests": [
+    {
+      "label": "erp-app-catalog",
+      "status": 200,
+      "elapsed_ms": 660.391,
+      "result": {
+        "app_ids": [
+          "pf01-3cfdc0b606dbb6f2"
+        ]
+      }
+    },
+    {
+      "label": "erp-operator-registration",
+      "status": 201,
+      "elapsed_ms": 478.44,
+      "result": {
+        "tenant_id": "01m6djaj2f9ye37h9e1nj44h6n"
+      }
+    }
+  ],
+  "finished_at": "2026-11-02T07:24:36.820678+00:00"
+}

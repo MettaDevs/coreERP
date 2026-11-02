@@ -35,3 +35,5 @@ Source PHP/AL serta SELECT SQL yang dirangkum pada [evidence](DATABASE-PATTERN-E
 Audit privat, query mentah, credential, dan file sesi lain tidak menjadi bagian paket publik. Referensi dan bukti yang aman ada pada halaman paket ini. Detail konfigurasi runtime tetap diperiksa melalui sumber koneksi yang sah.
 
 Pemeriksaan dokumentasi dapat dijalankan dengan `node scripts/check-healthcare-domain-neutrality.mjs` dan build VitePress. Pengecualian menunggu CI untuk PR dokumentasi ini tidak berlaku otomatis bagi PR implementasi. Ikuti gate test, kontrak, runtime dan keamanan yang sesuai perubahan nyata.
+
+Hasil implementasi [PF-01](../metta-platform-portal/PF-01.md) memisahkan writer tenant kanonik dari bootstrap ERP. Status review, command dan bukti fixture ada pada TODO portal dan `evidence/pf-01/`. Ini tidak memindahkan database atau mengaktifkan portal/enrollment; langkah berikutnya tetap CPDB-02 setelah review unit tersebut.
