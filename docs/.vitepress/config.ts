@@ -389,6 +389,33 @@ export default withMermaid({
               ],
             },
             {
+              text: 'Platform Metta dan portal customer',
+              collapsed: false,
+              items: [
+                { text: 'Model dan alur kedua sisi', link: '/todo/metta-platform-portal/' },
+                { text: 'Rencana pelaksanaan', link: '/todo/metta-platform-portal/PLAN' },
+                { text: 'TODO tim', link: '/todo/metta-platform-portal/TODO' },
+                { text: 'TODO pasien dan stok bersama', link: '/todo/metta-platform-portal/SHARING-TODO' },
+                { text: 'Perubahan dan skenario mendatang', link: '/todo/metta-platform-portal/CHANGES' },
+              ],
+            },
+            {
+              text: 'Database control plane terpisah',
+              collapsed: false,
+              items: [
+                { text: 'Keputusan dan dependensi', link: '/todo/control-plane-database/' },
+                { text: 'Handoff implementasi', link: '/todo/control-plane-database/HANDOFF' },
+                { text: 'PRD', link: '/todo/control-plane-database/PRD' },
+                { text: 'Organisasi dan aturan sharing', link: '/todo/control-plane-database/ORGANIZATION-AND-SHARING' },
+                { text: 'Profil kelompok layanan Faskes', link: '/todo/control-plane-database/SERVICE-GROUP-PROFILES' },
+                { text: 'Stok titipan DEPO dan pembayaran', link: '/todo/control-plane-database/SUPPLY-CUSTODY-AND-PAYMENT' },
+                { text: 'Bukti pola Kuta 1 dan Mengwi 1', link: '/todo/control-plane-database/DATABASE-PATTERN-EVIDENCE' },
+                { text: 'TODO pemisahan', link: '/todo/control-plane-database/TODO' },
+                { text: 'Cutover dan rollback', link: '/todo/control-plane-database/CUTOVER' },
+                { text: 'Referensi dan materi belajar', link: '/todo/control-plane-database/REFERENCES' },
+              ],
+            },
+            {
               text: 'Lapis Platform dan Foundation',
               collapsed: false,
               items: [

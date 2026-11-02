@@ -1,6 +1,12 @@
 # Tenant, organization directory, dan hierarchy
 
+::: info Target fondasi bersama ERP dan Faskes
+Model bisnis pada halaman ini tetap menjadi acuan. Target penempatan terbaru adalah Organization Foundation tenant-scoped pada database `core_control_plane`, tersedia bagi Faskes-only tanpa pembelian ERP. Lihat [spesifikasi organisasi dan sharing](../todo/control-plane-database/ORGANIZATION-AND-SHARING.md). Pemindahan authority belum diimplementasikan. Source saat ini dan schema di bawah tidak membuktikan directory sudah terpisah atau Faskes telah mengonsumsinya. Hierarchy tidak otomatis menentukan sharing pasien atau stock pool.
+:::
+
 Model kanonik CoreERP mengikuti pemisahan Microsoft Dynamics 365 antara tenant, identitas organisasi, dan penempatan organisasi dalam hierarchy. Referensi dan alasan keputusan ada di [referensi model organisasi Dynamics 365](../references/dynamics-365-organization-model.md).
+
+Fondasi organisasi melayani pengelola pemerintah maupun swasta. Bentuk pengelola tidak menjadi syarat tenant atau prefix identifier. Profile layanan, hierarchy purpose, sharing group dan grant dipilih menurut kebutuhan bisnis yang sah, bukan otomatis dari sektor kepemilikan.
 
 ## Batas yang tidak boleh dicampur
 

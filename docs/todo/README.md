@@ -27,6 +27,10 @@ dengan halamannya sendiri di sidebar.
 
 ## Peta dokumen
 
+Rencana lintas produk yang baru ada di [Platform Metta dan portal customer](metta-platform-portal/index.md). Dokumen tersebut memuat alur admin dan customer, TODO, serta aturan perubahan kebijakan. Statusnya usulan implementasi, bukan fitur yang sudah tersedia.
+
+[Pemisahan database control plane](control-plane-database/index.md) memuat PRD, TODO, runbook cutover/rollback, serta referensi resmi untuk belajar. Program ini menjadi prasyarat lintas rencana portal; pemisahan database dibedakan dari ekstraksi service atau repository.
+
 | Dokumen | Isi | Temuan |
 | --- | --- | --- |
 | [00-ringkasan.md](general/00-ringkasan.md) | Vonis fondasi, skor per dimensi, jalur kritis, dan urutan gelombang | — |
