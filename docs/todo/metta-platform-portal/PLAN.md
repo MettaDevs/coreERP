@@ -68,6 +68,8 @@ Rilis yang menawarkan pasien A/B terpisah tetapi stok bersama memerlukan SH-01 d
 
 **Depends on.** CPDB-01 pada TODO pemisahan database. PF-01 adalah satu pekerjaan bersama, tidak diduplikasi.
 
+Pelaksanaan PF-01 dan batas fixture tercatat pada [laporan PF-01](PF-01.md). Backend yang diuji adalah `360a8cc2`; bukti live memakai session SSO sintetis yang sudah diverifikasi, HTTP nyata dan SQL committed. Login biasa tanpa User baru diuji terpisah melalui signed-SSO test. Tidak mengklaim login provider eksternal atau UI portal yang belum dibuat.
+
 **Files.**
 
 - [ ] Tinjau dan ubah `apps/core/app/Platform/Tenant/Actions/RegisterBusiness.php` sesuai scope PF-01. Bukti berupa diff allowlist.
@@ -79,35 +81,35 @@ Rilis yang menawarkan pasien A/B terpisah tetapi stok bersama memerlukan SH-01 d
 
 **Build.**
 
-- [ ] Kerjakan PF-01a sampai PF-01d pada TODO. Pertahankan security role dan pemetaan issuer + subject. Pisahkan action tenant dari bootstrap ERP; jangan menambahkan sistem membership kedua. Bukti berupa diff, kontrak, dan hasil verifikasi unit ini.
+- [x] Kerjakan PF-01a sampai PF-01d pada TODO. Pertahankan security role dan pemetaan issuer + subject. Pisahkan action tenant dari bootstrap ERP; jangan menambahkan sistem membership kedua. Bukti berupa diff, kontrak, dan hasil verifikasi unit ini.
 
 **You see.**
 
-- [ ] Tenant dapat dibuat bagi principal yang sudah ada tanpa User duplikat, company ERP, entitlement ERP, atau environment ERP otomatis. Simpan hasil UI atau query read-only yang membuktikannya.
+- [x] Tenant dapat dibuat bagi principal yang sudah ada tanpa User duplikat, company ERP, entitlement ERP, atau environment ERP otomatis. Simpan hasil UI atau query read-only yang membuktikannya.
 
 **Verify, unit.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Tambahkan kasus identitas yang sama membuat tenant baru, dua subject dengan email sama, tenant tanpa environment, dan larangan customer menjadi operator. Jalankan suite Tenant, Identity, dan Boundary. Catat perintah tepat dan output pada SHA head.
+- [x] Tambahkan kasus identitas yang sama membuat tenant baru, dua subject dengan email sama, tenant tanpa environment, dan larangan customer menjadi operator. Jalankan suite Tenant, Identity, dan Boundary. Catat perintah tepat dan output pada SHA head.
 
 **Verify, live.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked. Ten lanes on `inherit-parent` at the PR head. Gunakan model parent dan fixture nonproduksi; ini rencana pengujian, bukan hasil yang sudah dijalankan.
 
-- [ ] Lane 1. Regression lane against trunk. Bandingkan pembuatan tenant operator ERP; tenant lama tetap dapat dibuat dan diakses. Save `artifacts/PF-01/lane-1/result.png`. Pass when hasil yang disebut terbukti pada UI atau output CLI nyata dan query pendukung sesuai; log negatif disimpan tanpa secret.
-- [ ] Lane 2. Login principal lama, buat tenant organisasi saja; tidak ada User atau environment ERP tambahan. Save `artifacts/PF-01/lane-2/result.png`. Pass when hasil yang disebut terbukti pada UI atau output CLI nyata dan query pendukung sesuai; log negatif disimpan tanpa secret.
-- [ ] Lane 3. Login principal baru; satu identity mapping dan satu membership terbentuk. Save `artifacts/PF-01/lane-3/result.png`. Pass when hasil yang disebut terbukti pada UI atau output CLI nyata dan query pendukung sesuai; log negatif disimpan tanpa secret.
-- [ ] Lane 4. Kirim dua subject dengan email sama; tidak terjadi penggabungan identity otomatis. Save `artifacts/PF-01/lane-4/result.png`. Pass when hasil yang disebut terbukti pada UI atau output CLI nyata dan query pendukung sesuai; log negatif disimpan tanpa secret.
-- [ ] Lane 5. Buat tenant tanpa app_ids; tidak muncul entitlement ERP otomatis. Save `artifacts/PF-01/lane-5/result.png`. Pass when hasil yang disebut terbukti pada UI atau output CLI nyata dan query pendukung sesuai; log negatif disimpan tanpa secret.
-- [ ] Lane 6. Coba route operator sebagai customer; akses ditolak di server. Save `artifacts/PF-01/lane-6/result.png`. Pass when hasil yang disebut terbukti pada UI atau output CLI nyata dan query pendukung sesuai; log negatif disimpan tanpa secret.
-- [ ] Lane 7. Operator membuat tenant customer; operator tidak mendapatkan role Owner customer. Save `artifacts/PF-01/lane-7/result.png`. Pass when hasil yang disebut terbukti pada UI atau output CLI nyata dan query pendukung sesuai; log negatif disimpan tanpa secret.
-- [ ] Lane 8. Dua request create identik; kontrak idempotency mengembalikan hasil yang sama. Save `artifacts/PF-01/lane-8/result.png`. Pass when hasil yang disebut terbukti pada UI atau output CLI nyata dan query pendukung sesuai; log negatif disimpan tanpa secret.
-- [ ] Lane 9. Dua principal memilih slug sama; hanya satu reservasi sah, konflik dijelaskan. Save `artifacts/PF-01/lane-9/result.png`. Pass when hasil yang disebut terbukti pada UI atau output CLI nyata dan query pendukung sesuai; log negatif disimpan tanpa secret.
-- [ ] Lane 10. Pilih dua tenant dengan identity yang sama; scope membership tidak tertukar. Save `artifacts/PF-01/lane-10/result.png`. Pass when hasil yang disebut terbukti pada UI atau output CLI nyata dan query pendukung sesuai; log negatif disimpan tanpa secret.
+- [x] Lane 1. Regression lane against trunk. Bandingkan pembuatan tenant operator ERP; tenant lama tetap dapat dibuat dan diakses. Save `docs/todo/metta-platform-portal/evidence/pf-01/http-acceptance.json`. Pass when hasil yang disebut terbukti pada UI atau output CLI nyata dan query pendukung sesuai; log negatif disimpan tanpa secret.
+- [x] Lane 2. Login principal lama, buat tenant organisasi saja; tidak ada User atau environment ERP tambahan. Save `docs/todo/metta-platform-portal/evidence/pf-01/http-acceptance.json`. Pass when hasil yang disebut terbukti pada UI atau output CLI nyata dan query pendukung sesuai; log negatif disimpan tanpa secret.
+- [x] Lane 3. Login principal baru; satu identity mapping dan satu membership terbentuk. Save `docs/todo/metta-platform-portal/evidence/pf-01/http-acceptance.json`. Pass when hasil yang disebut terbukti pada UI atau output CLI nyata dan query pendukung sesuai; log negatif disimpan tanpa secret.
+- [x] Lane 4. Kirim dua subject dengan email sama; tidak terjadi penggabungan identity otomatis. Save `docs/todo/metta-platform-portal/evidence/pf-01/http-acceptance.json`. Pass when hasil yang disebut terbukti pada UI atau output CLI nyata dan query pendukung sesuai; log negatif disimpan tanpa secret.
+- [x] Lane 5. Buat tenant tanpa app_ids; tidak muncul entitlement ERP otomatis. Save `docs/todo/metta-platform-portal/evidence/pf-01/http-acceptance.json`. Pass when hasil yang disebut terbukti pada UI atau output CLI nyata dan query pendukung sesuai; log negatif disimpan tanpa secret.
+- [x] Lane 6. Coba route operator sebagai customer; akses ditolak di server. Save `docs/todo/metta-platform-portal/evidence/pf-01/http-acceptance.json`. Pass when hasil yang disebut terbukti pada UI atau output CLI nyata dan query pendukung sesuai; log negatif disimpan tanpa secret.
+- [x] Lane 7. Operator membuat tenant customer; operator tidak mendapatkan role Owner customer. Save `docs/todo/metta-platform-portal/evidence/pf-01/http-acceptance.json`. Pass when hasil yang disebut terbukti pada UI atau output CLI nyata dan query pendukung sesuai; log negatif disimpan tanpa secret.
+- [x] Lane 8. Dua request create identik; kontrak idempotency mengembalikan hasil yang sama. Save `docs/todo/metta-platform-portal/evidence/pf-01/http-acceptance.json`. Pass when hasil yang disebut terbukti pada UI atau output CLI nyata dan query pendukung sesuai; log negatif disimpan tanpa secret.
+- [x] Lane 9. Dua principal memilih slug sama; hanya satu reservasi sah, konflik dijelaskan. Save `docs/todo/metta-platform-portal/evidence/pf-01/http-acceptance.json`. Pass when hasil yang disebut terbukti pada UI atau output CLI nyata dan query pendukung sesuai; log negatif disimpan tanpa secret.
+- [x] Lane 10. Pilih dua tenant dengan identity yang sama; scope membership tidak tertukar. Save `docs/todo/metta-platform-portal/evidence/pf-01/http-acceptance.json`. Pass when hasil yang disebut terbukti pada UI atau output CLI nyata dan query pendukung sesuai; log negatif disimpan tanpa secret.
 
 **Verify, perf.** Tests alone are not sufficient verification. A PR is verified only when its unit, live, and perf boxes are all checked.
 
-- [ ] Metric. Latency p95 create tenant tanpa provisioning dan jumlah principal/membership yang terbentuk.
-- [ ] Probe. Jalankan sampel trunk dan head secara bergantian pada fixture dan konkurensi yang sama. Catat query, antrean, error, jumlah sampel, dan apakah pekerjaan benar-benar selesai. Mulai 30 operasi untuk latency interaktif; durasi restore diukur terpisah karena mahal.
-- [ ] Baseline. Ukur trunk dahulu. Jika trunk belum mempunyai alur ini, catat ketiadaannya dan ukur kerja tambahan serta alur akhir secara absolut; jangan mengarang rasio.
-- [ ] Rule. Usulan p95 1 detik untuk transaksi tenant pada lingkungan uji terkontrol. Tidak ada record ganda pada request konkuren. Catat dan setujui penyesuaian fixture/budget sebelum run; pemeriksaan lint tidak memenuhi gate ini.
+- [x] Metric. Latency p95 create tenant tanpa provisioning dan jumlah principal/membership yang terbentuk.
+- [x] Probe. Jalankan sampel trunk dan head secara bergantian pada fixture dan konkurensi yang sama. Catat query, antrean, error, jumlah sampel, dan apakah pekerjaan benar-benar selesai. Mulai 30 operasi untuk latency interaktif; durasi restore diukur terpisah karena mahal.
+- [x] Baseline. Ukur trunk dahulu. Jika trunk belum mempunyai alur ini, catat ketiadaannya dan ukur kerja tambahan serta alur akhir secara absolut; jangan mengarang rasio.
+- [x] Rule. Usulan p95 1 detik untuk transaksi tenant pada lingkungan uji terkontrol. Tidak ada record ganda pada request konkuren. Catat dan setujui penyesuaian fixture/budget sebelum run; pemeriksaan lint tidak memenuhi gate ini.
 
 **Review gate.** None. PF-01 tidak merancang interaksi baru; audit CLI dan kontrak tetap wajib.
 

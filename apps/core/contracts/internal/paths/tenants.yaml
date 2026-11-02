@@ -35,6 +35,13 @@ post:
           type: object
           required: [legal_name, admin_name, admin_email, app_ids]
           properties:
+            requested_by:
+              type: integer
+              format: int64
+              description: |
+                Actor dari session konsol, diperiksa masih provider_admin pada Core.
+                Konsol mengirimnya server-side. Caller lama yang tidak menyebut actor
+                dicatat sebagai system, bukan sebagai owner baru.
             legal_name:
               type: string
               maxLength: 255

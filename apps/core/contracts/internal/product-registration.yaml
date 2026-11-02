@@ -9,7 +9,9 @@ info:
   description: Dipanggil hanya oleh bridge landing memakai token khusus. Identitas
     issuer+subject berasal dari pertukaran kode OIDC oleh Core. Email_verified dari
     provider tidak dipercaya; email dibuktikan lewat tautan independen. Surface ini
-    tidak membuat Core User/client/tenant bisnis dan tidak membuka endpoint operator.
+    tidak membuka endpoint operator. Login biasa tidak membuat Core User; operation
+    organizations membuat binding principal dan tenant kanonik secara eksplisit,
+    tanpa environment, entitlement atau instalasi ERP.
     Kredensial database, owner password dan metta tidak pernah disertakan. /session
     tanpa sesi customer menjawab authenticated=false. Trial milik customer dibatasi
     satu per produk, memakai release immutable dan jalur provisioning yang sama dengan
@@ -34,6 +36,8 @@ paths:
     $ref: paths/product-registration_email-verification.yaml
   /product-registration/tenants:
     $ref: paths/product-registration_tenants.yaml
+  /product-registration/organizations:
+    $ref: paths/product-registration_organizations.yaml
   /product-registration/launch:
     $ref: paths/product-registration_launch.yaml
   /product-registration/logout:

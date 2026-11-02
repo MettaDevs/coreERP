@@ -1,0 +1,53 @@
+post:
+  tags: [Product registration]
+  operationId: internal.productRegistration.storeOrganization
+  summary: Buat tenant kanonik bagi principal customer tanpa pemasangan ERP
+  description: |
+    Actor dan owner hanya berasal dari X-Registration-Session yang sah. Body tidak
+    dapat memilih user, actor operator, role, entitlement atau environment.
+    Ini metadata tenant kanonik ULID, berbeda dari resource Faskes UUID pada /tenants.
+    Tidak memanggil provisioner fasilitas, membuka enrollment, atau membuat trial.
+
+    Login biasa tidak membuat User. Pada permintaan ini, ProductCustomer diikat secara
+    eksplisit ke User PERSON melalui issuer+subject aktif. Subject yang sama memakai
+    principal yang sama. Principal baru memerlukan email kontak yang telah diverifikasi.
+    Email yang sudah dipakai akun lain tanpa exact identity menghasilkan konflik,
+    bukan auto-link atau email alias. Tautan yang dicabut/mismatched tidak diaktifkan.
+    Membership dan provenance creator belum memberikan permission management PF-04.
+
+    Idempotency actor-scoped dan slug conflict mengikuti tenant-registrations.
+  security:
+    - productRegistrationGateway: []
+      productRegistrationSession: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [name, slug, idempotency_key]
+          properties:
+            name: { type: string, maxLength: 255 }
+            slug: { type: string, minLength: 3, maxLength: 63, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' }
+            idempotency_key: { type: string, format: uuid }
+  responses:
+    '201':
+      description: Principal binding dan tenant committed tanpa bootstrap ERP.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/CanonicalTenantCreation' }
+    '200':
+      description: Replay tenant yang sama setelah session/identity/state diperiksa.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/CanonicalTenantCreation' }
+    '401':
+      description: Gateway atau session tidak sah.
+    '404':
+      description: Gateway tidak dikonfigurasi atau customer tidak ditemukan.
+    '409':
+      description: Konflik identity, email, slug, payload replay atau state tenant.
+    '422':
+      description: Isian tidak valid, contact belum terverifikasi atau field privilege/ERP ditolak.
+    '429':
+      description: Batas permintaan tercapai.

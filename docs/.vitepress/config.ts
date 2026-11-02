@@ -398,6 +398,7 @@ export default withMermaid({
               items: [
                 { text: 'Model dan alur kedua sisi', link: '/todo/metta-platform-portal/' },
                 { text: 'Rencana pelaksanaan', link: '/todo/metta-platform-portal/PLAN' },
+                { text: 'PF-01: pembuatan tenant', link: '/todo/metta-platform-portal/PF-01' },
                 { text: 'TODO tim', link: '/todo/metta-platform-portal/TODO' },
                 { text: 'TODO pasien dan stok bersama', link: '/todo/metta-platform-portal/SHARING-TODO' },
                 { text: 'Perubahan dan skenario mendatang', link: '/todo/metta-platform-portal/CHANGES' },

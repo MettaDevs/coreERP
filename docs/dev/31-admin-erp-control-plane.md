@@ -9,7 +9,7 @@ dilakukannya?** Ia aplikasi kedua di repo ini — `apps/control-plane`, namespac
 yang dipakai orang kita, bukan pengguna klinik.
 
 **Tiga nama, satu benda.** `apps/control-plane` adalah tempat kodenya, `admin.erp.<domain>` adalah alamatnya, dan
-"konsol operator" adalah sebutannya di layar. *Control plane* sendiri adalah **peran** dalam istilah SaaS —
+"konsol operator" adalah sebutannya di layar. _Control plane_ sendiri adalah **peran** dalam istilah SaaS —
 layanan global yang mengelola tenant, lisensi, dan penempatan — dan hampir setiap halaman lain memakainya dalam
 arti itu, bukan sebagai nama aplikasi ini. Halaman ini memakai **admin.erp** karena yang dibahas benda yang
 konkret: satu image, satu alamat, satu database bersama Core.
@@ -21,29 +21,35 @@ lewat agen, dan menyimpan setelan yang tidak boleh tinggal di `.env` server. Alu
 
 ## Anggapan yang keliru
 
-| Anggapan | Yang sebenarnya |
-| --- | --- |
-| Konsol punya database sendiri | Databasenya **sama persis dengan Core**, satu koneksi. Konsol tidak punya folder `database/` dan tidak boleh punya migration: dua aplikasi yang bermigrasi ke satu tabel akan saling menimpa. Skema seluruhnya milik Core |
-| Konsol menulis apa saja langsung ke tabel | Registry server klien memang ditulis langsung. Tetapi tenant, lingkungan, dan pembaruan armada **selalu lewat HTTP ke Core** — Core yang memiliki aturannya |
-| Operator adalah peran baru | Tidak ada peran baru. Otoritasnya satu baris `provider_access.role = 'provider_admin'`, tabel yang sama yang dipakai gate Core |
-| Konsol memanggil server klien | Tidak pernah. Server klien tidak dibuka dari internet; **agen yang menghubungi konsol**, dan konsol hanya menaruh operasi di antrean |
-| Konsol memegang semua kunci | Kunci **privat rilis** tidak pernah ada di sini. Kunci **privat lisensi** justru harus ada, dan itu konsekuensi yang disebut apa adanya di bagian [Kunci dan rahasia](#kunci-dan-rahasia) |
+| Anggapan                                  | Yang sebenarnya                                                                                                                                                                                                           |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Konsol punya database sendiri             | Databasenya **sama persis dengan Core**, satu koneksi. Konsol tidak punya folder `database/` dan tidak boleh punya migration: dua aplikasi yang bermigrasi ke satu tabel akan saling menimpa. Skema seluruhnya milik Core |
+| Konsol menulis apa saja langsung ke tabel | Registry server klien memang ditulis langsung. Tetapi tenant, lingkungan, dan pembaruan armada **selalu lewat HTTP ke Core** — Core yang memiliki aturannya                                                               |
+| Operator adalah peran baru                | Tidak ada peran baru. Otoritasnya satu baris `provider_access.role = 'provider_admin'`, tabel yang sama yang dipakai gate Core                                                                                            |
+| Konsol memanggil server klien             | Tidak pernah. Server klien tidak dibuka dari internet; **agen yang menghubungi konsol**, dan konsol hanya menaruh operasi di antrean                                                                                      |
+| Konsol memegang semua kunci               | Kunci **privat rilis** tidak pernah ada di sini. Kunci **privat lisensi** justru harus ada, dan itu konsekuensi yang disebut apa adanya di bagian [Kunci dan rahasia](#kunci-dan-rahasia)                                 |
+
+## Tenant tanpa pemasangan ERP
+
+[PF-01](../todo/metta-platform-portal/PF-01.md) menyediakan pembuatan tenant kanonik bagi principal yang sudah ada, terpisah dari registrasi ERP. Konsol tetap meminta Core melalui API. Actor berasal dari session operator dan owner dipilih eksplisit; operator tidak mendapat membership customer otomatis. Caller registrasi ERP lama tetap menjalankan bootstrap ERP melalui writer tenant yang sama.
+
+Receipt pusat menjaga replay request dan audit penciptaan tenant. Keanggotaan saja tidak menjadi permission pengelolaan platform. Schema dan runtime masih satu database sampai unit CPDB berikutnya selesai.
 
 ## Bentuk aplikasinya
 
 Konsol sengaja kurus: tanpa migration, tanpa antrean, tanpa broadcast; sesi dan cache memakai berkas justru
 supaya ia tidak menuntut tabel. Alasannya ditulis di `apps/control-plane/bootstrap/app.php`.
 
-| Folder | Isinya |
-| --- | --- |
-| `app/Models/` | Eloquent di atas tabel milik Core. `User` sengaja tanpa `$fillable`, sehingga `create()` gagal seketika: konsol tidak boleh melahirkan akun |
-| `app/Sites/` | Seluruh domain server klien: menyiapkan situs, token pendaftaran, perintah pasang, antrean operasi, laporan agen, lisensi, DNS, dan penurunan keadaan pemasangan |
-| `app/Environments/` | Lingkungan dan perintah ke Core. `InstalledModules` satu-satunya yang membuka database lingkungan lain |
-| `app/Customers/` | Melahirkan tenant. Nol `INSERT`; isinya hampir seluruhnya penanganan kegagalan HTTP |
-| `app/Registry/` dan `app/Dns/` | Harbor dan Cloudflare. Rahasianya di `console_settings`, terenkripsi |
-| `app/Sso/` | Klien OIDC konsol, terpisah dari klien milik Core |
-| `app/Audit/` | Satu-satunya penulis `operator_audit_events` |
-| `app/Http/Controllers/Sites/` | Tiga pintu yang sengaja dipisah: `SiteScreens` hanya membaca, `SiteActions` menulis dan mengaudit, `SiteSettings` menyimpan setelan yang tidak memerintah server |
+| Folder                         | Isinya                                                                                                                                                           |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/Models/`                  | Eloquent di atas tabel milik Core. `User` sengaja tanpa `$fillable`, sehingga `create()` gagal seketika: konsol tidak boleh melahirkan akun                      |
+| `app/Sites/`                   | Seluruh domain server klien: menyiapkan situs, token pendaftaran, perintah pasang, antrean operasi, laporan agen, lisensi, DNS, dan penurunan keadaan pemasangan |
+| `app/Environments/`            | Lingkungan dan perintah ke Core. `InstalledModules` satu-satunya yang membuka database lingkungan lain                                                           |
+| `app/Customers/`               | Melahirkan tenant. Nol `INSERT`; isinya hampir seluruhnya penanganan kegagalan HTTP                                                                              |
+| `app/Registry/` dan `app/Dns/` | Harbor dan Cloudflare. Rahasianya di `console_settings`, terenkripsi                                                                                             |
+| `app/Sso/`                     | Klien OIDC konsol, terpisah dari klien milik Core                                                                                                                |
+| `app/Audit/`                   | Satu-satunya penulis `operator_audit_events`                                                                                                                     |
+| `app/Http/Controllers/Sites/`  | Tiga pintu yang sengaja dipisah: `SiteScreens` hanya membaca, `SiteActions` menulis dan mengaudit, `SiteSettings` menyimpan setelan yang tidak memerintah server |
 
 Layarnya Inertia + React di `resources/js/pages/`.
 
@@ -116,13 +122,13 @@ menyentuh tabel konsol karena itu langsung terasa di suite konsol — itu yang d
 Tidak ada satu pun pemanggilan proses di `app/`. Semua perintah berjalan lewat API internal Core dengan bearer
 token `CONTROL_PLANE_TOKEN`, dijaga middleware `ControlPlaneOnly` di sisi Core.
 
-| Yang dikerjakan | Endpoint Core |
-| --- | --- |
-| Melahirkan tenant | `POST /api/internal/v1/tenants` |
+| Yang dikerjakan                        | Endpoint Core                                        |
+| -------------------------------------- | ---------------------------------------------------- |
+| Melahirkan tenant                      | `POST /api/internal/v1/tenants`                      |
 | App yang dibeli tenant (untuk lisensi) | `GET /api/internal/v1/tenants/{tenant}/entitlements` |
-| Menyiapkan lingkungan | `POST /api/internal/v1/environments/{id}/provision` |
-| Keadaan armada | `GET /api/internal/v1/fleet` |
-| Antre pembaruan | `POST /api/internal/v1/environments/upgrade` |
+| Menyiapkan lingkungan                  | `POST /api/internal/v1/environments/{id}/provision`  |
+| Keadaan armada                         | `GET /api/internal/v1/fleet`                         |
+| Antre pembaruan                        | `POST /api/internal/v1/environments/upgrade`         |
 
 Tiga tenggat yang berbeda, dan bedanya bukan selera (`config/core.php`): permintaan biasa 30 detik, penyiapan
 lingkungan 300 detik karena ia menunggu pekerjaan selesai, dan pembacaan entitlement paling pendek karena ia
@@ -161,11 +167,11 @@ Kunci baru di laporan diubah di tiga tempat, dan konsol harus lebih dulu menerim
 sesudah konsol, jadi konsol yang belum mengenal kuncinya menolak seluruh laporan, sementara laporan agen lama tanpa
 kunci itu harus tetap sah.
 
-| Tempat | Isinya |
-| --- | --- |
-| `contracts/openapi-agent.yaml`, skema `Report` | Bentuknya, beserta arti `null` dan arti kunci yang tidak ada |
-| `SiteReports::TOP_LEVEL` dan aturan validasinya | Yang diterima konsol |
-| `susun_laporan` di `deploy/agent/coreerp-agent` | Yang dikirim agen, disusun kunci demi kunci |
+| Tempat                                          | Isinya                                                       |
+| ----------------------------------------------- | ------------------------------------------------------------ |
+| `contracts/openapi-agent.yaml`, skema `Report`  | Bentuknya, beserta arti `null` dan arti kunci yang tidak ada |
+| `SiteReports::TOP_LEVEL` dan aturan validasinya | Yang diterima konsol                                         |
+| `susun_laporan` di `deploy/agent/coreerp-agent` | Yang dikirim agen, disusun kunci demi kunci                  |
 
 ### Kesehatan feed posting finance
 
@@ -206,17 +212,17 @@ Ringkasan armada situs tetap membutuhkan pembacaan seluruh situs. Server menghit
 Alamat rute berbahasa Indonesia, nama kelas dan method berbahasa Inggris. `/situs` tampil sebagai "Server
 klien" di layar.
 
-| Layar | Rute | Siapa |
-| --- | --- | --- |
-| Tenant | `/tenant` | operator |
-| Lingkungan, panel Server klien, perintah pasang | `/lingkungan`, `/lingkungan/{id}` | operator |
-| Pembaruan armada | `/pembaruan` | operator |
-| Server klien dan rinciannya | `/situs`, `/situs/{id}` | operator |
-| Pengaturan: kunci, registry, masa lisensi | `/pengaturan` | operator |
-| Akun operator dan penautan SSO | `/akun` | operator |
-| Berkas pemasang | `/pasang.sh`, `/agen/*` | **tanpa login**, dibatasi laju |
-| API agen | `/api/agent/v1/*` | tanda tangan kunci situs |
-| Pendaftaran rilis | `/api/releases/v1` | token rilis + tanda tangan berkas |
+| Layar                                           | Rute                              | Siapa                             |
+| ----------------------------------------------- | --------------------------------- | --------------------------------- |
+| Tenant                                          | `/tenant`                         | operator                          |
+| Lingkungan, panel Server klien, perintah pasang | `/lingkungan`, `/lingkungan/{id}` | operator                          |
+| Pembaruan armada                                | `/pembaruan`                      | operator                          |
+| Server klien dan rinciannya                     | `/situs`, `/situs/{id}`           | operator                          |
+| Pengaturan: kunci, registry, masa lisensi       | `/pengaturan`                     | operator                          |
+| Akun operator dan penautan SSO                  | `/akun`                           | operator                          |
+| Berkas pemasang                                 | `/pasang.sh`, `/agen/*`           | **tanpa login**, dibatasi laju    |
+| API agen                                        | `/api/agent/v1/*`                 | tanda tangan kunci situs          |
+| Pendaftaran rilis                               | `/api/releases/v1`                | token rilis + tanda tangan berkas |
 
 `/pasang.sh` dan `/agen/*` terbuka karena teknisi di lokasi klien belum punya apa pun untuk masuk. Yang
 mengesahkan pemasangan bukan sesi, melainkan token pendaftaran berumur pendek yang dibuat operator.
@@ -235,12 +241,12 @@ setiap pengguna tenant yang punya akun dapat membuka armada seluruh pelanggan.
 
 ## Kunci dan rahasia
 
-| Rahasia | Tempatnya | Catatan |
-| --- | --- | --- |
-| Kunci publik rilis | Berkas di server konsol | Disajikan ke agen saat pemasangan pertama; tidak rahasia |
-| Kunci privat lisensi | Berkas di server konsol | **Harus** ada di sini. Konsol yang dibobol karena itu dapat menerbitkan lisensi untuk app yang tidak dibeli — itu harga dari lisensi yang diterbitkan otomatis |
-| Robot sistem Harbor, token Cloudflare | `console_settings`, terenkripsi `Crypt` | Disimpan lewat perintah artisan yang membaca **stdin**, bukan argumen: argumen proses terbaca `ps` dan tersimpan di riwayat shell |
-| Masa lisensi bawaan | `console_settings`, terbuka | Diubah operator di `/pengaturan` |
+| Rahasia                               | Tempatnya                               | Catatan                                                                                                                                                        |
+| ------------------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Kunci publik rilis                    | Berkas di server konsol                 | Disajikan ke agen saat pemasangan pertama; tidak rahasia                                                                                                       |
+| Kunci privat lisensi                  | Berkas di server konsol                 | **Harus** ada di sini. Konsol yang dibobol karena itu dapat menerbitkan lisensi untuk app yang tidak dibeli — itu harga dari lisensi yang diterbitkan otomatis |
+| Robot sistem Harbor, token Cloudflare | `console_settings`, terenkripsi `Crypt` | Disimpan lewat perintah artisan yang membaca **stdin**, bukan argumen: argumen proses terbaca `ps` dan tersimpan di riwayat shell                              |
+| Masa lisensi bawaan                   | `console_settings`, terbuka             | Diubah operator di `/pengaturan`                                                                                                                               |
 
 Halaman Pengaturan menampilkan **sidik jari** kunci, tidak pernah isinya, dan menyebut apakah kunci privat dan
 publik lisensi berpasangan. Pasangan yang tidak cocok adalah kegagalan paling sunyi yang ada di sistem ini:
