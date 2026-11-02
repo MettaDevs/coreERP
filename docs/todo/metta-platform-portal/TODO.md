@@ -10,7 +10,7 @@ Untuk setiap ID, catat owner, branch/PR, SHA, bukti, dan penghambat. Jangan meng
 
 | Unit  | Peran penanggung jawab               | Status    | Bergantung pada     | PR/SHA dan bukti                                                                     |
 | ----- | ------------------------------------ | --------- | ------------------- | ------------------------------------------------------------------------------------ |
-| PF-01 | Codex, platform backend + security   | in_review | CPDB-01             | [PF-01](PF-01.md), branch `codex/pf-01-tenant-foundation`, backend teruji `a4f331dd` |
+| PF-01 | Codex, platform backend + security   | in_review | CPDB-01             | [PF-01](PF-01.md), branch `codex/pf-01-tenant-foundation`, backend teruji `360a8cc2` |
 | PF-02 | Platform backend + adapter Faskes    | blocked   | PF-01, CPDB-05      | Belum ada                                                                            |
 | PF-03 | Portal + admin UI + platform backend | blocked   | PF-02               | Belum ada                                                                            |
 | PF-04 | Identity/access + adapter Faskes     | blocked   | PF-02, PF-03        | Belum ada                                                                            |

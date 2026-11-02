@@ -68,7 +68,7 @@ Rilis yang menawarkan pasien A/B terpisah tetapi stok bersama memerlukan SH-01 d
 
 **Depends on.** CPDB-01 pada TODO pemisahan database. PF-01 adalah satu pekerjaan bersama, tidak diduplikasi.
 
-Pelaksanaan PF-01 dan batas fixture tercatat pada [laporan PF-01](PF-01.md). Backend yang diuji adalah `a4f331dd`; bukti live memakai session SSO sintetis yang sudah diverifikasi, HTTP nyata dan SQL committed. Login biasa tanpa User baru diuji terpisah melalui signed-SSO test. Tidak mengklaim login provider eksternal atau UI portal yang belum dibuat.
+Pelaksanaan PF-01 dan batas fixture tercatat pada [laporan PF-01](PF-01.md). Backend yang diuji adalah `360a8cc2`; bukti live memakai session SSO sintetis yang sudah diverifikasi, HTTP nyata dan SQL committed. Login biasa tanpa User baru diuji terpisah melalui signed-SSO test. Tidak mengklaim login provider eksternal atau UI portal yang belum dibuat.
 
 **Files.**
 

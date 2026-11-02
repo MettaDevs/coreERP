@@ -1,16 +1,16 @@
 {
   "schema_version": 1,
-  "run_id": "c7443c42eed74cf39db234d20abf0f1b",
-  "started_at": "2026-11-02T07:24:31.062381+00:00",
+  "run_id": "f4527673a1ca4c96ba19226d01f54c5c",
+  "started_at": "2026-11-02T08:39:44.411480+00:00",
   "scope": "ERP baseline only. Actual HTTP registration with first_environment=none and independent SQL observations. This does not verify the tenant-only endpoints.",
   "lanes": [],
   "status": "passed",
   "source_hashes": {
-    "scripts/verify-tenant-creation.py": "d46e5c1966698aed3f35953240cfa0a0d0c814dda6527c7acf4ce998692f6533",
-    "scripts/tenant-creation-fixture.php": "fa58f91688614ad5321783e836890e7d457f92c0e5a35704d1597e72f8b518ce"
+    "scripts/verify-tenant-creation.py": "46ff1004f8ab234850654cc6e0652145acb53f3baf6b71e30e2564505eb2b8ae",
+    "scripts/tenant-creation-fixture.php": "d19ee71c6a8b7c9c8f13f3900bae418731d3493fe51fb621a9aad3a2d607f420"
   },
-  "driver_source_revision": "cdab80be96ab309f88dbcc939e16f9c81f03b1d0",
-  "source_revision": "cdab80be96ab309f88dbcc939e16f9c81f03b1d0",
+  "driver_source_revision": "3c7d5a6ba2af7f854dba32051042dec2ae3840ea",
+  "source_revision": "3f3555b54b9fc9b39db358117076c3f4023d494d",
   "driver_worktree_dirty": true,
   "database": {
     "database": "core_erp_pf01_test_baseline",
@@ -30,11 +30,11 @@
   "first_environment": "none",
   "app_id": "pf01-3cfdc0b606dbb6f2",
   "observed": {
-    "tenant_id": "01m6djaj2f9ye37h9e1nj44h6n",
+    "tenant_id": "01m6dpmadzs5qbt6pdp0rqb8x2",
     "tenant_status": "active",
-    "principal_id": 3,
-    "membership_id": "01m6djaj6tqx9w24z560ffdsr6",
-    "membership_principal_id": 3,
+    "principal_id": 5,
+    "membership_id": "01m6dpmaj47v38pxs4020ydr4r",
+    "membership_principal_id": 5,
     "membership_status": "active",
     "membership_count": 1,
     "owner_role_count": 1,
@@ -46,7 +46,7 @@
     "environment_count": 0,
     "module_installation_count": 0,
     "operator_membership_count": 0,
-    "operator_principal_id": 2,
+    "operator_principal_id": 4,
     "must_change_password": true,
     "temporary_password_matches": true
   },
@@ -67,7 +67,7 @@
     {
       "label": "erp-app-catalog",
       "status": 200,
-      "elapsed_ms": 660.391,
+      "elapsed_ms": 888.67,
       "result": {
         "app_ids": [
           "pf01-3cfdc0b606dbb6f2"
@@ -77,11 +77,11 @@
     {
       "label": "erp-operator-registration",
       "status": 201,
-      "elapsed_ms": 478.44,
+      "elapsed_ms": 413.006,
       "result": {
-        "tenant_id": "01m6djaj2f9ye37h9e1nj44h6n"
+        "tenant_id": "01m6dpmadzs5qbt6pdp0rqb8x2"
       }
     }
   ],
-  "finished_at": "2026-11-02T07:24:36.820678+00:00"
+  "finished_at": "2026-11-02T08:39:50.938922+00:00"
 }

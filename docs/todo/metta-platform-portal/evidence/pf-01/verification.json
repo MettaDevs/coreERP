@@ -1,7 +1,7 @@
 {
-  "recorded_at": "2026-11-02T08:17:48.855183+00:00",
-  "base_sha": "cdab80be96ab309f88dbcc939e16f9c81f03b1d0",
-  "tested_backend_sha": "a4f331ddca684b1cc0b69b49b0271e5544b2d221",
+  "recorded_at": "2026-11-02T08:53:38.619157+00:00",
+  "base_sha": "3f3555b54b9fc9b39db358117076c3f4023d494d",
+  "tested_backend_sha": "360a8cc24e8627d700ca9650c97c59846d2ad10a",
   "scope": "PF01 source implementation and isolated synthetic fixtures only; no deploy, database split or analytics changes",
   "checks": [
     {
@@ -81,6 +81,32 @@
       "name": "VitePress docs build",
       "result": "pass",
       "limits": "No dead link. Nonblocking AL highlighting, browser metadata, Tailwind content and chunk warnings."
+    },
+    {
+      "name": "Latest-main scoped rerun",
+      "result": "373 tests completed with3 failures; resolved by focused rerun",
+      "limits": "Two timezone failures from main lazy-loading guard were fixed by explicit loadMissing. One README test fixture file was excluded by export-ignore."
+    },
+    {
+      "name": "Latest-main affected ModuleRequestContext/manifest/DateTimeSettings rerun",
+      "result": "pass",
+      "tests": 31,
+      "assertions": 198
+    },
+    {
+      "name": "UserClock scoped PHPStan and Pint after explicit relation loading",
+      "result": "pass"
+    },
+    {
+      "name": "Latest-main ERP baseline plus10HTTP lanes and150creation",
+      "result": "pass",
+      "requests": 179
+    },
+    {
+      "name": "Latest-main VitePress build",
+      "result": "pass",
+      "seconds": 89.15,
+      "limits": "No dead link. Nonblocking browser metadata, ancestor Tailwind and chunk warnings."
     }
   ],
   "performance": {
@@ -88,7 +114,7 @@
     "concurrency": 1,
     "samples": 150,
     "errors": 0,
-    "p95_ms": 509.47,
+    "p95_ms": 431.73,
     "p95_budget_ms": 1000,
     "sql_delta": {
       "clients": 150,
@@ -128,7 +154,7 @@
     "limits": "PHP development server and Docker test fixture. Machine load, resource observations and limiter profiling must accompany any performance interpretation. This is not a production capacity measurement."
   },
   "runtime": {
-    "storage": "Immutable Git snapshots on Linux Docker volumes; version hashes checked against Git blobs",
+    "storage": "Git archive of360a application code assembled from3c7 snapshot plus exact UserClock blob; no other app changes. Linux Docker volumes. Trunk snapshot3f3555b5.",
     "php_image": "coreerp-pf01-test:local",
     "php_image_id": "sha256:25260e58a7f63195e88ab9e1f5dd784bdc3e7eff4075057e5cc0cef4ef803888",
     "php": "8.4.27",
@@ -152,10 +178,11 @@
       "Query-count growth and extreme payload volume unmeasured; no UI lists/forms changed"
     ]
   },
-  "github_ci": "Authoritative status on the final PR head. Known main analytics time-test failure remains held; previous PR372 merge exception is not reused.",
+  "github_ci": "Final PR head is authoritative. Analytics is untouched by PF01; newer main changes are inherited, and no previous CI exception is reused.",
   "not_verified": [
     "Two database authority split, durable adapter receipt, revoke/staleness, backup/restore and RPO/RTO",
     "Platform management chain, invitations, grants/revoke and Faskes binding of PF02+",
     "Production capacity and real external-provider login"
-  ]
+  ],
+  "original_base_sha": "cdab80be96ab309f88dbcc939e16f9c81f03b1d0"
 }
