@@ -2,6 +2,8 @@
 
 Dokumen paket ini adalah spesifikasi dan backlog, bukan fitur yang sudah berjalan. PR dokumentasinya tidak menjalankan migration, membuat database, mengaktifkan trial, atau mengubah source Faskes.
 
+Hasil inventaris dan kontrak awal tersedia pada [CPDB-01](CPDB-01.md), dengan source/runtime SHA, manifest, dependency, batas bukti, dan blocker. Unit tersebut belum memisahkan database. PF-01 menggunakan hasil review kontrak itu; urutan CPDB-02 dan unit berikutnya tetap berlaku.
+
 ## Mulai dari urutan yang sudah disepakati
 
 1. Baca [PRD](PRD.md), [organisasi/sharing](ORGANIZATION-AND-SHARING.md), dan [TODO database](TODO.md).

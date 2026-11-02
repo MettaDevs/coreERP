@@ -405,6 +405,7 @@ export default withMermaid({
               items: [
                 { text: 'Keputusan dan dependensi', link: '/todo/control-plane-database/' },
                 { text: 'Handoff implementasi', link: '/todo/control-plane-database/HANDOFF' },
+                { text: 'CPDB-01: inventaris dan kontrak', link: '/todo/control-plane-database/CPDB-01' },
                 { text: 'PRD', link: '/todo/control-plane-database/PRD' },
                 { text: 'Organisasi dan aturan sharing', link: '/todo/control-plane-database/ORGANIZATION-AND-SHARING' },
                 { text: 'Profil kelompok layanan Faskes', link: '/todo/control-plane-database/SERVICE-GROUP-PROFILES' },

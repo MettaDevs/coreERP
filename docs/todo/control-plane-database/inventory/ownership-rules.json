@@ -1,0 +1,69 @@
+{
+    "format_version": 1,
+    "source_sha": "08366c35547632c6bcf9c7b643ef2455df4fc1bb",
+    "evidence": "target-design",
+    "target_database": "core_control_plane",
+    "move": {
+        "control": "clients console_settings environment_members environment_operations environments external_identities managed_product_tenants operator_audit_events passkeys product_auth_attempts product_customer_sessions product_customers product_email_challenges provider_access site_enrollment_tokens site_operations site_releases site_reports sites sso_login_attempts tenant_app_entitlements tenant_identity_providers tenant_memberships tenants users",
+        "organization-foundation": "hierarchy_purpose_organization_types hierarchy_purposes operating_units organization_hierarchies organization_hierarchy_nodes organization_hierarchy_purposes organization_hierarchy_versions organizations",
+        "framework-control": "cache cache_locks failed_jobs job_batches jobs password_reset_tokens sessions"
+    },
+    "projection": {
+        "organization-field-partition": "legal_entities organization_parties",
+        "organization-address-partition": "electronic_addresses locations parties party_locations party_location_purposes postal_addresses",
+        "reference-release": "country_regions location_purposes party_types party_relationship_types ref_address_parameters ref_administrative_division_external_codes ref_administrative_division_timezones ref_administrative_division_translations ref_administrative_divisions ref_countries ref_country_hierarchy_levels time_zones",
+        "tenant-address-reference-partition": "ref_buildings ref_districts ref_group_of_houses ref_land_plots ref_postal_codes ref_provinces ref_regencies ref_streets ref_villages",
+        "hierarchy-derived": "organization_hierarchy_closures",
+        "catalog-release": "app_dependencies apps",
+        "invitation-partition": "invitation_codes",
+        "per-database-infrastructure": "change_log_entries change_log_setup_fields change_log_setup_tables migrations outbox_events retention_policy_log_entries retention_policy_setups"
+    },
+    "retain": {
+        "erp-business": "access_audit_events address_books app_data_policies app_entry_points app_number_sequence_references app_reports automatic_role_assignment_rules core_module_installations core_module_migrations currency_precisions document_attachments document_notes finance_posting_deliveries finance_posting_events finance_posting_lines finance_posting_settings finance_postings finance_reference_account_imports finance_reference_accounts finance_settlement_modes fiscal_calendars fiscal_periods fiscal_years funding_sources integration_clients integration_scopes invitation_data_policy_scopes invitation_role_assignments number_sequence_allocations number_sequence_audit_events number_sequence_continuous_pool number_sequence_counters number_sequence_issues number_sequence_profiles number_sequence_reservations number_sequence_reusable_numbers party_address_books party_reference_values party_relationships party_role_registrations permissions planning_years print_identities report_exports report_last_used_options report_layout_defaults report_layouts report_presets role_assignment_data_policy_scopes role_assignments roles security_duties security_duty_privileges security_privilege_permissions security_privileges security_role_children security_role_duties sod_conflicts sod_rules tenant_number_sequences units_of_measure uom_classes uom_conversions uom_external_codes uom_systems uom_translations vendors workflow_configuration_versions workflow_configurations workflow_elements workflow_history workflow_instances workflow_parameters workflow_transitions workflow_types workflow_work_items working_time_calendar_days working_time_calendar_lines working_time_calendars working_time_lines working_time_templates",
+        "analytics-hold": "analytics_dashboards analytics_query_cache analytics_query_log analytics_saved_queries analytics_widgets",
+        "historical-inactive": "app_installations app_placements app_releases app_service_credentials module_entry_points module_installations module_placements modules tenant_deployments tenant_module_entitlements"
+    },
+    "routine_rules": {
+        "aset_capture_book_ledger": ["retain", "module-local"],
+        "aset_capture_group_ledger": ["retain", "module-local"],
+        "aset_guard_ledger_history": ["retain", "module-local"],
+        "coreerp_bump_row_version": ["projection", "per-database-function"],
+        "coreerp_forbid_change_log_update": [
+            "projection",
+            "per-database-function"
+        ],
+        "coreerp_log_change": ["projection", "per-database-function"],
+        "coreerp_stamp_audit_actor": ["projection", "per-database-function"],
+        "operator_audit_events_tolak_ubah": ["move", "control-append-only"]
+    },
+    "migration_overrides": {
+        "2026_07_23_010000_rename_module_records_to_app_records": [
+            "projection",
+            "historical-rename-partition"
+        ],
+        "2026_09_28_120000_add_audit_actor_columns_to_tenant_tables": [
+            "projection",
+            "dynamic-per-database-infrastructure"
+        ],
+        "2026_09_29_140000_add_row_version_to_tenant_tables": [
+            "projection",
+            "dynamic-per-database-infrastructure"
+        ],
+        "2026_09_29_130000_share_locations_between_parties": [
+            "projection",
+            "organization-address-partition"
+        ],
+        "2026_10_15_050000_index_cursor_lookups": [
+            "projection",
+            "partition-indexes"
+        ],
+        "2026_10_09_180000_allow_multiple_record_pictures": [
+            "retain",
+            "document-attachments-index"
+        ],
+        "2026_10_15_030000_populate_indonesian_address_hierarchy": [
+            "projection",
+            "reference-release-import-action"
+        ]
+    }
+}

@@ -1,0 +1,25 @@
+name: cpdb-inventory
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/cpdb-inventory.yml"
+      - "scripts/cpdb-*"
+      - "scripts/test_cpdb_inventory.py"
+      - "docs/todo/control-plane-database/**"
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - run: python3 -m unittest discover -s scripts -p test_cpdb_inventory.py -v
+      - run: python3 scripts/cpdb-inventory.py --check
+      - run: node scripts/check-healthcare-domain-neutrality.mjs

@@ -1,0 +1,306 @@
+{
+    "format_version": 1,
+    "evidence": "target-design",
+    "implemented": false,
+    "physical_control_database": "core_control_plane",
+    "on_prem": "Authority lokal per partisi. Tidak ada refresh atau TTL yang memerlukan vendor.",
+    "identity": {
+        "principal_key": "users.id bigint dipertahankan; product_customers.id UUID tetap sebagai binding legacy",
+        "external_key": ["issuer", "subject"],
+        "mapping": "PF-01 membuat binding eksplisit ProductCustomer UUID -> principal bigint berdasarkan issuer+subject terverifikasi. Konflik subject/link diarsipkan untuk resolusi, tidak digabung berdasarkan email.",
+        "non_human_principals": "IntegrationClientAccounts memakai operasi authority identity dan receipt lokal. Token/signing_secret integration_clients tetap di ERP.",
+        "membership": [
+            "membership_id",
+            "tenant_id",
+            "principal_id",
+            "status",
+            "revision"
+        ],
+        "forbidden_membership_fields": ["system_role"],
+        "organization_invitation": [
+            "invitation_id",
+            "tenant_id",
+            "issuer",
+            "recipient_subject_or_verified_acceptance",
+            "inviter_principal_id",
+            "token_digest",
+            "expires_at",
+            "consumed_revision"
+        ],
+        "erp_role_intent": "Environment, local role ID/version, scope, ceiling dan operation ID tervalidasi. Pivot role ERP tidak menjadi catalog role pusat."
+    },
+    "authorities": [
+        {
+            "domain": "provider-operations",
+            "owner": "control",
+            "assignment": "provider_access; operator authentication terpisah dari customer",
+            "grants": "Operasi layanan yang diotorisasi dan diaudit. Tidak otomatis memberi Owner customer."
+        },
+        {
+            "domain": "tenant-management",
+            "owner": "control",
+            "assignment": "Catalog dan assignment role -> duty -> privilege -> permission -> entry point tenant-scoped pada pusat, terpisah dari catalog ERP",
+            "resources": [
+                "tenant-membership",
+                "tenant-management-assignment",
+                "organization-invitation",
+                "environment-grant",
+                "organization-directory",
+                "hierarchy-publication",
+                "sharing-policy-publication"
+            ],
+            "rule": "Satu resource/action tidak memberi hak sibling resource. Lindungi pengelola terakhir dan transfer yang diterima penerus. Nama role disimpan sebagai data."
+        },
+        {
+            "domain": "erp-business",
+            "owner": "business-environment",
+            "assignment": "roles, security_role_duties, role_assignments dan scope tetap lokal",
+            "rule": "Owner ERP dan OwnerRoleDuties tetap mengikuti kontrak ERP. Grant platform tidak otomatis memasang Owner ERP."
+        },
+        {
+            "domain": "commercial-entitlement",
+            "owner": "control",
+            "assignment": "tenant_app_entitlements dengan status dan waktu berlaku",
+            "rule": "Entitlement bukan membership, environment grant atau bukti module installed. Customer manager tidak menciptakan hak komersial sendiri."
+        },
+        {
+            "domain": "environment-admission",
+            "owner": "control",
+            "assignment": "Environment grant berversi atas tenant/principal/environment",
+            "rule": "Membership, entitlement relevan, desired state, expiry, grant dan local receipt diperiksa bersama. environment_members sekarang hanya indeks, belum kontrak grant lengkap."
+        },
+        {
+            "domain": "organization-foundation",
+            "owner": "foundation-control-partition",
+            "assignment": "Permission tenant-scoped pada action Foundation",
+            "rule": "Tersedia bagi Faskes-only tanpa entitlement ERP. Tidak ada master writable kedua atau implicit descendant grant."
+        }
+    ],
+    "projection_protocol": {
+        "identity": "tenant_id + authority_id + stable_source_id + target_environment_id",
+        "fields": [
+            "source_revision",
+            "effective_from",
+            "source_checkpoint",
+            "applied_revision",
+            "payload_hash",
+            "tombstone",
+            "valid_until",
+            "authority_partition"
+        ],
+        "local_sets": {
+            "tenant": ["id", "status", "display_label_if_required"],
+            "principal": [
+                "id",
+                "account_type",
+                "status",
+                "audit_display_label_if_required"
+            ],
+            "membership": ["id", "tenant_id", "principal_id", "status"],
+            "organization": [
+                "id",
+                "tenant_id",
+                "classification",
+                "status",
+                "name",
+                "generic_profile"
+            ],
+            "hierarchy": [
+                "id",
+                "purpose",
+                "published_version",
+                "effective_dates",
+                "nodes",
+                "closure_checkpoint"
+            ],
+            "grant": [
+                "id",
+                "tenant_id",
+                "principal_id",
+                "environment_id",
+                "status",
+                "ceiling",
+                "expires_at",
+                "revision"
+            ],
+            "catalog": [
+                "authority_product_id",
+                "release_revision",
+                "manifest_hash",
+                "local_navigation_and_security_binding"
+            ]
+        },
+        "exclude": [
+            "password",
+            "password_hash",
+            "SSO secret",
+            "code_verifier",
+            "signing private key",
+            "integration credential"
+        ],
+        "apply": "Pusat commit state+durable operation bersama. Target commit projection/local effect+receipt bersama. Ack pusat setelah receipt. Duplikat dengan hash sama replay receipt; operation ID sama payload berbeda ditolak.",
+        "ordering": "Revision menurun ditolak. Gap revision meminta snapshot/checkpoint authority, tidak menebak perubahan yang hilang. Tombstone dan revoke bertahan saat restore/replay.",
+        "fencing": "Tenant/environment desired-state revision dan lease diperiksa lagi sebelum commit/ack. Worker lama tidak mengaktifkan resource yang sudah ditutup.",
+        "reconciliation": "Bandingkan authority revision/hash dengan local receipt/checkpoint. Perbedaan tetap pending/blocked dan retry operation yang sama. Tidak fallback ke canonical copy lama.",
+        "revoke_max_seconds": 60,
+        "revoke_status": "Target kontrak SaaS, belum diukur. Launch baru dan privileged administration gagal-tertutup bila authority tidak dapat diverifikasi.",
+        "on_prem_exception": "Authority Foundation/identity lokal. Tidak mengirim directory vendor dan tidak bergantung pada vendor TTL."
+    },
+    "policy": {
+        "domains": [
+            "patient-registry",
+            "clinical-record-access",
+            "item-catalog",
+            "service-catalog",
+            "pricing-availability",
+            "inventory-source"
+        ],
+        "group_fields": [
+            "id",
+            "tenant_id",
+            "domain",
+            "mode_capability_id",
+            "member_organization_ids",
+            "authority_product_id",
+            "authority_environment_id",
+            "authority_partition",
+            "revision",
+            "status",
+            "effective_from",
+            "effective_until"
+        ],
+        "write_binding_key": [
+            "tenant_id",
+            "domain",
+            "operating_context",
+            "effective_interval"
+        ],
+        "write_binding_rule": "Tepat satu authority aktif untuk satu context write. Hierarchy membership tidak otomatis mengubah group, grant, owner atau placement.",
+        "deployment_ack": [
+            "target_environment_id",
+            "adapter_version",
+            "schema_capabilities",
+            "policy_revision",
+            "policy_hash",
+            "applied_checkpoint",
+            "receipt_id",
+            "applied_at",
+            "status"
+        ],
+        "activation": "Draft -> validated -> published -> applied. Published immutable; effective per target hanya sesudah ack compatible. Revoke restriktif menutup akses lama meskipun ack terlambat.",
+        "profile_fields": [
+            "id",
+            "tenant_or_platform_template_scope",
+            "name",
+            "slug",
+            "revision",
+            "status",
+            "validated_parameters",
+            "capability_versions",
+            "process_definition_version"
+        ],
+        "profile_rule": "Nama profile data bebas tervalidasi, bukan enum customer atau class per customer. Action/capability adalah daftar kemampuan kode yang direview.",
+        "service_group_assignment": [
+            "organization_id",
+            "service_group_id",
+            "main_or_supporting_role",
+            "service_structure_revision",
+            "effective_interval",
+            "patient_write_binding"
+        ],
+        "legacy_mapping": [
+            "tenant_id",
+            "organization_id",
+            "product_id",
+            "environment_id",
+            "local_object_type",
+            "local_id",
+            "source_revision",
+            "verified_checkpoint"
+        ],
+        "legacy_rule": "Local integer/name/NRM tidak membuktikan kesamaan. Data yang sudah shared tetap baseline legacy sampai migration preview/fencing/reconciliation sah.",
+        "catalog_rule": "Satu authority per key dan field. Obat/satuan serta definisi jasa tetap di aplikasi pemilik. Projection release lengkap dengan local overrides tervalidasi; pricing/section/account tidak ikut ditimpa.",
+        "scope_gate": "Lintas-environment reference catalog SH-04 berbeda dari pasien atau ledger lintas-environment. Tidak menawarkan mode yang capability belum teruji.",
+        "sandbox": "Namespace/snapshot terpisah; tidak publish ke production, tidak issue production stock atau outbound production.",
+        "acceptance": ["OS-01..18", "SG-01..14", "SH-01..05"],
+        "runtime_status": "Belum ada metadata policy/profile/ack ini pada schema Core yang diaudit. Tidak ada klaim enforcement Faskes.",
+        "inventory_binding_fields": [
+            "stock_owner_organization_id",
+            "legal_entity_id",
+            "authority_environment_id",
+            "warehouse_location_id",
+            "ledger_authority_id"
+        ],
+        "inventory_owner_rule": "Capability awal menolak pool lintas stock owner atau legal entity. Satu owner dengan custodian berbeda tetap dapat memakai binding custody sesuai profile. Visibility agregat tidak memberi hak issue atau menyatukan ledger."
+    },
+    "custody": {
+        "binding_fields": [
+            "id",
+            "tenant_id",
+            "clinical_organization_id",
+            "requesting_organization_id",
+            "procurement_party_id",
+            "stock_owner_organization_id",
+            "custodian_organization_id",
+            "physical_site_id",
+            "location_id",
+            "fulfillment_unit_id",
+            "inventory_authority_product_id",
+            "inventory_authority_environment_id",
+            "allowed_item_category_ids",
+            "eligibility_profile_revision",
+            "custody_agreement_reference",
+            "seller_party_id",
+            "billing_issuer_party_id",
+            "receivable_beneficiary_party_id",
+            "revenue_beneficiary_party_id",
+            "collector_party_id",
+            "settlement_rule_reference",
+            "revision",
+            "effective_interval"
+        ],
+        "operation_snapshot": [
+            "origin_environment_id",
+            "episode_or_order_id",
+            "authority_id",
+            "binding_revision",
+            "process_profile_version",
+            "stock_owner_id",
+            "custodian_id",
+            "location_id",
+            "lot_id",
+            "batch",
+            "expiry",
+            "seller_id",
+            "beneficiary_id",
+            "collector_id",
+            "settlement_reference",
+            "idempotency_id",
+            "correlation_id"
+        ],
+        "independent_states": [
+            "clinical_realization",
+            "reservation_or_issue_receipt",
+            "billing_collection_settlement"
+        ],
+        "single_owner": "Satu owner Apotek dengan custodian Klinik sah sebagai model teknis. Tidak menggabungkan ledger dua owner atau menyimpulkan eligibility hukum.",
+        "reversal": "Retur/refund menunjuk owner, lokasi/lot, invoice serta alokasi kas asal. Tidak memakai routing terbaru untuk mengubah pihak.",
+        "failure": "Authority/binding ambigu atau unavailable berarti pending/ditolak. Clinical commit bukan bukti issue atau settlement remote sukses.",
+        "acceptance": ["SH-06", "CD-01..12"],
+        "runtime_status": "Kontrak target. Tidak membaca atau menguji transaksi, procedure, legal eligibility, atau settlement legacy pada CPDB-01."
+    },
+    "coupling_replacements": {
+        "X01": "Identity/membership/tenant projection lokal untuk FK/subquery ERP; pengelolaan tenant memakai chain security pusat tersendiri.",
+        "X02": "Tenant creation tunggal PF-01: commit identity/tenant/membership pusat, intent ERP terpisah; tidak memberi operator Owner atau membuat identity berdasarkan email.",
+        "X03": "Acceptance organisasi pusat + local business-role intent/receipt. Gagal lokal mempertahankan grant pending.",
+        "X04": "Action Foundation pusat, company extension lokal, projection directory/hierarchy/alamat. Jalur baca tidak membuat canonical party atau nomor ERP.",
+        "X05": "Catalog platform dan local manifest/security snapshot terpisah; permission join tetap lokal. Daftar installed tetap database bisnis.",
+        "X06": "Audit stamp ID pada PDO tujuan dan reset tiap context; enrichment actor/report melalui projection lokal atau snapshot label sesuai kebutuhan.",
+        "X07": "Outbox, migration history, trigger change-log, retention dan store dipartisi menurut database tujuan. Tidak membuat global transaction dua PDO.",
+        "X08": "Resolver control/business/maintenance eksplisit dan registry provider/client-server. Pooled business tidak mengikuti control/default yang berubah.",
+        "X09": "Credential integration dan transaksi tetap ERP; identity akun aplikasi via authority operation+local receipt.",
+        "X10": "Global reference release tervalidasi terpisah dari detail geografis ber-tenant. Tidak publish tenant rows sebagai data global.",
+        "X11": "Module dan layanan Foundation bisnis memakai kontrak ke projection lokal; tidak menulis canonical directory/control dari database bisnis.",
+        "X12": "Analytics tetap ditahan. Klasifikasi dependency dicatat saja; pekerjaan terkait menunggu user melanjutkan analytics."
+    }
+}
