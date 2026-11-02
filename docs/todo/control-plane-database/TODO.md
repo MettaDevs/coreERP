@@ -35,7 +35,7 @@ CPDB-01 juga mencakup rincian berikut sebelum schema final dibuat.
 - [x] CPDB-01h. Kunci kontrak domain group pasien, clinical-record grants, obat, jasa, pricing/availability dan inventory source. [Kontrak policy/profile](CPDB-01.md#policy-group-profile-custody-dan-pembayaran) dan `inventory/contracts.json` mencakup assignment kelompok, authority katalog, process version, legacy mapping, satu write binding, revision/effective date, capability dan data shared lama.
 - [x] CPDB-01i. Tambahkan binding custody serta procurement, clinical org, stock owner, lokasi/custodian, seller, beneficiary, collector dan settlement reference pada kontrak. Bukti berada pada bagian custody `inventory/contracts.json`. Legal eligibility, ledger dan pembayaran tidak dinyatakan berjalan; mode titipan tetap mengikuti SH-06/CD.
 
-Centang CPDB-01 membuktikan keluaran inventaris/kontrak yang diminta, bukan acceptance split atau rehearsal. Owner integrasi adalah Codex pada branch `codex/cpdb-01-evidence-20261102`, source baseline `08366c35547632c6bcf9c7b643ef2455df4fc1bb`. Status review/check akhir dan PR dicatat pada laporan penyerahan. PF-01 mempunyai input kontrak; tidak dikerjakan dalam PR CPDB-01 ini.
+Centang CPDB-01 membuktikan keluaran inventaris/kontrak yang diminta, bukan acceptance split atau rehearsal. Owner integrasi adalah Codex pada branch `codex/cpdb-01-evidence-20261102`, source baseline `08366c35547632c6bcf9c7b643ef2455df4fc1bb`. Hasil diserahkan melalui [PR #372](https://github.com/MettaDevs/coreERP/pull/372), dengan bukti lokal pada `inventory/verification.json` dan status CI pada head PR tersebut. PF-01 mempunyai input kontrak; tidak dikerjakan dalam PR CPDB-01 ini.
 
 ## PF-01. Gunakan pekerjaan fondasi yang sudah direncanakan
 

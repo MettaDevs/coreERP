@@ -1,5 +1,5 @@
 {
-    "recorded_at": "2026-11-02T05:19:20.351175+00:00",
+    "recorded_at": "2026-11-02T05:20:36.257156+00:00",
     "scope": "CPDB-01 inventory and target contracts only",
     "source_baseline": "08366c35547632c6bcf9c7b643ef2455df4fc1bb",
     "local_checks": [
@@ -51,7 +51,8 @@
         "verdict": "No remaining blocking findings for inventory/contracts; does not verify split runtime or final CI"
     },
     "github_ci": {
-        "status": "Pending PR creation; never waived"
+        "status": "Authoritative status is attached to the current PR head; no waiver",
+        "verified_by_local_checks": false
     },
     "not_executed": [
         "Migration/database creation/data copy",
@@ -67,7 +68,7 @@
         "docs/.vitepress/config.ts": "f942c41b6d8e0399b4f6bba5756c2f7971350ffd141accbd7d474ea6adaaabf1",
         "docs/todo/control-plane-database/CPDB-01.md": "bc7f5dac69941bcf94f87c0fd9c8181fa732980e8f135aebd213325b1bf4d756",
         "docs/todo/control-plane-database/HANDOFF.md": "d0d0a8fb63373779b00ad33810bc9c1b1178edba3773d1c7972908856f648001",
-        "docs/todo/control-plane-database/TODO.md": "130fd4d77ac887e0ef4f5d9f8dcbf202b19f2d82797ffcb8f304ef519ac9cc3b",
+        "docs/todo/control-plane-database/TODO.md": "a3bd30f0e4d593e1e2c5773e92fc30d13804381328fab3e0ca44db60d11373f5",
         "docs/todo/control-plane-database/inventory/.gitattributes": "48faf7a93c986c1d309cba957c908c75541c25ff0ac78bacc8120ce6dedbf2ca",
         "docs/todo/control-plane-database/inventory/contracts.json": "6d4be7ad80b6cfb0d367995c1cf3d2fd4dc62adeb83b6a4f9ffe38d272b4edbf",
         "docs/todo/control-plane-database/inventory/decisions.tsv": "b86c81d8b5382df63f5128b37da89d1c6852b2b9e326728e56d67ba41fe3a2f8",
@@ -83,5 +84,7 @@
         "scripts/cpdb-runtime.sql": "a2b0b677298f298467f114bb83639d538e55afa0166503c3e62364bfd423ca67",
         "scripts/test_cpdb_inventory.py": "cea4237607221411483dbc5ef8a91be3e2fee2851bbddf5bcf8ec388f2c1050f"
     },
-    "hash_normalization": "UTF-8 text with LF, matching committed Git blobs"
+    "hash_normalization": "UTF-8 text with LF, matching committed Git blobs",
+    "pull_request": "https://github.com/MettaDevs/coreERP/pull/372",
+    "audit_implementation_commit": "19317778e3798f11419538575a03cbd042dba01d"
 }
