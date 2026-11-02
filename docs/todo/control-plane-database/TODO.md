@@ -1,6 +1,6 @@
 # TODO pemisahan database control plane
 
-Daftar ini menjalankan [PRD](PRD.md). Semua implementasi masih belum dimulai. Owner berikut adalah peran yang diusulkan; isi nama, branch, PR, SHA, bukti, dan penghambat ketika pekerjaan diambil.
+Daftar ini menjalankan [PRD](PRD.md). Hasil inventaris dan kontrak CPDB-01 tersedia pada [laporan CPDB-01](CPDB-01.md) untuk review. Pemisahan koneksi/schema dan perilaku aplikasi belum diimplementasikan. Owner berikut adalah peran yang diusulkan; isi nama, branch, PR, SHA, bukti, dan penghambat ketika pekerjaan diambil.
 
 Nama database target adalah `core_control_plane`. Master organisasi/hierarchy dan metadata sharing berada pada Organization Foundation di database tersebut; ERP dan Faskes tidak mempunyai master writable kedua. Baca [kontrak organisasi/sharing](ORGANIZATION-AND-SHARING.md) dan [TODO enforcement healthcare](../metta-platform-portal/SHARING-TODO.md).
 
@@ -10,7 +10,7 @@ Gunakan status `ready`, `blocked`, `in_progress`, `in_review`, `verified`, atau 
 
 | Unit                 | Owner                                               | Bergantung pada | Status awal | Hasil yang dapat direview                                               |
 | -------------------- | --------------------------------------------------- | --------------- | ----------- | ----------------------------------------------------------------------- |
-| CPDB-01              | Platform + database + security                      | Tidak ada       | ready       | Manifest ownership, baseline, contract akses, dan keputusan routing.    |
+| CPDB-01              | Codex, integrasi platform/database/security         | Tidak ada       | in_review   | [Manifest, baseline, kontrak dan blocker](CPDB-01.md).                  |
 | PF-01                | Owner portal platform yang sama dengan rencana lama | CPDB-01         | blocked     | Tenant dapat dibuat tanpa instalasi ERP atau identity duplikat.         |
 | CPDB-02              | Database + runtime                                  | CPDB-01, PF-01  | blocked     | Koneksi, target migration, role, serta store framework eksplisit.       |
 | CPDB-03              | Platform access + backend ERP                       | CPDB-02         | blocked     | Projection, FK/query pengganti, durable operations, dan kontrak revoke. |
@@ -22,18 +22,20 @@ PF-01 bukan pekerjaan ganda. Schema ownership mempunyai satu owner integrasi. UI
 
 ## CPDB-01. Inventaris dan kunci batas
 
-- [ ] CPDB-01a. Rekam HEAD, schema version, koneksi aktual, data size, writer aktif, dan baseline latency. Bukti berupa manifest read-only; source audit saja tidak cukup.
-- [ ] CPDB-01b. Klasifikasikan semua objek dari model marker, migration Core/module, dan katalog PostgreSQL. Bukti berupa daftar move/retain/projection dengan jumlah objek belum diklasifikasikan nol.
-- [ ] CPDB-01c. Temukan FK, raw join, whereHas, eager loading, audit actor lookup, trigger, view, dan fungsi lintas calon batas. Bukti berupa dependency map dan pengganti untuk setiap temuan.
-- [ ] CPDB-01d. Putuskan authority pengelola tenant, entitlement, environment grant, undangan organisasi, serta role bisnis ERP. Bukti berupa contract yang mempertahankan Owner ERP dan tidak menambahkan `system_role` membership.
-- [ ] CPDB-01e. Tentukan konfigurasi control/business/maintenance dan lokasi pooled ERP ketika database_name kosong. Bukti berupa tabel resolusi koneksi untuk request, job, CLI, installer, dan on-prem.
-- [ ] CPDB-01f. Tetapkan backup scope, key availability, target revoke/staleness, baseline RPO/RTO, dan budget maintenance dari rehearsal awal. Angka usulan dibedakan dari hasil pengukuran.
+- [x] CPDB-01a. Rekam HEAD, schema version, koneksi aktual, data size, writer aktif, dan baseline latency. [Baseline](CPDB-01.md#baseline-source-dan-runtime) memuat snapshot read-only dua database dan probe empat runtime. Latency yang diukur hanya read SQL; latency aplikasi dan writer yang tidak tampak tetap unknown.
+- [x] CPDB-01b. Klasifikasikan semua objek dari model marker, migration Core/module, dan katalog PostgreSQL. `inventory/manifest.json` dan `inventory/migrations.json` memuat move/retain/projection dengan nol objek ditemukan yang belum diklasifikasikan, pada scope snapshot yang disebut.
+- [x] CPDB-01c. Temukan FK, raw join, whereHas, eager loading, audit actor lookup, trigger, view, dan fungsi lintas calon batas. [Dependency map](CPDB-01.md#pengganti-coupling-dan-transaksi), indeks source dan kontrak X01..X12 mencatat pengganti. SQL dinamis/writer tak teramati tetap gate trace/fencing rehearsal, bukan dianggap sudah aman.
+- [x] CPDB-01d. Putuskan authority pengelola tenant, entitlement, environment grant, undangan organisasi, serta role bisnis ERP. [Kontrak identity/kewenangan](CPDB-01.md#identity-dan-kewenangan) mempertahankan Owner ERP, tanpa `system_role` membership. Schema chain pengelolaan pusat belum diimplementasikan.
+- [x] CPDB-01e. Tentukan konfigurasi control/business/maintenance dan lokasi pooled ERP ketika database_name kosong. [Tabel resolusi](CPDB-01.md#resolusi-koneksi-dan-writer) mencakup request, job, CLI, installer, dan on-prem. Pooled ERP tetap business `core_erp`, bukan database control baru.
+- [x] CPDB-01f. Catat backup scope, key availability, target revoke/staleness, serta pengukuran RPO/RTO dan maintenance yang harus dilakukan pada rehearsal. [Bukti dan batas pengukuran](CPDB-01.md#backup-kunci-dan-pengukuran) memisahkan hasil read-only dari unknown. Sesuai batas kerja CPDB-01, rehearsal copy/restore tidak dijalankan; hasil terukur tetap wajib pada CPDB-04f.
 
 CPDB-01 juga mencakup rincian berikut sebelum schema final dibuat.
 
-- [ ] CPDB-01g. Masukkan Organization Foundation pusat sebagai authority identity/hierarchy tanpa ERP. Audit klasifikasi field legal_entities/operating_units, OrganizationParty/Address Book, projection dan company setup lokal.
-- [ ] CPDB-01h. Kunci kontrak domain group pasien, clinical-record grants, obat, jasa, pricing/availability dan inventory source. Sertakan profil kelompok layanan dengan kelompok unit utama/pendukung, authority katalog lintas kelompok, process profile berversi dan pemetaan legacy. Tentukan satu write binding, revision/effective date, capability, dan penanganan data lama yang sudah shared.
-- [ ] CPDB-01i. Tambahkan binding custody serta procurement, clinical org, stock owner, lokasi/custodian, seller, beneficiary, collector dan settlement reference. Metadata tidak dianggap bukti legal eligibility atau ledger/pembayaran yang sudah berjalan; mode titipan mengikuti SH-06/CD.
+- [x] CPDB-01g. Masukkan Organization Foundation pusat sebagai authority identity/hierarchy tanpa ERP pada manifest/kontrak. [Partisi field dan Address Book](CPDB-01.md#ownership-yang-dikunci) mencakup generic profile, projection dan company setup lokal; bukan migration authority runtime.
+- [x] CPDB-01h. Kunci kontrak domain group pasien, clinical-record grants, obat, jasa, pricing/availability dan inventory source. [Kontrak policy/profile](CPDB-01.md#policy-group-profile-custody-dan-pembayaran) dan `inventory/contracts.json` mencakup assignment kelompok, authority katalog, process version, legacy mapping, satu write binding, revision/effective date, capability dan data shared lama.
+- [x] CPDB-01i. Tambahkan binding custody serta procurement, clinical org, stock owner, lokasi/custodian, seller, beneficiary, collector dan settlement reference pada kontrak. Bukti berada pada bagian custody `inventory/contracts.json`. Legal eligibility, ledger dan pembayaran tidak dinyatakan berjalan; mode titipan tetap mengikuti SH-06/CD.
+
+Centang CPDB-01 membuktikan keluaran inventaris/kontrak yang diminta, bukan acceptance split atau rehearsal. Owner integrasi adalah Codex pada branch `codex/cpdb-01-evidence-20261102`, source baseline `08366c35547632c6bcf9c7b643ef2455df4fc1bb`. Hasil diserahkan melalui [PR #372](https://github.com/MettaDevs/coreERP/pull/372), dengan bukti lokal pada `inventory/verification.json` dan status CI pada head PR tersebut. PF-01 mempunyai input kontrak; tidak dikerjakan dalam PR CPDB-01 ini.
 
 ## PF-01. Gunakan pekerjaan fondasi yang sudah direncanakan
 
@@ -102,8 +104,9 @@ Foundation dan metadata policy pada unit ini tidak menggantikan enforcement pasi
 
 Setiap tugas verified menyimpan PR, SHA, schema version, manifest, output command, dan screenshot atau log perilaku yang relevan. Gunakan status `INCONCLUSIVE` bila bukti belum cukup, bukan dianggap lulus.
 
-| Tanggal    | Keputusan                                                                     | Bukti                   | Status                                                     |
-| ---------- | ----------------------------------------------------------------------------- | ----------------------- | ---------------------------------------------------------- |
-| 2026-11-02 | Target database control plane terpisah; runtime/repo tetap; bridging ditunda. | PRD dan instruksi user. | Desain disepakati secara arah; implementasi belum dimulai. |
+| Tanggal    | Keputusan                                                                               | Bukti                                                       | Status                                                     |
+| ---------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------- |
+| 2026-11-02 | Target database control plane terpisah; runtime/repo tetap; bridging ditunda.           | PRD dan instruksi user.                                     | Desain disepakati secara arah; implementasi belum dimulai. |
+| 2026-11-02 | Inventaris/kontrak CPDB-01a..i tersedia; rehearsal write/copy/restore tetap di CPDB-04. | [CPDB-01](CPDB-01.md), `inventory/`, dan collector/checker. | in_review; belum ada split runtime.                        |
 
 Jangan mengubah kuota trial, membuka public ERP, mengganti key, atau menghapus data sebagai efek samping pemisahan. Perubahan kebutuhan mengikuti [aturan perubahan portal](../metta-platform-portal/CHANGES.md) dan harus memperbarui acceptance case yang terkena.
