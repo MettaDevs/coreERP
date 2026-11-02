@@ -13,13 +13,11 @@ import {
     EmptyTitle,
 } from '@apperp/ui/empty';
 import { FormControl } from '@apperp/ui/form-control';
-import { Input } from '@apperp/ui/input';
-import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { PageDialog, PageDialogContent } from '@apperp/ui/page-dialog';
-import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
 import { useRecordTransition } from '@apperp/ui/use-record-transition';
+import RecordListPage from '../../_shared/RecordListPage';
 import { useRecordList } from '../../use-record-list';
 import type { RecordCardState } from '../_shared/record-card';
 import type { Context } from './valueAdjustment';
@@ -189,89 +187,81 @@ export default function ValueAdjustmentListPage({
     return (
         <>
             {changesTransitionConfirmation}
-            <ListPageLayout
-                header={
-                    <RecordActionBar title="Penyesuaian nilai aset">
-                        {can('create') && (
-                            <ActionButton
-                                action="create"
-                                type="button"
-                                onClick={() => {
-                                    requestChangesTransition(() => {
-                                        setCard({ mode: 'create' });
-                                    });
-                                }}
-                            />
-                        )}
-                    </RecordActionBar>
-                }
-                filters={
-                    <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
-                        <div className="w-full sm:w-72">
-                            <FormControl>
-                                <Input
-                                    label="Cari"
-                                    type="search"
-                                    placeholder="Nomor bukti, alasan, atau buku"
-                                    value={search}
-                                    onChange={(event) =>
-                                        setSearch(event.target.value)
-                                    }
+            <RecordListPage
+                toolbar={{
+                    title: 'Penyesuaian nilai aset',
+                    search: {
+                        value: search,
+                        onValueChange: setSearch,
+                        label: 'Cari',
+                        placeholder: 'Nomor bukti, alasan, atau buku',
+                    },
+                    children: (
+                        <>
+                            {can('create') && (
+                                <ActionButton
+                                    action="create"
+                                    type="button"
+                                    onClick={() => {
+                                        requestChangesTransition(() => {
+                                            setCard({ mode: 'create' });
+                                        });
+                                    }}
                                 />
-                            </FormControl>
-                        </div>
-                        <div className="w-full sm:w-56">
-                            <FormControl>
-                                <Select
-                                    label="Jenis"
-                                    items={PILIHAN_JENIS.map(
-                                        (pilihan) => pilihan.label,
-                                    )}
-                                    value={
+                            )}
+                        </>
+                    ),
+                }}
+                filters={
+                    <>
+                        <FormControl>
+                            <Select
+                                label="Jenis"
+                                items={PILIHAN_JENIS.map(
+                                    (pilihan) => pilihan.label,
+                                )}
+                                value={
+                                    PILIHAN_JENIS.find(
+                                        (pilihan) => pilihan.value === jenis,
+                                    )?.label ?? null
+                                }
+                                ariaLabel="Saring berdasarkan jenis"
+                                onValueChange={(value) =>
+                                    setJenis(
                                         PILIHAN_JENIS.find(
                                             (pilihan) =>
-                                                pilihan.value === jenis,
-                                        )?.label ?? null
-                                    }
-                                    ariaLabel="Saring berdasarkan jenis"
-                                    onValueChange={(value) =>
-                                        setJenis(
-                                            PILIHAN_JENIS.find(
-                                                (pilihan) =>
-                                                    pilihan.label === value,
-                                            )?.value ?? '',
-                                        )
-                                    }
-                                />
-                            </FormControl>
-                        </div>
-                        <div className="w-full sm:w-48">
-                            <FormControl>
-                                <Select
-                                    label="Status"
-                                    items={PILIHAN_STATUS.map(
-                                        (pilihan) => pilihan.label,
-                                    )}
-                                    value={
+                                                pilihan.label === value,
+                                        )?.value ?? '',
+                                    )
+                                }
+                            />
+                        </FormControl>
+
+                        <FormControl>
+                            <Select
+                                label="Status"
+                                items={PILIHAN_STATUS.map(
+                                    (pilihan) => pilihan.label,
+                                )}
+                                value={
+                                    PILIHAN_STATUS.find(
+                                        (pilihan) => pilihan.value === status,
+                                    )?.label ?? null
+                                }
+                                ariaLabel="Saring berdasarkan status"
+                                onValueChange={(value) =>
+                                    setStatus(
                                         PILIHAN_STATUS.find(
                                             (pilihan) =>
-                                                pilihan.value === status,
-                                        )?.label ?? null
-                                    }
-                                    ariaLabel="Saring berdasarkan status"
-                                    onValueChange={(value) =>
-                                        setStatus(
-                                            PILIHAN_STATUS.find(
-                                                (pilihan) =>
-                                                    pilihan.label === value,
-                                            )?.value ?? '',
-                                        )
-                                    }
-                                />
-                            </FormControl>
-                        </div>
-                    </div>
+                                                pilihan.label === value,
+                                        )?.value ?? '',
+                                    )
+                                }
+                            />
+                        </FormControl>
+                    </>
                 }
+                filtersActive={Boolean(jenis || status)}
             >
                 {!memuat && !terlihat.length ? (
                     <Empty>
@@ -315,7 +305,7 @@ export default function ValueAdjustmentListPage({
                         }}
                     />
                 )}
-            </ListPageLayout>
+            </RecordListPage>
             {card && (
                 <PageDialog
                     open

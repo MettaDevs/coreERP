@@ -1,17 +1,76 @@
 # Register aset, penempatan, perencanaan, dan dokumen lifecycle.
 #
-# Tidak ada `POST /api/v1/aset`. Ia dibuang 18 September 2026: aset hanya lahir dari
-# dokumen penerimaan, yang membawa nomor, jumlah per baris, rujukan permintaan pembelian,
-# dan peringatan ambang kapitalisasi sebelum nomornya terbit. Lihat `penerimaan-aset.yaml`.
-/api/v1/aset:
+# POST register hanya membuat aset rencana. Aset aktual tetap lahir dari penerimaan.
+/api/modules/management-aset/v1/aset:
   get:
     tags:
     - Lifecycle aset
     operationId: listAset
     summary: Menampilkan register aset tenant aktif
+    description: |
+      Mencakup aset aktual dan aset rencana. is_budgeted menandai aset rencana,
+      tanpa tanggal perolehan, nilai aktual, buku penyusutan, atau jurnal aktual.
+      planning_company_id merupakan perusahaan eksplisit pada form perencanaan,
+      memerlukan create/update perencanaan selain aset.read dan tetap menyaring
+      tenant, perusahaan, serta unit yang dijangkau kebijakan. Query biasa memakai perusahaan aktif.
+    parameters:
+    - name: planning_company_id
+      in: query
+      schema:
+        $ref: '#/components/schemas/Ulid'
     responses:
       '200':
         description: Register aset
+  post:
+    tags: [Lifecycle aset]
+    operationId: createBudgetedAsset
+    summary: Membuat aset sebagai perencanaan di register tanpa posting aktual
+    description: |
+      Memerlukan aset.create dan kebijakan tanggung jawab perusahaan/unit pilihan.
+      Idempotency-Key wajib; kode memakai reference management-aset.asset-code.
+      is_budgeted wajib true. Tanggal perolehan/pemakaian serta nilai perolehan
+      aktual dilarang. Server membuat lifecycle_state budgeted tanpa buku,
+      penempatan, ledger, atau feed posting. Percobaan ulang mengembalikan record yang sama.
+    parameters:
+    - $ref: '#/components/parameters/IdempotencyKey'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BudgetedAssetWrite'
+    responses:
+      '201': {description: Aset rencana lengkap termasuk id, kode, nama, is_budgeted, dan version}
+      '200': {description: Hasil permintaan idempoten sebelumnya}
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '422':
+        $ref: '#/components/responses/ValidationError'
+/api/modules/management-aset/v1/aset/{id}/planning:
+  patch:
+    tags: [Lifecycle aset]
+    operationId: updateBudgetedAsset
+    summary: Mengubah identitas aset rencana tanpa mengubahnya menjadi aset aktual
+    parameters:
+    - $ref: '#/components/parameters/RecordId'
+    - $ref: '#/components/parameters/IfMatch'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            allOf:
+            - $ref: '#/components/schemas/BudgetedAssetWrite'
+            - $ref: '#/components/schemas/VersionInput'
+    responses:
+      '200': {description: Aset rencana tersimpan}
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404': {description: Aset rencana tidak ditemukan atau di luar perusahaan aktif}
+      '409':
+        $ref: '#/components/responses/StaleVersion'
+      '422':
+        $ref: '#/components/responses/ValidationError'
 /api/v1/aset/{id}:
   get:
     tags:
@@ -321,6 +380,9 @@
       sebagai snapshot, dan penanggung jawab.
       Rincian membawa needed_on, funding_source_id, funding_source_name, dan estimasi
       yang boleh null. needed_on pada data lama boleh null sampai dokumen dilengkapi.
+      planned_asset_id menunjuk satu aset dari register, aktual maupun rencana.
+      planned_asset_code dan nama_aset menyimpan snapshot; jenis_aset_id diturunkan
+      server dari aset terpilih.
       planning_type dan funding_source header lama dipertahankan sebagai data historis,
       tidak menjadi input baseline baru.
     parameters:

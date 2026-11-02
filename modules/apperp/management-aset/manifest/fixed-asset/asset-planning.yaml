@@ -26,7 +26,7 @@ security:
   privileges:
     - code: management-aset.perencanaan-aset.maintain
       name: Kelola perencanaan aset
-      permissions: [management-aset.perencanaan-aset.read, management-aset.perencanaan-aset.create, management-aset.perencanaan-aset.update]
+      permissions: [management-aset.perencanaan-aset.read, management-aset.perencanaan-aset.create, management-aset.perencanaan-aset.update, management-aset.aset.read]
     - code: management-aset.perencanaan-aset.retire
       name: Arsipkan perencanaan aset
       permissions: [management-aset.perencanaan-aset.archive]

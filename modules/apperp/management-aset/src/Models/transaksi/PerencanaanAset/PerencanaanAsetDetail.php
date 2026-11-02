@@ -25,6 +25,8 @@ use Illuminate\Support\Carbon;
  * @property string $planning_id
  * @property int $line_number
  * @property string $jenis_aset_id
+ * @property ?string $planned_asset_id
+ * @property ?string $planned_asset_code
  * @property ?string $satuan_id
  * @property string $nama_aset
  * @property string $unit
@@ -59,6 +61,7 @@ class PerencanaanAsetDetail extends Model
         'nama_aset', 'unit', 'quantity', 'requested_specification',
         'estimated_unit_price', 'estimated_total_price', 'estimate_pending',
         'needed_on', 'funding_source_id', 'funding_source_name',
+        'planned_asset_id', 'planned_asset_code',
     ];
 
     /** @return array<string, string> */

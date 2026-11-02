@@ -8,13 +8,10 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
-import { FormControl } from '@apperp/ui/form-control';
-import { Input } from '@apperp/ui/input';
-import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { PageDialog, PageDialogContent } from '@apperp/ui/page-dialog';
-import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
 import { useRecordTransition } from '@apperp/ui/use-record-transition';
+import RecordListPage from '../../_shared/RecordListPage';
 import { useRecordList } from '../../use-record-list';
 import type { RecordCardState } from '../_shared/record-card';
 import type { Disposal, DisposalResource } from './disposal';
@@ -137,35 +134,27 @@ export default function DisposalListPage({
     return (
         <>
             {changesTransitionConfirmation}
-            <ListPageLayout
-                header={
-                    <RecordActionBar title={jenis.title}>
-                        {can('create') && (
-                            <ActionButton
-                                action="create"
-                                type="button"
-                                onClick={() => bukaBaru()}
-                            />
-                        )}
-                    </RecordActionBar>
-                }
-                filters={
-                    <div className="border-b px-5 py-3">
-                        <div className="w-full sm:w-72">
-                            <FormControl>
-                                <Input
-                                    label="Cari"
-                                    type="search"
-                                    placeholder="Nomor bukti, aset, atau keterangan"
-                                    value={search}
-                                    onChange={(event) =>
-                                        setSearch(event.target.value)
-                                    }
+            <RecordListPage
+                toolbar={{
+                    title: jenis.title,
+                    search: {
+                        value: search,
+                        onValueChange: setSearch,
+                        label: 'Cari',
+                        placeholder: 'Nomor bukti, aset, atau keterangan',
+                    },
+                    children: (
+                        <>
+                            {can('create') && (
+                                <ActionButton
+                                    action="create"
+                                    type="button"
+                                    onClick={() => bukaBaru()}
                                 />
-                            </FormControl>
-                        </div>
-                    </div>
-                }
+                            )}
+                        </>
+                    ),
+                }}
             >
                 {!memuat && !terlihat.length ? (
                     <Empty>
@@ -190,7 +179,7 @@ export default function DisposalListPage({
                         onRowAction={(_, baris) => bukaDokumen(baris.id)}
                     />
                 )}
-            </ListPageLayout>
+            </RecordListPage>
             {card && (
                 <PageDialog
                     open

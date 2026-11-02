@@ -11,8 +11,8 @@ import {
     EmptyTitle,
 } from '@apperp/ui/empty';
 import { FormControl } from '@apperp/ui/form-control';
-import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
+import RecordListPage from '../../_shared/RecordListPage';
 import { RecordLookup } from '../../_shared/RecordLookup';
 import { api, errorMessage } from '../../api';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
@@ -172,127 +172,148 @@ export default function MaintenanceKpiPage() {
     ];
 
     return (
-        <div>
-            <RecordActionBar title="KPI pemeliharaan" />
-            <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
-                <div className="w-full sm:w-44">
-                    <FormControl>
-                        <DatePicker
-                            label="Dari"
+        <div className="h-full min-h-0 overflow-hidden">
+            <RecordListPage
+                toolbar={{ title: 'KPI pemeliharaan' }}
+                filters={
+                    <>
+                        <FormControl>
+                            <DatePicker
+                                label="Dari"
 
-                            value={from}
-                            onValueChange={(value) => setFrom(value)}
-                        />
-                    </FormControl>
-                </div>
-                <div className="w-full sm:w-44">
-                    <FormControl>
-                        <DatePicker
-                            label="Sampai"
+                                value={from}
+                                onValueChange={(value) => setFrom(value)}
+                            />
+                        </FormControl>
 
-                            value={until}
-                            onValueChange={(value) => setUntil(value)}
-                        />
-                    </FormControl>
-                </div>
-                <div className="w-full sm:w-48">
-                    <FormControl>
-                        <Select
-                            label="Kelompokkan"
-                            items={GROUPINGS}
-                            value={grouping}
-                            ariaLabel="Kelompokkan KPI"
-                            onValueChange={(value) =>
-                                setGrouping(value ?? 'aset')
-                            }
-                        />
-                    </FormControl>
-                </div>
-                <div className="w-full sm:w-56">
-                    <FormControl>
-                        <RecordLookup
-                            source={types}
-                            label="Jenis aset"
-                            items={[
-                                { value: '', label: 'Semua jenis' },
-                                ...types.options.map((option) => ({
-                                    value: option.id,
-                                    label: optionLabel(option),
-                                })),
-                            ]}
-                            value={type || null}
-                            placeholder="Semua jenis"
-                            ariaLabel="Saring jenis aset"
-                            onValueChange={(value) => setType(value ?? '')}
-                        />
-                    </FormControl>
-                </div>
-                <div className="w-full sm:w-56">
-                    <FormControl>
-                        <RecordLookup
-                            source={locations}
-                            label="Lokasi"
-                            items={[
-                                { value: '', label: 'Semua lokasi' },
-                                ...locations.options.map((option) => ({
-                                    value: option.id,
-                                    label: optionLabel(option),
-                                })),
-                            ]}
-                            value={location || null}
-                            placeholder="Semua lokasi"
-                            ariaLabel="Saring lokasi"
-                            onValueChange={(value) => setLocation(value ?? '')}
-                        />
-                    </FormControl>
-                </div>
-            </div>
+                        <FormControl>
+                            <DatePicker
+                                label="Sampai"
 
-            {current && (
-                <dl className="grid gap-3 border-b px-5 py-3 sm:grid-cols-5">
-                    {[
-                        [
-                            'Availability',
-                            current.total.availability_persen === null
-                                ? '—'
-                                : `${hours(current.total.availability_persen)}%`,
-                        ],
-                        [
-                            'Downtime',
-                            `${hours(current.total.downtime_jam)} jam`,
-                        ],
-                        ['Kerusakan', String(current.total.jumlah_kerusakan)],
-                        ['MTBF', `${hours(current.total.mtbf_jam)} jam`],
-                        ['MTTR', `${hours(current.total.mttr_jam)} jam`],
-                    ].map(([label, value]) => (
-                        <div key={label}>
-                            <dt className="text-muted-foreground text-xs">
-                                {label}
-                            </dt>
-                            <dd className="text-lg font-semibold">{value}</dd>
-                        </div>
-                    ))}
-                </dl>
-            )}
+                                value={until}
+                                onValueChange={(value) => setUntil(value)}
+                            />
+                        </FormControl>
 
-            {current && current.rows.length === 0 ? (
-                <Empty>
-                    <EmptyHeader>
-                        <EmptyTitle>Tidak ada aset pada pilihan ini</EmptyTitle>
-                        <EmptyDescription>
-                            Ubah periode atau saringan untuk melihat kinerja
-                            pemeliharaan aset.
-                        </EmptyDescription>
-                    </EmptyHeader>
-                </Empty>
-            ) : (
-                <DataTable
-                    columns={columns}
-                    data={current?.rows ?? []}
-                    getRowKey={(row) => row.kunci ?? 'tanpa'}
-                    getRowLabel={(row) => row.kode ?? 'Tanpa lokasi'}
-                />
-            )}
+                        <FormControl>
+                            <Select
+                                label="Kelompokkan"
+                                items={GROUPINGS}
+                                value={grouping}
+                                ariaLabel="Kelompokkan KPI"
+                                onValueChange={(value) =>
+                                    setGrouping(value ?? 'aset')
+                                }
+                            />
+                        </FormControl>
+
+                        <FormControl>
+                            <RecordLookup
+                                source={types}
+                                label="Jenis aset"
+                                items={[
+                                    { value: '', label: 'Semua jenis' },
+                                    ...types.options.map((option) => ({
+                                        value: option.id,
+                                        label: optionLabel(option),
+                                    })),
+                                ]}
+                                value={type || null}
+                                placeholder="Semua jenis"
+                                ariaLabel="Saring jenis aset"
+                                onValueChange={(value) => setType(value ?? '')}
+                            />
+                        </FormControl>
+
+                        <FormControl>
+                            <RecordLookup
+                                source={locations}
+                                label="Lokasi"
+                                items={[
+                                    { value: '', label: 'Semua lokasi' },
+                                    ...locations.options.map((option) => ({
+                                        value: option.id,
+                                        label: optionLabel(option),
+                                    })),
+                                ]}
+                                value={location || null}
+                                placeholder="Semua lokasi"
+                                ariaLabel="Saring lokasi"
+                                onValueChange={(value) =>
+                                    setLocation(value ?? '')
+                                }
+                            />
+                        </FormControl>
+                    </>
+                }
+                filtersActive={Boolean(
+                    type ||
+                    location ||
+                    grouping !== 'aset' ||
+                    from !== `${today.slice(0, 7)}-01` ||
+                    until !== today,
+                )}
+                notice={
+                    current && (
+                        <dl className="grid gap-3 border-b px-5 py-3 sm:grid-cols-5">
+                            {[
+                                [
+                                    'Availability',
+                                    current.total.availability_persen === null
+                                        ? '—'
+                                        : `${hours(current.total.availability_persen)}%`,
+                                ],
+                                [
+                                    'Downtime',
+                                    `${hours(current.total.downtime_jam)} jam`,
+                                ],
+                                [
+                                    'Kerusakan',
+                                    String(current.total.jumlah_kerusakan),
+                                ],
+                                [
+                                    'MTBF',
+                                    `${hours(current.total.mtbf_jam)} jam`,
+                                ],
+                                [
+                                    'MTTR',
+                                    `${hours(current.total.mttr_jam)} jam`,
+                                ],
+                            ].map(([label, value]) => (
+                                <div key={label}>
+                                    <dt className="text-muted-foreground text-xs">
+                                        {label}
+                                    </dt>
+                                    <dd className="text-lg font-semibold">
+                                        {value}
+                                    </dd>
+                                </div>
+                            ))}
+                        </dl>
+                    )
+                }
+            >
+                {current && current.rows.length === 0 ? (
+                    <Empty>
+                        <EmptyHeader>
+                            <EmptyTitle>
+                                Tidak ada aset pada pilihan ini
+                            </EmptyTitle>
+                            <EmptyDescription>
+                                Ubah periode atau saringan untuk melihat kinerja
+                                pemeliharaan aset.
+                            </EmptyDescription>
+                        </EmptyHeader>
+                    </Empty>
+                ) : (
+                    <DataTable
+                        columns={columns}
+                        data={current?.rows ?? []}
+                        getRowKey={(row) => row.kunci ?? 'tanpa'}
+                        getRowLabel={(row) => row.kode ?? 'Tanpa lokasi'}
+                    />
+                )}
+            </RecordListPage>
         </div>
     );
 }

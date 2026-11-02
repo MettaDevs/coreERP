@@ -11,8 +11,8 @@ security:
       name: Lihat register aset
       entry_point: management-aset.aset.form
       access: read
-    # Sejak 18 September 2026 izin ini menjaga penyelesaian dokumen penerimaan, bukan
-    # sebuah endpoint pembuatan aset — endpoint itu sudah tidak ada.
+    # Izin ini menjaga penyelesaian penerimaan aktual dan pembuatan kartu aset rencana.
+    # POST register hanya menerima aset rencana tanpa nilai/buku/posting aktual.
     - code: management-aset.aset.create
       name: Daftarkan aset ke register
       entry_point: management-aset.aset.api

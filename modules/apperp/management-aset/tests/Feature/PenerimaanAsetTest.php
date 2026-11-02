@@ -368,13 +368,7 @@ class PenerimaanAsetTest extends TestCase
         $this->assertNull($daftar[0]['serial_number']);
     }
 
-    /**
-     * Sejak 18 September 2026 dokumen penerimaan adalah satu-satunya pintu ke register.
-     *
-     * Selama `POST /aset` masih hidup, kalimat "inventarisasi aset adalah penerimaan"
-     * tidak benar: aset masih bisa lahir tanpa dokumen, tanpa rujukan permintaan
-     * pembelian, dan tanpa peringatan ambang kapitalisasi.
-     */
+    /** Perolehan aktual tetap melalui penerimaan; POST register hanya menerima aset rencana tanpa nilai/tanggal aktual. */
     public function test_aset_tidak_dapat_dibuat_langsung_tanpa_dokumen_penerimaan(): void
     {
         $this->sebagaiPengguna($this->tenantId, ['management-aset.aset.create'])
@@ -389,7 +383,7 @@ class PenerimaanAsetTest extends TestCase
                 'currency_code' => 'IDR',
                 'usage_org_unit_id' => $this->orgUnitId,
             ])
-            ->assertStatus(405);
+            ->assertUnprocessable()->assertJsonValidationErrors(['is_budgeted', 'acquired_on', 'acquisition_value']);
     }
 
     public function test_nomor_seri_diisi_sekaligus_lewat_grid_dokumen(): void

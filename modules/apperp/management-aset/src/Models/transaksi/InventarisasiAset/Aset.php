@@ -38,10 +38,11 @@ use Modules\Apperp\ManagementAset\Support\StatusAset;
  * @property ?string $financial_dimension_org_unit_id
  * @property ?string $serial_number
  * @property ?string $model_number
- * @property Carbon $acquired_on
+ * @property ?Carbon $acquired_on
  * @property ?Carbon $placed_in_service_on
  * @property string $acquisition_value
- * @property string $currency_code
+ * @property ?string $currency_code
+ * @property bool $is_budgeted
  * @property string $lifecycle_state
  * @property ?string $keterangan
  * @property ?Carbon $deleted_at
@@ -67,6 +68,7 @@ class Aset extends Model
      */
     public const FIELD_CAPTIONS = [
         'kode' => 'Kode aset',
+        'is_budgeted' => 'Aset sebagai perencanaan',
         'nama' => 'Nama aset',
         'group_aset_id' => 'Group aset',
         'kelompok_harta_fiskal_id' => 'Kelompok harta fiskal',
@@ -116,12 +118,17 @@ class Aset extends Model
 
     protected $table = 'aset_tr_aset';
 
+    protected static function booted(): void
+    {
+        static::addGlobalScope('actual', fn ($query) => $query->where('aset_tr_aset.is_budgeted', false));
+    }
+
     protected $fillable = [
         'tenant_id', 'creation_key', 'kode', 'nama', 'legal_entity_id', 'responsible_org_unit_id',
         'group_aset_id', 'kelompok_harta_fiskal_id', 'jenis_aset_id', 'kondisi_aset_id', 'pabrikan_aset_id', 'model_aset_id',
         'induk_aset_id', 'lokasi_aset_id', 'financial_dimension_org_unit_id',
         'serial_number', 'model_number', 'acquired_on', 'placed_in_service_on',
-        'acquisition_value', 'currency_code', 'lifecycle_state', 'keterangan',
+        'acquisition_value', 'currency_code', 'lifecycle_state', 'keterangan', 'is_budgeted',
         'penerimaan_aset_id', 'penerimaan_aset_detail_id',
     ];
 
@@ -129,6 +136,7 @@ class Aset extends Model
     protected function casts(): array
     {
         return [
+            'is_budgeted' => 'boolean',
             'acquired_on' => 'date',
             'placed_in_service_on' => 'date',
             'acquisition_value' => 'decimal:2',

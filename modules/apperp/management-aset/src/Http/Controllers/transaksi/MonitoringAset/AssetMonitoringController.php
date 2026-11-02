@@ -634,14 +634,15 @@ class AssetMonitoringController extends Controller
                         // Selama draf: ditemukan padahal sudah tidak beredar atau tercatat di lokasi
                         // lain, atau tidak ditemukan padahal masih beredar — aturan yang sama dengan
                         // AssetMonitoringStatus::result().
-                        [$decommissioned, $disposed] = StatusAset::tidakLagiBeredar();
+                        $nonCirculating = StatusAset::tidakLagiBeredar();
+                        $placeholders = implode(', ', array_fill(0, count($nonCirculating), '?'));
                         $query->whereNull(self::LINES.'.hasil')
                             ->whereNotNull(self::LINES.'.ada')
                             ->whereRaw(
                                 'case when "'.self::LINES.'"."ada" '
-                                .'then ("aset_hitung"."lifecycle_state" in (?, ?) or "aset_hitung"."lokasi_aset_id" is distinct from "'.self::HEADER.'"."lokasi_aset_id") '
-                                .'else "aset_hitung"."lifecycle_state" not in (?, ?) end',
-                                [$decommissioned, $disposed, $decommissioned, $disposed],
+                                .'then ("aset_hitung"."lifecycle_state" in ('.$placeholders.') or "aset_hitung"."lokasi_aset_id" is distinct from "'.self::HEADER.'"."lokasi_aset_id") '
+                                .'else "aset_hitung"."lifecycle_state" not in ('.$placeholders.') end',
+                                [...$nonCirculating, ...$nonCirculating],
                             );
                     });
             });

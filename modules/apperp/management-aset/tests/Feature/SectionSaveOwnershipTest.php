@@ -25,6 +25,7 @@ final class SectionSaveOwnershipTest extends TestCase
         'transactions/downtime/DowntimePage.tsx' => 1,
         'transactions/insurance/InsurancePage.tsx' => 1,
         'transactions/inventarisasi-aset/AsetDetailPage.tsx' => 1,
+        'transactions/inventarisasi-aset/BudgetedAssetCard.tsx' => 1,
         'transactions/inventarisasi-aset/PenerimaanDetailPage.tsx' => 1,
         'transactions/maintenance-requests/MaintenanceRequestDetailPage.tsx' => 1,
         'transactions/monitoring-aset/MonitoringDetailPage.tsx' => 1,
