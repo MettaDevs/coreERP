@@ -64,7 +64,8 @@ final class UserClock
     public function legalEntityTimezone(Request $request): ?string
     {
         $membership = $this->workspace->membership($request);
-        $zone = $membership === null ? null : $this->workspace->legalEntity($request, $membership)?->legalEntity?->timezone;
+        $organization = $membership === null ? null : $this->workspace->legalEntity($request, $membership);
+        $zone = $organization?->loadMissing('legalEntity')->legalEntity?->timezone;
 
         return self::known($zone) ? $zone : null;
     }
