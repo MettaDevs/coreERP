@@ -35,7 +35,6 @@ class LayerDirectionBoundaryTest extends TestCase
      */
     private const ALLOWED = [
         'App\\Platform\\Organization\\Models\\LegalEntity -> App\\Foundation\\FiscalCalendar\\Models\\FiscalCalendar',
-        'App\\Platform\\Tenant\\Actions\\RegisterBusiness -> App\\Platform\\ControlPlane\\Models\\Client',
         'App\\Platform\\Tenant\\Models\\Tenant -> App\\Platform\\ControlPlane\\Models\\Client',
     ];
 

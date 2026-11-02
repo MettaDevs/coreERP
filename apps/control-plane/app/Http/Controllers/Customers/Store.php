@@ -74,6 +74,7 @@ class Store extends Controller
                     ? $input['first_environment_expires_at']
                     : null,
                 ($input['first_environment_hosting'] ?? null) === 'client_server' ? 'client_server' : 'provider',
+                (int) $request->user()->getAuthIdentifier(),
             );
         } catch (CustomerRejected $rejected) {
             // Penolakan Core dipulangkan sebagai kesalahan formulir, bukan halaman 500. Keduanya

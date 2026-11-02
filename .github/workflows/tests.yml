@@ -22,7 +22,7 @@ on:
 
   # 8.5 dijalankan terjadwal, bukan pada tiap pull request. Alasannya di bawah.
   schedule:
-    - cron: '0 20 * * 0'
+    - cron: "0 20 * * 0"
 
 permissions:
   contents: read
@@ -145,6 +145,9 @@ jobs:
           # daripada xdebug untuk coverage baris, dan nyalakan hanya pada job yang memakainya.
           coverage: none
 
+      - name: Check tenant creation verifier
+        run: python3 ../../scripts/test_tenant_creation_verifier.py
+
       # `cache: npm` menyimpan unduhan npm antar run. Lockfile-nya ada di akar repo, bukan
       # di folder app, jadi jalurnya disebut eksplisit — tanpa itu cache tidak pernah kena
       # dan langkah ini tetap mengunduh semuanya sambil terlihat seolah sudah di-cache.
@@ -160,7 +163,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
-          node-version: '22'
+          node-version: "22"
           cache: npm
           cache-dependency-path: package-lock.json
 
@@ -334,7 +337,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
-          php-version: '8.4'
+          php-version: "8.4"
           tools: composer:v2
           coverage: none
 

@@ -7,7 +7,7 @@ namespace App\Foundation\UnitOfMeasure;
 use App\Foundation\UnitOfMeasure\Listeners\ProvisionUnitsForNewTenant;
 use App\Foundation\UnitOfMeasure\ModuleServices\UnitOfMeasureDirectoryCore;
 use App\Platform\Modules\Contracts\UnitOfMeasureDirectory;
-use App\Platform\Tenant\Events\TenantCreated;
+use App\Platform\Tenant\Events\ErpTenantInitialized;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
@@ -24,12 +24,8 @@ final class UnitOfMeasureServiceProvider extends ServiceProvider
         $this->app->bind(UnitOfMeasureDirectory::class, UnitOfMeasureDirectoryCore::class);
     }
 
-    /**
-     * Satuan bawaan disiapkan saat tenant lahir, sinkron di dalam transaksi pendaftarannya: gagal
-     * di sini membatalkan seluruh pendaftaran.
-     */
     public function boot(): void
     {
-        Event::listen(TenantCreated::class, ProvisionUnitsForNewTenant::class);
+        Event::listen(ErpTenantInitialized::class, ProvisionUnitsForNewTenant::class);
     }
 }

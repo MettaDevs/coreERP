@@ -13,6 +13,7 @@ use App\Platform\ControlPlane\Http\Controllers\Internal\FleetController;
 use App\Platform\ControlPlane\Http\Controllers\Internal\OperatorSecondFactorController;
 use App\Platform\ControlPlane\Http\Controllers\Internal\ProductRegistrationController;
 use App\Platform\ControlPlane\Http\Controllers\Internal\ProductTenantController;
+use App\Platform\ControlPlane\Http\Controllers\Internal\TenantCreationController;
 use App\Platform\ControlPlane\Http\Middleware\ProductRegistrationGateway;
 use App\Platform\Organization\Http\Controllers\Internal\HrPositionAssignmentController;
 use App\Platform\Organization\Http\Controllers\Internal\OrganizationDirectoryController;
@@ -92,6 +93,7 @@ Route::prefix('internal/v1')->middleware(['throttle:30,1', 'control-plane'])->gr
     Route::post('operators/{user}/verify-second-factor', OperatorSecondFactorController::class)->whereNumber('user');
     Route::post('environments', [EnvironmentCreationController::class, 'store']);
     Route::post('tenants', [TenantProvisioningController::class, 'store']);
+    Route::post('tenant-registrations', [TenantCreationController::class, 'operator']);
     Route::get('managed-products', [ProductTenantController::class, 'catalog']);
     Route::get('product-tenants', [ProductTenantController::class, 'index']);
     Route::post('product-tenants', [ProductTenantController::class, 'store']);
@@ -112,6 +114,7 @@ Route::prefix('internal/v1/product-registration')->middleware([ProductRegistrati
     Route::post('email-challenge', [ProductRegistrationController::class, 'emailChallenge']);
     Route::post('email-verification', [ProductRegistrationController::class, 'emailVerification']);
     Route::post('tenants', [ProductRegistrationController::class, 'storeTenant']);
+    Route::post('organizations', [TenantCreationController::class, 'customer']);
     Route::post('launch', [ProductRegistrationController::class, 'launch']);
     Route::post('logout', [ProductRegistrationController::class, 'logout']);
     Route::post('backchannel-logout', [ProductRegistrationController::class, 'backchannelLogout']);

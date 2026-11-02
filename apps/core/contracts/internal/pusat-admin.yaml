@@ -35,6 +35,7 @@ paths:
   /operators/{user}/verify-second-factor: { $ref: 'paths/operators_user_verify-second-factor.yaml' }
   /environments: { $ref: 'paths/environments.yaml' }
   /tenants: { $ref: 'paths/tenants.yaml' }
+  /tenant-registrations: { $ref: 'paths/tenant-registrations.yaml' }
   /tenants/{tenant}/entitlements: { $ref: 'paths/tenants_tenant_entitlements.yaml' }
   /environments/{environment}/provision: { $ref: 'paths/environments_environment_provision.yaml' }
   /fleet: { $ref: 'paths/fleet.yaml' }

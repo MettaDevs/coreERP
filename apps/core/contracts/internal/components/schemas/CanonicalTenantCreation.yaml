@@ -1,0 +1,14 @@
+type: object
+required: [tenant_id, membership_id, principal_id, replayed]
+properties:
+  tenant_id:
+    type: string
+    format: ulid
+  membership_id:
+    type: string
+    format: ulid
+  principal_id:
+    type: integer
+    format: int64
+  replayed:
+    type: boolean

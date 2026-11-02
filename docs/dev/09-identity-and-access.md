@@ -26,8 +26,8 @@ Keanggotaan tenant tidak membawa penanda owner, admin, atau user. Kolom `system_
 (SEC-22, keputusan pemilik produk): semua hak di dalam tenant, termasuk hak mengelola tenant itu sendiri, datang
 dari rantai security role di bawah.
 
-Setiap tenant punya satu **role Owner** (`roles.is_owner`, satu per tenant). Padanannya di Dynamics 365 adalah
-*System administrator*:
+Setiap tenant yang menjalankan bootstrap ERP punya satu **role Owner** (`roles.is_owner`, satu per tenant). Padanannya di Dynamics 365 adalah
+_System administrator_:
 
 - **Memegang semua duty yang sah untuk tenant itu**: duty Core, duty setiap app yang dibeli, dan duty khusus tenant
   yang sudah diterbitkan. `OwnerRoleDuties` menyamakannya setiap kali katalog berubah — saat manifest app
@@ -36,11 +36,13 @@ Setiap tenant punya satu **role Owner** (`roles.is_owner`, satu per tenant). Pad
 - **Tidak dapat diubah, diarsipkan, atau dijadikan turunan role lain.** Turunan diwarisi induknya; Owner sebagai
   turunan membuat role mana pun setara Owner tanpa melewati penjaga berikutnya.
 - **Hanya pemegang Owner yang dapat memberikan atau mencabut role Owner**, lewat layar anggota maupun undangan.
-  Pemegang *Kelola akses* tanpa Owner dapat mengatur role lain, tetapi tidak role ini.
+  Pemegang _Kelola akses_ tanpa Owner dapat mengatur role lain, tetapi tidak role ini.
 - **Tenant tidak boleh terkunci.** Perubahan anggota atau role yang membuat tidak ada lagi anggota aktif pemegang
   permission `core.access.update` ditolak (`AccessGuards`).
 
-Pendaftar tenant menerima role Owner saat tenant lahir. Saat kolomnya dibuang, setiap anggota aktif yang dulu
+Pendaftar ERP menerima role Owner saat bootstrap ERP. Pembuatan tenant-only pada [PF-01](../todo/metta-platform-portal/PF-01.md) hanya membuat metadata, membership, receipt dan audit. Membership tersebut tidak memberi permission pengelolaan atau role Owner ERP. Chain pengelolaan platform tetap pekerjaan PF-04.
+
+Saat kolomnya dibuang, setiap anggota aktif yang dulu
 `owner` atau `admin` dipindahkan menjadi pemegang role Owner beserta cakupan data semua kebijakan app yang dibeli,
 sehingga tidak ada yang kehilangan akses yang dulu dipegangnya.
 
@@ -58,12 +60,12 @@ User
   -> Module entry point
 ```
 
-| Tingkat | Makna |
-| --- | --- |
-| Security role | Sekumpulan tanggung jawab atau partisipasi dalam proses bisnis. |
-| Duty | Bagian dari proses bisnis, misalnya mengelola requisition. |
-| Privilege | Aksi yang diperlukan untuk menyelesaikan suatu tugas. |
-| Permission | Hak dan access level pada entry point tertentu. |
+| Tingkat            | Makna                                                              |
+| ------------------ | ------------------------------------------------------------------ |
+| Security role      | Sekumpulan tanggung jawab atau partisipasi dalam proses bisnis.    |
+| Duty               | Bagian dari proses bisnis, misalnya mengelola requisition.         |
+| Privilege          | Aksi yang diperlukan untuk menyelesaikan suatu tugas.              |
+| Permission         | Hak dan access level pada entry point tertentu.                    |
 | Module entry point | Form, menu item, API/service, report, atau action yang dilindungi. |
 
 Role tidak mempunyai `module_id` dan tidak dimiliki department. App mendaftarkan entry point dan permission kanonik melalui contract/manifest. Administrator tenant menyusun role dari duty yang diperlukan, termasuk duty lintas app.
@@ -73,21 +75,21 @@ Role tidak mempunyai `module_id` dan tidak dimiliki department. App mendaftarkan
 Layar setup Core ikut rantai yang sama sebagai app `core`. Katalognya ditulis migration, bukan manifest —
 migration Core juga dijalankan admin.erp tanpa kelas aplikasi, jadi isinya berdiri di migration itu sendiri, sedangkan
 kode permission yang dipakai kode aplikasi ada di `CoreSecurityCatalog`. Sepuluh kelompok layar punya satu entry point `form` dan dua duty,
-padanan duty *Inquire* dan *Maintain* di Dynamics 365:
+padanan duty _Inquire_ dan _Maintain_ di Dynamics 365:
 
-| Kelompok | Duty Lihat (`read`) | Duty Kelola (`read` + `update`) |
-| --- | --- | --- |
-| Akses dan keamanan | `core.access.inquire` | `core.access.manage` |
-| Organisasi dan buku alamat | `core.organization.inquire` | `core.organization.manage` |
-| Number sequence dan kalender fiskal | `core.number-sequence.inquire` | `core.number-sequence.manage` |
-| Data referensi | `core.reference-data.inquire` | `core.reference-data.manage` |
-| Tata letak laporan | `core.report-layout.inquire` | `core.report-layout.manage` |
-| Workflow | `core.workflow.inquire` | `core.workflow.manage` |
-| Setup finance | `core.finance-setup.inquire` | `core.finance-setup.manage` |
-| Klien integrasi sistem luar | `core.integration-clients.inquire` | `core.integration-clients.manage` |
-| Vendor | `core.vendor.inquire` | `core.vendor.manage` |
-| Riwayat perubahan | `core.change-log.inquire` | `core.change-log.manage` |
-| Retensi data | `core.retention.inquire` | `core.retention.manage` |
+| Kelompok                            | Duty Lihat (`read`)                | Duty Kelola (`read` + `update`)   |
+| ----------------------------------- | ---------------------------------- | --------------------------------- |
+| Akses dan keamanan                  | `core.access.inquire`              | `core.access.manage`              |
+| Organisasi dan buku alamat          | `core.organization.inquire`        | `core.organization.manage`        |
+| Number sequence dan kalender fiskal | `core.number-sequence.inquire`     | `core.number-sequence.manage`     |
+| Data referensi                      | `core.reference-data.inquire`      | `core.reference-data.manage`      |
+| Tata letak laporan                  | `core.report-layout.inquire`       | `core.report-layout.manage`       |
+| Workflow                            | `core.workflow.inquire`            | `core.workflow.manage`            |
+| Setup finance                       | `core.finance-setup.inquire`       | `core.finance-setup.manage`       |
+| Klien integrasi sistem luar         | `core.integration-clients.inquire` | `core.integration-clients.manage` |
+| Vendor                              | `core.vendor.inquire`              | `core.vendor.manage`              |
+| Riwayat perubahan                   | `core.change-log.inquire`          | `core.change-log.manage`          |
+| Retensi data                        | `core.retention.inquire`           | `core.retention.manage`           |
 
 Klien integrasi memakai permission `core.integration-clients.read` dan `core.integration-clients.update`.
 Duty Lihat hanya membuka daftar; duty Kelola juga mengatur scope, membuat dan mengubah koneksi,
@@ -143,14 +145,14 @@ Contoh: pegawai Finance yang juga mengontrol aset menerima role `Finance Manager
 
 Permission menyatakan kemampuan bisnis, bukan sekadar visibilitas menu. UI menyembunyikan action yang tidak dimiliki user, tetapi API tetap memvalidasi authorization.
 
-| Operasi | Pola permission | Catatan |
-| --- | --- | --- |
-| Read | `module.resource.read` | Membaca daftar dan detail. |
-| Create | `module.resource.create` | Membuat record pada konteks yang sah. |
-| Update | `module.resource.update` | Tidak otomatis memberi hak approve. |
-| Delete lifecycle | `archive`, `void`, atau `retire` | Hindari hard-delete generik untuk transaksi ERP. |
-| Sensitive action | `approve`, `post`, `pay`, atau `close` | Duty terpisah dan masuk pemeriksaan SoD. |
-| Settings | `module.settings.manage` | Mengubah konfigurasi module. |
+| Operasi          | Pola permission                        | Catatan                                          |
+| ---------------- | -------------------------------------- | ------------------------------------------------ |
+| Read             | `module.resource.read`                 | Membaca daftar dan detail.                       |
+| Create           | `module.resource.create`               | Membuat record pada konteks yang sah.            |
+| Update           | `module.resource.update`               | Tidak otomatis memberi hak approve.              |
+| Delete lifecycle | `archive`, `void`, atau `retire`       | Hindari hard-delete generik untuk transaksi ERP. |
+| Sensitive action | `approve`, `post`, `pay`, atau `close` | Duty terpisah dan masuk pemeriksaan SoD.         |
+| Settings         | `module.settings.manage`               | Mengubah konfigurasi module.                     |
 
 Tenant boleh mengubah komposisi role dan membuat duty/privilege khusus melalui Konfigurasi keamanan, tetapi tidak boleh menciptakan permission code atau entry point palsu. Kode tersebut hanya berasal dari contract module yang dikenal katalog.
 
@@ -215,8 +217,8 @@ Automatic assignment rule dapat menghubungkan position atau business data dengan
 
 ### Tautan pekerja ke akun pengguna
 
-Pekerja bukan pengguna, dan tidak setiap pengguna adalah pekerja. Tautan keduanya — padanan *associate
-user with person* di F&O dan `User Setup` → `Employee No.` di Business Central — disimpan module HR pada
+Pekerja bukan pengguna, dan tidak setiap pengguna adalah pekerja. Tautan keduanya — padanan _associate
+user with person_ di F&O dan `User Setup` → `Employee No.` di Business Central — disimpan module HR pada
 `hr_workers.core_membership_id`, bukan di Core.
 
 - **Satu akun, satu pekerja.** Indeks unik parsial `hr_workers_core_membership_active_unique` hanya
@@ -303,14 +305,14 @@ Pemilihan produk hanya menghasilkan entitlement. Artifact deployment diproses da
 
 ## Invitation dan role provisioning
 
-Pemegang *Kelola akses* membuat kode undangan yang dapat dipakai berulang sampai dicabut atau kedaluwarsa. Core menyimpan hash untuk validasi dan ciphertext agar pemegang yang berwenang dapat menyalin ulang kode aktif. Invitation dapat membawa security-role assignment serta grant data policy; undangan yang membawa role Owner hanya dapat dibuat atau diubah pemegang Owner. Redemption membuat identity/membership dan assignment dalam satu transaksi; akses anggota yang sudah bergabung tidak berubah jika kode kemudian dicabut.
+Pemegang _Kelola akses_ membuat kode undangan yang dapat dipakai berulang sampai dicabut atau kedaluwarsa. Core menyimpan hash untuk validasi dan ciphertext agar pemegang yang berwenang dapat menyalin ulang kode aktif. Invitation dapat membawa security-role assignment serta grant data policy; undangan yang membawa role Owner hanya dapat dibuat atau diubah pemegang Owner. Redemption membuat identity/membership dan assignment dalam satu transaksi; akses anggota yang sudah bergabung tidak berubah jika kode kemudian dicabut.
 
 ### Kapan sebuah tenant memakai SSO
 
 Dua syarat, dan yang kedua berbentuk terbalik dari yang biasa diduga:
 
 1. **Penempatannya menyetel penyedia** — `COREERP_SSO_ISSUER`, `_CLIENT_ID`, dan `_CLIENT_SECRET` terisi ketiganya. Templat env agen on-prem tidak memuat satu pun di antaranya, jadi server klien selalu menjawab tidak.
-2. **Tenant itu tidak mengatakan sebaliknya.** Baris `tenant_identity_providers` mencatat *pengecualian*, bukan izin: tenant tanpa baris mengikuti bawaan penempatan, yaitu menyala.
+2. **Tenant itu tidak mengatakan sebaliknya.** Baris `tenant_identity_providers` mencatat _pengecualian_, bukan izin: tenant tanpa baris mengikuti bawaan penempatan, yaitu menyala.
 
 Jawabannya dihitung di satu tempat, `TenantSso::availableFor()`, yang dibaca halaman masuk, seluruh rute `/sso/*`, dan pembuatan undangan terikat.
 
@@ -333,13 +335,13 @@ Menyalakan tidak menutup kata sandi: yang bertambah tombol SSO di samping formul
 
 Sejak 16 September 2026 undangan punya dua bentuk, dan yang membedakannya satu kolom: ada atau tidaknya email yang diundang.
 
-| | Kode anonim | Terikat akun SSO |
-| --- | --- | --- |
-| Siapa yang dapat menukarkan | Siapa pun yang memegang kodenya | Hanya satu akun SSO tertentu |
-| Berapa kali | Berulang, sampai dicabut | Sekali |
-| Kedaluwarsa | Tidak, kecuali disetel | Ya, bawaan tujuh hari |
-| Cara menukarkan | Formulir nama, email, kata sandi di `/join` | Tombol masuk SSO |
-| Syarat | Tidak ada | Email wajib sudah terdaftar di penyedia SSO |
+|                             | Kode anonim                                 | Terikat akun SSO                            |
+| --------------------------- | ------------------------------------------- | ------------------------------------------- |
+| Siapa yang dapat menukarkan | Siapa pun yang memegang kodenya             | Hanya satu akun SSO tertentu                |
+| Berapa kali                 | Berulang, sampai dicabut                    | Sekali                                      |
+| Kedaluwarsa                 | Tidak, kecuali disetel                      | Ya, bawaan tujuh hari                       |
+| Cara menukarkan             | Formulir nama, email, kata sandi di `/join` | Tombol masuk SSO                            |
+| Syarat                      | Tidak ada                                   | Email wajib sudah terdaftar di penyedia SSO |
 
 Undangan terikat menyimpan `sso_subject` — nilai yang dijawab endpoint pencarian penyedia saat undangan dibuat, dan yang kelak muncul sebagai klaim `sub` di ID token. **Yang dibandingkan saat penukaran adalah subjek itu, tidak pernah emailnya.** Alasannya sama dengan alasan jalur masuk SSO menolak pencocokan lewat email: penyedia menulis `email_verified_at` pada pendaftaran mandiri tanpa benar-benar memverifikasi, sehingga siapa pun yang mendaftar di sana dengan email orang lain akan lolos kalau email dijadikan bukti.
 
@@ -349,7 +351,7 @@ Penukarannya memakai upacara tiga kaki yang sama dengan masuk lewat SSO — `sso
 
 Emailnya dikirim penyedia, bukan Core: repo ini tidak punya jalur email sama sekali. Tautannya mendarat di `/undangan` pada **domain dasar** lalu dialihkan ke alamat tenant, karena penyedia menolak `accept_url` yang host-nya di luar alamat balik client — dan alamat balik itu satu per penempatan, di domain dasar.
 
-Yang perlu disadari: endpoint pencarian penyedia tidak mengenal scope, sehingga setiap pemegang *Kelola akses* (`core.access.update`) dapat memakainya untuk memeriksa apakah sebuah email terdaftar di direktori. Yang menahannya hanya throttle dan jejak audit `access.invitation.sso.ditolak`.
+Yang perlu disadari: endpoint pencarian penyedia tidak mengenal scope, sehingga setiap pemegang _Kelola akses_ (`core.access.update`) dapat memakainya untuk memeriksa apakah sebuah email terdaftar di direktori. Yang menahannya hanya throttle dan jejak audit `access.invitation.sso.ditolak`.
 
 Role dapat diberikan melalui:
 
@@ -381,13 +383,13 @@ Core menandatangani JWT maksimal lima menit untuk app yang tepat (`aud`). Selain
 
 ```json
 {
-  "management-aset.asset-responsibility": {
-    "all": false,
-    "scope_grants": [
-      { "legal_entity_id": "LE-A", "operating_unit_ids": ["FO-A"] },
-      { "legal_entity_id": "LE-B", "operating_unit_ids": ["FO-B"] }
-    ]
-  }
+    "management-aset.asset-responsibility": {
+        "all": false,
+        "scope_grants": [
+            { "legal_entity_id": "LE-A", "operating_unit_ids": ["FO-A"] },
+            { "legal_entity_id": "LE-B", "operating_unit_ids": ["FO-B"] }
+        ]
+    }
 }
 ```
 
@@ -398,7 +400,7 @@ mengubah pasangan grant ini.
 
 ## Number sequence administration
 
-Pemegang duty *Kelola number sequence* (`core.number-sequence.manage`) dapat mengatur Number Sequence. Permission ini memberi akses ke konfigurasi nomor tenant aktif saja; ia tidak memberi provider admin akses ke nomor tenant dan tidak memberi app akses ke layar konfigurasi. App memakai credential service serta context tenant yang Core verifikasi terhadap entitlement dan installation readiness.
+Pemegang duty _Kelola number sequence_ (`core.number-sequence.manage`) dapat mengatur Number Sequence. Permission ini memberi akses ke konfigurasi nomor tenant aktif saja; ia tidak memberi provider admin akses ke nomor tenant dan tidak memberi app akses ke layar konfigurasi. App memakai credential service serta context tenant yang Core verifikasi terhadap entitlement dan installation readiness.
 
 ## Product launcher
 

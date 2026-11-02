@@ -41,6 +41,7 @@ final class CreateCustomer
         string $firstEnvironment = 'production',
         ?string $firstEnvironmentExpiresAt = null,
         string $firstEnvironmentHosting = 'provider',
+        ?int $requestedBy = null,
     ): array {
         $endpoint = $this->endpoint();
 
@@ -54,6 +55,7 @@ final class CreateCustomer
                     'admin_email' => $adminEmail,
                     'app_ids' => $apps,
                     'first_environment' => $firstEnvironment,
+                    ...($requestedBy === null ? [] : ['requested_by' => $requestedBy]),
                     // Dibuang ketika kosong, bukan dikirim null. Aturan Core memakai
                     // `exclude_unless`, dan kunci yang hadir bernilai null tetap dianggap hadir.
                     ...($firstEnvironmentExpiresAt === null

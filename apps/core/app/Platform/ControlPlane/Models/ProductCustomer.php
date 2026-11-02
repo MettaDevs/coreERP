@@ -18,6 +18,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $email
  * @property string|null $verified_email
  * @property Carbon|null $email_verified_at
+ * @property int|null $user_id
  */
 final class ProductCustomer extends Model
 {
