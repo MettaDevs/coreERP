@@ -16,6 +16,7 @@
         "docs/todo/control-plane-database/inventory/source-references.json",
         "docs/todo/control-plane-database/inventory/staging-allowlist.json",
         "docs/todo/control-plane-database/inventory/verification.json",
+        "scripts/check-healthcare-domain-neutrality.mjs",
         "scripts/cpdb-inventory.py",
         "scripts/cpdb-runtime.py",
         "scripts/cpdb-runtime.sql",

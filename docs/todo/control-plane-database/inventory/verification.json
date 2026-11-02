@@ -1,5 +1,5 @@
 {
-    "recorded_at": "2026-11-02T05:20:36.257156+00:00",
+    "recorded_at": "2026-11-02T05:28:14.748300+00:00",
     "scope": "CPDB-01 inventory and target contracts only",
     "source_baseline": "08366c35547632c6bcf9c7b643ef2455df4fc1bb",
     "local_checks": [
@@ -44,6 +44,14 @@
         {
             "command": "Audit output inspection",
             "result": "No credential values, key material or patient/transaction identifiers captured"
+        },
+        {
+            "command": "ESLint on scripts/check-healthcare-domain-neutrality.mjs",
+            "result": "PASS after mechanical formatting only"
+        },
+        {
+            "command": "Before/after checker comparison on neutral, forbidden-sector and allowed-example fixtures",
+            "result": "Same stdout, stderr and exit status for all three cases"
         }
     ],
     "review": {
@@ -71,14 +79,15 @@
         "docs/todo/control-plane-database/TODO.md": "a3bd30f0e4d593e1e2c5773e92fc30d13804381328fab3e0ca44db60d11373f5",
         "docs/todo/control-plane-database/inventory/.gitattributes": "48faf7a93c986c1d309cba957c908c75541c25ff0ac78bacc8120ce6dedbf2ca",
         "docs/todo/control-plane-database/inventory/contracts.json": "6d4be7ad80b6cfb0d367995c1cf3d2fd4dc62adeb83b6a4f9ffe38d272b4edbf",
-        "docs/todo/control-plane-database/inventory/decisions.tsv": "b86c81d8b5382df63f5128b37da89d1c6852b2b9e326728e56d67ba41fe3a2f8",
+        "docs/todo/control-plane-database/inventory/decisions.tsv": "f1a2f83ac3fd461382de058cdbe3bf2a14612497978cbeea35ae70647dd46763",
         "docs/todo/control-plane-database/inventory/field-partitions.json": "3000635eeb2bfee8d77297b4695213f59b50a420093cacb19b02b5ef492d5db7",
         "docs/todo/control-plane-database/inventory/manifest.json": "66b5eefd295cbb53ef20d83a20224a8ab9906a76b48bc5812d8938aa246ce817",
         "docs/todo/control-plane-database/inventory/migrations.json": "cc4afc52330bfa1107a3f7d0db165e7afca6c8b73fab4c6117ed593b0cb4f4e3",
         "docs/todo/control-plane-database/inventory/ownership-rules.json": "4287165188ad8646a74bafdf10514d4e147dfd24ec00fbf306250672daeffb40",
         "docs/todo/control-plane-database/inventory/runtime-dev1.json": "a58e68fa0fdd9a3517468d08e924f526eee8b84e7cf08a4d16b1d186862e1b36",
         "docs/todo/control-plane-database/inventory/source-references.json": "c74bcc13f3e194c02c331e69adc405090b6e95aae13a48beee52ae2ad8eeff22",
-        "docs/todo/control-plane-database/inventory/staging-allowlist.json": "e32bfa587bbd133506e0ae94c57c98ac6290e82cc11983b1a71f978bccbb7302",
+        "docs/todo/control-plane-database/inventory/staging-allowlist.json": "103c01388c16d4d641cc607c99bf891f4278ed66a2a4e042e1bb957c741421e9",
+        "scripts/check-healthcare-domain-neutrality.mjs": "3eee055135d87aa07e4a7952fd9e068cb1c49a063e1dc1669872760efe55621a",
         "scripts/cpdb-inventory.py": "61734e07e35a2f652bbd36e226f30b3b2fa16df3cdcd03f9a38d9bc5b7c2a8b7",
         "scripts/cpdb-runtime.py": "57eba0f80b1d652c1b65fe13746f5047da426d80b8ce4c77aae325f2ca5db114",
         "scripts/cpdb-runtime.sql": "a2b0b677298f298467f114bb83639d538e55afa0166503c3e62364bfd423ca67",
@@ -86,5 +95,12 @@
     },
     "hash_normalization": "UTF-8 text with LF, matching committed Git blobs",
     "pull_request": "https://github.com/MettaDevs/coreERP/pull/372",
-    "audit_implementation_commit": "19317778e3798f11419538575a03cbd042dba01d"
+    "audit_implementation_commit": "19317778e3798f11419538575a03cbd042dba01d",
+    "ci_followup": {
+        "failed_head": "e2df94596d875d5c46fdc93b8b027692fcbf8d44",
+        "job": "https://github.com/MettaDevs/coreERP/actions/runs/41393481544/job/125109768184",
+        "cause": "15 pre-existing ESLint format errors in checker introduced by PR 371; checker blob matched origin/main",
+        "fix": "Existing ESLint --fix and Prettier; no formatter policy or behavior change",
+        "status": "Current head checks remain authoritative; rerun required"
+    }
 }
