@@ -1,5 +1,9 @@
 # admin.erp: konsol operator
 
+::: info Pemisahan database sedang direncanakan
+Keadaan runtime yang dijelaskan halaman ini masih database bersama. Arah target terbaru ada pada [PRD pemisahan database control plane](../todo/control-plane-database/PRD.md). Pemisahan belum diimplementasikan. Target tersebut memerlukan audit routing, transaksi, FK/query, role, dan store framework; bukan cukup mengganti konfigurasi database. Baca PRD sebelum memakai pernyataan lama tentang biaya pemisahan sebagai prosedur implementasi.
+:::
+
 Halaman ini menjawab satu pertanyaan: **apa sebenarnya admin.erp itu, dan apa yang boleh dan tidak boleh
 dilakukannya?** Ia aplikasi kedua di repo ini — `apps/control-plane`, namespace `ControlPlane\` — dan satu-satunya
 yang dipakai orang kita, bukan pengguna klinik.
