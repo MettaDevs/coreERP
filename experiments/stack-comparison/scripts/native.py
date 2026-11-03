@@ -15,14 +15,19 @@ from sql_observer import validate_database
 
 LAB = Path(__file__).resolve().parents[1]
 NETWORK = "coreerp-stack-comparison_default"
-# Port internal 8000 untuk semua kandidat; hanya nama variabel listener dan pool yang berbeda per bahasa.
+# Port internal 8000 untuk semua kandidat. Budget sama: 2 CPU, 1 GiB, maksimal 8 koneksi database per
+# container. Go dan Rust memakai 2 thread dari kuota cgroup; Bun satu thread per proses, jadi dua proses
+# reusePort dengan pool 4. PHP memakai 8 worker Octane, satu koneksi per worker (lihat load.py).
+BUN_PROCESSES = 2
 CANDIDATES = {
     "go": {"image": "coreerp-native-go:local", "port": 18642, "command": [],
-           "environment": {"LISTEN_ADDR": "0.0.0.0:8000", "DB_POOL_SIZE": "10"}},
-    "hono": {"image": "coreerp-native-ts:local", "port": 18644, "command": ["bun", "dist/hono.js"],
-             "environment": {"HOST": "0.0.0.0", "PORT": "8000", "DB_POOL_SIZE": "10"}},
-    "elysia": {"image": "coreerp-native-ts:local", "port": 18645, "command": ["bun", "dist/elysia.js"],
-               "environment": {"HOST": "0.0.0.0", "PORT": "8000", "DB_POOL_SIZE": "10"}},
+           "environment": {"LISTEN_ADDR": "0.0.0.0:8000", "DB_POOL_SIZE": "8"}},
+    "hono": {"image": "coreerp-native-ts:local", "port": 18644,
+             "command": ["sh", "-c", f"for i in $(seq {BUN_PROCESSES}); do bun dist/hono.js & done; wait"],
+             "environment": {"HOST": "0.0.0.0", "PORT": "8000", "DB_POOL_SIZE": str(8 // BUN_PROCESSES)}},
+    "elysia": {"image": "coreerp-native-ts:local", "port": 18645,
+               "command": ["sh", "-c", f"for i in $(seq {BUN_PROCESSES}); do bun dist/elysia.js & done; wait"],
+               "environment": {"HOST": "0.0.0.0", "PORT": "8000", "DB_POOL_SIZE": str(8 // BUN_PROCESSES)}},
     "rust": {"image": "coreerp-native-rust:local", "port": 18643, "command": [],
              "environment": {"BIND_HOST": "0.0.0.0", "PORT": "8000", "DB_POOL": "8"}},
 }

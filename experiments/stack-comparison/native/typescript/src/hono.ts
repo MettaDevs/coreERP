@@ -16,6 +16,7 @@ app.all('*', (context) =>
 const server = Bun.serve({
     hostname: config.HOST,
     port: config.PORT ?? 18644,
+    reusePort: true,
     fetch: (request, server) => app.fetch(request, { server }),
 });
 process.stderr.write(

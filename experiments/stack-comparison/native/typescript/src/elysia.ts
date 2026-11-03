@@ -11,7 +11,11 @@ app.all(
         application.handle(request, server?.requestIP(request)?.address ?? ''),
     { parse: 'none' },
 );
-app.listen({ hostname: config.HOST, port: config.PORT ?? 18645 });
+app.listen({
+    hostname: config.HOST,
+    port: config.PORT ?? 18645,
+    reusePort: true,
+});
 process.stderr.write(
     JSON.stringify({
         event: 'listening',
