@@ -1,6 +1,6 @@
 # TODO platform dan portal customer
 
-Ini daftar kerja aktif untuk rencana [platform Metta](index.md), diselaraskan 2 November 2026 dengan [TODO pemisahan database](../control-plane-database/TODO.md). PF-01 telah diimplementasikan dan hasilnya disiapkan untuk review pada [laporan PF-01](PF-01.md). PF-02 dan unit berikutnya belum diimplementasikan. Bukti fixture tidak berarti runtime server sudah berubah.
+Ini daftar kerja aktif untuk rencana [platform Metta](index.md), diselaraskan 3 November 2026 dengan [TODO pemisahan database](../control-plane-database/TODO.md). PF-01 telah merge melalui [PR #376](https://github.com/MettaDevs/coreERP/pull/376), main `6b3cf584`, dengan bukti pada [laporan PF-01](PF-01.md). CPDB-02 dikerjakan berikutnya. PF-02 dan unit portal berikutnya tetap menunggu CPDB-05. Bukti fixture tidak berarti runtime server sudah berubah.
 
 ## Kelola status pekerjaan
 
@@ -8,14 +8,14 @@ Gunakan `ready`, `blocked`, `in_progress`, `in_review`, `verified`, atau `supers
 
 Untuk setiap ID, catat owner, branch/PR, SHA, bukti, dan penghambat. Jangan menghapus ID yang batal; tandai superseded dan tautkan penggantinya. [PLAN](PLAN.md) menetapkan urutan dan verifikasi. [CHANGES](CHANGES.md) menetapkan cara mengubah scope.
 
-| Unit  | Peran penanggung jawab               | Status    | Bergantung pada     | PR/SHA dan bukti                                                                     |
-| ----- | ------------------------------------ | --------- | ------------------- | ------------------------------------------------------------------------------------ |
-| PF-01 | Codex, platform backend + security   | in_review | CPDB-01             | [PF-01](PF-01.md), branch `codex/pf-01-tenant-foundation`, backend teruji `360a8cc2` |
-| PF-02 | Platform backend + adapter Faskes    | blocked   | PF-01, CPDB-05      | Belum ada                                                                            |
-| PF-03 | Portal + admin UI + platform backend | blocked   | PF-02               | Belum ada                                                                            |
-| PF-04 | Identity/access + adapter Faskes     | blocked   | PF-02, PF-03        | Belum ada                                                                            |
-| PF-05 | Runtime/operasi + platform backend   | blocked   | PF-02, PF-04        | Belum ada                                                                            |
-| PF-06 | QA + release owner                   | blocked   | PF-03, PF-04, PF-05 | Belum ada                                                                            |
+| Unit  | Peran penanggung jawab               | Status   | Bergantung pada     | PR/SHA dan bukti                                                                             |
+| ----- | ------------------------------------ | -------- | ------------------- | -------------------------------------------------------------------------------------------- |
+| PF-01 | Codex, platform backend + security   | verified | CPDB-01             | [PF-01](PF-01.md), [PR #376](https://github.com/MettaDevs/coreERP/pull/376), main `6b3cf584` |
+| PF-02 | Platform backend + adapter Faskes    | blocked  | PF-01, CPDB-05      | Belum ada                                                                                    |
+| PF-03 | Portal + admin UI + platform backend | blocked  | PF-02               | Belum ada                                                                                    |
+| PF-04 | Identity/access + adapter Faskes     | blocked  | PF-02, PF-03        | Belum ada                                                                                    |
+| PF-05 | Runtime/operasi + platform backend   | blocked  | PF-02, PF-04        | Belum ada                                                                                    |
+| PF-06 | QA + release owner                   | blocked  | PF-03, PF-04, PF-05 | Belum ada                                                                                    |
 
 Peran dapat dikerjakan orang yang sama. Jangan membagi dua penulis schema atau kontrak yang sama tanpa satu owner integrasi. PF-01 menjadi prasyarat bersama untuk split database, bukan tugas duplikat. PF-02 dimulai setelah split lulus CPDB-05; prototipe UI boleh berjalan tanpa membuka enrollment.
 
@@ -26,7 +26,7 @@ Peran dapat dikerjakan orang yang sama. Jangan membagi dua penulis schema atau k
 - [x] PF-01c. Tentukan principal bersama yang mengikat identity `issuer + subject`. Satukan jalur ProductCustomer dan User melalui pemetaan eksplisit; jangan mencocokkan otomatis berdasarkan email. Bukti berupa kasus akun lama, baru, dan subject berbeda.
 - [x] PF-01d. Tetapkan shared action dan boundary operator/customer. Bukti berupa otorisasi server dan audit aktor yang benar; operator tidak menjadi Owner otomatis.
 
-Bukti PF-01 berada pada `evidence/pf-01/verification.json`, `http-acceptance.json` dan `erp-baseline.json`. Seluruh lane HTTP dan SQL lulus pada fixture terisolasi. Principal customer dipetakan saat creation, collision credential tidak auto-link, dan keanggotaan tidak menjadi permission management. Analytics tetap hold. Tidak ada merge atau deploy dari pekerjaan PF-01.
+Bukti PF-01 berada pada `evidence/pf-01/verification.json`, `http-acceptance.json` dan `erp-baseline.json`. Seluruh lane HTTP dan SQL lulus pada fixture terisolasi. Principal customer dipetakan saat creation, collision credential tidak auto-link, dan keanggotaan tidak menjadi permission management. PR #376 merge setelah CI hijau dan verifikasi independen. Analytics tetap hold. Tidak ada deploy.
 
 ## PF-02. Kaitkan fasilitas dan provisioning ke tenant
 

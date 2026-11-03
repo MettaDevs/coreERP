@@ -1,6 +1,6 @@
 # TODO pemisahan database control plane
 
-Daftar ini menjalankan [PRD](PRD.md). Hasil inventaris dan kontrak CPDB-01 tersedia pada [laporan CPDB-01](CPDB-01.md) untuk review. Pemisahan koneksi/schema dan perilaku aplikasi belum diimplementasikan. Owner berikut adalah peran yang diusulkan; isi nama, branch, PR, SHA, bukti, dan penghambat ketika pekerjaan diambil.
+Daftar ini menjalankan [PRD](PRD.md). CPDB-01 telah diserahkan melalui PR #372 dan PF-01 telah merge melalui PR #376. [CPDB-02](CPDB-02.md) menyiapkan koneksi, target schema, store dan role pada fixture terisolasi. Cutover serta acceptance aplikasi dua database belum dilakukan.
 
 Nama database target adalah `core_control_plane`. Master organisasi/hierarchy dan metadata sharing berada pada Organization Foundation di database tersebut; ERP dan Faskes tidak mempunyai master writable kedua. Baca [kontrak organisasi/sharing](ORGANIZATION-AND-SHARING.md) dan [TODO enforcement healthcare](../metta-platform-portal/SHARING-TODO.md).
 
@@ -8,15 +8,15 @@ Gunakan status `ready`, `blocked`, `in_progress`, `in_review`, `verified`, atau 
 
 ## Urutan dan pembagian kerja
 
-| Unit                 | Owner                                               | Bergantung pada | Status awal | Hasil yang dapat direview                                               |
-| -------------------- | --------------------------------------------------- | --------------- | ----------- | ----------------------------------------------------------------------- |
-| CPDB-01              | Codex, integrasi platform/database/security         | Tidak ada       | in_review   | [Manifest, baseline, kontrak dan blocker](CPDB-01.md).                  |
-| PF-01                | Owner portal platform yang sama dengan rencana lama | CPDB-01         | blocked     | Tenant dapat dibuat tanpa instalasi ERP atau identity duplikat.         |
-| CPDB-02              | Database + runtime                                  | CPDB-01, PF-01  | blocked     | Koneksi, target migration, role, serta store framework eksplisit.       |
-| CPDB-03              | Platform access + backend ERP                       | CPDB-02         | blocked     | Projection, FK/query pengganti, durable operations, dan kontrak revoke. |
-| CPDB-04              | Release owner + database                            | CPDB-03         | blocked     | Rehearsal, copy/validation tooling, dan rollback yang teruji.           |
-| CPDB-05              | QA + security + release owner                       | CPDB-04         | blocked     | Acceptance dua database dan handoff cutover.                            |
-| PF-02 dan berikutnya | Tim portal/Faskes                                   | CPDB-05         | blocked     | Lanjutkan rencana portal pada storage yang sudah dipisah.               |
+| Unit                 | Owner                                       | Bergantung pada | Status awal | Hasil yang dapat direview                                                |
+| -------------------- | ------------------------------------------- | --------------- | ----------- | ------------------------------------------------------------------------ |
+| CPDB-01              | Codex, integrasi platform/database/security | Tidak ada       | verified    | [Manifest, baseline, kontrak dan blocker](CPDB-01.md), PR #372.          |
+| PF-01                | Codex, platform backend + security          | CPDB-01         | verified    | [PF-01](../metta-platform-portal/PF-01.md), PR #376, main `6b3cf584`.    |
+| CPDB-02              | Codex, database + runtime                   | CPDB-01, PF-01  | in_review   | [Koneksi, schema, role dan batas bukti](CPDB-02.md), backend `f278e3dc`. |
+| CPDB-03              | Platform access + backend ERP               | CPDB-02         | blocked     | Projection, FK/query pengganti, durable operations, dan kontrak revoke.  |
+| CPDB-04              | Release owner + database                    | CPDB-03         | blocked     | Rehearsal, copy/validation tooling, dan rollback yang teruji.            |
+| CPDB-05              | QA + security + release owner               | CPDB-04         | blocked     | Acceptance dua database dan handoff cutover.                             |
+| PF-02 dan berikutnya | Tim portal/Faskes                           | CPDB-05         | blocked     | Lanjutkan rencana portal pada storage yang sudah dipisah.                |
 
 PF-01 bukan pekerjaan ganda. Schema ownership mempunyai satu owner integrasi. UI prototyping boleh paralel; perubahan schema bersama tidak dikerjakan oleh dua branch tanpa koordinasi kontrak.
 
@@ -44,12 +44,14 @@ Centang CPDB-01 membuktikan keluaran inventaris/kontrak yang diminta, bukan acce
 
 ## CPDB-02. Pisahkan koneksi dan migration
 
-- [ ] CPDB-02a. Implementasikan resolusi control, business, environment, dan maintenance yang eksplisit. Bukti berupa sentinel dan current_database() pada koneksi yang berbeda.
-- [ ] CPDB-02b. Perbaiki EnvironmentConnection::controlPlane(), for(), register(), dan pins(). Bukti berupa pooled ERP tidak diarahkan ke control DB setelah context switch atau job panjang.
-- [ ] CPDB-02c. Tetapkan koneksi session/cache/queue/locks/password reset/scheduler. Bukti berupa daftar store dan test yang benar-benar menjalankan producer/consumer setelah restart.
-- [ ] CPDB-02d. Buat target/history migration pusat dan bisnis yang berbeda dengan schema owner tunggal di source Core. Bukti berupa fresh bootstrap dan upgrade, tanpa migration module ERP masuk control DB.
-- [ ] CPDB-02e. Pisahkan role runtime, migration, dan provisioning. Bukti berupa uji negatif CONNECT/table/sequence/default privilege dan tidak ada credential maintenance pada browser.
-- [ ] CPDB-02f. Dokumentasikan pengecualian runtime yang masih memegang dua credential. Jangan mengklaim pemisahan process atau host selesai.
+- [x] CPDB-02a. Resolusi authority/business/environment/maintenance memakai tujuan eksplisit. [Runtime](evidence/cpdb-02/runtime.json) merekam current_database dan login berbeda; sentinel config serta missing-alias guard juga diuji.
+- [x] CPDB-02b. Pooled tetap business pada nested/failed context. PDO runtime dan migrator mempunyai ownership; ancestor dipertahankan dan derived connection ditutup. [Feature test](CPDB-02.md#bukti-dan-pengulangan) serta review mencatat regresinya.
+- [x] CPDB-02c. SQL store dipilih saat boot. Producer/consumer baru memeriksa session, reset, cache, locks, queue sukses/gagal/batch dan scheduler; Valkey juga diuji melalui proses berbeda. Bukti berada pada [ringkasan](evidence/cpdb-02/verification.json).
+- [x] CPDB-02d. Control memakai fixed manifest/history terpisah, baseline DDL dan delta PF01 asli. Fresh/upgrade/custom schema/idempotency lulus. [Fresh dedicated](evidence/cpdb-02/fresh-copy.json) memakai history bisnis transisional; tidak ada migration module ERP pada control. Projection tetap CPDB-03.
+- [x] CPDB-02e. Role fixture runtime, migrator dan provisioner berbeda. CONNECT, schema/table/sequence/default privilege, inheritance, PUBLIC dan history negatif diuji langsung. Credential hanya pada konfigurasi server/proses; tidak ada field browser atau job payload baru yang membawanya.
+- [x] CPDB-02f. [Pengecualian process](CPDB-02.md#pengecualian-process) mencatat Core, installer, operasi database dan pembaca pemasangan console. Tidak mengklaim isolasi process/host.
+
+Centang CPDB-02 membuktikan infrastruktur pada fixture terisolasi, bukan acceptance split/cutover. Client dump17 pada image basis masih menjadi gap packaging yang perlu diperhitungkan pada copy/rehearsal. Analytics tetap hold dan tidak ada deploy.
 
 ## CPDB-03. Ganti coupling database bersama
 

@@ -1,0 +1,142 @@
+{
+  "unit": "CPDB-02",
+  "evidence": "runtime-verified isolated fixture; no server cutover",
+  "base_sha": "6b3cf5846fd4442c3e895cacf2ba58275f9dd75e",
+  "tested_code_sha": "f278e3dc11e50cc05f62ae16cfd0de861c886fd8",
+  "recorded_at": "2026-11-03T02:58:39.064150+00:00",
+  "runtime": {
+    "lanes_passed": 58,
+    "boolean_checks": 449,
+    "fresh_processes": 10,
+    "php": "8.4.27",
+    "postgres": "16.14",
+    "source_hashes_match": true
+  },
+  "checks": [
+    {
+      "scope": "baseline generator offline",
+      "status": "passed",
+      "tests": 29,
+      "evidence_origin": "owner-recorded local tool output"
+    },
+    {
+      "scope": "runtime verifier offline guards",
+      "status": "passed",
+      "tests": 10,
+      "evidence_origin": "owner-recorded local tool output"
+    },
+    {
+      "scope": "control baseline/upgrade/custom schema and boundary regression",
+      "status": "passed",
+      "tests": 23,
+      "assertions": 163,
+      "evidence_origin": "owner-recorded local tool output"
+    },
+    {
+      "scope": "worker state final including paired end events",
+      "status": "passed",
+      "tests": 7,
+      "assertions": 18,
+      "evidence_origin": "owner-recorded local tool output"
+    },
+    {
+      "scope": "async report regression final",
+      "status": "passed",
+      "tests": 4,
+      "assertions": 49,
+      "evidence_origin": "owner-recorded local tool output"
+    },
+    {
+      "scope": "Valkey real server + independent process roundtrip",
+      "status": "passed",
+      "tests": 5,
+      "assertions": 22,
+      "evidence_origin": "owner-recorded local tool output"
+    },
+    {
+      "scope": "console full serial suite",
+      "status": "passed",
+      "tests": 465,
+      "assertions": 2982,
+      "evidence_origin": "owner-recorded local tool output"
+    },
+    {
+      "scope": "Core full PHPStan",
+      "status": "passed",
+      "evidence_origin": "owner-recorded local tool output"
+    },
+    {
+      "scope": "console full PHPStan",
+      "status": "passed",
+      "evidence_origin": "owner-recorded local tool output"
+    },
+    {
+      "scope": "changed PHP Pint",
+      "status": "passed",
+      "core_files": 34,
+      "console_files": 4,
+      "evidence_origin": "owner-recorded local tool output"
+    },
+    {
+      "scope": "Core relevant parallel initial",
+      "status": "failed_then_corrected",
+      "tests": 718,
+      "initial_errors": 2,
+      "initial_failures": 19,
+      "note": "Affected files/regressions rerun after fixes. This is not a claim of a fresh 718-test final pass.",
+      "evidence_origin": "owner-recorded local tool output"
+    },
+    {
+      "scope": "Core serial initial",
+      "status": "fixture_corrected",
+      "note": "5 Copy failures due client17/server16 and missing fixture .env warnings. Fixture corrected; full Copy rerun passed.",
+      "evidence_origin": "owner-recorded local tool output"
+    },
+    {
+      "scope": "Copy actual serial rerun with client16",
+      "status": "passed",
+      "tests": 12,
+      "assertions": 80,
+      "evidence_origin": "owner-recorded local tool output"
+    },
+    {
+      "scope": "docs build",
+      "status": "passed",
+      "dead_links": 0,
+      "nonblocking_warnings": [
+        "browser metadata age",
+        "ancestor Tailwind content",
+        "chunk size"
+      ],
+      "evidence_origin": "owner-recorded local tool output"
+    },
+    {
+      "scope": "healthcare neutrality checker",
+      "status": "passed",
+      "evidence_origin": "owner-recorded local tool output"
+    }
+  ],
+  "role_fixture": "6 synthetic roles; four target databases; credentials private",
+  "fresh_copy": {
+    "status": "passed",
+    "client_major": 16,
+    "client_version": "16.15",
+    "server_version": "16.14",
+    "source_data": "synthetic fixture plus source reference data only",
+    "schema_and_data_restored": true
+  },
+  "known_gaps": [
+    "Business historical schema is transitional, not a CPDB-03 projection.",
+    "Cross-database business queries, durable commit, revoke and Foundation authority API remain CPDB-03.",
+    "No runtime server migration/copy/cutover, external SSO/browser or production capacity measurement.",
+    "Packaged client17 in base deploy/perakit/Dockerfile is not proven compatible with server16 restore; local failure transaction_timeout recorded, correct-major fixture passed. Resolve in copy/rehearsal delivery before cutover."
+  ],
+  "authorization": {
+    "analytics": "hold",
+    "deployment": false,
+    "merge": false,
+    "legacy_writes": false,
+    "enrollment_reopened": false
+  },
+  "check_recording": "Local command-output results recorded by integration owner. Independent reviewer reran only its stated scope; CI is a separate delivery check."
+}
