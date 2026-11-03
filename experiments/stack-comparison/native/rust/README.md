@@ -45,6 +45,7 @@ rahasia tidak disimpan dalam source maupun image.
 | `BIND_HOST` | `127.0.0.1` | Alamat listener. Image memakai `0.0.0.0`. |
 | `PORT` | `18643` | Port listener. |
 | `SESSION_COOKIE` | `laravel-session` | Nama cookie sesi fixture PHP aktual. |
+| `CACHE_PREFIX` | `laravel-cache-` | Awalan kunci tabel `cache` untuk limiter login, sama dengan PHP. |
 
 Untuk Docker pada server Linux, pasok host database yang dapat dijangkau dari
 container dan konfigurasi resource/pool dari rencana pembanding. Script lokal
@@ -118,7 +119,8 @@ diatribusikan hanya ke runtime Rust.
 ## Kepemilikan kode
 
 `main.rs` memiliki adapter HTTP dan pool. `auth.rs` memiliki sesi JSON/base64,
-cookie/CSRF, password, workspace, role hierarchy, dan data scope. `numbering.rs`
+cookie/CSRF, password, limiter login (primitif cache Laravel menurut
+`../../login-limiter.md`), workspace, role hierarchy, dan data scope. `numbering.rs`
 memiliki scope/context, preallocation, lock, replay, dan audit nomor. `receipts.rs`
 memiliki transaksi penerimaan, aset, placement, buku, atribut, dan attachment
 callback. `posting.rs` memiliki normalisasi, mapping akun, dimensi historis,

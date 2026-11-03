@@ -1,6 +1,6 @@
 use axum::{
     Json,
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
 use serde_json::{Value, json};
@@ -14,6 +14,7 @@ pub struct Error {
     pub status: StatusCode,
     pub body: Value,
     pub sql_state: Option<String>,
+    pub headers: HeaderMap,
 }
 
 impl Error {
@@ -22,6 +23,7 @@ impl Error {
             status: StatusCode::from_u16(status).unwrap(),
             body: json!({"message": message}),
             sql_state: None,
+            headers: HeaderMap::new(),
         }
     }
     pub fn validation(field: &str, message: &str) -> Self {
@@ -58,7 +60,7 @@ impl From<tokio_postgres::Error> for Error {
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
-        (self.status, Json(self.body)).into_response()
+        (self.status, self.headers, Json(self.body)).into_response()
     }
 }
 

@@ -313,6 +313,7 @@ dependencies = [
  "deadpool-postgres",
  "hex",
  "hmac 0.12.1",
+ "md-5",
  "rand 0.8.8",
  "regex",
  "rust_decimal",

@@ -23,6 +23,7 @@ pub struct App {
     pub pool: Pool,
     pub crypto: crypto::CookieCrypto,
     pub cookie_name: String,
+    pub cache_prefix: String,
 }
 
 #[tokio::main]
@@ -51,6 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         pool,
         crypto,
         cookie_name: env("SESSION_COOKIE", "laravel-session"),
+        cache_prefix: env("CACHE_PREFIX", "laravel-cache-"),
     });
     let address = format!("{}:{}", env("BIND_HOST", "127.0.0.1"), env("PORT", "18643"));
     let listener = tokio::net::TcpListener::bind(&address).await?;
@@ -112,7 +114,7 @@ async fn handle(
                 }
                 return Ok(Html("<!doctype html><html><head><title>Login</title></head><body><form method=\"post\" action=\"/login\"><input name=\"email\" type=\"email\"><input name=\"password\" type=\"password\"><button>Login</button></form></body></html>").into_response());
             }
-            if parts.method==Method::POST {return Ok(Json(session.login(db,&body,&ip).await?).into_response());}
+            if parts.method==Method::POST {return session.login(&app,db,&body,&ip).await;}
         }
         if path=="/logout" && parts.method==Method::POST {
             db.execute("delete from sessions where id=$1",&[&session.id]).await?;

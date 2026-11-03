@@ -3,11 +3,15 @@ use crate::{
     crypto::{constant_eq, random_token},
     db::{self, Error, Result, flag, nullable, text},
 };
-use axum::http::{HeaderMap, Method};
+use axum::{
+    Json,
+    http::{HeaderMap, HeaderValue, Method},
+    response::{IntoResponse, Response},
+};
 use base64::{Engine, engine::general_purpose::STANDARD};
+use md5::{Digest, Md5};
 use rand::Rng;
 use serde_json::{Value, json};
-use sha1::{Digest, Sha1};
 use std::collections::{HashMap, HashSet};
 use tokio_postgres::Client;
 
@@ -53,6 +57,33 @@ mod tests {
         ]);
         assert!(unrestricted.allows("company-a", Some("unit-b")));
         assert!(!unrestricted.allows("company-b", Some("unit-b")));
+    }
+
+    #[test]
+    fn limiter_keys_and_values_follow_laravel() {
+        // md5("login" + email + "|" + ip), dihitung terpisah dengan hashlib Python.
+        assert_eq!(
+            route_key("someone@example.test", "172.17.0.1"),
+            "c5115501bccc8b97cc271533cbe762f0"
+        );
+        assert_eq!(
+            fortify_key("someone@example.test", "172.17.0.1"),
+            "someone@example.test|172.17.0.1"
+        );
+        assert_eq!(serialize(0), "i:0;");
+        assert_eq!(unserialize("i:1793750460;"), Some(1793750460));
+        assert_eq!(unserialize("s:1:\"5\";"), None);
+        let headers = rate_limit_headers(0, Some(42));
+        assert_eq!(headers["x-ratelimit-limit"], "5");
+        assert_eq!(headers["x-ratelimit-remaining"], "0");
+        assert_eq!(headers["retry-after"], "42");
+        let reset: i64 = headers["x-ratelimit-reset"]
+            .to_str()
+            .unwrap()
+            .parse()
+            .unwrap();
+        assert!((reset - epoch() - 42).abs() <= 1);
+        assert!(!rate_limit_headers(4, None).contains_key("retry-after"));
     }
 }
 
@@ -151,28 +182,61 @@ impl Session {
         Ok(())
     }
 
-    pub async fn login(&mut self, db: &Client, body: &Value, ip: &str) -> Result<Value> {
+    /// `POST /login` di belakang `throttle:login`, urutannya mengikuti `login-limiter.md`: limiter route
+    /// memeriksa dan menghitung kunci `Kr` sebelum kredensial, Fortify menghitung `Kf` saat gagal dan
+    /// menghapusnya saat sukses, lalu header sisa percobaan dibaca ulang sesudah handler.
+    pub async fn login(
+        &mut self,
+        app: &App,
+        db: &Client,
+        body: &Value,
+        ip: &str,
+    ) -> Result<Response> {
         let email = text(body, "email").to_lowercase();
         let password = text(body, "password");
         if email.is_empty() || password.is_empty() {
             return Err(Error::validation("email", "The email field is required."));
         }
-        let limiter_key = format!(
-            "native-rust:login:{}",
-            hex::encode(Sha1::digest(format!("{email}|{ip}").as_bytes()))
-        );
-        let epoch = chrono::Utc::now().timestamp();
-        db.execute("insert into cache (key,value,expiration) values ($1,'i:0;',$2) on conflict (key) do nothing", &[&limiter_key, &(epoch + 60)]).await?;
-        let attempts = db.query_one("update cache set value='i:' || (case when expiration <= $2 then 1 else cast(substring(value from '[0-9]+') as integer)+1 end)::text || ';', expiration=case when expiration <= $2 then $2+60 else expiration end where key=$1 returning value", &[&limiter_key, &epoch]).await?;
-        let count: i32 = attempts
-            .get::<_, String>(0)
-            .trim_start_matches("i:")
-            .trim_end_matches(';')
-            .parse()
-            .unwrap_or(6);
-        if count > 5 {
-            return Err(Error::new(429, "Too Many Attempts."));
+        let limiter = Limiter {
+            db,
+            prefix: &app.cache_prefix,
+        };
+        let route = route_key(&email, ip);
+        if limiter.too_many_attempts(&route).await? {
+            let retry_after = limiter.available_in(&route).await?;
+            let mut error = Error::new(429, "Too Many Attempts.");
+            error.headers = rate_limit_headers(0, Some(retry_after));
+            return Err(error);
         }
+        limiter.hit(&route).await?;
+        let outcome = self
+            .authenticate(db, &limiter, &fortify_key(&email, ip), &email, password)
+            .await;
+        if outcome
+            .as_ref()
+            .is_err_and(|error| error.status.is_server_error())
+        {
+            return outcome.map(|body| Json(body).into_response());
+        }
+        let remaining = (MAX_ATTEMPTS - limiter.attempts(&route).await?).max(0);
+        let headers = rate_limit_headers(remaining, None);
+        match outcome {
+            Ok(body) => Ok((headers, Json(body)).into_response()),
+            Err(mut error) => {
+                error.headers.extend(headers);
+                Err(error)
+            }
+        }
+    }
+
+    async fn authenticate(
+        &mut self,
+        db: &Client,
+        limiter: &Limiter<'_>,
+        fortify_key: &str,
+        email: &str,
+        password: String,
+    ) -> Result<Value> {
         let user = db::optional(
             db,
             "select * from users where lower(email)=$1 and account_type='person' limit 1",
@@ -180,7 +244,7 @@ impl Session {
         )
         .await?;
         let Some(user) = user else {
-            return Err(login_failed());
+            return Err(login_failed(limiter, fortify_key).await);
         };
         let hash = text(&user, "password");
         let first_hash = hash.clone();
@@ -191,7 +255,7 @@ impl Session {
         .await
         .unwrap_or(false);
         if !first {
-            return Err(login_failed());
+            return Err(login_failed(limiter, fortify_key).await);
         }
         if !user["two_factor_secret"].is_null() && !user["two_factor_confirmed_at"].is_null() {
             return Err(Error::unsupported(
@@ -211,7 +275,7 @@ impl Session {
         .await
         .unwrap_or(false);
         if !second {
-            return Err(login_failed());
+            return Err(login_failed(limiter, fortify_key).await);
         }
         db.execute("delete from sessions where id=$1", &[&self.id])
             .await?;
@@ -230,8 +294,7 @@ impl Session {
             .await?;
         self.id = random_token();
         self.user = Some(user);
-        db.execute("delete from cache where key=$1", &[&limiter_key])
-            .await?;
+        limiter.clear(fortify_key).await?;
         Ok(json!({"two_factor":false}))
     }
 
@@ -259,8 +322,198 @@ impl Session {
     }
 }
 
-fn login_failed() -> Error {
-    Error::validation("email", "These credentials do not match our records.")
+/// Kredensial ditolak: Fortify menghitung `Kf` sebelum menjawab 422.
+async fn login_failed(limiter: &Limiter<'_>, fortify_key: &str) -> Error {
+    match limiter.hit(fortify_key).await {
+        Ok(_) => Error::validation("email", "These credentials do not match our records."),
+        Err(error) => error,
+    }
+}
+
+const MAX_ATTEMPTS: i64 = 5;
+const DECAY_SECONDS: i64 = 60;
+/// `Repository::FLEXIBLE_CREATED_KEY_PREFIX`, ikut dihapus bersama setiap kunci.
+const FLEXIBLE_CREATED: &str = "illuminate:cache:flexible:created:";
+
+/// Kunci `throttle:login`: `ThrottleRequests` menghash nama limiter dengan kunci dari `RateLimiter::for`.
+fn route_key(email: &str, ip: &str) -> String {
+    hex::encode(Md5::digest(format!("login{email}|{ip}").as_bytes()))
+}
+/// Kunci `LoginRateLimiter` Fortify.
+fn fortify_key(email: &str, ip: &str) -> String {
+    format!("{email}|{ip}")
+}
+fn epoch() -> i64 {
+    chrono::Utc::now().timestamp()
+}
+fn serialize(value: i64) -> String {
+    format!("i:{value};")
+}
+fn unserialize(value: &str) -> Option<i64> {
+    value.strip_prefix("i:")?.strip_suffix(';')?.parse().ok()
+}
+
+fn rate_limit_headers(remaining: i64, retry_after: Option<i64>) -> HeaderMap {
+    let mut headers = HeaderMap::new();
+    headers.insert("x-ratelimit-limit", HeaderValue::from(MAX_ATTEMPTS));
+    headers.insert("x-ratelimit-remaining", HeaderValue::from(remaining));
+    if let Some(retry_after) = retry_after {
+        headers.insert("retry-after", HeaderValue::from(retry_after));
+        headers.insert(
+            "x-ratelimit-reset",
+            HeaderValue::from(epoch() + retry_after),
+        );
+    }
+    headers
+}
+
+/// `DatabaseStore` dan `RateLimiter` Laravel sebatas yang dipakai login. Setiap method satu primitif
+/// dengan statement dan batas transaksi yang sama seperti PHP; jangan digabung menjadi satu statement,
+/// karena tujuannya pengukuran yang sebanding, bukan limiter tercepat.
+struct Limiter<'a> {
+    db: &'a Client,
+    prefix: &'a str,
+}
+
+impl Limiter<'_> {
+    fn keys(&self, key: &str) -> (String, String) {
+        (
+            format!("{}{key}", self.prefix),
+            format!("{}{FLEXIBLE_CREATED}{key}", self.prefix),
+        )
+    }
+
+    /// Baris yang kedaluwarsa dihapus lalu dianggap tidak ada. Nilai selain bilangan bulat dibaca 0.
+    async fn get(&self, key: &str) -> Result<Option<i64>> {
+        let (prefixed, flexible) = self.keys(key);
+        let Some(row) = self
+            .db
+            .query_opt("select * from cache where key in ($1)", &[&prefixed])
+            .await?
+        else {
+            return Ok(None);
+        };
+        let now = epoch();
+        if row.try_get::<_, i64>("expiration")? <= now {
+            self.db
+                .execute(
+                    "delete from cache where key in ($1,$2) and expiration <= $3",
+                    &[&prefixed, &flexible, &now],
+                )
+                .await?;
+            return Ok(None);
+        }
+        Ok(Some(
+            unserialize(&row.try_get::<_, String>("value")?).unwrap_or(0),
+        ))
+    }
+
+    async fn add(&self, key: &str, value: i64) -> Result<bool> {
+        if self.get(key).await?.is_some() {
+            return Ok(false);
+        }
+        let (prefixed, _) = self.keys(key);
+        let inserted = self
+            .db
+            .execute(
+                "insert into cache (key,value,expiration) values ($1,$2,$3) on conflict do nothing",
+                &[&prefixed, &serialize(value), &(epoch() + DECAY_SECONDS)],
+            )
+            .await?;
+        Ok(inserted > 0)
+    }
+
+    /// Transaksi sendiri dengan row lock. Expiration tidak disentuh; baris yang hilang menghasilkan 0.
+    async fn increment(&self, key: &str) -> Result<i64> {
+        let (prefixed, _) = self.keys(key);
+        self.db.batch_execute("begin").await?;
+        let result = async {
+            let Some(row) = self
+                .db
+                .query_opt(
+                    "select * from cache where key = $1 limit 1 for update",
+                    &[&prefixed],
+                )
+                .await?
+            else {
+                return Ok(0);
+            };
+            let Some(current) = unserialize(&row.try_get::<_, String>("value")?) else {
+                return Ok(0);
+            };
+            let hits = current + 1;
+            self.db
+                .execute(
+                    "update cache set value = $1 where key = $2",
+                    &[&serialize(hits), &prefixed],
+                )
+                .await?;
+            Ok::<i64, Error>(hits)
+        }
+        .await;
+        match result {
+            Ok(hits) => {
+                self.db.batch_execute("commit").await?;
+                Ok(hits)
+            }
+            Err(error) => {
+                self.db.batch_execute("rollback").await?;
+                Err(error)
+            }
+        }
+    }
+
+    async fn put(&self, key: &str, value: i64) -> Result<()> {
+        let (prefixed, _) = self.keys(key);
+        self.db.execute("insert into cache (key,value,expiration) values ($1,$2,$3) on conflict (key) do update set value=excluded.value,expiration=excluded.expiration", &[&prefixed, &serialize(value), &(epoch() + DECAY_SECONDS)]).await?;
+        Ok(())
+    }
+
+    async fn forget(&self, key: &str) -> Result<()> {
+        let (prefixed, flexible) = self.keys(key);
+        self.db
+            .execute(
+                "delete from cache where key in ($1,$2)",
+                &[&prefixed, &flexible],
+            )
+            .await?;
+        Ok(())
+    }
+
+    async fn attempts(&self, key: &str) -> Result<i64> {
+        Ok(self.get(key).await?.unwrap_or(0))
+    }
+
+    async fn hit(&self, key: &str) -> Result<i64> {
+        self.add(&format!("{key}:timer"), epoch() + DECAY_SECONDS)
+            .await?;
+        let added = self.add(key, 0).await?;
+        let hits = self.increment(key).await?;
+        if !added && hits == 1 {
+            self.put(key, 1).await?;
+        }
+        Ok(hits)
+    }
+
+    async fn too_many_attempts(&self, key: &str) -> Result<bool> {
+        if self.attempts(key).await? >= MAX_ATTEMPTS {
+            if self.get(&format!("{key}:timer")).await?.is_some() {
+                return Ok(true);
+            }
+            self.forget(key).await?;
+        }
+        Ok(false)
+    }
+
+    async fn available_in(&self, key: &str) -> Result<i64> {
+        let timer = self.get(&format!("{key}:timer")).await?.unwrap_or(0);
+        Ok((timer - epoch()).max(0))
+    }
+
+    async fn clear(&self, key: &str) -> Result<()> {
+        self.forget(key).await?;
+        self.forget(&format!("{key}:timer")).await
+    }
 }
 fn guard_key() -> &'static str {
     "login_web_59ba36addc2b2f9401580f014c7f58ea4e30989d"
