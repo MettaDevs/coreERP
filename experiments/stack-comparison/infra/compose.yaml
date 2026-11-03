@@ -34,6 +34,7 @@ services:
     image: ${POSTGRES_IMAGE:?Set POSTGRES_IMAGE to an inspected digest}
     cpus: 2
     mem_limit: 1g
+    stop_grace_period: 120s
     environment:
       POSTGRES_DB: erp_compare
       POSTGRES_USER: compare_admin
