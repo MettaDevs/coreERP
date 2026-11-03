@@ -2,6 +2,25 @@
 
 Dicatat 3 November 2026, sekitar 16:22 WITA. Pengguna meminta berhenti dan menyerahkan pekerjaan kepada agent lain. Semua agent, listener uji, dan build milik eksperimen sudah dihentikan. Belum ada benchmark server, keputusan pemenang, merge, push, atau deploy aplikasi aktif.
 
+## Benchmark dev1, 3-4 November malam
+
+dev2 dilewati atas keputusan pengguna (CPU steal 35-37%). Load runner: `load/user-flow.js` (k6 0.55.0, satu sesi per VU, jeda Uniform(1,9) detik, start Uniform(0,10) sesudah jendela login), `scripts/load.py` (satu run, sampler cgroup/koneksi/checkpoint, oracle rekonsiliasi atas ledger), `scripts/load_report.py`, `scripts/ramp.py`. Fixture 128 tenant × 8 akun: `private/fixture-128.json`, `seed-128.dump` (`23de4f57…`), baseline `seed-128-baseline.json`. Evidence run di `private/load/<run-id>/`.
+
+Budget: setiap SUT 2 CPU, 1 GiB, maksimal 8 koneksi database (PHP 8 worker Octane, Go/Rust pool 8, Bun dua proses reusePort pool 4). Database 4 CPU, 4 GB, shared_buffers 1 GB (nilai di `runtime.env` dev1, bawaan compose tetap ukuran laptop). Generator 2 CPU, 2 GB.
+
+Perbaikan yang terbukti sebelum angka dipakai (rincian dan evidence di `decisions.tsv`):
+- Cast `text[]` pada kolom `char(26)` di Go dan Rust membuat query izin seq scan; dihapus.
+- Bun `idleTimeout` 255 detik; bawaannya memutus request di atas 10 detik.
+- Prepared statement per koneksi di Bun dan Rust; A/B 2×2 menurunkan CPU database per request sekitar separuh.
+- Runner: jendela login 0,5 × VU, kegagalan login terpisah dari verdict SLO, fixture lewat SharedArray, ramp berhenti pada run rusak.
+
+Angka sejauh ini, satu run per langkah, belum lima ulangan:
+- PHP lulus 200 VU, gagal 400 VU (throttled 50% periode di kuota 2 CPU, baca p95 2,2 detik).
+- CPU per request pada 200 VU, sesudah perbaikan: database sekitar 7-8 ms untuk Go/Bun/Rust dan 17 ms untuk PHP; app 2,3 ms Rust, 4,3 ms Go, 6,2 ms Bun, 22 ms PHP.
+- Ramp `r7` (Go, Hono, Elysia, Rust yang sudah diperbaiki) berjalan dari 400 VU; log di `~/coreerp-stack-comparison/run-rust-cache.log` dan `private/load/r7-ramp.json`.
+
+Belum: lima ulangan di titik batas tiap stack, PHP diperhalus antara 200 dan 400 VU, profiling di titik batas, `dev-windows1`.
+
 ## Correctness selesai di dev1, 3 November 20:46 WITA
 
 Cluster uji dev1 berjalan dari compose eksperimen (`coreerp-stack-comparison`, port loopback 18640/18641). `runtime.env` di dev1 sudah LF dan `PHP_IMAGE` menunjuk ID dev1. Evidence dev1 berawalan `d1-` (PHP dan Go/Hono/Elysia) serta `d2-` (Rust sesudah perbaikan reset).
