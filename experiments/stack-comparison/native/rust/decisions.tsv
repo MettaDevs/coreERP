@@ -1,0 +1,6 @@
+ts	phase	decision	why	evidence	result
+2026-11-03T07:59:00Z	implementation	Menggunakan domain Rust dan database schema asli	Membandingkan operasi nyata tanpa PHP dan tanpa mengganti kerja trigger	src/receipts.rs;src/posting.rs	Alur pending purchase selesai
+2026-11-03T07:59:01Z	verification	Memisahkan clone pengembangan dan clone golden	Probe pencabutan akses dan race tidak mengubah baseline final	conformance.py;auth_probes.py	26 probe HTTP dan 11 probe akses lulus
+2026-11-03T07:59:02Z	verification	Menggunakan oracle SQL koordinator dan forced-red satu sen	Memeriksa efek tersimpan secara independen dari fungsi kandidat	experiments/stack-comparison/scripts/sql_oracle.py	24 pemeriksaan hijau; selftest merah terdeteksi dan rollback hijau
+2026-11-03T07:59:03Z	verification	Menjalankan satu golden flow lalu menghentikan listener	Menjaga clone final untuk pemeriksaan independen koordinator	experiments/stack-comparison/private/rust-final-flow.json	HTTP VERIFIED nol perbedaan dan oracle hijau
+2026-11-03T08:12:03.5363065Z	verification	Mereproduksi dan memperbaiki timestamp publication lintas detik	Kolom posting harus sama dengan timestamp input dan payload walau menunggu lock	private/timestamp-before.json;private/timestamp-after.json;timestamp_probe.py	Merah sebelum perbaikan, hijau sesudah perbaikan; tujuh unit test lulus
