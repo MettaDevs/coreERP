@@ -138,7 +138,14 @@ func (q *request) buildPosting(h object, lines, assets []object, persist bool) (
 			}
 			mappings[a.group] = mapping
 		}
-		journal = append(journal, object{"account_id": mapping[column], "debit": debit.StringFixed(amount), "credit": credit.StringFixed(amount), "description": truncate(description, 255), "org_unit_id": a.unit, "mapping": object{"label": "Group " + str(groups[a.group]["kode"]) + " · " + labels[column], "fix_url": "/management-aset/fixed-aset-posting-profiles", "reference": "posting-group:" + a.group + ":" + column}})
+		debitValue, creditValue := debit.StringFixed(amount), credit.StringFixed(amount)
+		if debit.IsZero() {
+			debitValue = "0"
+		}
+		if credit.IsZero() {
+			creditValue = "0"
+		}
+		journal = append(journal, object{"account_id": mapping[column], "debit": debitValue, "credit": creditValue, "description": truncate(description, 255), "org_unit_id": a.unit, "mapping": object{"label": "Group " + str(groups[a.group]["kode"]) + " · " + labels[column], "fix_url": "/management-aset/fixed-aset-posting-profiles", "reference": "posting-group:" + a.group + ":" + column}})
 		return nil
 	}
 	for _, a := range aggregates {
@@ -244,7 +251,14 @@ func (q *request) publishPosting(input object, persist bool) (object, error) {
 	} else if boolean(input["requires_vendor"]) {
 		return nil, errors.New("required posting vendor missing")
 	}
-	journal := objects(input["lines"])
+	journal := []object{}
+	for _, original := range objects(input["lines"]) {
+		line := object{}
+		for key, value := range original {
+			line[key] = value
+		}
+		journal = append(journal, line)
+	}
 	if len(journal) < 2 || len(journal) > 5000 {
 		return nil, errors.New("posting journal line count invalid")
 	}
@@ -393,7 +407,11 @@ func (q *request) publishPosting(input object, persist bool) (object, error) {
 			if e != nil {
 				return e
 			}
-			if e = q.insert("finance_postings", object{"id": id, "tenant_id": tenant, "legal_entity_id": company, "posting_id": postingID, "posting_type": input["posting_type"], "contract_version": 1, "source_module": source["module"], "source_type": source["type"], "source_number": source["number"], "source_id": source["id"], "currency_code": input["currency_code"], "currency_decimals": amount, "posting_date": date, "document_date": input["document_date"], "occurred_at": occurred, "published_at": time.Now().UTC(), "settlement_mode": input["settlement_mode"], "status": status, "manual_reason": reason, "hold_reasons": holds, "vendor_id": input["vendor_id"], "reverses_posting_id": nil, "adjusts_posting_id": nil, "total_debit": total, "total_credit": total, "payload": jsonText(payload), "input": jsonText(input), "input_hash": hash}); e != nil {
+			published, e := time.Parse(time.RFC3339, str(payload["published_at"]))
+			if e != nil {
+				return e
+			}
+			if e = q.insert("finance_postings", object{"id": id, "tenant_id": tenant, "legal_entity_id": company, "posting_id": postingID, "posting_type": input["posting_type"], "contract_version": 1, "source_module": source["module"], "source_type": source["type"], "source_number": source["number"], "source_id": source["id"], "currency_code": input["currency_code"], "currency_decimals": amount, "posting_date": date, "document_date": input["document_date"], "occurred_at": occurred, "published_at": published, "settlement_mode": input["settlement_mode"], "status": status, "manual_reason": reason, "hold_reasons": holds, "vendor_id": input["vendor_id"], "reverses_posting_id": nil, "adjusts_posting_id": nil, "total_debit": total, "total_credit": total, "payload": jsonText(payload), "input": jsonText(input), "input_hash": hash}); e != nil {
 				return e
 			}
 			for _, l := range tableLines {
