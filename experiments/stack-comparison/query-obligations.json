@@ -1,0 +1,63 @@
+{
+  "purpose": "Pengecualian kewajiban SQL yang sudah ditelaah untuk compare_queries.py. Setiap entri menjelaskan mengapa selisih bukan kewajiban yang hilang. FAIL hanya boleh dikecualikan dengan evidence perilaku.",
+  "waivers": [
+    {
+      "candidates": ["go", "hono", "elysia", "rust"],
+      "operations": ["*"],
+      "kind": "write-verb",
+      "match": {"table": "sessions"},
+      "reason": "Kedua sisi menulis tepat satu baris sesi per request. Kandidat memakai INSERT ... ON CONFLICT DO UPDATE; PHP membaca baris lalu UPDATE atau INSERT.",
+      "evidence": ""
+    },
+    {
+      "candidates": ["go", "hono", "elysia", "rust"],
+      "operations": ["receipt-complete"],
+      "kind": "transaction-savepoint:release",
+      "reason": "Laravel tidak mengirim RELEASE untuk savepoint bersarang. Kandidat mengirimnya, jadi ini kerja tambahan kandidat, bukan kewajiban yang hilang.",
+      "evidence": ""
+    },
+    {
+      "candidates": ["rust"],
+      "operations": ["receipt-complete"],
+      "kind": "transaction-savepoint:savepoint",
+      "reason": "Numbering Rust memakai empat savepoint untuk tiga nomor aset, PHP enam. Ini strategi query yang berbeda dan menjadi alasan atribusi runtime murni INCONCLUSIVE.",
+      "evidence": "private/g2-rust-oracle.json asset_number_issued dan duplicate_asset_code bersih; private/c2-rust-conformance.json completion-race tepat satu 200"
+    },
+    {
+      "candidates": ["go", "rust"],
+      "operations": ["workspace"],
+      "kind": "read-extra",
+      "reason": "Kandidat menghitung ulang izin saat memilih workspace. Bacaan tambahan, bukan kewajiban yang hilang.",
+      "evidence": ""
+    },
+    {
+      "candidates": ["rust"],
+      "operations": ["receipt-preview"],
+      "kind": "read-extra",
+      "reason": "Preview Rust memuat lookup detail seperti show. Bacaan tambahan, bukan kewajiban yang hilang.",
+      "evidence": ""
+    },
+    {
+      "candidates": ["rust"],
+      "operations": ["*"],
+      "kind": "read-missing",
+      "match": "operating_units",
+      "reason": "PHP memuat seluruh direktori unit operasi untuk dekorasi; Rust hanya kolom yang dipakai respons.",
+      "evidence": "private/g2-rust-http.json VERIFIED 0 selisih pada fixture yang type dan number unitnya terisi (BU00001, DP00001)"
+    },
+    {
+      "candidates": ["rust"],
+      "operations": ["*"],
+      "kind": "transaction-rollback",
+      "reason": "Rust mengirim ROLLBACK saat koneksi dikembalikan dan diambil dari pool. Kerja tambahan, bukan kewajiban yang hilang. WAJIB dituning sebelum benchmark: setiap ROLLBACK di luar transaksi menulis WARNING ke log PostgreSQL.",
+      "evidence": ""
+    },
+    {
+      "candidates": ["rust"],
+      "operations": ["*"],
+      "kind": "transaction-other:reset all",
+      "reason": "Rust mengirim RESET ALL bersama ROLLBACK untuk membersihkan setting sesi koneksi pool. Kerja tambahan; lihat catatan tuning pada transaction-rollback.",
+      "evidence": ""
+    }
+  ]
+}

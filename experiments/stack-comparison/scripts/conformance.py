@@ -123,9 +123,31 @@ def rollback(base: str, fixture: dict, password: str, database: str) -> list[dic
     return observed
 
 
+def throttle(base: str) -> list[dict]:
+    """Limiter login Fortify: percobaan gagal untuk satu email dan IP dihitung, lalu ditolak dengan petunjuk tunggu."""
+    client = Client(base)
+    client.request("GET", "/login")
+    observed = []
+    email = f"throttle-{uuid.uuid4().hex}@stack-comparison.example.invalid"
+    for attempt in range(1, 7):
+        result = client.request("POST", "/login", {"email": email, "password": "wrong-password"})
+        headers = {key.lower(): value for key, value in result.headers.items()}
+        body = result.body if isinstance(result.body, dict) else {}
+        # Nilai limit/remaining pasti; retry-after dan reset bergantung jam, jadi hanya keberadaannya.
+        observed.append({"probe": f"login-throttle-{attempt}", "status": result.status,
+                         "limit": headers.get("x-ratelimit-limit"), "remaining": headers.get("x-ratelimit-remaining"),
+                         "timed_headers": sorted(header for header in headers if header in {"retry-after", "x-ratelimit-reset"}),
+                         "message": re.sub(r"\d+", "#", str(body.get("message"))),
+                         "errors": {field: [re.sub(r"\d+", "#", message) for message in messages] for field, messages in body.get("errors", {}).items()}})
+    return observed
+
+
+SECTIONS = ["http", "revocation", "rollback", "throttle"]
+
+
 def compare(expected: dict, actual: dict) -> list[dict]:
     differences = []
-    for section in ["http", "revocation", "rollback"]:
+    for section in [name for name in SECTIONS if name in expected and name in actual]:
         left, right = expected[section], actual[section]
         if section == "http":
             left, right = left["events"], right["events"]
@@ -148,20 +170,22 @@ if __name__ == "__main__":
     parser.add_argument("--env", type=Path, default=LAB / "private" / "runtime.env")
     parser.add_argument("--expected", type=Path, help="Hasil conformance PHP sebagai acuan probe yang direkam.")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--sections", nargs="+", choices=SECTIONS, default=SECTIONS)
     args = parser.parse_args()
     validate_database(args.database)
     fixture = json.loads(args.fixture.read_text(encoding="utf-8"))
     password = fixture_password(args.env)
-    report = {"database": args.database, "base": args.base,
-              "http": http_probes()(args.base, fixture, password),
-              "revocation": revocation(args.base, fixture, password, args.database),
-              "rollback": rollback(args.base, fixture, password, args.database)}
+    probes = {"http": lambda: http_probes()(args.base, fixture, password),
+              "revocation": lambda: revocation(args.base, fixture, password, args.database),
+              "rollback": lambda: rollback(args.base, fixture, password, args.database),
+              "throttle": lambda: throttle(args.base)}
+    report = {"database": args.database, "base": args.base, **{section: probes[section]() for section in args.sections}}
     if args.expected:
         report["differences"] = compare(json.loads(args.expected.read_text(encoding="utf-8")), report)
         report["verdict"] = "NOT VERIFIED" if report["differences"] else "VERIFIED"
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps({"verdict": report.get("verdict", "RECORDED"), "differences": len(report.get("differences", [])),
-                      "http": len(report["http"]["events"]), "revocation": len(report["revocation"]), "rollback": len(report["rollback"])}))
+    counts = {section: len(report[section]["events"] if section == "http" else report[section]) for section in args.sections}
+    print(json.dumps({"verdict": report.get("verdict", "RECORDED"), "differences": len(report.get("differences", [])), **counts}))
     if report.get("differences"):
         raise SystemExit(1)
