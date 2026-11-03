@@ -4,6 +4,7 @@
 import http from 'k6/http';
 import exec from 'k6/execution';
 import { sleep } from 'k6';
+import { SharedArray } from 'k6/data';
 import { Counter, Trend } from 'k6/metrics';
 
 const BASE = __ENV.BASE;
@@ -13,8 +14,12 @@ const LOGIN = Number(__ENV.LOGIN_SECONDS || 60);
 const WARMUP = Number(__ENV.WARMUP_SECONDS || 30);
 const PLATEAU = Number(__ENV.PLATEAU_SECONDS || 90);
 const DRAIN = Number(__ENV.DRAIN_SECONDS || 300);
-const fixture = JSON.parse(open('/fixture/fixture.json'));
-const prefix = `${BASE}/api/modules/${fixture.module_id}/v1`;
+// Fixture dimuat sekali untuk semua VU; parse per VU menghabiskan 2 GB pada 800 VU.
+const fixtureFile = '/fixture/fixture.json';
+const accounts = new SharedArray('accounts', () => JSON.parse(open(fixtureFile)).accounts);
+const tenants = new SharedArray('tenants', () => JSON.parse(open(fixtureFile)).tenants.map((tenant) => ({ tenant_id: tenant.tenant_id, receipt_body: tenant.receipt_body })));
+const moduleId = new SharedArray('module', () => [JSON.parse(open(fixtureFile)).module_id])[0];
+const prefix = `${BASE}/api/modules/${moduleId}/v1`;
 
 export const options = {
     scenarios: {
@@ -36,6 +41,7 @@ const cycleBusy = new Trend('cycle_busy', true);
 
 let account = null;
 let accountIndex = -1;
+let document = null;
 let cycling = false;
 let loginAttempted = false;
 
@@ -105,8 +111,8 @@ function login() {
     // Sebaran login hanya untuk percobaan pertama; login yang gagal diulang sesudah think time.
     if (!loginAttempted) sleep(Math.random() * LOGIN * 0.5);
     loginAttempted = true;
-    const index = (exec.vu.idInTest - 1) % fixture.accounts.length;
-    const candidate = fixture.accounts[index];
+    const index = (exec.vu.idInTest - 1) % accounts.length;
+    const candidate = accounts[index];
     call('login-page', 'login', 'GET', `${BASE}/login`, null, 200);
     call('login', 'login', 'POST', `${BASE}/login`, { email: candidate.email, password: PASSWORD }, 200);
     call('workspace', 'login', 'PUT', `${BASE}/api/v1/workspace-context`, {
@@ -116,6 +122,12 @@ function login() {
     }, 200);
     accountIndex = index;
     account = candidate;
+    if (document === null) {
+        for (let position = 0; position < tenants.length && document === null; position++) {
+            const tenant = tenants[position];
+            if (tenant.tenant_id === candidate.tenant_id) document = tenant.receipt_body;
+        }
+    }
 }
 
 export default function () {
@@ -135,7 +147,6 @@ export default function () {
 }
 
 function cycle() {
-    const document = fixture.tenants.find((tenant) => tenant.tenant_id === account.tenant_id).receipt_body;
     const receipts = `${prefix}/penerimaan-aset`;
     const started = Date.now();
     let busy = 0;

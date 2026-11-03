@@ -36,12 +36,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
     profile = json.loads((LAB / "profile.json").read_text(encoding="utf-8"))
     steps = args.steps or profile["load"]["capacity_steps"]
-    state = {candidate: {"last_pass": None, "first_fail": None, "runs": []} for candidate in args.candidates}
+    state = {candidate: {"last_pass": None, "first_fail": None, "stopped": None, "runs": []} for candidate in args.candidates}
     summary_path = PRIVATE / "load" / f"{args.name}-ramp.json"
     for index, vus in enumerate(steps):
         order = args.candidates[index % len(args.candidates):] + args.candidates[: index % len(args.candidates)]
         for candidate in order:
-            if state[candidate]["first_fail"] is not None:
+            if state[candidate]["first_fail"] is not None or state[candidate]["stopped"] is not None:
                 continue
             db = database(args.name, candidate, index)
             cloned = run("lab.py", "clone", "--database", db, "--seed", str(args.seed))
@@ -57,12 +57,19 @@ if __name__ == "__main__":
                      "write_p95": report.get("write", {}).get("p95"), "rps": report.get("plateau_successful_rps"),
                      "error": None if report_path.exists() else (result.stderr or result.stdout)[-800:]}
             state[candidate]["runs"].append(entry)
+            # Hanya FAIL yang menjadi batas; run rusak atau tidak meyakinkan bukan bukti kapasitas.
             if verdict.startswith("PASS"):
                 state[candidate]["last_pass"] = vus
-            else:
+            elif verdict == "FAIL":
                 state[candidate]["first_fail"] = vus
+            else:
+                state[candidate]["stopped"] = {"vus": vus, "reason": verdict}
             summary_path.write_text(json.dumps({"name": args.name, "steps": steps, "candidates": state}, indent=2) + "\n", encoding="utf-8")
             print(json.dumps({"candidate": candidate, **entry}), flush=True)
-        if all(entry["first_fail"] is not None for entry in state.values()):
+            if verdict == "ERROR":
+                print("RUN-ERROR: ramp dihentikan karena runner gagal; perbaiki sebelum melanjutkan.", flush=True)
+                print("ALL-DONE", flush=True)
+                raise SystemExit(1)
+        if all(entry["first_fail"] is not None or entry["stopped"] is not None for entry in state.values()):
             break
     print("ALL-DONE", flush=True)
