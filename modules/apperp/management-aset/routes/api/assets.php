@@ -2,16 +2,13 @@
 
 use Illuminate\Support\Facades\Route;
 use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\InventarisasiAset\AsetController;
+use Modules\Apperp\ManagementAset\Http\Controllers\transaksi\InventarisasiAset\BudgetedAssetController;
 
 Route::get('aset', [AsetController::class, 'index']);
-// Rute spesifik didahulukan agar `{id}` tidak menelan `history`.
-//
-// `POST aset` dibuang 18 September 2026. Aset kini hanya lahir dari dokumen
-// penerimaan: satu berkas untuk satu kedatangan, dengan jumlah per baris, rujukan
-// permintaan pembelian, dan peringatan ambang kapitalisasi sebelum nomornya terbit.
-// Selama dua pintu masih terbuka, "inventarisasi aset adalah penerimaan" tidak benar
-// — dan izin `management-aset.aset.create` sekarang berarti menyelesaikan penerimaan.
-//
+Route::post('aset', [BudgetedAssetController::class, 'store']);
+Route::patch('aset/{id}/planning', [BudgetedAssetController::class, 'update']);
+// POST aset hanya membuat aset rencana tanpa perolehan, buku, atau posting aktual.
+// Aset aktual tetap hanya lahir dari penyelesaian dokumen penerimaan.
 // `POST aset/{id}/penempatan` dibuang 17 September 2026. Ia satu-satunya yang pernah
 // menulis `lifecycle_state = 'in_use'` — nilai yang tidak pernah dibaca logika mana pun
 // — dan seluruh pekerjaannya kini dikerjakan dokumen mutasi, yang membawa nomor,

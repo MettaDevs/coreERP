@@ -1,5 +1,13 @@
 # Register aset
 
+## Aset sebagai perencanaan
+
+Register menyimpan aset aktual dan aset rencana pada tabel yang sama. Kartu rencana bertanda **Aset sebagai perencanaan** (`is_budgeted: true`, status `budgeted`) dapat dibuat melalui menu Inventarisasi atau Baru pada lookup perencanaan, memakai `BudgetedAssetCard` yang sama. Ia hanya membawa identitas, perusahaan, unit penanggung jawab, group, jenis, dan keterangan. Jenis tidak dipilih ulang pada baris rencana.
+
+`POST aset` hanya menerima kartu rencana. Penyelesaian penerimaan tetap menjadi pintu perolehan aset aktual. Kartu rencana tidak memiliki tanggal perolehan/pemakaian, mata uang aktual, buku penyusutan, penempatan fisik, atau ledger; nilai aktualnya nol. Penandanya tidak dapat diubah menjadi aktual lewat update. Database menolak buku dan ledger aktual yang menunjuk kartu rencana. Query operasional model Aset memakai scope `actual`; register dan ekspor membukanya secara eksplisit sambil mempertahankan tenant serta hak organisasi.
+
+Kode memakai reference `management-aset.asset-code` yang sama. Sebelum barang diperoleh, tanggal pembuatan kartu dipakai sebagai konteks tahun nomor. Counter tetap milik Core dan Idempotency-Key yang sama tidak membuat kartu atau nomor kedua. Kartu rencana dan aset aktual hasil penerimaan memiliki identitas masing-masing; penelusuran realisasi melewati baris rencana dan permintaan asal. Lihat [Perencanaan aset](../perencanaan-aset/).
+
 Lampiran Penerimaan yang dirujuk snapshot posting finance dapat dibaca sistem finance melalui GET `/api/internal/v1/finance-postings/{posting_id}/receipts/{receipt}/attachments` dan endpoint berkasnya. Core memeriksa token tenant, prefix jenis dan status pending/posted; module menjawab apakah parent Penerimaan aktif masih milik tenant/entitas posting melalui `FinanceEvidenceRecordType`. Ini hak integrasi atas bukti posting, terpisah dari izin sesi pengguna CoreERP. Pembaca BO memeriksa role/unit penggunanya sendiri. File tetap pada storage CoreERP, daftar mengirim metadata publik, dan unduh memeriksa hash/ukuran25MiB. Snapshot jurnal dan ACK tidak berubah saat bukti dibuka. Tidak berlaku bagi semua jenis dokumen aset; kiriman lama tanpa receipt tidak mendapat akses lewat tebakan.
 
 ## Nomenklatur kode aset

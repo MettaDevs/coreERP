@@ -24,6 +24,8 @@ namespace Modules\Apperp\ManagementAset\Support;
  */
 final class StatusAset
 {
+    public const BUDGETED = 'budgeted';
+
     /** Tercatat sebagai aset; keadaan awal setiap aset yang diterima. */
     public const DITERIMA = 'received';
 
@@ -38,6 +40,7 @@ final class StatusAset
      * `in_use` tidak ditulis lagi sejak 17 September 2026; labelnya dipertahankan untuk baris lama.
      */
     public const LABELS = [
+        self::BUDGETED => 'Rencana',
         self::DITERIMA => 'Diterima',
         'in_use' => 'Digunakan',
         self::DIHENTIKAN => 'Didekomisioning',
@@ -47,7 +50,7 @@ final class StatusAset
     /** @return list<string> */
     public static function semua(): array
     {
-        return [self::DITERIMA, self::DIHENTIKAN, self::DILEPAS];
+        return [self::BUDGETED, self::DITERIMA, self::DIHENTIKAN, self::DILEPAS];
     }
 
     /**
@@ -60,7 +63,7 @@ final class StatusAset
      */
     public static function tidakLagiBeredar(): array
     {
-        return [self::DIHENTIKAN, self::DILEPAS];
+        return [self::BUDGETED, self::DIHENTIKAN, self::DILEPAS];
     }
 
     public static function sudahDilepas(?string $status): bool
@@ -129,6 +132,7 @@ final class StatusAset
     public static function label(?string $status): string
     {
         return match ($status) {
+            self::BUDGETED => 'Rencana',
             self::DITERIMA => 'Diterima',
             'in_use' => 'Digunakan',
             self::DIHENTIKAN => 'Didekomisioning',
@@ -146,6 +150,6 @@ final class StatusAset
      */
     public static function bolehDikoreksi(?string $status): bool
     {
-        return ! self::sudahDilepas($status);
+        return $status !== self::BUDGETED && ! self::sudahDilepas($status);
     }
 }

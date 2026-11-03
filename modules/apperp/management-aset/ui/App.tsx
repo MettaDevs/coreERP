@@ -122,7 +122,6 @@ const REPORT_PAGES: Record<
     {
         permission: string;
         Page: LazyExoticComponent<ComponentType>;
-        layout?: 'flow';
     }
 > = {
     'laporan-penyusutan-aset': {
@@ -143,7 +142,6 @@ const REPORT_PAGES: Record<
     },
     'kpi-pemeliharaan': {
         permission: 'management-aset.kpi-pemeliharaan.read',
-        layout: 'flow',
         Page: lazy(() => import('./transactions/downtime/MaintenanceKpiPage')),
     },
     'laporan-penjualan-aset': {
@@ -460,7 +458,10 @@ export default function App({
         permissions.includes('management-aset.jadwal-pemeliharaan.read')
     ) {
         return (
-            <main>
+            <main
+                data-layout="full-height"
+                className="h-full min-h-0 overflow-hidden"
+            >
                 <MaintenanceSchedulePage
                     context={konteks}
                     permissions={permissions}
@@ -474,7 +475,10 @@ export default function App({
         permissions.includes('management-aset.pembacaan-counter.read')
     ) {
         return (
-            <main>
+            <main
+                data-layout="full-height"
+                className="h-full min-h-0 overflow-hidden"
+            >
                 <CounterReadingPage
                     context={konteks}
                     permissions={permissions}
@@ -489,7 +493,10 @@ export default function App({
         permissions.includes('management-aset.polis-asuransi.read')
     ) {
         return (
-            <main>
+            <main
+                data-layout="full-height"
+                className="h-full min-h-0 overflow-hidden"
+            >
                 <InsurancePage context={konteks} permissions={permissions} />
             </main>
         );
@@ -501,7 +508,10 @@ export default function App({
             permissions.includes('management-aset.kontrak-servis.read'))
     ) {
         return (
-            <main>
+            <main
+                data-layout="full-height"
+                className="h-full min-h-0 overflow-hidden"
+            >
                 <WarrantyPage context={konteks} permissions={permissions} />
             </main>
         );
@@ -512,7 +522,10 @@ export default function App({
         permissions.includes('management-aset.downtime-aset.read')
     ) {
         return (
-            <main>
+            <main
+                data-layout="full-height"
+                className="h-full min-h-0 overflow-hidden"
+            >
                 <DowntimePage permissions={permissions} />
             </main>
         );
@@ -549,14 +562,10 @@ export default function App({
     const report = REPORT_PAGES[view];
 
     if (report && permissions.includes(report.permission)) {
-        const fullHeight = report.layout !== 'flow';
-
         return (
             <main
-                data-layout={fullHeight ? 'full-height' : undefined}
-                className={
-                    fullHeight ? 'h-full min-h-0 overflow-hidden' : undefined
-                }
+                data-layout="full-height"
+                className="h-full min-h-0 overflow-hidden"
             >
                 <report.Page />
             </main>

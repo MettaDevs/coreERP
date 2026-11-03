@@ -37,8 +37,8 @@ import {
     PageDialogClose,
     PageDialogBody,
 } from '@apperp/ui/page-dialog';
-import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { useRecordTransition } from '@apperp/ui/use-record-transition';
+import RecordListPage from '../../_shared/RecordListPage';
 import { RecordLookup } from '../../_shared/RecordLookup';
 import { ApiError, api, errorMessage, newIdempotencyKey } from '../../api';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
@@ -383,97 +383,105 @@ export default function CounterReadingPage({
         requestReadingTransition(() => setRecording(false));
 
     return (
-        <div ref={pageFeedbackScopeRef}>
+        <div
+            ref={pageFeedbackScopeRef}
+            className="h-full min-h-0 overflow-hidden"
+        >
             {readingTransitionConfirmation}
-            <RecordActionBar
-                feedback={pageFeedbackSummary}
-                title="Pembacaan counter"
+            <RecordListPage
+                toolbar={{
+                    feedback: pageFeedbackSummary,
+                    title: 'Pembacaan counter',
+                    children: (
+                        <>
+                            {canCreate && (
+                                <ActionButton
+                                    action="create"
+                                    type="button"
+                                    onClick={openRecord}
+                                />
+                            )}
+                        </>
+                    ),
+                }}
+                filters={
+                    <>
+                        <FormControl>
+                            <RecordLookup
+                                source={assetSource}
+                                label="Aset"
+                                items={[
+                                    { value: '', label: 'Semua aset' },
+                                    ...assetChoices,
+                                ]}
+                                value={filterAset || null}
+                                placeholder="Semua aset"
+                                searchPlaceholder="Cari kode atau nama aset"
+                                ariaLabel="Saring berdasarkan aset"
+                                onValueChange={(value) => {
+                                    setFilterAset(value ?? '');
+                                }}
+                            />
+                        </FormControl>
+
+                        <FormControl>
+                            <RecordLookup
+                                source={counterTypes}
+                                label="Counter"
+                                items={[
+                                    { value: '', label: 'Semua counter' },
+                                    ...counterChoices,
+                                ]}
+                                value={filterCounter || null}
+                                placeholder="Semua counter"
+                                ariaLabel="Saring berdasarkan counter"
+                                onValueChange={(value) => {
+                                    setFilterCounter(value ?? '');
+                                }}
+                            />
+                        </FormControl>
+
+                        {assetError && (
+                            <p className="text-muted-foreground text-sm">
+                                {assetError}
+                            </p>
+                        )}
+                    </>
+                }
+                filtersActive={Boolean(filterAset || filterCounter)}
             >
-                {canCreate && (
-                    <ActionButton
-                        action="create"
-                        type="button"
-                        onClick={openRecord}
+                {!loading && rows.length === 0 && !list.error ? (
+                    <Empty>
+                        <EmptyHeader>
+                            <EmptyTitle>Belum ada pembacaan counter</EmptyTitle>
+                            <EmptyDescription>
+                                Catat angka meter aset secara berkala, misalnya
+                                jam operasi atau jumlah tindakan, supaya
+                                pemeliharaan berbasis pemakaian dapat
+                                dijadwalkan.
+                            </EmptyDescription>
+                        </EmptyHeader>
+                    </Empty>
+                ) : (
+                    <DataTable
+                        columns={columns}
+                        incremental={list}
+                        sort={list.sort}
+                        onSortChange={list.onSortChange}
+                        data={rows}
+                        getRowKey={(row) => row.id}
+                        getRowLabel={(row) =>
+                            `${row.aset_kode} ${showReadAt(row.dibaca_pada)}`
+                        }
+                        actions={actions}
+                        onRowAction={(action, row) => {
+                            if (action === 'archive') {
+                                setArchiving(row);
+                            }
+                        }}
                     />
                 )}
-            </RecordActionBar>
-
-            <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
-                <div className="w-full sm:w-80">
-                    <FormControl>
-                        <RecordLookup
-                            source={assetSource}
-                            label="Aset"
-                            items={[
-                                { value: '', label: 'Semua aset' },
-                                ...assetChoices,
-                            ]}
-                            value={filterAset || null}
-                            placeholder="Semua aset"
-                            searchPlaceholder="Cari kode atau nama aset"
-                            ariaLabel="Saring berdasarkan aset"
-                            onValueChange={(value) => {
-                                setFilterAset(value ?? '');
-                            }}
-                        />
-                    </FormControl>
-                </div>
-                <div className="w-full sm:w-64">
-                    <FormControl>
-                        <RecordLookup
-                            source={counterTypes}
-                            label="Counter"
-                            items={[
-                                { value: '', label: 'Semua counter' },
-                                ...counterChoices,
-                            ]}
-                            value={filterCounter || null}
-                            placeholder="Semua counter"
-                            ariaLabel="Saring berdasarkan counter"
-                            onValueChange={(value) => {
-                                setFilterCounter(value ?? '');
-                            }}
-                        />
-                    </FormControl>
-                </div>
-                {assetError && (
-                    <p className="text-muted-foreground text-sm">
-                        {assetError}
-                    </p>
-                )}
-            </div>
-
-            {!loading && rows.length === 0 && !list.error ? (
-                <Empty>
-                    <EmptyHeader>
-                        <EmptyTitle>Belum ada pembacaan counter</EmptyTitle>
-                        <EmptyDescription>
-                            Catat angka meter aset secara berkala, misalnya jam
-                            operasi atau jumlah tindakan, supaya pemeliharaan
-                            berbasis pemakaian dapat dijadwalkan.
-                        </EmptyDescription>
-                    </EmptyHeader>
-                </Empty>
-            ) : (
-                <DataTable
-                    columns={columns}
-                    incremental={list}
-                    sort={list.sort}
-                    onSortChange={list.onSortChange}
-                    data={rows}
-                    getRowKey={(row) => row.id}
-                    getRowLabel={(row) =>
-                        `${row.aset_kode} ${showReadAt(row.dibaca_pada)}`
-                    }
-                    actions={actions}
-                    onRowAction={(action, row) => {
-                        if (action === 'archive') {
-                            setArchiving(row);
-                        }
-                    }}
-                />
-            )}
-
+            </RecordListPage>
             <PageDialog
                 open={recording}
                 onOpenChange={(open) => {

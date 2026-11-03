@@ -36,7 +36,8 @@ export type Aset = {
     nama: string;
     serial_number: string | null;
     acquisition_value: string;
-    currency_code: string;
+    currency_code: string | null;
+    is_budgeted: boolean;
     lifecycle_state: string;
     group_aset_id?: string | null;
     jenis_aset_id?: string | null;

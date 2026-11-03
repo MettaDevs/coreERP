@@ -64,6 +64,7 @@ import {
 import AssetPicture from './AssetPicture';
 import type { AttributeDefinition } from './attributes';
 import { toFieldConfig } from './attributes';
+import BudgetedAssetCard from './BudgetedAssetCard';
 import { printAssetLabels } from './labels';
 import { bukaPenerimaan } from './penerimaan';
 
@@ -515,6 +516,40 @@ export default function AsetDetailPage({
             <div className="text-muted-foreground p-5 text-sm">
                 Memuat aset…
             </div>
+        );
+    }
+
+    if (detail?.is_budgeted) {
+        return (
+            <BudgetedAssetCard
+                companyId={detail.legal_entity_id}
+                unitId={String(detail.responsible_org_unit_id ?? '')}
+                permissions={permissions}
+                asset={{
+                    id: detail.id,
+                    kode: detail.kode,
+                    nama: detail.nama,
+                    jenis_aset_id: detail.jenis_aset_id ?? '',
+                    group_aset_id: detail.group_aset_id ?? '',
+                    legal_entity_id: detail.legal_entity_id,
+                    responsible_org_unit_id: String(
+                        detail.responsible_org_unit_id ?? '',
+                    ),
+                    is_budgeted: true,
+                    keterangan: detail.keterangan
+                        ? String(detail.keterangan)
+                        : null,
+                    version: detail.version,
+                }}
+                onClose={onClose ?? navigateClose}
+                onSaved={() => {
+                    if (onSaved) {
+                        onSaved(detail.id);
+                    } else {
+                        navigateClose();
+                    }
+                }}
+            />
         );
     }
 

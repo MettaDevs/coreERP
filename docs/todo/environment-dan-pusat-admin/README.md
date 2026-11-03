@@ -1,5 +1,9 @@
 # Control plane: pelanggan, environment, dan cara keduanya lahir
 
+::: info Rencana historis dan penggantinya
+Bagian pemisahan database, transport, dan relasi pusat-environment di halaman ini merupakan rencana historis. Untuk pekerjaan baru, ikuti [PRD pemisahan database control plane](../control-plane-database/PRD.md) serta [rencana portal customer](../metta-platform-portal/index.md). Pernyataan target di dokumen lama tidak membuktikan implementasi runtime. Desain perilaku yang sudah berjalan tetap dijelaskan pada docs/dev.
+:::
+
 Halaman ini rencana kerja, bukan desain kanonik. Ia menunggu review; bila disetujui, isinya naik ke
 `docs/dev/` sebagai halaman desain tersendiri — dan itulah yang menutup instruksi `LIFE-15`.
 

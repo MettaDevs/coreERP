@@ -18,6 +18,10 @@ export default withMermaid({
     'apps/_template/**',
   ],
   cleanUrls: true,
+  markdown: {
+    // Shiki belum menyediakan AL; tampilkan contoh Business Central sebagai teks biasa.
+    languages: [{ name: 'al', scopeName: 'source.al', patterns: [] }],
+  },
 
   // Tanggal "terakhir diperbarui" dibaca dari git log. Build image memakai
   // context `docs/` yang tidak membawa `.git`, jadi dimatikan di sana lewat
@@ -386,6 +390,35 @@ export default withMermaid({
                   text: 'Bentuk lokasi, peran, dan relasi',
                   link: '/todo/buku-alamat-global/',
                 },
+              ],
+            },
+            {
+              text: 'Platform Metta dan portal customer',
+              collapsed: false,
+              items: [
+                { text: 'Model dan alur kedua sisi', link: '/todo/metta-platform-portal/' },
+                { text: 'Rencana pelaksanaan', link: '/todo/metta-platform-portal/PLAN' },
+                { text: 'PF-01: pembuatan tenant', link: '/todo/metta-platform-portal/PF-01' },
+                { text: 'TODO tim', link: '/todo/metta-platform-portal/TODO' },
+                { text: 'TODO pasien dan stok bersama', link: '/todo/metta-platform-portal/SHARING-TODO' },
+                { text: 'Perubahan dan skenario mendatang', link: '/todo/metta-platform-portal/CHANGES' },
+              ],
+            },
+            {
+              text: 'Database control plane terpisah',
+              collapsed: false,
+              items: [
+                { text: 'Keputusan dan dependensi', link: '/todo/control-plane-database/' },
+                { text: 'Handoff implementasi', link: '/todo/control-plane-database/HANDOFF' },
+                { text: 'CPDB-01: inventaris dan kontrak', link: '/todo/control-plane-database/CPDB-01' },
+                { text: 'PRD', link: '/todo/control-plane-database/PRD' },
+                { text: 'Organisasi dan aturan sharing', link: '/todo/control-plane-database/ORGANIZATION-AND-SHARING' },
+                { text: 'Profil kelompok layanan Faskes', link: '/todo/control-plane-database/SERVICE-GROUP-PROFILES' },
+                { text: 'Stok titipan DEPO dan pembayaran', link: '/todo/control-plane-database/SUPPLY-CUSTODY-AND-PAYMENT' },
+                { text: 'Bukti pola Kuta 1 dan Mengwi 1', link: '/todo/control-plane-database/DATABASE-PATTERN-EVIDENCE' },
+                { text: 'TODO pemisahan', link: '/todo/control-plane-database/TODO' },
+                { text: 'Cutover dan rollback', link: '/todo/control-plane-database/CUTOVER' },
+                { text: 'Referensi dan materi belajar', link: '/todo/control-plane-database/REFERENCES' },
               ],
             },
             {

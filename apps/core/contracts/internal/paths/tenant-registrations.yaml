@@ -1,0 +1,52 @@
+post:
+  tags: [Pusat admin]
+  operationId: internal.tenantRegistrations.store
+  summary: Buat tenant untuk principal yang sudah ada tanpa memasang ERP
+  description: |
+    Memakai action CreateTenant yang sama dengan jalur customer. Tidak membuat akun,
+    role ERP, satuan, entitlement, environment atau module installation. Owner dipilih
+    eksplisit melalui owner_user_id; operator tidak menjadi owner sebagai fallback.
+    requested_by berasal dari session konsol dan harus masih mempunyai provider_admin.
+    Token bersama membuktikan proses konsol, bukan menggantikan pemeriksaan actor.
+
+    Receipt memakai scope actor dan idempotency_key. Replay dengan payload sama
+    memulangkan tenant/membership semula, setelah authorization diperiksa kembali.
+    Payload berbeda pada key yang sama atau slug yang sudah dipakai menghasilkan 409.
+    Replay tidak mengaktifkan tenant atau membership yang sudah ditutup.
+    Membership aktif bukan permission management; catalog pengelolaan mengikuti PF-04.
+  security:
+    - controlPlaneToken: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required: [name, slug, idempotency_key, requested_by, owner_user_id]
+          properties:
+            name: { type: string, maxLength: 255 }
+            slug: { type: string, minLength: 3, maxLength: 63, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' }
+            idempotency_key: { type: string, format: uuid }
+            requested_by: { type: integer, format: int64 }
+            owner_user_id: { type: integer, format: int64 }
+  responses:
+    '201':
+      description: Tenant metadata dan membership committed.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/CanonicalTenantCreation' }
+    '200':
+      description: Replay operation actor yang sama, tanpa write duplikat.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/CanonicalTenantCreation' }
+    '401':
+      description: Token proses tidak sah atau tidak dikonfigurasi.
+    '404':
+      description: Actor tidak berwenang atau principal tidak ditemukan.
+    '409':
+      description: Konflik slug, payload replay, atau state tenant/principal.
+    '422':
+      description: Isian tidak valid atau mencoba menyertakan konfigurasi ERP/privilege.
+    '429':
+      description: Batas permintaan tercapai.

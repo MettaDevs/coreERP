@@ -13,18 +13,17 @@ import { DatePicker } from '@apperp/ui/date-picker';
 import { FormControl } from '@apperp/ui/form-control';
 import { InlineLookup } from '@apperp/ui/inline-lookup';
 import { Input } from '@apperp/ui/input';
-import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import {
     PageDialog,
     PageDialogContent,
     PageDialogToolbar,
     PageDialogBody,
 } from '@apperp/ui/page-dialog';
-import { RecordActionBar } from '@apperp/ui/record-action-bar';
 
 import { Textarea } from '@apperp/ui/textarea';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
 import { useRecordTransition } from '@apperp/ui/use-record-transition';
+import RecordListPage from '../../_shared/RecordListPage';
 import {
     api,
     errorMessage,
@@ -436,18 +435,21 @@ export default function PurchaseRequestPage({
         <>
             {requestTransitionConfirmation}
             {!createCard && (
-                <ListPageLayout
-                    header={
-                        <RecordActionBar title="Permintaan pembelian aset">
-                            {can('create') && (
-                                <ActionButton
-                                    action="create"
-                                    disabled={busy}
-                                    onClick={() => void create()}
-                                />
-                            )}
-                        </RecordActionBar>
-                    }
+                <RecordListPage
+                    toolbar={{
+                        title: 'Permintaan pembelian aset',
+                        children: (
+                            <>
+                                {can('create') && (
+                                    <ActionButton
+                                        action="create"
+                                        disabled={busy}
+                                        onClick={() => void create()}
+                                    />
+                                )}
+                            </>
+                        ),
+                    }}
                 >
                     {!open && error && (
                         <p
@@ -489,7 +491,7 @@ export default function PurchaseRequestPage({
                         }}
                         emptyMessage="Belum ada permintaan pembelian aset."
                     />
-                </ListPageLayout>
+                </RecordListPage>
             )}
             <PageDialog
                 open={open}

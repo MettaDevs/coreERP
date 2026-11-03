@@ -6,10 +6,11 @@ info:
   version: 1.0.0
   description: Dipanggil hanya oleh bridge landing memakai token khusus. Identitas issuer+subject berasal
     dari pertukaran kode OIDC oleh Core. Email_verified dari provider tidak dipercaya; email dibuktikan
-    lewat tautan independen. Surface ini tidak membuat Core User/client/tenant bisnis dan tidak membuka
-    endpoint operator. Kredensial database, owner password dan metta tidak pernah disertakan. /session
-    tanpa sesi customer menjawab authenticated=false. Trial milik customer dibatasi satu per produk, memakai
-    release immutable dan jalur provisioning yang sama dengan console.
+    lewat tautan independen. Surface ini tidak membuka endpoint operator. Login biasa tidak membuat Core
+    User; operation organizations membuat binding principal dan tenant kanonik secara eksplisit, tanpa
+    environment, entitlement atau instalasi ERP. Kredensial database, owner password dan metta tidak pernah
+    disertakan. /session tanpa sesi customer menjawab authenticated=false. Trial milik customer dibatasi
+    satu per produk, memakai release immutable dan jalur provisioning yang sama dengan console.
 servers:
 - url: /api/internal/v1
 security:
@@ -268,6 +269,74 @@ paths:
                 idempotency_key:
                   type: string
                   format: uuid
+  /product-registration/organizations:
+    post:
+      tags:
+      - Product registration
+      operationId: internal.productRegistration.storeOrganization
+      summary: Buat tenant kanonik bagi principal customer tanpa pemasangan ERP
+      description: |
+        Actor dan owner hanya berasal dari X-Registration-Session yang sah. Body tidak
+        dapat memilih user, actor operator, role, entitlement atau environment.
+        Ini metadata tenant kanonik ULID, berbeda dari resource Faskes UUID pada /tenants.
+        Tidak memanggil provisioner fasilitas, membuka enrollment, atau membuat trial.
+
+        Login biasa tidak membuat User. Pada permintaan ini, ProductCustomer diikat secara
+        eksplisit ke User PERSON melalui issuer+subject aktif. Subject yang sama memakai
+        principal yang sama. Principal baru memerlukan email kontak yang telah diverifikasi.
+        Email yang sudah dipakai akun lain tanpa exact identity menghasilkan konflik,
+        bukan auto-link atau email alias. Tautan yang dicabut/mismatched tidak diaktifkan.
+        Membership dan provenance creator belum memberikan permission management PF-04.
+
+        Idempotency actor-scoped dan slug conflict mengikuti tenant-registrations.
+      security:
+      - productRegistrationGateway: []
+        productRegistrationSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - name
+              - slug
+              - idempotency_key
+              properties:
+                name:
+                  type: string
+                  maxLength: 255
+                slug:
+                  type: string
+                  minLength: 3
+                  maxLength: 63
+                  pattern: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+                idempotency_key:
+                  type: string
+                  format: uuid
+      responses:
+        '201':
+          description: Principal binding dan tenant committed tanpa bootstrap ERP.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CanonicalTenantCreation'
+        '200':
+          description: Replay tenant yang sama setelah session/identity/state diperiksa.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CanonicalTenantCreation'
+        '401':
+          description: Gateway atau session tidak sah.
+        '404':
+          description: Gateway tidak dikonfigurasi atau customer tidak ditemukan.
+        '409':
+          description: Konflik identity, email, slug, payload replay atau state tenant.
+        '422':
+          description: Isian tidak valid, contact belum terverifikasi atau field privilege/ERP ditolak.
+        '429':
+          description: Batas permintaan tercapai.
   /product-registration/launch:
     post:
       tags:
@@ -409,6 +478,25 @@ components:
       description: Token opaque sesi customer yang disimpan pada cookie HttpOnly oleh landing. Bukan kredensial
         operator.
   schemas:
+    CanonicalTenantCreation:
+      type: object
+      required:
+      - tenant_id
+      - membership_id
+      - principal_id
+      - replayed
+      properties:
+        tenant_id:
+          type: string
+          format: ulid
+        membership_id:
+          type: string
+          format: ulid
+        principal_id:
+          type: integer
+          format: int64
+        replayed:
+          type: boolean
     ProductRegistrationSession:
       type: object
       required:

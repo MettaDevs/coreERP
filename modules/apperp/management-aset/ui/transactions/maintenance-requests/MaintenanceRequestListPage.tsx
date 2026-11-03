@@ -14,13 +14,11 @@ import {
     EmptyTitle,
 } from '@apperp/ui/empty';
 import { FormControl } from '@apperp/ui/form-control';
-import { Input } from '@apperp/ui/input';
-import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { PageDialog, PageDialogContent } from '@apperp/ui/page-dialog';
-import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
 import { useRecordTransition } from '@apperp/ui/use-record-transition';
+import RecordListPage from '../../_shared/RecordListPage';
 import { useRecordList } from '../../use-record-list';
 import type { RecordCardState } from '../_shared/record-card';
 import type { Context } from './maintenanceRequest';
@@ -195,52 +193,45 @@ export default function MaintenanceRequestListPage({
     return (
         <>
             {changesTransitionConfirmation}
-            <ListPageLayout
-                header={
-                    <RecordActionBar title="Permintaan pemeliharaan">
-                        {can('create') && (
-                            <ActionButton
-                                action="create"
-                                type="button"
-                                onClick={openNewRequest}
-                            />
-                        )}
-                    </RecordActionBar>
-                }
+            <RecordListPage
+                toolbar={{
+                    title: 'Permintaan pemeliharaan',
+                    search: {
+                        value: search,
+                        onValueChange: setSearch,
+                        label: 'Cari',
+                        placeholder: 'Nomor, aset, lokasi, atau deskripsi',
+                    },
+                    children: (
+                        <>
+                            {can('create') && (
+                                <ActionButton
+                                    action="create"
+                                    type="button"
+                                    onClick={openNewRequest}
+                                />
+                            )}
+                        </>
+                    ),
+                }}
                 filters={
-                    <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
-                        <div className="w-full sm:w-72">
-                            <FormControl>
-                                <Input
-                                    label="Cari"
-                                    type="search"
-                                    placeholder="Nomor, aset, lokasi, atau deskripsi"
-                                    value={search}
-                                    onChange={(event) =>
-                                        setSearch(event.target.value)
-                                    }
-                                />
-                            </FormControl>
-                        </div>
-                        <div className="w-full sm:w-52">
-                            <FormControl>
-                                <Select
-                                    label="Status"
-                                    items={STATUS_FILTER}
-                                    value={status || ALL}
-                                    ariaLabel="Saring berdasarkan status"
-                                    onValueChange={(value) => {
-                                        setStatus(
-                                            !value || value === ALL
-                                                ? ''
-                                                : value,
-                                        );
-                                    }}
-                                />
-                            </FormControl>
-                        </div>
-                    </div>
+                    <>
+                        <FormControl>
+                            <Select
+                                label="Status"
+                                items={STATUS_FILTER}
+                                value={status || ALL}
+                                ariaLabel="Saring berdasarkan status"
+                                onValueChange={(value) => {
+                                    setStatus(
+                                        !value || value === ALL ? '' : value,
+                                    );
+                                }}
+                            />
+                        </FormControl>
+                    </>
                 }
+                filtersActive={Boolean(status)}
             >
                 {!loading && !visible.length ? (
                     <Empty>
@@ -285,7 +276,7 @@ export default function MaintenanceRequestListPage({
                         }}
                     />
                 )}
-            </ListPageLayout>
+            </RecordListPage>
             {card && (
                 <PageDialog
                     open

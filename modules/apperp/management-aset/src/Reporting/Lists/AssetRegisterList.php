@@ -117,7 +117,7 @@ final class AssetRegisterList implements ListExportSource
         }
 
         /** @var Builder<Aset> $query */
-        $query = app(OrganizationScope::class)->asetQuery(Aset::query(), $context->request());
+        $query = app(OrganizationScope::class)->asetQuery(Aset::withoutGlobalScope('actual'), $context->request());
         $q = trim(is_string($filters['q'] ?? null) ? $filters['q'] : '');
         RecordSearch::apply($query, ['aset_tr_aset.kode', 'aset_tr_aset.nama', 'aset_tr_aset.serial_number'], $q, ['aset_tr_aset.kode', 'aset_tr_aset.serial_number']);
 

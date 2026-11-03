@@ -2,6 +2,7 @@
 
 namespace Modules\Apperp\ManagementAset\Http\Controllers\transaksi\PerencanaanAset;
 
+use App\Platform\Modules\Contracts\DataPolicyFilter;
 use App\Platform\Modules\Contracts\FundingSourceDirectory;
 use App\Platform\Modules\Contracts\IncrementalList;
 use App\Platform\Modules\Contracts\NumberSequenceIssuer;
@@ -10,6 +11,7 @@ use App\Platform\Modules\Contracts\PlanningYearDirectory;
 use App\Platform\Modules\Contracts\RowVersion;
 use Brick\Math\BigDecimal;
 use Brick\Math\RoundingMode;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,7 +20,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Modules\Apperp\ManagementAset\Http\Controllers\Controller;
-use Modules\Apperp\ManagementAset\Models\master\JenisAset;
+use Modules\Apperp\ManagementAset\Models\transaksi\InventarisasiAset\Aset;
 use Modules\Apperp\ManagementAset\Models\transaksi\PerencanaanAset\PerencanaanAset;
 use Modules\Apperp\ManagementAset\Models\transaksi\PerencanaanAset\PerencanaanAsetDetail;
 use Modules\Apperp\ManagementAset\Models\transaksi\PermintaanPengadaanAset\PermintaanPengadaanAsetDetail;
@@ -139,7 +141,7 @@ class PerencanaanAsetController extends Controller
         $data = $this->validated($request);
         app(PlanningOrganizationScope::class)->require($request, $data['legal_entity_id'], $data['planning_org_unit_id']);
         $this->validateFundingSources($tenant, $data['details']);
-        $unitMap = $this->validateLookupMasters($tenant, $data['details'], $units);
+        $unitMap = $this->resolveUnits($tenant, $data['details'], $units);
         try {
             DB::transaction(function () use ($request, $data, $key, $tenant, $numbers, $unitMap): void {
                 $code = $numbers->issue('management-aset.perencanaan-aset', $tenant, 'perencanaan-aset:'.$key, $data['legal_entity_id'], manualValue: filled($data['kode'] ?? null) ? trim($data['kode']) : null);
@@ -170,14 +172,15 @@ class PerencanaanAsetController extends Controller
         $this->guard($request, 'update');
         $plan = $this->plan($request, $id);
         abort_unless($plan->status === 'draft', 422, 'Hanya rencana draf yang dapat diubah.');
-        $data = $this->validated($request, $id);
-        if ($data['legal_entity_id'] !== $plan->legal_entity_id) {
+        $company = $request->validate(['legal_entity_id' => ['required', 'ulid']])['legal_entity_id'];
+        if ($company !== $plan->legal_entity_id) {
             throw ValidationException::withMessages(['legal_entity_id' => 'Perusahaan dokumen tersimpan tidak dapat dipindahkan.']);
         }
+        $data = $this->validated($request, $id);
         app(OrganizationScope::class)->require($request, $plan->legal_entity_id, $plan->planning_org_unit_id);
         app(OrganizationScope::class)->require($request, $data['legal_entity_id'], $data['planning_org_unit_id']);
         $this->validateFundingSources($this->tenant($request), $data['details'], $id);
-        $unitMap = $this->validateLookupMasters($this->tenant($request), $data['details'], $units);
+        $unitMap = $this->resolveUnits($this->tenant($request), $data['details'], $units);
         $version = RowVersion::expected($request);
 
         DB::transaction(function () use ($request, $id, $version, $data, $unitMap): void {
@@ -233,6 +236,24 @@ class PerencanaanAsetController extends Controller
         return $record;
     }
 
+    /**
+     * Jalur lintas perusahaan eksplisit milik form rencana; tidak mengubah tempat kerja.
+     *
+     * @return Builder<Aset>
+     */
+    private function selectedAssetsQuery(Request $request, string $companyId): Builder
+    {
+        abort_unless(in_array('management-aset.aset.read', $request->attributes->get('coreerp.permissions', []), true), 403);
+        app(PlanningOrganizationScope::class)->require($request, $companyId);
+        $query = Aset::withoutGlobalScope('actual')->where('legal_entity_id', $companyId);
+
+        DataPolicyFilter::apply($query,
+            $request->attributes->get('coreerp.data_policies', [])['management-aset.asset-responsibility'] ?? ['all' => false, 'scope_grants' => []],
+            'legal_entity_id', 'responsible_org_unit_id');
+
+        return $query;
+    }
+
     /** @return array<string, mixed> */
     private function validated(Request $request, ?string $planId = null): array
     {
@@ -248,7 +269,7 @@ class PerencanaanAsetController extends Controller
             'details.*.id' => ['nullable', 'ulid', 'distinct'],
             'details.*.needed_on' => ['required', 'date_format:Y-m-d'],
             'details.*.funding_source_id' => ['required', 'ulid'],
-            'details.*.jenis_aset_id' => ['required', 'ulid'],
+            'details.*.planned_asset_id' => ['required', 'ulid'],
             'details.*.satuan_id' => ['required', 'ulid'],
             'details.*.quantity' => ['required', 'numeric', 'gt:0'],
             'details.*.requested_specification' => ['required', 'string', 'max:2000'],
@@ -272,6 +293,19 @@ class PerencanaanAsetController extends Controller
             throw ValidationException::withMessages(['responsible_user_id' => 'Pilih penanggung jawab dari anggota yang masih aktif.']);
         }
 
+        $assets = $this->selectedAssetsQuery($request, $data['legal_entity_id'])
+            ->whereIn('id', array_column($data['details'], 'planned_asset_id'))->get(['id', 'kode', 'nama', 'jenis_aset_id'])->keyBy('id');
+        foreach ($data['details'] as $index => &$detail) {
+            $asset = $assets->get($detail['planned_asset_id']);
+            if ($asset === null) {
+                throw ValidationException::withMessages(['details.'.$index.'.planned_asset_id' => 'Pilih aset sebagai perencanaan dari perusahaan dokumen yang dapat Anda akses.']);
+            }
+            $detail['jenis_aset_id'] = $asset->jenis_aset_id;
+            $detail['planned_asset_code'] = $asset->kode;
+            $detail['nama_aset'] = $asset->nama;
+        }
+        unset($detail);
+
         return $data;
     }
 
@@ -279,13 +313,8 @@ class PerencanaanAsetController extends Controller
      * @param  list<array<string, mixed>>  $details
      * @return array<string, array{id: string, code: string, name: string, symbol: ?string, decimal_places: int}>
      */
-    private function validateLookupMasters(string $tenant, array $details, AssetUnitOfMeasureDirectory $units): array
+    private function resolveUnits(string $tenant, array $details, AssetUnitOfMeasureDirectory $units): array
     {
-        $ids = array_values(array_unique(array_column($details, 'jenis_aset_id')));
-        $count = JenisAset::query()->whereIn('id', $ids)->where('aktif', true)->count();
-        if ($count !== count($ids)) {
-            throw ValidationException::withMessages(['details' => 'Jenis aset tidak ditemukan atau sudah tidak aktif.']);
-        }
         try {
             return $units->resolve($tenant, array_values(array_unique(array_column($details, 'satuan_id'))));
         } catch (RuntimeException) {
@@ -339,7 +368,6 @@ class PerencanaanAsetController extends Controller
      */
     private function replaceDetails(string $planId, array $details, array $units): void
     {
-        $types = JenisAset::query()->whereIn('id', array_column($details, 'jenis_aset_id'))->pluck('nama', 'id');
         $existing = PerencanaanAsetDetail::query()->where('planning_id', $planId)->get()->keyBy('id');
         $nextNumber = (int) PerencanaanAsetDetail::withTrashed()->where('planning_id', $planId)->max('line_number');
         $tenantId = (string) PerencanaanAset::query()->whereKey($planId)->value('tenant_id');
@@ -360,7 +388,8 @@ class PerencanaanAsetController extends Controller
             $line->fill([
                 'planning_id' => $planId, 'line_number' => $line->exists ? $line->line_number : ++$nextNumber,
                 'jenis_aset_id' => $detail['jenis_aset_id'], 'satuan_id' => $detail['satuan_id'],
-                'nama_aset' => $types[$detail['jenis_aset_id']],
+                'nama_aset' => $detail['nama_aset'],
+                'planned_asset_id' => $detail['planned_asset_id'], 'planned_asset_code' => $detail['planned_asset_code'],
                 // `unit` snapshot kode satuan untuk tampilan; `satuan_id` di atas yang menunjuk
                 // satuan milik Core. Keduanya tidak saling menggantikan.
                 'unit' => $units[$detail['satuan_id']]['name'],

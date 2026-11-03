@@ -4,6 +4,37 @@ Halaman ini untuk developer. Isinya dokumen rencana pengadaan aset — yang dibu
 
 Rencana aset adalah daftar barang yang akan diadakan beserta jumlah dan satuannya. Ia belum menjadi aset; aset baru lahir saat barangnya diterima.
 
+## Aset sebagai perencanaan dan padanan Business Central
+
+Rincian memakai satu field **Aset sebagai perencanaan**, yang memilih record dari register Inventarisasi aset. Barang yang belum ada dapat dibuat sebagai aset rencana dari aksi Baru pada lookup yang sama atau dari Inventarisasi. Tidak ada pilihan jenis/aset acuan kedua pada rincian: jenis dan nama diturunkan server dari aset terpilih. Spesifikasi kebutuhan, jumlah, satuan, sumber dana, tanggal kebutuhan, serta estimasi tetap milik dokumen rencana.
+
+Pilihan baru wajib membawa `planned_asset_id`; baris lama tanpa pilihan aset harus dilengkapi sebelum diubah. `planned_asset_code`, `nama_aset`, dan `jenis_aset_id` menyimpan identitas saat baris disimpan. Mengganti perusahaan draft mengosongkan pilihan aset, tanpa membuang spesifikasi dan isian kebutuhan lainnya.
+
+### Source Business Central yang diperiksa
+
+Pada BCApps lokal commit `777e102e90`, `Inventory/Requisition/ReqWorksheet.Page.al` (page 291) memakai No. dari master Item, Quantity, dan Due Date. `RequisitionLine.Table.al` menghubungkan No. ke Item ketika Type = Item. Sementara itu `FixedAssets/FixedAsset/FixedAssetCard.Page.al` menyediakan Budgeted Asset, dan `FAJournalLine.Table.al` mengharuskan Budgeted FA No. menunjuk kartu bertanda Budgeted Asset. Path tersebut relatif terhadap `src/Layers/W1/BaseApp`.
+
+Pilihan pengguna mengikuti konsep [Budgeted Fixed Asset BC](https://learn.microsoft.com/en-us/dynamics365/business-central/fa-how-manage-budgets): identitas aset dapat dibuat sebelum barang diperoleh. Perencanaan CoreERP mengacu langsung ke register aset yang sama. [Requisition Worksheet BC](https://learn.microsoft.com/en-us/dynamics365/business-central/production-about-planning-functionality) tetap menjadi pembanding alur kebutuhan barang, bukan alasan mempertahankan pemilih klasifikasi pada rincian. Perhitungan proyeksi penyusutan anggaran BC belum menjadi fitur perubahan ini.
+
+| Kemampuan | Keputusan |
+| --- | --- |
+| Resource/lifecycle | `aset_tr_aset.is_budgeted` dan status `budgeted`; identitas rencana tersimpan pada register yang sama |
+| Tenant/perusahaan/unit | Aset dan dokumen harus satu tenant/perusahaan; kebijakan tanggung jawab tetap diterapkan pada pemilihan dan penyimpanan |
+| Security | Perencanaan memakai `aset.read`; Baru memakai `aset.create`, koreksi kartu rencana memakai `aset.update` |
+| Nomor | Memakai reference `management-aset.asset-code` yang sama; tanggal pembuatan dipakai untuk konteks tahun sebelum ada perolehan aktual |
+| Workflow | Tidak ada approval baru; membuat kartu rencana tidak menerima atau mengaktifkan barang |
+| API/audit | Lookup memakai GET aset; kartu rencana dan pilihan pada dokumen tetap diaudit sebagai record module |
+
+### Batas dengan aset aktual
+
+Aset rencana dibuat tanpa tanggal perolehan/pemakaian, mata uang aktual, buku penyusutan, penempatan fisik, maupun ledger. Nilai perolehan aktualnya nol. Label penandanya adalah **Aset sebagai perencanaan**. Penanda tidak dapat diubah pada kartu tersimpan. Penerimaan tetap membuat aset aktual terpisah dan menelusuri kebutuhan asal melalui permintaan serta baris rencana; kartu rencana tidak menjadi barang aktual hanya karena disimpan atau diubah.
+
+Query model Aset menyaring aset rencana dari pemrosesan aktual melalui scope `actual`. Register, ekspor register, pembacaan kartu, dan lookup perencanaan membuka scope ini secara eksplisit sambil tetap mempertahankan tenant dan kebijakan organisasi. Database menolak pembuatan/perubahan buku penyusutan dan penambahan ledger aktual yang menunjuk aset rencana, serta menolak perubahan flag menjadi aktual. Perolehan fisik tetap melalui dokumen penerimaan. Ini mencegah API yang dipanggil langsung melewati penanda UI.
+
+`GET aset?planning_company_id=...` adalah pilihan perusahaan eksplisit pada form perencanaan. Ia memerlukan izin create/update perencanaan dan `aset.read`, tetap menyaring tenant serta unit yang boleh diakses, dan tidak mengganti perusahaan aktif. Query register biasa tetap mengikuti perusahaan aktif. `record_ids`, pencarian, dan cursor tidak memperluas batas tersebut.
+
+Kartu rencana dibuat melalui `POST aset` dengan `is_budgeted: true` dan Idempotency-Key; diperbarui melalui `PATCH aset/{id}/planning` dengan version. Isian nilai/tanggal aktual dilarang. Kedua layar memakai `BudgetedAssetCard`; tidak ada form pembuat kedua di perencanaan. Regresinya berada di `PerencanaanAsetTest`, termasuk penolakan buku dan ledger lewat SQL langsung.
+
 ## Baseline tahunan
 
 `planned_on` adalah **Tanggal dokumen**, sedangkan `planning_year_id` menunjuk master **Tahun Rencana** Foundation milik perusahaan dokumen. `planning_year` menyimpan angka tahun dari master sebagai snapshot, bukan input bebas. Dokumen pada Oktober 2026 boleh berisi kebutuhan 2027. Setiap baris membawa `needed_on` yang wajib berada dalam angka tahun tersebut. Tahun Rencana tetap kalender Januari–Desember dan terpisah dari tahun buku; tidak ada daftar tahun buatan browser. Master dibuat sesuai kebutuhan melalui kartu Foundation. Tahun nonaktif hilang dari pilihan baru, tetapi dokumen yang sudah menunjuknya dapat mempertahankan referensi tersebut. Angka tahun master tidak dapat diubah maknanya setelah dibuat.
@@ -120,12 +151,7 @@ baris draft, dan mode fokus dengan total perkiraan di bawah tabel. Mode fokus me
 draft yang sama dan tidak menyimpan dokumen. Baris tetap memakai key klien yang stabil
 hingga mendapat ID tersimpan.
 
-Pemilih jenis aset bersama modul membaca master lewat daftar bertahap yang sama
-dengan lookup. Pilihan tetap dipertahankan saat pencarian berubah. Menambahkan
-pilihan mengganti baris kosong yang belum disentuh terlebih dahulu, lalu menambah
-baris baru; baris yang sudah diisi dipertahankan. Satu jenis boleh muncul lagi untuk
-spesifikasi berbeda. Pemilih hanya mengisi jenis aset; satuan, sumber dana, tanggal
-kebutuhan, dan estimasi tidak ditebak dari klasifikasi tersebut.
+Pemilihan aset memakai loader bertahap register yang sama. Baru membuka kartu aset rencana Inventarisasi dan hasil simpan langsung dipilih pada baris yang memintanya. Perubahan perusahaan membatalkan sumber lookup lama dan mengosongkan aset terpilih. Satu aset dapat menjadi dasar lebih dari satu baris kebutuhan; jumlah pada rencana bukan perubahan jumlah barang yang sudah tercatat.
 
 ## Di mana kodenya
 
@@ -134,8 +160,8 @@ kebutuhan, dan estimasi tidak ditebak dari klasifikasi tersebut.
 | `src/Http/Controllers/transaksi/PerencanaanAset/PerencanaanAsetController.php` | Seluruh logika |
 | `src/Services/AssetUnitOfMeasureDirectory.php` | Satuan dari Core |
 | `ui/transactions/perencanaan-aset/PlanningPage.tsx` | Layar |
-| `ui/transactions/perencanaan-aset/planning-lines.ts` | Penyusunan baris dari pilihan jenis aset |
-| `ui/master/AssetTypePicker.tsx` | Pemilih banyak jenis aset untuk perencanaan dan penerimaan |
+| `ui/transactions/perencanaan-aset/planning-lines.ts` | Draft baris dan pengosongan pilihan aset saat perusahaan berubah |
+| `ui/transactions/inventarisasi-aset/BudgetedAssetCard.tsx` | Kartu aset rencana yang dipakai register dan lookup |
 
 ## Halaman terkait
 

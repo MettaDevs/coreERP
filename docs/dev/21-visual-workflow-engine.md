@@ -1,6 +1,13 @@
 # Visual Workflow Engine
 
-CoreERP menyediakan layanan alur persetujuan terpusat (**Visual Workflow Engine**) yang berjalan di Control Plane. Aplikasi bisnis tidak membangun mesin persetujuan (*approval engine*) atau antrian task sendiri; mereka mendeklarasikan tipe workflow pada manifest, menyerahkan instansiasi dokumen ke Core, dan mendengarkan event keputusan yang diterbitkan Core.
+::: info Arah engine proses bisnis
+Pemilik memilih **Flowable** pada 31 Oktober 2026 untuk proses bisnis visual yang dapat
+dikonfigurasi per tenant dan dikoordinasikan lintas module. Pilihan ini menggantikan rencana
+Temporal. [Rencana integrasi Flowable](/todo/workflow-temporal/) masih backlog; keputusan engine
+bukan bukti dependency terpasang atau runtime approval di bawah sudah dimigrasikan.
+:::
+
+CoreERP menyediakan layanan alur persetujuan terpusat (**Visual Workflow Engine**) yang berjalan di Control Plane. Aplikasi bisnis tidak membangun mesin persetujuan (_approval engine_) atau antrian task sendiri; mereka mendeklarasikan tipe workflow pada manifest, menyerahkan instansiasi dokumen ke Core, dan mendengarkan event keputusan yang diterbitkan Core.
 
 ```mermaid
 sequenceDiagram
@@ -31,9 +38,9 @@ sequenceDiagram
 
 ## Prinsip Utama
 
-1. **App Bisnis tidak menyimpan approver.** App bisnis hanya mengetahui bahwa dokumen membutuhkan persetujuan dan mengirim konteks data keputusan (*decision context*). Siapa yang menyetujui, berapa tahapan (*step*), dan batas nominal persetujuan adalah konfigurasi admin tenant di Core.
+1. **App Bisnis tidak menyimpan approver.** App bisnis hanya mengetahui bahwa dokumen membutuhkan persetujuan dan mengirim konteks data keputusan (_decision context_). Siapa yang menyetujui, berapa tahapan (_step_), dan batas nominal persetujuan adalah konfigurasi admin tenant di Core.
 2. **Asinkron dan Idempoten.** Keputusan persetujuan dapat terjadi beberapa menit hingga berhari-hari kemudian. App bisnis menyimpan `workflow_instance_id` sejak awal dan mendengarkan event bertanda tangan `core.workflow.decision.v2`.
-3. **Pemisahan Tugas (*Segregation of Duties / SoD*).** Pembuat dokumen (*initiator*) secara struktural dicegah menyetujui dokumennya sendiri pada step yang sama.
+3. **Pemisahan Tugas (_Segregation of Duties / SoD_).** Pembuat dokumen (_initiator_) secara struktural dicegah menyetujui dokumennya sendiri pada step yang sama.
 
 ---
 
@@ -43,24 +50,25 @@ Setiap aplikasi yang memiliki proses persetujuan wajib mendeklarasikan `workflow
 
 ```yaml
 workflow_types:
-  - code: management-aset.dekomisioning-aset-verification
-    name: Verifikasi usulan dekomisioning aset
-    decision_context_schema:
-      type: object
-      required: [document_id, asset_id, nilai_buku]
-      properties:
-        document_id:
-          type: string
-        asset_id:
-          type: string
-        nilai_buku:
-          type: number
+    - code: management-aset.dekomisioning-aset-verification
+      name: Verifikasi usulan dekomisioning aset
+      decision_context_schema:
+          type: object
+          required: [document_id, asset_id, nilai_buku]
+          properties:
+              document_id:
+                  type: string
+              asset_id:
+                  type: string
+              nilai_buku:
+                  type: number
 ```
 
 ### Kolom Deklarasi:
-* `code`: Kode unik global berformat `<app-id>.<workflow-identifier>`.
-* `name`: Nama alur yang dipahami oleh administrator bisnis.
-* `decision_context_schema`: Skema JSON yang memvalidasi data kontekstual yang dikirim aplikasi saat memicu workflow. Kolom di dalam skema ini dapat dipakai sebagai variabel kondisi pada editor visual Core.
+
+- `code`: Kode unik global berformat `<app-id>.<workflow-identifier>`.
+- `name`: Nama alur yang dipahami oleh administrator bisnis.
+- `decision_context_schema`: Skema JSON yang memvalidasi data kontekstual yang dikirim aplikasi saat memicu workflow. Kolom di dalam skema ini dapat dipakai sebagai variabel kondisi pada editor visual Core.
 
 ---
 
@@ -78,10 +86,11 @@ graph LR
 ```
 
 ### Tipe Assignee yang Didukung:
+
 1. **Specific User**: Mengarahkan task ke satu anggota tenant tertentu (`user_id`).
 2. **Security Role**: Mengarahkan task ke seluruh anggota yang memegang role tertentu (misal: `Asset Manager`). Siapa pun pemegang role dapat mengklaim dan memutuskan.
 3. **Position (via HR)**: Mengarahkan task ke posisi spesifik (misal: `Kepala Cabang`) yang datanya diterbitkan oleh modul Human Resources.
-4. **Hierarki Organisasi**: Menelusuri rantai pelaporan unit kerja ke atas (*managerial hierarchy*).
+4. **Hierarki Organisasi**: Menelusuri rantai pelaporan unit kerja ke atas (_managerial hierarchy_).
 
 ---
 
@@ -130,41 +139,43 @@ Setelah seluruh tahapan persetujuan selesai atau ditolak, Core menerbitkan event
 
 ```json
 {
-  "specversion": "1.0",
-  "id": "01JMB8W9EVT001",
-  "source": "core.workflow",
-  "type": "core.workflow.decision.v2",
-  "time": "2026-08-19T10:30:00Z",
-  "tenant_id": "01JMB8W3Z9E4T0K1M9P5A2Q3R1",
-  "datacontenttype": "application/json",
-  "data": {
-    "instance_id": "01JMB8W9INST123",
-    "workflow_type_code": "management-aset.dekomisioning-aset-verification",
-    "document_id": "01JMB8W9DOC456",
-    "decision": "approved",
-    "decided_by_user_id": "01JMB8W9USR789",
-    "decided_at": "2026-08-19T10:30:00Z",
-    "notes": "Disetujui untuk pemusnahan unit rusak total.",
-    "decision_context": {
-      "asset_id": "01JMB8W2X5N8V1B7K3P9M0Q2W4",
-      "nilai_buku": 0
+    "specversion": "1.0",
+    "id": "01JMB8W9EVT001",
+    "source": "core.workflow",
+    "type": "core.workflow.decision.v2",
+    "time": "2026-08-19T10:30:00Z",
+    "tenant_id": "01JMB8W3Z9E4T0K1M9P5A2Q3R1",
+    "datacontenttype": "application/json",
+    "data": {
+        "instance_id": "01JMB8W9INST123",
+        "workflow_type_code": "management-aset.dekomisioning-aset-verification",
+        "document_id": "01JMB8W9DOC456",
+        "decision": "approved",
+        "decided_by_user_id": "01JMB8W9USR789",
+        "decided_at": "2026-08-19T10:30:00Z",
+        "notes": "Disetujui untuk pemusnahan unit rusak total.",
+        "decision_context": {
+            "asset_id": "01JMB8W2X5N8V1B7K3P9M0Q2W4",
+            "nilai_buku": 0
+        }
     }
-  }
 }
 ```
 
 ### Nilai Keputusan (`decision`):
-* `approved`: Seluruh step persetujuan berhasil disetujui. App bisnis melanjutkan mutasi status ke tahap berikutnya (misal: aset menjadi `decommissioned`).
-* `rejected`: Salah satu step menolak usulan. Dokumen kembali ke draf atau dibatalkan.
-* `cancelled`: Workflow dibatalkan oleh permohonan pembuat dokumen.
+
+- `approved`: Seluruh step persetujuan berhasil disetujui. App bisnis melanjutkan mutasi status ke tahap berikutnya (misal: aset menjadi `decommissioned`).
+- `rejected`: Salah satu step menolak usulan. Dokumen kembali ke draf atau dibatalkan.
+- `cancelled`: Workflow dibatalkan oleh permohonan pembuat dokumen.
 
 ---
 
 ## 5. Inbox Persetujuan Terpusat (`/workflow-inbox`)
 
 Pengguna tidak perlu memeriksa aplikasi bisnis satu per satu untuk mengetahui persetujuan yang tertahan. Control Plane menyediakan **Workflow Inbox** terpusat di `/workflow-inbox`:
-* Menampilkan seluruh work item yang ditugaskan ke user atau role miliknya lintas seluruh aplikasi bisnis.
-* Menyediakan pratinjau ringkasan dokumen dan tombol aksi instan: **Setujui (*Approve*)**, **Tolak (*Reject*)**, dan **Delegasikan (*Delegate*)**.
+
+- Menampilkan seluruh work item yang ditugaskan ke user atau role miliknya lintas seluruh aplikasi bisnis.
+- Menyediakan pratinjau ringkasan dokumen dan tombol aksi instan: **Setujui (_Approve_)**, **Tolak (_Reject_)**, dan **Delegasikan (_Delegate_)**.
 
 ---
 
@@ -230,15 +241,15 @@ parameter persetujuan mandiri tenant bagi tipe workflow lain.
 
 ## Di mana kodenya
 
-| Berkas | Isinya |
-| --- | --- |
-| `apps/core/app/Foundation/Workflow/Http/Controllers/WorkflowConfigurationController.php` | Manajemen konfigurasi dan editor graf workflow |
-| `apps/core/app/Foundation/Workflow/Http/Controllers/Internal/InternalWorkflowInstanceController.php` | Endpoint internal `/internal/v1/workflows/instances` |
-| `apps/core/app/Foundation/Workflow/Http/Controllers/WorkflowInboxController.php` | Pengelolaan work items dan inbox persetujuan |
-| `apps/core/resources/js/pages/settings/workflows.tsx` | Layar daftar konfigurasi workflow per tipe |
-| `apps/core/resources/js/pages/settings/workflow-editor.tsx` | Editor kanvas visual untuk menyusun step dan rule kondisi |
-| `apps/core/resources/js/pages/workflow-inbox.tsx` | Layar antrian inbox persetujuan terpusat |
-| `apps/core/contracts/asyncapi.yaml` | Kontrak event `core.workflow.decision.v2` |
+| Berkas                                                                                               | Isinya                                                    |
+| ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `apps/core/app/Foundation/Workflow/Http/Controllers/WorkflowConfigurationController.php`             | Manajemen konfigurasi dan editor graf workflow            |
+| `apps/core/app/Foundation/Workflow/Http/Controllers/Internal/InternalWorkflowInstanceController.php` | Endpoint internal `/internal/v1/workflows/instances`      |
+| `apps/core/app/Foundation/Workflow/Http/Controllers/WorkflowInboxController.php`                     | Pengelolaan work items dan inbox persetujuan              |
+| `apps/core/resources/js/pages/settings/workflows.tsx`                                                | Layar daftar konfigurasi workflow per tipe                |
+| `apps/core/resources/js/pages/settings/workflow-editor.tsx`                                          | Editor kanvas visual untuk menyusun step dan rule kondisi |
+| `apps/core/resources/js/pages/workflow-inbox.tsx`                                                    | Layar antrian inbox persetujuan terpusat                  |
+| `apps/core/contracts/asyncapi.yaml`                                                                  | Kontrak event `core.workflow.decision.v2`                 |
 
 ---
 

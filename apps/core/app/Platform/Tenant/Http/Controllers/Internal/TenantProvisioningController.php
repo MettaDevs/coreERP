@@ -6,10 +6,10 @@ namespace App\Platform\Tenant\Http\Controllers\Internal;
 
 use App\Http\Controllers\Controller;
 use App\Platform\Environment\Models\Environment;
+use App\Platform\Identity\Models\User;
 use App\Platform\Identity\Support\TemporaryPassword;
 use App\Platform\Tenant\Actions\RegisterBusiness;
 use App\Platform\Tenant\Http\Requests\Internal\TenantProvisioningRequest;
-use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -31,7 +31,7 @@ final class TenantProvisioningController extends Controller
     {
         $temporaryPassword = TemporaryPassword::generate();
 
-        $owner = $registerBusiness->handle([
+        $creation = $registerBusiness->forOperator([
             'name' => $request->string('admin_name')->toString(),
             'email' => $request->string('admin_email')->toString(),
             'password' => $temporaryPassword,
@@ -41,13 +41,9 @@ final class TenantProvisioningController extends Controller
             'first_environment' => $request->firstEnvironment(),
             'first_environment_expires_at' => $request->firstEnvironmentExpiresAt(),
             'first_environment_hosting' => $request->firstEnvironmentHosting(),
-        ]);
-
-        $membership = TenantMembership::query()
-            ->where('user_id', $owner->id)
-            ->whereHas('roleAssignments.role', fn ($query) => $query->where('is_owner', true))
-            ->latest('created_at')
-            ->firstOrFail();
+        ], $request->filled('requested_by') ? User::query()->findOrFail($request->integer('requested_by')) : null);
+        $owner = $creation->principal;
+        $membership = $creation->membership;
 
         /*
          * Lingkungan pertamanya — dan ia boleh TIDAK ADA.

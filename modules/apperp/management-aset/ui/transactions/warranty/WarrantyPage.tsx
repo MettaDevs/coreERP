@@ -24,13 +24,13 @@ import {
     PageDialogClose,
     PageDialogBody,
 } from '@apperp/ui/page-dialog';
-import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Select } from '@apperp/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@apperp/ui/tabs';
 import { Textarea } from '@apperp/ui/textarea';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
 import { useRecordTransition } from '@apperp/ui/use-record-transition';
 import { day, money } from '../../_shared/format';
+import RecordListPage from '../../_shared/RecordListPage';
 import { RecordLookup } from '../../_shared/RecordLookup';
 import { RecordMultiLookup } from '../../_shared/RecordMultiLookup';
 import { useVendors } from '../../_shared/useVendors';
@@ -689,183 +689,212 @@ export default function WarrantyPage({
     });
 
     return (
-        <Tabs ref={pageFeedbackScopeRef} value={tab} onValueChange={setTab}>
+        <Tabs
+            ref={pageFeedbackScopeRef}
+            value={tab}
+            onValueChange={setTab}
+            className="h-full min-h-0 overflow-hidden"
+        >
             {warrantyTransitionConfirmation}
             {contractTransitionConfirmation}
-            <RecordActionBar
-                feedback={pageFeedbackSummary}
-                title="Garansi dan kontrak servis"
+            <RecordListPage
+                toolbar={{
+                    feedback: pageFeedbackSummary,
+                    title: 'Garansi dan kontrak servis',
+                    children: (
+                        <>
+                            {tab === 'garansi' &&
+                                can('garansi-aset.create') && (
+                                    <ActionButton
+                                        action="create"
+                                        type="button"
+                                        onClick={newWarranty}
+                                    />
+                                )}
+                            {tab === 'kontrak' &&
+                                can('kontrak-servis.create') && (
+                                    <ActionButton
+                                        action="create"
+                                        type="button"
+                                        disabled={!context.legal_entity_id}
+                                        onClick={newContract}
+                                    />
+                                )}
+                            <TabsList>
+                                {can('garansi-aset.read') && (
+                                    <TabsTrigger value="garansi">
+                                        Garansi
+                                    </TabsTrigger>
+                                )}
+                                {can('kontrak-servis.read') && (
+                                    <TabsTrigger value="kontrak">
+                                        Kontrak servis
+                                    </TabsTrigger>
+                                )}
+                                <TabsTrigger value="berakhir">
+                                    Akan berakhir
+                                </TabsTrigger>
+                            </TabsList>
+                        </>
+                    ),
+                }}
             >
-                {tab === 'garansi' && can('garansi-aset.create') && (
-                    <ActionButton
-                        action="create"
-                        type="button"
-                        onClick={newWarranty}
-                    />
-                )}
-                {tab === 'kontrak' && can('kontrak-servis.create') && (
-                    <ActionButton
-                        action="create"
-                        type="button"
-                        disabled={!context.legal_entity_id}
-                        onClick={newContract}
-                    />
-                )}
-                <TabsList>
-                    {can('garansi-aset.read') && (
-                        <TabsTrigger value="garansi">Garansi</TabsTrigger>
-                    )}
-                    {can('kontrak-servis.read') && (
-                        <TabsTrigger value="kontrak">
-                            Kontrak servis
-                        </TabsTrigger>
-                    )}
-                    <TabsTrigger value="berakhir">Akan berakhir</TabsTrigger>
-                </TabsList>
-            </RecordActionBar>
+                <TabsContent
+                    value="garansi"
+                    className="min-h-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col"
+                >
+                    {warranties !== null &&
+                    warranties.length === 0 &&
+                    !warrantyList.error ? (
+                        <Empty>
+                            <EmptyHeader>
+                                <EmptyTitle>
+                                    Belum ada garansi tercatat
+                                </EmptyTitle>
+                                <EmptyDescription>
+                                    Catat garansi dari vendor atau pabrikan
+                                    supaya perbaikan selama masa garansi
+                                    diarahkan ke penjaminnya.
+                                </EmptyDescription>
+                            </EmptyHeader>
+                        </Empty>
+                    ) : (
+                        <DataTable
+                            columns={warrantyColumns}
+                            incremental={warrantyList}
+                            sort={warrantyList.sort}
+                            onSortChange={warrantyList.onSortChange}
+                            data={warranties ?? []}
+                            getRowKey={(row) => row.id}
+                            getRowLabel={(row) => row.aset_kode}
+                            actions={[
+                                ...(can('garansi-aset.update')
+                                    ? [{ id: 'ubah', label: 'Ubah' }]
+                                    : []),
+                                ...(can('garansi-aset.archive')
+                                    ? [
+                                          {
+                                              id: 'arsip',
+                                              label: 'Delete',
+                                              destructive: true,
+                                          },
+                                      ]
+                                    : []),
+                            ]}
+                            onRowAction={(id, row) => {
+                                if (id === 'arsip') {
+                                    void archive(
+                                        `/garansi-aset/${row.id}`,
+                                        row.version,
+                                        'Garansi diarsipkan.',
+                                    );
 
-            <TabsContent value="garansi">
-                {warranties !== null &&
-                warranties.length === 0 &&
-                !warrantyList.error ? (
-                    <Empty>
-                        <EmptyHeader>
-                            <EmptyTitle>Belum ada garansi tercatat</EmptyTitle>
-                            <EmptyDescription>
-                                Catat garansi dari vendor atau pabrikan supaya
-                                perbaikan selama masa garansi diarahkan ke
-                                penjaminnya.
-                            </EmptyDescription>
-                        </EmptyHeader>
-                    </Empty>
-                ) : (
-                    <DataTable
-                        columns={warrantyColumns}
-                        incremental={warrantyList}
-                        sort={warrantyList.sort}
-                        onSortChange={warrantyList.onSortChange}
-                        data={warranties ?? []}
-                        getRowKey={(row) => row.id}
-                        getRowLabel={(row) => row.aset_kode}
-                        actions={[
-                            ...(can('garansi-aset.update')
-                                ? [{ id: 'ubah', label: 'Ubah' }]
-                                : []),
-                            ...(can('garansi-aset.archive')
-                                ? [
-                                      {
-                                          id: 'arsip',
-                                          label: 'Delete',
-                                          destructive: true,
-                                      },
-                                  ]
-                                : []),
-                        ]}
-                        onRowAction={(id, row) => {
-                            if (id === 'arsip') {
-                                void archive(
-                                    `/garansi-aset/${row.id}`,
-                                    row.version,
-                                    'Garansi diarsipkan.',
-                                );
-
-                                return;
-                            }
-
-                            editWarranty(row);
-                        }}
-                    />
-                )}
-            </TabsContent>
-
-            <TabsContent value="kontrak">
-                {contracts !== null &&
-                contracts.length === 0 &&
-                !contractList.error ? (
-                    <Empty>
-                        <EmptyHeader>
-                            <EmptyTitle>Belum ada kontrak servis</EmptyTitle>
-                            <EmptyDescription>
-                                Catat kontrak pemeliharaan dengan vendor beserta
-                                aset yang ditanggungnya.
-                            </EmptyDescription>
-                        </EmptyHeader>
-                    </Empty>
-                ) : (
-                    <DataTable
-                        columns={contractColumns}
-                        incremental={contractList}
-                        sort={contractList.sort}
-                        onSortChange={contractList.onSortChange}
-                        data={contracts ?? []}
-                        getRowKey={(row) => row.id}
-                        getRowLabel={(row) => row.kode}
-                        onRowClick={(row) => void openContract(row)}
-                        actions={
-                            can('kontrak-servis.archive')
-                                ? [
-                                      {
-                                          id: 'arsip',
-                                          label: 'Delete',
-                                          destructive: true,
-                                      },
-                                  ]
-                                : []
-                        }
-                        onRowAction={(id, row) =>
-                            id === 'arsip' &&
-                            void archive(
-                                `/kontrak-servis/${row.id}`,
-                                row.version,
-                                'Kontrak servis diarsipkan.',
-                            )
-                        }
-                    />
-                )}
-            </TabsContent>
-
-            <TabsContent value="berakhir">
-                <div className="border-b px-5 py-3">
-                    <div className="w-full sm:w-48">
-                        <FormControl>
-                            <Select
-                                label="Berakhir dalam"
-                                items={WINDOWS}
-                                value={days}
-                                ariaLabel="Rentang hari"
-                                onValueChange={(value) =>
-                                    setDays(value ?? '30')
+                                    return;
                                 }
-                            />
-                        </FormControl>
+
+                                editWarranty(row);
+                            }}
+                        />
+                    )}
+                </TabsContent>
+
+                <TabsContent
+                    value="kontrak"
+                    className="min-h-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col"
+                >
+                    {contracts !== null &&
+                    contracts.length === 0 &&
+                    !contractList.error ? (
+                        <Empty>
+                            <EmptyHeader>
+                                <EmptyTitle>
+                                    Belum ada kontrak servis
+                                </EmptyTitle>
+                                <EmptyDescription>
+                                    Catat kontrak pemeliharaan dengan vendor
+                                    beserta aset yang ditanggungnya.
+                                </EmptyDescription>
+                            </EmptyHeader>
+                        </Empty>
+                    ) : (
+                        <DataTable
+                            columns={contractColumns}
+                            incremental={contractList}
+                            sort={contractList.sort}
+                            onSortChange={contractList.onSortChange}
+                            data={contracts ?? []}
+                            getRowKey={(row) => row.id}
+                            getRowLabel={(row) => row.kode}
+                            onRowClick={(row) => void openContract(row)}
+                            actions={
+                                can('kontrak-servis.archive')
+                                    ? [
+                                          {
+                                              id: 'arsip',
+                                              label: 'Delete',
+                                              destructive: true,
+                                          },
+                                      ]
+                                    : []
+                            }
+                            onRowAction={(id, row) =>
+                                id === 'arsip' &&
+                                void archive(
+                                    `/kontrak-servis/${row.id}`,
+                                    row.version,
+                                    'Kontrak servis diarsipkan.',
+                                )
+                            }
+                        />
+                    )}
+                </TabsContent>
+
+                <TabsContent
+                    value="berakhir"
+                    className="min-h-0 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col"
+                >
+                    <div className="border-b px-5 py-3">
+                        <div className="w-full sm:w-48">
+                            <FormControl>
+                                <Select
+                                    label="Berakhir dalam"
+                                    items={WINDOWS}
+                                    value={days}
+                                    ariaLabel="Rentang hari"
+                                    onValueChange={(value) =>
+                                        setDays(value ?? '30')
+                                    }
+                                />
+                            </FormControl>
+                        </div>
                     </div>
-                </div>
-                {expiring !== null &&
-                expiringItems.length === 0 &&
-                !expiryList.error ? (
-                    <Empty>
-                        <EmptyHeader>
-                            <EmptyTitle>
-                                Tidak ada yang berakhir dalam {days} hari
-                            </EmptyTitle>
-                            <EmptyDescription>
-                                Garansi dan kontrak servis yang akan habis
-                                tampil di sini supaya sempat diperpanjang.
-                            </EmptyDescription>
-                        </EmptyHeader>
-                    </Empty>
-                ) : (
-                    <DataTable
-                        columns={expiringColumns}
-                        incremental={expiryList}
-                        sort={expiryList.sort}
-                        onSortChange={expiryList.onSortChange}
-                        data={expiringItems}
-                        getRowKey={(row) => `${row.jenis}-${row.id}`}
-                        getRowLabel={(row) => row.referensi ?? row.id}
-                    />
-                )}
-            </TabsContent>
+                    {expiring !== null &&
+                    expiringItems.length === 0 &&
+                    !expiryList.error ? (
+                        <Empty>
+                            <EmptyHeader>
+                                <EmptyTitle>
+                                    Tidak ada yang berakhir dalam {days} hari
+                                </EmptyTitle>
+                                <EmptyDescription>
+                                    Garansi dan kontrak servis yang akan habis
+                                    tampil di sini supaya sempat diperpanjang.
+                                </EmptyDescription>
+                            </EmptyHeader>
+                        </Empty>
+                    ) : (
+                        <DataTable
+                            columns={expiringColumns}
+                            incremental={expiryList}
+                            sort={expiryList.sort}
+                            onSortChange={expiryList.onSortChange}
+                            data={expiringItems}
+                            getRowKey={(row) => `${row.jenis}-${row.id}`}
+                            getRowLabel={(row) => row.referensi ?? row.id}
+                        />
+                    )}
+                </TabsContent>
+            </RecordListPage>
 
             <PageDialog
                 open={warrantyDraft !== null}

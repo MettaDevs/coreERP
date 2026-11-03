@@ -76,6 +76,16 @@ class ReportScreenCodeTest extends TestCase
         $this->assertSharedReportFlow($mutated, (string) file_get_contents($dir.'/useReportData.ts'));
     }
 
+    public function test_guard_rejects_a_ribbon_action_that_does_not_call_the_print_handler(): void
+    {
+        $dir = dirname(__DIR__, 2).'/ui/laporan/_shared';
+        $layout = (string) file_get_contents($dir.'/ReportPageLayout.tsx');
+        $mutated = str_replace('onSelect: handlePrint', 'onSelect: unrelatedHandler', $layout, $count);
+        $this->assertSame(1, $count);
+        $this->expectException(AssertionFailedError::class);
+        $this->assertSharedReportFlow($mutated, (string) file_get_contents($dir.'/useReportData.ts'));
+    }
+
     public function test_report_pages_use_the_report_that_their_menu_names(): void
     {
         $dir = dirname(__DIR__, 2).'/ui/laporan';
@@ -120,7 +130,7 @@ class ReportScreenCodeTest extends TestCase
             $this->fail('Layout harus memiliki handler cetak yang dapat diperiksa.');
         }
         $this->assertMatchesRegularExpression('/requestPrint\(\{\s*report:\s*reportCode\s*,.*?parameters:\s*toParameters\(filters\)/s', $handler[1]);
-        $this->assertStringContainsString('onClick={handlePrint}', $layout);
+        $this->assertStringContainsString('onSelect: handlePrint', $layout);
         $this->assertMatchesRegularExpression('/const\s+filterState:\s*ReportFilterState\s*=\s*\{\s*reportCode\s*,/', $hook);
         $this->assertStringContainsString('const url = `/laporan/${reportCode}', $hook);
         $this->assertMatchesRegularExpression('/await\s+api<ReportApiResponse>\(url\)/', $hook);

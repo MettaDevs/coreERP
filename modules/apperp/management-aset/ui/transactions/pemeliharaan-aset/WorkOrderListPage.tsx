@@ -1,7 +1,6 @@
 import { FileOutput } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { ActionButton } from '@apperp/ui/action-button';
-import { Button } from '@apperp/ui/button';
 import { DataTable } from '@apperp/ui/data-table';
 import type {
     DataTableColumn,
@@ -13,14 +12,11 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
-import { FormControl } from '@apperp/ui/form-control';
-import { Input } from '@apperp/ui/input';
-import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import { PageDialog, PageDialogContent } from '@apperp/ui/page-dialog';
-import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Switch } from '@apperp/ui/switch';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
 import { useRecordTransition } from '@apperp/ui/use-record-transition';
+import RecordListPage from '../../_shared/RecordListPage';
 import { requestPrint } from '../../print';
 import { useRecordList } from '../../use-record-list';
 import type { RecordCardState } from '../_shared/record-card';
@@ -237,43 +233,60 @@ export default function WorkOrderListPage({
     return (
         <>
             {changesTransitionConfirmation}
-            <ListPageLayout
-                header={
-                    <RecordActionBar title="Work order">
-                        {can('create') && !hanyaPekerjaanSaya && (
-                            <ActionButton
-                                action="create"
-                                type="button"
-                                onClick={bukaWorkOrderBaru}
-                            />
-                        )}
-                        {!hanyaPekerjaanSaya && (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() =>
-                                    requestPrint({
-                                        report: 'daftar-work-order',
-                                        title: 'Ekspor daftar work order',
-                                        parameters: {},
-                                    })
-                                }
-                            >
-                                <FileOutput />
-                                Ekspor daftar
-                            </Button>
-                        )}
-                        {can('execute') ? (
-                            <label className="flex items-center gap-2 text-sm">
-                                <Switch
-                                    checked={hanyaPekerjaanSaya}
-                                    onCheckedChange={setHanyaPekerjaanSaya}
+            <RecordListPage
+                toolbar={{
+                    groups: !hanyaPekerjaanSaya
+                        ? [
+                              {
+                                  id: 'home',
+                                  label: 'Home',
+                                  actions: [
+                                      {
+                                          id: 'export',
+                                          label: 'Ekspor daftar',
+                                          icon: <FileOutput />,
+                                          onSelect: () =>
+                                              requestPrint({
+                                                  report: 'daftar-work-order',
+                                                  title: 'Ekspor daftar work order',
+                                                  parameters: {},
+                                              }),
+                                      },
+                                  ],
+                              },
+                          ]
+                        : [],
+                    title: 'Work order',
+                    search: !hanyaPekerjaanSaya
+                        ? {
+                              value: search,
+                              onValueChange: setSearch,
+                              label: 'Cari work order',
+                              placeholder: 'Cari kode, jenis, atau keterangan',
+                          }
+                        : undefined,
+                    children: (
+                        <>
+                            {can('create') && !hanyaPekerjaanSaya && (
+                                <ActionButton
+                                    action="create"
+                                    type="button"
+                                    onClick={bukaWorkOrderBaru}
                                 />
-                                Pekerjaan saya
-                            </label>
-                        ) : undefined}
-                    </RecordActionBar>
-                }
+                            )}
+
+                            {can('execute') ? (
+                                <label className="flex items-center gap-2 text-sm">
+                                    <Switch
+                                        checked={hanyaPekerjaanSaya}
+                                        onCheckedChange={setHanyaPekerjaanSaya}
+                                    />
+                                    Pekerjaan saya
+                                </label>
+                            ) : undefined}
+                        </>
+                    ),
+                }}
             >
                 {hanyaPekerjaanSaya ? (
                     !pekerjaanSaya.length &&
@@ -330,29 +343,6 @@ export default function WorkOrderListPage({
                     )
                 ) : (
                     <div className="flex h-full min-h-0 flex-col">
-                        <div className="flex shrink-0 flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:items-end sm:justify-between">
-                            <div className="space-y-1">
-                                <p className="font-semibold">
-                                    Daftar work order
-                                </p>
-                                <p className="text-muted-foreground text-sm">
-                                    {visibleWorkOrders.length} work order
-                                    ditampilkan
-                                </p>
-                            </div>
-                            <FormControl>
-                                <Input
-                                    className="w-full sm:w-80"
-                                    type="search"
-                                    placeholder="Cari kode, jenis, atau keterangan"
-                                    aria-label="Cari work order"
-                                    value={search}
-                                    onChange={(event) =>
-                                        setSearch(event.target.value)
-                                    }
-                                />
-                            </FormControl>
-                        </div>
                         <DataTable
                             className="min-h-0 flex-1"
                             columns={workOrderColumns}
@@ -381,7 +371,7 @@ export default function WorkOrderListPage({
                         />
                     </div>
                 )}
-            </ListPageLayout>
+            </RecordListPage>
             {card && (
                 <PageDialog
                     open

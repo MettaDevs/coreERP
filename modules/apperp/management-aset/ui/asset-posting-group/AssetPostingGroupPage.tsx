@@ -15,7 +15,6 @@ import {
 } from '@apperp/ui/alert-dialog';
 import { Badge } from '@apperp/ui/badge';
 import { Button } from '@apperp/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
 import { DataTable, DataTableText } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
 import { DatePicker } from '@apperp/ui/date-picker';
@@ -37,6 +36,7 @@ import type { ListLoader } from '@apperp/ui/use-incremental-list';
 import { useIncrementalList } from '@apperp/ui/use-incremental-list';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
 import { useRecordTransition } from '@apperp/ui/use-record-transition';
+import RecordListPage from '../_shared/RecordListPage';
 import RecordLookup from '../_shared/RecordLookup';
 import { api, ApiError } from '../api';
 import { recordQueryUrl } from '../transactions/_shared/record-card';
@@ -227,22 +227,25 @@ export default function AssetPostingGroupPage({
     const cardMatrix = openedMatrix ?? matrix;
 
     return (
-        <Card className="flex h-full min-h-0 flex-col overflow-hidden rounded-none border-0 shadow-none">
-            <CardHeader className="shrink-0 border-b">
-                <CardTitle>Setup Akun/COA Aset</CardTitle>
-                <Input
-                    aria-label="Cari group aset"
-                    placeholder="Cari kode atau nama group"
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                />
-                <p className="text-muted-foreground mt-1 text-sm">
-                    Akun jurnal untuk setiap group aset. Posting memakai baris
-                    yang tanggal berlakunya paling akhir, tetapi tidak melewati
-                    tanggal postingnya.
-                </p>
-            </CardHeader>
-            <CardContent className="flex min-h-0 flex-1 flex-col gap-4 px-5 py-4">
+        <>
+            <RecordListPage
+                toolbar={{
+                    title: 'Setup Akun/COA Aset',
+                    search: {
+                        value: search,
+                        onValueChange: setSearch,
+                        label: 'Cari group aset',
+                        placeholder: 'Cari kode atau nama group',
+                    },
+                }}
+                notice={
+                    <p className="text-muted-foreground px-5 pb-3 text-sm">
+                        Akun jurnal untuk setiap group aset. Posting memakai
+                        baris yang tanggal berlakunya paling akhir, tetapi tidak
+                        melewati tanggal postingnya.
+                    </p>
+                }
+            >
                 {!matrix && <IncrementalListStatus state={list} />}
                 {matrix &&
                     matrix.groups.length === 0 &&
@@ -281,7 +284,7 @@ export default function AssetPostingGroupPage({
                             />
                         </>
                     )}
-            </CardContent>
+            </RecordListPage>
             {editing && cardMatrix && (
                 <PostingGroupSheet
                     key={editing.id + ':' + (initialDate ?? 'default')}
@@ -299,7 +302,7 @@ export default function AssetPostingGroupPage({
                     onSaved={list.reload}
                 />
             )}
-        </Card>
+        </>
     );
 }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Platform\Tenant\Http\Requests\Internal;
 
 use App\Platform\Environment\Models\Environment;
+use App\Platform\Identity\Models\User;
 use App\Platform\Identity\Support\TemporaryPassword;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
@@ -73,6 +74,7 @@ final class TenantProvisioningRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'requested_by' => ['sometimes', 'integer', Rule::exists(User::class, 'id')],
             'legal_name' => ['required', 'string', 'max:255'],
             /*
              * Jenis lingkungan pertama, dan ia OPSIONAL dengan bawaan `production`.

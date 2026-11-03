@@ -1,5 +1,4 @@
 import { router, usePage } from '@inertiajs/react';
-import { ListPlus } from 'lucide-react';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useWorkDate } from '@/hooks/use-work-date';
@@ -23,31 +22,29 @@ import { DatePicker, formatDateInput } from '@apperp/ui/date-picker';
 import { DocumentLines } from '@apperp/ui/document-lines';
 import { FormControl, FormGrid } from '@apperp/ui/form-control';
 import { Input } from '@apperp/ui/input';
-import { ListPageLayout } from '@apperp/ui/list-page-layout';
 import {
     PageDialog,
     PageDialogContent,
     PageDialogToolbar,
     PageDialogBody,
 } from '@apperp/ui/page-dialog';
-import { RecordActionBar } from '@apperp/ui/record-action-bar';
 
 import { Textarea } from '@apperp/ui/textarea';
 import { useConfirmation } from '@apperp/ui/use-confirmation';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
 import { useRecordTransition } from '@apperp/ui/use-record-transition';
+import RecordListPage from '../../_shared/RecordListPage';
 import { RecordLookup } from '../../_shared/RecordLookup';
 import { api, errorMessage, newIdempotencyKey } from '../../api';
-import { AssetTypePicker } from '../../master/AssetTypePicker';
-import { useMasterOptions } from '../../master/useMasterOptions';
 import { useRecordList } from '../../use-record-list';
 import { useRecordOptions } from '../../use-record-list';
 import { useSaveFeedback } from '../../use-save-feedback';
 import { RecordCardHeader, recordQueryUrl } from '../_shared/record-card';
 import { useRecordCardDirty } from '../_shared/use-record-card-dirty';
 import { useRecordQueryTarget } from '../_shared/use-record-query-target';
+import BudgetedAssetCard from '../inventarisasi-aset/BudgetedAssetCard';
 import { FundingSourceLookup } from './FundingSourceLookup';
-import { appendPlanningTypes, createPlanningLine } from './planning-lines';
+import { clearPlanningAssets, createPlanningLine } from './planning-lines';
 import type {
     PlanningDetail as Detail,
     PlanningDraftDetail as DraftDetail,
@@ -154,7 +151,9 @@ export default function PlanningPage({
     const [viewing, setViewing] = useState<Plan | null>(null);
     const [selectedLines, setSelectedLines] = useState<string[]>([]);
     const [selectedDraftLines, setSelectedDraftLines] = useState<string[]>([]);
-    const [pickingTypes, setPickingTypes] = useState(false);
+    const [creatingAssetForLine, setCreatingAssetForLine] = useState<
+        number | null
+    >(null);
     const [manualCode, setManualCode] = useState('');
     const [search, setSearch] = useState('');
     const [editSections, setEditSections] = useState(['general', 'lines']);
@@ -405,7 +404,7 @@ export default function PlanningPage({
         if (
             !editing.details.every(
                 (detail) =>
-                    detail.jenis_aset_id &&
+                    detail.planned_asset_id &&
                     detail.satuan_id &&
                     detail.funding_source_id &&
                     detail.needed_on &&
@@ -414,7 +413,7 @@ export default function PlanningPage({
         ) {
             editFeedback.reportSaveError(
                 null,
-                'Pilih jenis aset, satuan, sumber dana, tanggal kebutuhan, dan isi spesifikasi pada setiap rincian.',
+                'Pilih aset sebagai perencanaan, satuan, sumber dana, tanggal kebutuhan, dan isi spesifikasi pada setiap rincian.',
             );
 
             return;
@@ -442,20 +441,7 @@ export default function PlanningPage({
             planning_year_id: editing.planning_year_id,
             responsible_user_id: editing.responsible_user_id,
             description: editing.description || null,
-            details: editing.details.map((detail) => ({
-                ...(detail.id ? { id: detail.id } : {}),
-                jenis_aset_id: detail.jenis_aset_id,
-                satuan_id: detail.satuan_id,
-                requested_specification: detail.requested_specification,
-                quantity: Number(detail.quantity),
-                needed_on: detail.needed_on,
-                funding_source_id: detail.funding_source_id,
-                estimated_unit_price:
-                    detail.estimated_unit_price === null ||
-                    detail.estimated_unit_price === ''
-                        ? null
-                        : Number(detail.estimated_unit_price),
-            })),
+            details: clearPlanningAssets(editing.details),
         };
 
         try {
@@ -529,7 +515,7 @@ export default function PlanningPage({
     };
     const closePlan = () => {
         requestPlanTransition(() => {
-            setPickingTypes(false);
+            setCreatingAssetForLine(null);
             setEditing(undefined);
             createCard?.onClose();
         });
@@ -566,12 +552,6 @@ export default function PlanningPage({
     const canRequest = permissions.includes(
         'management-aset.permintaan-pembelian-aset.create',
     );
-    const typeSource = useMasterOptions(
-        editing ? 'jenis-aset' : null,
-        '',
-        editing?.details.map((line) => line.jenis_aset_id).filter(Boolean) ??
-            [],
-    );
     const unitSource = useRecordOptions<AsetType>(
         editing ? '/reference-data/units-of-measure' : null,
         (item) => item.nama,
@@ -599,6 +579,16 @@ export default function PlanningPage({
     const selectedCompanyId = editing
         ? (editing.legal_entity_id ?? singleCompany?.id ?? null)
         : null;
+    const canReadAssets = permissions.includes('management-aset.aset.read');
+    const plannedAssetSource = useRecordOptions<AsetType>(
+        selectedCompanyId && canReadAssets
+            ? `/aset?planning_company_id=${encodeURIComponent(selectedCompanyId)}`
+            : null,
+        (item) => `${item.kode} - ${item.nama}`,
+        editing?.details.flatMap((line) =>
+            line.planned_asset_id ? [line.planned_asset_id] : [],
+        ) ?? [],
+    );
     const operatingUnitSource = useRecordOptions<OrganizationOption>(
         selectedCompanyId
             ? `/perencanaan-aset/organizations?kind=operating_units&legal_entity_id=${encodeURIComponent(selectedCompanyId)}`
@@ -708,13 +698,13 @@ export default function PlanningPage({
     ];
     const viewColumns: DataTableColumn<Detail>[] = [
         {
-            id: 'asset_type',
-            header: 'Jenis aset',
-            minWidth: 220,
+            id: 'planned_asset',
+            header: 'Aset sebagai perencanaan',
+            minWidth: 250,
             cell: (line) =>
-                [line.jenis_aset_kode, line.jenis_aset_nama ?? line.nama_aset]
+                [line.planned_asset_code, line.nama_aset]
                     .filter(Boolean)
-                    .join(' - '),
+                    .join(' - ') || 'Pilih aset',
         },
         {
             id: 'specification',
@@ -778,32 +768,62 @@ export default function PlanningPage({
         editing?.details.map((detail, index) => ({ detail, index })) ?? [];
     const editColumns: DataTableColumn<(typeof editRows)[number]>[] = [
         {
-            id: 'asset_type',
-            header: 'Jenis aset',
-            width: 220,
-            minWidth: 160,
+            id: 'planned_asset',
+            header: 'Aset sebagai perencanaan',
+            width: 280,
+            minWidth: 220,
             required: true,
             content: 'control',
             cell: ({ detail, index }) => (
                 <FormControl
-                    data-error-field={`details.${index}.jenis_aset_id`}
-                    error={editFieldError(`details.${index}.jenis_aset_id`)}
+                    data-error-field={`details.${index}.planned_asset_id`}
+                    error={editFieldError(`details.${index}.planned_asset_id`)}
                 >
                     <RecordLookup
-                        label="Jenis aset"
+                        label="Aset sebagai perencanaan"
                         required
-                        source={typeSource}
-                        items={typeSource.options.map((record) => ({
-                            value: record.id,
-                            label: typeSource.getLabel(record),
-                        }))}
-                        value={detail.jenis_aset_id || null}
-                        placeholder="Pilih jenis aset"
-                        ariaLabel={`Jenis aset baris ${index + 1}`}
+                        source={plannedAssetSource}
+                        value={detail.planned_asset_id || null}
+                        placeholder="Pilih aset"
+                        items={[
+                            ...plannedAssetSource.options.map((asset) => ({
+                                value: asset.id,
+                                label: plannedAssetSource.getLabel(asset),
+                            })),
+                            ...(detail.planned_asset_id &&
+                            !plannedAssetSource.options.some(
+                                (asset) => asset.id === detail.planned_asset_id,
+                            )
+                                ? [
+                                      {
+                                          value: detail.planned_asset_id,
+                                          label: [
+                                              detail.planned_asset_code,
+                                              detail.nama_aset,
+                                          ]
+                                              .filter(Boolean)
+                                              .join(' - '),
+                                      },
+                                  ]
+                                : []),
+                        ]}
+                        disabled={!canReadAssets || !selectedCompanyId}
                         portalContainer={sheetContentRef}
-                        onValueChange={(value) =>
-                            updateDetail(index, { jenis_aset_id: value ?? '' })
-                        }
+                        allowCreate={Boolean(
+                            selectedCompanyId &&
+                            permissions.includes('management-aset.aset.create'),
+                        )}
+                        onCreate={() => setCreatingAssetForLine(index)}
+                        onValueChange={(value) => {
+                            const asset = plannedAssetSource.options.find(
+                                (record) => record.id === value,
+                            );
+                            updateDetail(index, {
+                                planned_asset_id: value ?? '',
+                                planned_asset_code: asset?.kode,
+                                nama_aset: asset?.nama,
+                            });
+                        }}
                     />
                 </FormControl>
             ),
@@ -1030,34 +1050,28 @@ export default function PlanningPage({
 
             {planTransitionConfirmation}
             {!createCard && (
-                <ListPageLayout
-                    header={
-                        <RecordActionBar
-                            title="Perencanaan aset"
-                            feedback={!viewing ? pageFeedbackSummary : null}
-                        >
-                            {can('create') && (
-                                <ActionButton
-                                    action="create"
-                                    disabled={saving || cardLoading}
-                                    onClick={() => void openCreate()}
-                                />
-                            )}
-                        </RecordActionBar>
-                    }
-                    filters={
-                        <div className="px-4 pb-3">
-                            <FormControl className="w-full sm:w-80">
-                                <Input
-                                    label="Cari perencanaan"
-                                    value={search}
-                                    onChange={(event) =>
-                                        setSearch(event.target.value)
-                                    }
-                                />
-                            </FormControl>
-                        </div>
-                    }
+                <RecordListPage
+                    toolbar={{
+                        title: 'Perencanaan aset',
+                        feedback: !viewing ? pageFeedbackSummary : null,
+                        search: {
+                            value: search,
+                            onValueChange: setSearch,
+                            label: 'Cari',
+                            placeholder: 'Cari perencanaan',
+                        },
+                        children: (
+                            <>
+                                {can('create') && (
+                                    <ActionButton
+                                        action="create"
+                                        disabled={saving || cardLoading}
+                                        onClick={() => void openCreate()}
+                                    />
+                                )}
+                            </>
+                        ),
+                    }}
                 >
                     <DataTable
                         columns={planColumns}
@@ -1084,7 +1098,7 @@ export default function PlanningPage({
                                 : 'Belum ada rencana aset. Pilih Baru untuk membuat perencanaan.'
                         }
                     />
-                </ListPageLayout>
+                </RecordListPage>
             )}
 
             <PageDialog
@@ -1249,7 +1263,7 @@ export default function PlanningPage({
                                             columns={viewColumns}
                                             data={viewing.details ?? []}
                                             getRowKey={(line) =>
-                                                line.id ?? line.jenis_aset_id
+                                                line.id ?? line.planned_asset_id
                                             }
                                             selection={
                                                 canRequest
@@ -1477,6 +1491,10 @@ export default function PlanningPage({
                                                                     null,
                                                                 planning_year:
                                                                     null,
+                                                                details:
+                                                                    clearPlanningAssets(
+                                                                        editing.details,
+                                                                    ),
                                                             });
                                                         }}
                                                     />
@@ -1738,21 +1756,6 @@ export default function PlanningPage({
                                                         ),
                                                 );
                                             }}
-                                            toolbar={
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    disabled={
-                                                        saving || cardLoading
-                                                    }
-                                                    onClick={() =>
-                                                        setPickingTypes(true)
-                                                    }
-                                                >
-                                                    <ListPlus aria-hidden="true" />
-                                                    Pilih jenis aset
-                                                </Button>
-                                            }
                                             onAddRow={() =>
                                                 setEditing(
                                                     (current) =>
@@ -1782,24 +1785,20 @@ export default function PlanningPage({
                     )}
                 </PageDialogContent>
             </PageDialog>
-            {pickingTypes && editing && (
-                <AssetTypePicker
-                    source={typeSource}
-                    disabled={saving || cardLoading}
-                    onClose={() => setPickingTypes(false)}
-                    onChoose={(records) => {
-                        setEditing(
-                            (current) =>
-                                current && {
-                                    ...current,
-                                    details: appendPlanningTypes(
-                                        current.details,
-                                        records,
-                                        emptyDetail,
-                                    ),
-                                },
-                        );
-                        setPickingTypes(false);
+            {creatingAssetForLine !== null && selectedCompanyId && (
+                <BudgetedAssetCard
+                    companyId={selectedCompanyId}
+                    unitId={selectedUnitId}
+                    permissions={permissions}
+                    onClose={() => setCreatingAssetForLine(null)}
+                    onSaved={(asset) => {
+                        plannedAssetSource.acceptItems([asset]);
+                        updateDetail(creatingAssetForLine, {
+                            planned_asset_id: asset.id,
+                            planned_asset_code: asset.kode,
+                            nama_aset: asset.nama,
+                        });
+                        setCreatingAssetForLine(null);
                     }}
                 />
             )}

@@ -25,6 +25,7 @@ use App\Platform\Identity\Models\User;
 use App\Platform\Modules\Models\ProviderAccess;
 use App\Platform\Organization\Models\Organization;
 use App\Platform\Tenant\Models\Tenant;
+use App\Platform\Tenant\Models\TenantCreationRequest;
 use App\Platform\Tenant\Models\TenantMembership;
 use Illuminate\Database\Eloquent\Model;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -59,6 +60,7 @@ class BatasPusatTest extends TestCase
             [ProductAuthAttempt::class, 'product_auth_attempts'],
             [ProductEmailChallenge::class, 'product_email_challenges'],
             [Tenant::class, 'tenants'],
+            [TenantCreationRequest::class, 'tenant_creation_requests'],
             [TenantMembership::class, 'tenant_memberships'],
             [ProviderAccess::class, 'provider_access'],
             [Environment::class, 'environments'],

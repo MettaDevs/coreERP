@@ -1,9 +1,7 @@
-import { AlertCircle, Filter, Printer, RefreshCw } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { AlertCircle, Printer, RefreshCw } from 'lucide-react';
+import { useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@apperp/ui/alert';
-import { Badge } from '@apperp/ui/badge';
-import { Button } from '@apperp/ui/button';
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
 import {
@@ -12,10 +10,8 @@ import {
     EmptyHeader,
     EmptyTitle,
 } from '@apperp/ui/empty';
-import { FilterPane } from '@apperp/ui/filter-pane';
-import { ListPageLayout } from '@apperp/ui/list-page-layout';
-import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { Spinner } from '@apperp/ui/spinner';
+import RecordListPage from '../../_shared/RecordListPage';
 import { requestPrint } from '../../print';
 import { ReportFilterEngine } from './ReportFilterEngine';
 import { filled, toParameters } from './reportOptions';
@@ -52,7 +48,6 @@ export function ReportPageLayout<T extends Record<string, unknown>>({
         () => new Map(rows.map((row, index) => [row, index])),
         [rows],
     );
-    const [filterPanelOpen, setFilterPanelOpen] = useState(false);
     const activeFilterCount = Object.values(filters).filter(filled).length;
 
     const handlePrint = () => {
@@ -65,77 +60,35 @@ export function ReportPageLayout<T extends Record<string, unknown>>({
     };
 
     return (
-        <ListPageLayout
+        <RecordListPage
             aria-label={description ? `${title}. ${description}` : title}
-            header={
-                <RecordActionBar
-                    title={title}
-                    trailing={
-                        <Button
-                            type="button"
-                            variant={filterPanelOpen ? 'secondary' : 'ghost'}
-                            size="sm"
-                            aria-expanded={filterPanelOpen}
-                            aria-controls="report-filter-panel"
-                            aria-label={
-                                filterPanelOpen
-                                    ? 'Tutup filter laporan'
-                                    : `Buka filter laporan${activeFilterCount ? `, ${activeFilterCount} filter aktif` : ''}`
-                            }
-                            title="Filter laporan"
-                            onClick={() => setFilterPanelOpen((open) => !open)}
-                        >
-                            <Filter aria-hidden="true" />
-                            <span className="hidden sm:inline">Filter</span>
-                            {activeFilterCount > 0 && (
-                                <Badge variant="secondary">
-                                    {activeFilterCount}
-                                </Badge>
-                            )}
-                        </Button>
-                    }
-                >
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={onRefresh}
-                        disabled={loading}
-                        title="Segarkan data terbaru"
-                        aria-label="Segarkan data terbaru"
-                    >
-                        <RefreshCw
-                            className={`size-3.5 ${loading ? 'animate-spin' : ''}`}
-                        />
-                        <span className="hidden sm:inline">Segarkan</span>
-                    </Button>
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={handlePrint}
-                        disabled={loading}
-                        title="Pilih format untuk mencetak atau mengunduh laporan"
-                    >
-                        <Printer className="size-3.5" />
-                        <span>Cetak / unduh</span>
-                    </Button>
-                </RecordActionBar>
-            }
-            filterSide="right"
-            filterPanel={
-                filterPanelOpen ? (
-                    <FilterPane
-                        id="report-filter-panel"
-                        title="Filter laporan"
-                        description="Hasil diperbarui otomatis saat filter diubah."
-                        side="right"
-                        onClose={() => setFilterPanelOpen(false)}
-                    >
-                        <ReportFilterEngine state={filterState} />
-                    </FilterPane>
-                ) : null
-            }
+            toolbar={{
+                title,
+                groups: [
+                    {
+                        id: 'home',
+                        label: 'Home',
+                        actions: [
+                            {
+                                id: 'refresh',
+                                label: 'Segarkan',
+                                icon: <RefreshCw />,
+                                disabled: loading,
+                                onSelect: onRefresh,
+                            },
+                            {
+                                id: 'print',
+                                label: 'Cetak / unduh',
+                                icon: <Printer />,
+                                disabled: loading,
+                                onSelect: handlePrint,
+                            },
+                        ],
+                    },
+                ],
+            }}
+            filters={<ReportFilterEngine state={filterState} />}
+            filtersActive={activeFilterCount > 0}
             footer={
                 <div className="text-muted-foreground flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t px-4 py-2 text-xs">
                     <span>
@@ -192,6 +145,6 @@ export function ReportPageLayout<T extends Record<string, unknown>>({
                     />
                 )}
             </section>
-        </ListPageLayout>
+        </RecordListPage>
     );
 }

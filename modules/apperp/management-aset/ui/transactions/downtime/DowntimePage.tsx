@@ -4,7 +4,6 @@ import { toast } from 'sonner';
 import { useDateTimeFormat } from '@/hooks/use-date-time';
 import { ActionButton } from '@apperp/ui/action-button';
 import { Badge } from '@apperp/ui/badge';
-import { Button } from '@apperp/ui/button';
 import { Checkbox } from '@apperp/ui/checkbox';
 import { DataTable } from '@apperp/ui/data-table';
 import type { DataTableColumn } from '@apperp/ui/data-table';
@@ -26,10 +25,10 @@ import {
     PageDialogClose,
     PageDialogBody,
 } from '@apperp/ui/page-dialog';
-import { RecordActionBar } from '@apperp/ui/record-action-bar';
 import { useRecordNavigation } from '@apperp/ui/use-record-navigation';
 import { useRecordTransition } from '@apperp/ui/use-record-transition';
 import { zonedInput } from '../../_shared/format';
+import RecordListPage from '../../_shared/RecordListPage';
 import { RecordLookup } from '../../_shared/RecordLookup';
 import { ApiError, api, newIdempotencyKey } from '../../api';
 import { optionLabel, useMasterOptions } from '../../master/useMasterOptions';
@@ -327,96 +326,106 @@ export default function DowntimePage({
     });
 
     return (
-        <div ref={pageFeedbackScopeRef}>
+        <div
+            ref={pageFeedbackScopeRef}
+            className="h-full min-h-0 overflow-hidden"
+        >
             {draftTransitionConfirmation}
-            <RecordActionBar
-                feedback={pageFeedbackSummary}
-                title="Downtime aset"
-            >
-                {can('create') && (
-                    <Button type="button" onClick={newDowntime}>
-                        Catat downtime
-                    </Button>
-                )}
-            </RecordActionBar>
+            <RecordListPage
+                toolbar={{
+                    feedback: pageFeedbackSummary,
+                    title: 'Downtime aset',
+                    children: (
+                        <>
+                            {can('create') && (
+                                <ActionButton
+                                    action="create"
+                                    type="button"
+                                    onClick={newDowntime}
+                                />
+                            )}
+                        </>
+                    ),
+                }}
+                filters={
+                    <>
+                        <FormControl>
+                            <RecordLookup
+                                source={assetSource}
+                                label="Aset"
+                                items={[
+                                    { value: '', label: 'Semua aset' },
+                                    ...assetChoices,
+                                ]}
+                                value={filterAset || null}
+                                placeholder="Semua aset"
+                                searchPlaceholder="Cari kode atau nama aset"
+                                ariaLabel="Saring berdasarkan aset"
+                                onValueChange={(value) =>
+                                    setFilterAset(value ?? '')
+                                }
+                            />
+                        </FormControl>
 
-            <div className="flex flex-col gap-3 border-b px-5 py-3 sm:flex-row sm:flex-wrap sm:items-end">
-                <div className="w-full sm:w-80">
-                    <FormControl>
-                        <RecordLookup
-                            source={assetSource}
-                            label="Aset"
-                            items={[
-                                { value: '', label: 'Semua aset' },
-                                ...assetChoices,
-                            ]}
-                            value={filterAset || null}
-                            placeholder="Semua aset"
-                            searchPlaceholder="Cari kode atau nama aset"
-                            ariaLabel="Saring berdasarkan aset"
-                            onValueChange={(value) =>
-                                setFilterAset(value ?? '')
-                            }
-                        />
-                    </FormControl>
-                </div>
-                <label className="flex items-center gap-2 text-sm">
-                    <Checkbox
-                        checked={openOnly}
-                        onCheckedChange={(checked) =>
-                            setOpenOnly(checked === true)
+                        <label className="flex items-center gap-2 text-sm">
+                            <Checkbox
+                                checked={openOnly}
+                                onCheckedChange={(checked) =>
+                                    setOpenOnly(checked === true)
+                                }
+                            />
+                            Hanya aset yang masih berhenti
+                        </label>
+                    </>
+                }
+                filtersActive={Boolean(filterAset || openOnly)}
+            >
+                {rows !== null && rows.length === 0 ? (
+                    <Empty>
+                        <EmptyHeader>
+                            <EmptyTitle>Belum ada downtime tercatat</EmptyTitle>
+                            <EmptyDescription>
+                                Downtime tercatat otomatis saat work order
+                                dengan pekerjaan yang menuntut aset berhenti
+                                mulai dikerjakan, atau dicatat di sini saat aset
+                                berhenti di luar work order.
+                            </EmptyDescription>
+                        </EmptyHeader>
+                    </Empty>
+                ) : (
+                    <DataTable
+                        columns={columns}
+                        incremental={list}
+                        sort={list.sort}
+                        onSortChange={list.onSortChange}
+                        data={rows ?? []}
+                        getRowKey={(row) => row.id}
+                        getRowLabel={(row) => row.aset_kode}
+                        actions={[
+                            ...(can('update')
+                                ? [
+                                      {
+                                          id: 'ubah',
+                                          label: 'Koreksi waktu atau alasan',
+                                      },
+                                  ]
+                                : []),
+                            ...(can('archive')
+                                ? [
+                                      {
+                                          id: 'arsip',
+                                          label: 'Delete',
+                                          destructive: true,
+                                      },
+                                  ]
+                                : []),
+                        ]}
+                        onRowAction={(id, row) =>
+                            id === 'arsip' ? void archive(row) : openEdit(row)
                         }
                     />
-                    Hanya aset yang masih berhenti
-                </label>
-            </div>
-
-            {rows !== null && rows.length === 0 ? (
-                <Empty>
-                    <EmptyHeader>
-                        <EmptyTitle>Belum ada downtime tercatat</EmptyTitle>
-                        <EmptyDescription>
-                            Downtime tercatat otomatis saat work order dengan
-                            pekerjaan yang menuntut aset berhenti mulai
-                            dikerjakan, atau dicatat di sini saat aset berhenti
-                            di luar work order.
-                        </EmptyDescription>
-                    </EmptyHeader>
-                </Empty>
-            ) : (
-                <DataTable
-                    columns={columns}
-                    incremental={list}
-                    sort={list.sort}
-                    onSortChange={list.onSortChange}
-                    data={rows ?? []}
-                    getRowKey={(row) => row.id}
-                    getRowLabel={(row) => row.aset_kode}
-                    actions={[
-                        ...(can('update')
-                            ? [
-                                  {
-                                      id: 'ubah',
-                                      label: 'Koreksi waktu atau alasan',
-                                  },
-                              ]
-                            : []),
-                        ...(can('archive')
-                            ? [
-                                  {
-                                      id: 'arsip',
-                                      label: 'Delete',
-                                      destructive: true,
-                                  },
-                              ]
-                            : []),
-                    ]}
-                    onRowAction={(id, row) =>
-                        id === 'arsip' ? void archive(row) : openEdit(row)
-                    }
-                />
-            )}
-
+                )}
+            </RecordListPage>
             <PageDialog
                 open={draft !== null}
                 onOpenChange={(open) => {

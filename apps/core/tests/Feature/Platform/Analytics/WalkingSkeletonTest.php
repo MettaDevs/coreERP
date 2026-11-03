@@ -268,7 +268,13 @@ class WalkingSkeletonTest extends TestCase
     public function test_time_range_follows_the_users_zone_and_narrows_rows(): void
     {
         $this->setAcquiredOn(['AST-A1' => '2026-09-01', 'AST-A2' => '2026-10-15', 'AST-A3' => '2026-12-31', 'AST-B1' => '2027-01-01', 'AST-B2' => '2026-10-01']);
-        $this->travelTo(CarbonImmutable::parse('2026-10-31 16:30:00', 'UTC'));
+        $referenceTime = CarbonImmutable::parse('2026-10-31 16:30:00', 'UTC');
+        // Fixture izin harus sudah berlaku pada waktu yang diuji, terlepas dari tanggal CI berjalan.
+        foreach (RoleAssignment::query()->where('membership_id', $this->membership->id)->get() as $assignment) {
+            $assignment->update(['valid_from' => $referenceTime->subMinute()]);
+            $assignment->dataPolicyScopes()->update(['valid_from' => $referenceTime->subMinute()]);
+        }
+        $this->travelTo($referenceTime);
 
         $count = fn (array $query): mixed => $this->actingAs($this->owner)->postJson('/api/v1/analytics/query', [
             'dataset' => self::DATASET, 'measures' => ['count'], ...$query,

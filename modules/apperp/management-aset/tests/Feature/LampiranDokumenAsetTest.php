@@ -280,14 +280,17 @@ class LampiranDokumenAsetTest extends TestCase
             DB::table('aset_m_jenis_aset')->insert(['id' => $jenis, 'tenant_id' => $this->tenantId, 'creation_key' => 'type-'.$jenis, 'kode' => 'J'.Str::random(6), 'nama' => 'Laptop kerja', 'aktif' => true, 'created_at' => $now, 'updated_at' => $now]);
         }
 
-        return (string) $this->sebagaiPengguna($this->tenantId, ['management-aset.perencanaan-aset.create'])
+        $assetId = $this->aset($this->legalEntityId, $this->unitId);
+        DB::table('aset_tr_aset')->where('id', $assetId)->update(['jenis_aset_id' => $jenis]);
+
+        return (string) $this->sebagaiPengguna($this->tenantId, ['management-aset.perencanaan-aset.create', 'management-aset.aset.read'])
             ->withHeader('Idempotency-Key', 'plan-'.Str::ulid())
             ->postJson('/api/modules/management-aset/v1/perencanaan-aset', [
                 'legal_entity_id' => $this->legalEntityId, 'planning_org_unit_id' => $this->unitId,
                 'planned_on' => '2026-07-30', 'planning_year_id' => $year['id'],
                 'responsible_user_id' => (string) auth()->id(), 'description' => 'Perangkat tim',
                 'details' => [[
-                    'jenis_aset_id' => $jenis, 'satuan_id' => $this->buatSatuanUji($this->tenantId), 'quantity' => 1,
+                    'planned_asset_id' => $assetId, 'satuan_id' => $this->buatSatuanUji($this->tenantId), 'quantity' => 1,
                     'requested_specification' => 'RAM 16 GB', 'estimated_unit_price' => 15000000,
                     'needed_on' => '2026-10-01', 'funding_source_id' => $fundingSource['id'],
                 ]],

@@ -7,7 +7,7 @@ namespace Tests\Feature\Platform\Tenant;
 use App\Platform\Modules\Actions\RegisterAppCatalog;
 use App\Platform\Modules\Events\AppNumberSequenceReferencesDeclared;
 use App\Platform\Tenant\Actions\RegisterBusiness;
-use App\Platform\Tenant\Events\TenantCreated;
+use App\Platform\Tenant\Events\ErpTenantInitialized;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -34,7 +34,7 @@ class FoundationProvisioningRollbackTest extends TestCase
         $outerLevel = DB::transactionLevel();
         $unitsWritten = 0;
 
-        Event::listen(TenantCreated::class, function (TenantCreated $event) use ($outerLevel, &$unitsWritten): void {
+        Event::listen(ErpTenantInitialized::class, function (ErpTenantInitialized $event) use ($outerLevel, &$unitsWritten): void {
             $this->assertGreaterThan($outerLevel, DB::transactionLevel(), 'Listener harus berjalan di dalam transaksi pendaftaran.');
             $unitsWritten = DB::table('units_of_measure')->where('tenant_id', $event->tenantId)->count();
 

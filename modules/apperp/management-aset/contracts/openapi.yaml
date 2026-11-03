@@ -4315,15 +4315,86 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/ValidationError'
-  /api/v1/aset:
+  /api/modules/management-aset/v1/aset:
     get:
       tags:
       - Lifecycle aset
       operationId: listAset
       summary: Menampilkan register aset tenant aktif
+      description: |
+        Mencakup aset aktual dan aset rencana. is_budgeted menandai aset rencana,
+        tanpa tanggal perolehan, nilai aktual, buku penyusutan, atau jurnal aktual.
+        planning_company_id merupakan perusahaan eksplisit pada form perencanaan,
+        memerlukan create/update perencanaan selain aset.read dan tetap menyaring
+        tenant, perusahaan, serta unit yang dijangkau kebijakan. Query biasa memakai perusahaan aktif.
+      parameters:
+      - name: planning_company_id
+        in: query
+        schema:
+          $ref: '#/components/schemas/Ulid'
       responses:
         '200':
           description: Register aset
+    post:
+      tags:
+      - Lifecycle aset
+      operationId: createBudgetedAsset
+      summary: Membuat aset sebagai perencanaan di register tanpa posting aktual
+      description: |
+        Memerlukan aset.create dan kebijakan tanggung jawab perusahaan/unit pilihan.
+        Idempotency-Key wajib; kode memakai reference management-aset.asset-code.
+        is_budgeted wajib true. Tanggal perolehan/pemakaian serta nilai perolehan
+        aktual dilarang. Server membuat lifecycle_state budgeted tanpa buku,
+        penempatan, ledger, atau feed posting. Percobaan ulang mengembalikan record yang sama.
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BudgetedAssetWrite'
+      responses:
+        '201':
+          description: Aset rencana lengkap termasuk id
+          kode: null
+          nama: null
+          is_budgeted: null
+          dan version: null
+        '200':
+          description: Hasil permintaan idempoten sebelumnya
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /api/modules/management-aset/v1/aset/{id}/planning:
+    patch:
+      tags:
+      - Lifecycle aset
+      operationId: updateBudgetedAsset
+      summary: Mengubah identitas aset rencana tanpa mengubahnya menjadi aset aktual
+      parameters:
+      - $ref: '#/components/parameters/RecordId'
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - $ref: '#/components/schemas/BudgetedAssetWrite'
+              - $ref: '#/components/schemas/VersionInput'
+      responses:
+        '200':
+          description: Aset rencana tersimpan
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Aset rencana tidak ditemukan atau di luar perusahaan aktif
+        '409':
+          $ref: '#/components/responses/StaleVersion'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /api/v1/aset/{id}:
     get:
       tags:
@@ -4638,6 +4709,9 @@ paths:
         sebagai snapshot, dan penanggung jawab.
         Rincian membawa needed_on, funding_source_id, funding_source_name, dan estimasi
         yang boleh null. needed_on pada data lama boleh null sampai dokumen dilengkapi.
+        planned_asset_id menunjuk satu aset dari register, aktual maupun rencana.
+        planned_asset_code dan nama_aset menyimpan snapshot; jenis_aset_id diturunkan
+        server dari aset terpilih.
         planning_type dan funding_source header lama dipertahankan sebagai data historis,
         tidak menjadi input baseline baru.
       parameters:
@@ -9906,7 +9980,7 @@ components:
     AsetPlanningDetailWrite:
       type: object
       required:
-      - jenis_aset_id
+      - planned_asset_id
       - satuan_id
       - quantity
       - requested_specification
@@ -9917,8 +9991,12 @@ components:
           allOf:
           - $ref: '#/components/schemas/Ulid'
           description: ID baris tersimpan saat mengubah dokumen; baris baru tidak mengirim ID.
-        jenis_aset_id:
-          $ref: '#/components/schemas/Ulid'
+        planned_asset_id:
+          allOf:
+          - $ref: '#/components/schemas/Ulid'
+          description: Satu aset yang dipilih dari register, aktual atau aset rencana. Jenis dan nama berasal dari aset, bukan
+            pilihan kedua pada baris perencanaan. Harus satu tenant, perusahaan dokumen, dan lolos kebijakan tanggung jawab
+            aset; memerlukan aset.read.
         satuan_id:
           allOf:
           - $ref: '#/components/schemas/Ulid'
@@ -15007,6 +15085,36 @@ components:
           uniqueItems: true
           items:
             $ref: '#/components/schemas/Ulid'
+    BudgetedAssetWrite:
+      type: object
+      required:
+      - nama
+      - legal_entity_id
+      - responsible_org_unit_id
+      - group_aset_id
+      - jenis_aset_id
+      - is_budgeted
+      properties:
+        nama:
+          type: string
+          maxLength: 255
+        legal_entity_id:
+          $ref: '#/components/schemas/Ulid'
+        responsible_org_unit_id:
+          $ref: '#/components/schemas/Ulid'
+        group_aset_id:
+          $ref: '#/components/schemas/Ulid'
+        jenis_aset_id:
+          $ref: '#/components/schemas/Ulid'
+        is_budgeted:
+          type: boolean
+          enum:
+          - true
+          description: Aset sebagai perencanaan. Tidak dapat diubah menjadi aset aktual melalui kartu.
+        keterangan:
+          type: string
+          nullable: true
+          maxLength: 2000
   responses:
     Unauthenticated:
       description: Sesi aplikasi tidak valid

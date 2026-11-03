@@ -10,12 +10,14 @@ use App\Foundation\UnitOfMeasure\UnitOfMeasureServiceProvider;
 use App\Foundation\Vendor\VendorServiceProvider;
 use App\Foundation\Workflow\WorkflowServiceProvider;
 use App\Platform\Analytics\AnalyticsServiceProvider;
+use App\Platform\ControlPlane\ControlPlaneServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Providers\FortifyServiceProvider;
 use App\Providers\ModuleServiceProvider;
 
 return [
     AppServiceProvider::class,
+    ControlPlaneServiceProvider::class,
     FortifyServiceProvider::class,
     // Engine analitik: limiter API layarnya (area 9) dan, kelak, rute embed (area 17).
     AnalyticsServiceProvider::class,
