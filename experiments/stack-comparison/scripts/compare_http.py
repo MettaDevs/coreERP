@@ -123,6 +123,8 @@ def compare_runs(expected: dict, actual: dict) -> dict:
         for key in ["fixture_id", "fixture_hash", "run_id"]:
             if not isinstance(run.get(key), str) or not run[key] or run.get(key) != expected.get(key):
                 comparison.differences.append({"path": f"run[{side}].{key}", "reason": "missing or mismatched experiment identity"})
+        if not isinstance(run.get("account"), dict) or run["account"].get("user_id") is None or run.get("account") != expected.get("account"):
+            comparison.differences.append({"path": f"run[{side}].account", "reason": "both runs must act as the same fixture account"})
         if [entry.get("status") for entry in run.get("authentication", [])] != [200, 200, 200]:
             comparison.differences.append({"path": f"run[{side}].authentication", "reason": "three successful HTTP authentication/workspace actions required"})
         if [event.get("operation") for event in run.get("events", [])] != expected_operations:

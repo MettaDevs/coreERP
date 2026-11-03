@@ -153,7 +153,8 @@ if __name__ == "__main__":
         "source_sha": fixture["source_sha"], "profile_id": profile["id"], "fixture_id": fixture["fixture_id"],
         "fixture_hash": hashlib.sha256(json.dumps(fixture, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
         "run_id": run_id,
-        "authentication": [{"status": result.status, "duration_ms": result.duration_ms} for result in login],
+        "account": {"index": arguments.account, **{key: account[key] for key in ["user_id", "tenant_id", "legal_entity_id", "membership_id"]}},
+        "authentication":[{"status": result.status, "duration_ms": result.duration_ms} for result in login],
         "events": events,
     }
     arguments.output.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")

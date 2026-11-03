@@ -4,14 +4,126 @@ from __future__ import annotations
 
 import argparse
 import base64
+import copy
+import hashlib
 import json
 from pathlib import Path
+import re
 
 from sql_observer import sql, validate_database
 
+ULID = re.compile(r"[0-7][0-9A-HJKMNP-TV-Z]{25}", re.IGNORECASE)
+CREATION_KEY = re.compile(r"[A-Za-z0-9:_-]{1,200}")
+POSTING_OWNER = "(SELECT p.posting_id FROM finance_postings p WHERE p.id=x.finance_posting_id)"
+# Pekerjaan tahan lama profil ini. Setiap baris baru harus dimiliki receipt, aset, posting, atau
+# nomor yang diakui HTTP; baris seed harus tetap identik dengan baseline.
+DURABLE = {
+    "aset_tr_penerimaan_aset": ("x.id", "receipt"),
+    "aset_tr_penerimaan_aset_details": ("x.penerimaan_aset_id", "receipt"),
+    "aset_tr_aset": ("x.id", "asset"),
+    "aset_tr_buku_aset": ("x.aset_id", "asset"),
+    "aset_tr_ledger_aset": ("x.aset_id", "asset"),
+    "aset_tr_penempatan_aset": ("x.aset_id", "asset"),
+    "aset_tr_aset_atribut": ("x.aset_id", "asset"),
+    "finance_postings": ("x.posting_id", "posting"),
+    "finance_posting_lines": (POSTING_OWNER, "posting"),
+    "finance_posting_events": (POSTING_OWNER, "posting"),
+    "finance_posting_deliveries": (POSTING_OWNER, "posting"),
+    "number_sequence_issues": ("x.idempotency_key", "number"),
+}
+HEADER_FIELDS = [
+    "legal_entity_id", "responsible_org_unit_id", "receiving_org_unit_id", "tanggal", "tanggal_siap_pakai",
+    "diterima_oleh_user_id", "penanggung_jawab_user_id", "lokasi_aset_id", "currency_code", "keterangan",
+    "cara_perolehan", "vendor_id", "vendor_invoice_reference", "vendor_invoice_date", "purchase_order_reference",
+]
+DETAIL_TEXT_FIELDS = [
+    "nama", "group_aset_id", "jenis_aset_id", "kondisi_aset_id", "pabrikan_aset_id", "model_aset_id",
+    "model_number", "keterangan", "permintaan_pembelian_detail_id",
+]
 
-def query(fixture: dict) -> str:
-    encoded = base64.b64encode(json.dumps(fixture, separators=(",", ":")).encode()).decode()
+
+def durable_rows() -> str:
+    return "\n UNION ALL ".join(
+        f"SELECT '{table}' AS table_name, x.id::text AS id, md5(row_to_json(x)::text) AS hash, '{kind}' AS kind, ({owner})::text AS owner FROM {table} x"
+        for table, (owner, kind) in DURABLE.items()
+    )
+
+
+def capture_baseline(database: str, seed: Path) -> dict:
+    validate_database(database)
+    rows = json.loads(sql("SELECT coalesce(json_agg(json_build_array(table_name,id,hash)),'[]'::json) FROM (" + durable_rows() + ") d;", database))
+    tables: dict[str, dict[str, str]] = {table: {} for table in DURABLE}
+    for table, identifier, digest in rows:
+        tables[table][identifier] = digest
+    return {"database": database, "seed_sha256": hashlib.sha256(seed.read_bytes()).hexdigest(), "tables": tables}
+
+
+def single(run: dict, operation: str, status: int) -> dict:
+    events = [event for event in run["events"] if event["operation"] == operation]
+    if len(events) != 1 or events[0]["status"] != status:
+        raise ValueError("Perlu tepat satu acknowledgement HTTP " + operation)
+    return events[0]["body"]["data"]
+
+
+def flow_acknowledgement(run: dict) -> dict:
+    """Satu siklus driver HTTP: hanya respons yang diterima generator, tanpa membaca database."""
+    created = single(run, "receipt-create", 201)
+    completed = single(run, "receipt-complete", 200)
+    assets = single(run, "receipt-assets", 200)
+    if completed["id"] != created["id"] or completed["status"] != "selesai":
+        raise ValueError("Acknowledgement completion tidak menunjuk receipt yang dibuat.")
+    return {
+        "account": run["account"], "receipt_id": created["id"], "creation_key": created["creation_key"],
+        "receipt_code": created["kode"], "outcome": "completed", "version": completed["version"],
+        "asset_ids": [asset["id"] for asset in assets], "asset_codes": [asset["kode"] for asset in assets],
+        "posting_id": completed["posting"]["posting_id"],
+    }
+
+
+def load_acknowledgements(paths: list[Path]) -> list[dict]:
+    entries = []
+    for path in paths:
+        run = json.loads(path.read_text(encoding="utf-8"))
+        entries.extend(run["acknowledgements"] if "acknowledgements" in run else [flow_acknowledgement(run)])
+    return entries
+
+
+def bind(entries: list[dict], fixture: dict) -> list[dict]:
+    """Ikat acknowledgement ke akun dan input fixture; fixture, bukan generator, menjadi sumber harapan."""
+    bound, receipts, keys = [], set(), set()
+    tenants = {tenant["tenant_id"]: tenant for tenant in fixture["tenants"]}
+    for entry in entries:
+        account = fixture["accounts"][entry["account"]["index"]]
+        for key in ["user_id", "tenant_id", "legal_entity_id", "membership_id"]:
+            if entry["account"].get(key) != account[key]:
+                raise ValueError("Akun acknowledgement tidak sama dengan fixture: " + key)
+        if entry["outcome"] not in {"completed", "draft"} or type(entry["version"]) is not int:
+            raise ValueError("Outcome atau versi acknowledgement tidak sah.")
+        identifiers = [entry["receipt_id"], *entry["asset_ids"]]
+        if not all(isinstance(value, str) and ULID.fullmatch(value) for value in identifiers):
+            raise ValueError("ID acknowledgement bukan ULID.")
+        if not isinstance(entry["creation_key"], str) or not CREATION_KEY.fullmatch(entry["creation_key"]):
+            raise ValueError("creation_key acknowledgement tidak sah.")
+        if entry["receipt_id"] in receipts or entry["creation_key"] in keys or len(set(entry["asset_ids"])) != len(entry["asset_ids"]):
+            raise ValueError("Acknowledgement ganda untuk satu pekerjaan.")
+        receipts.add(entry["receipt_id"])
+        keys.add(entry["creation_key"])
+        bound.append({
+            "user_id": account["user_id"], "tenant_id": account["tenant_id"], "legal_entity_id": account["legal_entity_id"],
+            "receipt_id": entry["receipt_id"], "creation_key": entry["creation_key"], "receipt_code": entry["receipt_code"],
+            "outcome": entry["outcome"], "version": entry["version"], "asset_ids": entry["asset_ids"],
+            "asset_codes": entry["asset_codes"], "posting_id": entry.get("posting_id"),
+            "body": tenants[account["tenant_id"]]["receipt_body"],
+        })
+    return bound
+
+
+def query(fixture: dict, acknowledgements: list[dict], baseline: dict) -> str:
+    data = {**fixture, "acknowledgements": acknowledgements, "baseline": baseline}
+    encoded = base64.b64encode(json.dumps(data, separators=(",", ":")).encode()).decode()
+    header = ", ".join(f"('{field}', x.{field}::text)" for field in HEADER_FIELDS)
+    detail = "\n       ".join(f"AND x.{field}::text IS NOT DISTINCT FROM line.body->>'{field}'" for field in DETAIL_TEXT_FIELDS)
+    tables = ", ".join(f"('{table}')" for table in DURABLE)
     return """
 WITH input AS (
  SELECT convert_from(decode('""" + encoded + """','base64'),'UTF8')::jsonb AS data
@@ -21,6 +133,26 @@ WITH input AS (
    tenant_id text, legal_entity_id text, vendor_id text, book_id text, profile_id text,
    attribute_id text, attribute_value text, business_unit_code text
  )
+), ack AS (
+ SELECT item.* FROM input, jsonb_to_recordset(data->'acknowledgements') AS item(
+   user_id bigint, tenant_id text, legal_entity_id text, receipt_id text, creation_key text, receipt_code text,
+   outcome text, version integer, asset_ids jsonb, asset_codes jsonb, posting_id text, body jsonb
+ )
+), ack_asset AS (
+ SELECT k.receipt_id, asset.value AS asset_id FROM ack k, jsonb_array_elements_text(k.asset_ids) asset(value)
+), ack_owner AS (
+ SELECT 'receipt' AS kind, receipt_id AS owner FROM ack
+ UNION SELECT 'asset', asset_id FROM ack_asset
+ UNION SELECT 'posting', posting_id FROM ack WHERE posting_id IS NOT NULL
+ UNION SELECT 'number', 'penerimaan-aset:'||creation_key FROM ack
+ UNION SELECT 'number', 'aset:'||a.creation_key FROM aset_tr_aset a JOIN ack_asset k ON k.asset_id=a.id
+), base_row AS (
+ SELECT t.key AS table_name, r.key AS id, r.value #>> '{}' AS hash
+ FROM input, jsonb_each(data->'baseline'->'tables') t, jsonb_each(t.value) r
+), durable AS (
+ """ + durable_rows() + """
+), new_row AS (
+ SELECT n.* FROM durable n WHERE NOT EXISTS(SELECT 1 FROM base_row b WHERE b.table_name=n.table_name AND b.id=n.id)
 ), r AS (
  SELECT r.*, f.book_id, f.profile_id, f.attribute_id, f.attribute_value, f.business_unit_code, f.module_id
  FROM aset_tr_penerimaan_aset r JOIN f USING(tenant_id)
@@ -31,8 +163,8 @@ WITH input AS (
    sum(round(ppn_per_unit*jumlah,2)) AS tax
  FROM aset_tr_penerimaan_aset_details GROUP BY penerimaan_aset_id
 ), completed AS (
- SELECT r.*, d.quantity, d.value, d.tax
- FROM r JOIN d ON d.receipt_id=r.id WHERE r.status='selesai'
+ SELECT r.*, coalesce(d.quantity,0) AS quantity, coalesce(d.value,0) AS value, coalesce(d.tax,0) AS tax
+ FROM r LEFT JOIN d ON d.receipt_id=r.id WHERE r.status='selesai'
 ), asset AS (
  SELECT a.*, c.profile_id AS expected_profile_id, c.book_id AS expected_book_id,
    c.attribute_id AS expected_attribute_id, c.attribute_value AS expected_attribute_value,
@@ -45,7 +177,51 @@ WITH input AS (
 ), failures AS (
  SELECT 'foreign_tenant' AS label, count(*) AS violations FROM tenants
  WHERE id NOT IN (SELECT tenant_id FROM f)
- UNION ALL SELECT 'nonempty_completed_work', CASE WHEN count(*)>0 THEN 0 ELSE 1 END FROM completed
+ UNION ALL SELECT 'ack_nonempty_completed', CASE WHEN EXISTS(SELECT 1 FROM ack WHERE outcome='completed') THEN 0 ELSE 1 END
+ UNION ALL SELECT 'ack_receipt_stored', count(*) FROM ack k WHERE NOT EXISTS(
+   SELECT 1 FROM aset_tr_penerimaan_aset x WHERE x.id=k.receipt_id AND x.tenant_id=k.tenant_id
+     AND x.legal_entity_id=k.legal_entity_id AND x.creation_key=k.creation_key AND x.kode=k.receipt_code AND x.deleted_at IS NULL)
+ UNION ALL SELECT 'ack_state', count(*) FROM ack k JOIN aset_tr_penerimaan_aset x ON x.id=k.receipt_id
+ WHERE x.version<>k.version OR x.status<>CASE k.outcome WHEN 'completed' THEN 'selesai' ELSE 'draft' END
+ UNION ALL SELECT 'ack_actor', count(*) FROM ack k WHERE
+   EXISTS(SELECT 1 FROM aset_tr_penerimaan_aset x WHERE x.id=k.receipt_id
+     AND (x.created_by_user_id IS DISTINCT FROM k.user_id OR x.updated_by_user_id IS DISTINCT FROM k.user_id))
+   OR EXISTS(SELECT 1 FROM aset_tr_penerimaan_aset_details x WHERE x.penerimaan_aset_id=k.receipt_id
+     AND (x.created_by_user_id IS DISTINCT FROM k.user_id OR x.updated_by_user_id IS DISTINCT FROM k.user_id))
+   OR EXISTS(SELECT 1 FROM aset_tr_aset x WHERE x.penerimaan_aset_id=k.receipt_id
+     AND (x.created_by_user_id IS DISTINCT FROM k.user_id OR x.updated_by_user_id IS DISTINCT FROM k.user_id))
+ UNION ALL SELECT 'ack_header_input', count(*) FROM ack k JOIN aset_tr_penerimaan_aset x ON x.id=k.receipt_id
+ WHERE EXISTS(SELECT 1 FROM (VALUES """ + header + """) stored(field, value)
+   WHERE k.body->>stored.field IS DISTINCT FROM stored.value)
+ UNION ALL SELECT 'ack_detail_input', count(*) FROM ack k WHERE
+   (SELECT count(*) FROM aset_tr_penerimaan_aset_details x WHERE x.penerimaan_aset_id=k.receipt_id)<>jsonb_array_length(k.body->'details')
+   OR EXISTS(SELECT 1 FROM jsonb_array_elements(k.body->'details') WITH ORDINALITY line(body, number)
+     WHERE NOT EXISTS(SELECT 1 FROM aset_tr_penerimaan_aset_details x
+       WHERE x.penerimaan_aset_id=k.receipt_id AND x.tenant_id=k.tenant_id AND x.line_number=line.number
+       """ + detail + """
+       AND x.jumlah=(line.body->>'jumlah')::integer
+       AND x.nilai_per_unit=(line.body->>'nilai_per_unit')::numeric
+       AND x.ppn_per_unit=coalesce((line.body->>'ppn_per_unit')::numeric,0)
+       AND x.residu_per_unit=coalesce((line.body->>'residu_per_unit')::numeric,0)
+       AND x.akumulasi_per_unit=0 AND x.periode_berjalan=0 AND x.saldo_awal_buku IS NULL
+       AND x.atribut::jsonb=coalesce(line.body->'atribut','[]'::jsonb)))
+ UNION ALL SELECT 'ack_assets_exact', count(*) FROM ack k WHERE
+   coalesce((SELECT jsonb_agg(x.id::text ORDER BY x.id) FROM aset_tr_aset x WHERE x.penerimaan_aset_id=k.receipt_id AND x.deleted_at IS NULL),'[]'::jsonb)
+     <> (SELECT coalesce(jsonb_agg(value ORDER BY value),'[]'::jsonb) FROM jsonb_array_elements_text(k.asset_ids) value)
+   OR coalesce((SELECT jsonb_agg(x.kode ORDER BY x.kode) FROM aset_tr_aset x WHERE x.penerimaan_aset_id=k.receipt_id AND x.deleted_at IS NULL),'[]'::jsonb)
+     <> (SELECT coalesce(jsonb_agg(value ORDER BY value),'[]'::jsonb) FROM jsonb_array_elements_text(k.asset_codes) value)
+   OR jsonb_array_length(k.asset_ids)<>CASE k.outcome WHEN 'completed'
+     THEN (SELECT sum((line->>'jumlah')::integer) FROM jsonb_array_elements(k.body->'details') line) ELSE 0 END
+ UNION ALL SELECT 'ack_posting', count(*) FROM ack k WHERE
+   (SELECT count(*) FROM finance_postings p WHERE p.tenant_id=k.tenant_id AND p.source_id=k.receipt_id)
+     <> CASE k.outcome WHEN 'completed' THEN 1 ELSE 0 END
+   OR (k.outcome='completed' AND (k.posting_id IS DISTINCT FROM 'AST-ACQ-'||k.receipt_id OR NOT EXISTS(
+     SELECT 1 FROM finance_postings p WHERE p.tenant_id=k.tenant_id AND p.source_id=k.receipt_id AND p.posting_id=k.posting_id)))
+ UNION ALL SELECT 'unacknowledged_'||t.table_name, (SELECT count(*) FROM new_row n WHERE n.table_name=t.table_name
+   AND NOT EXISTS(SELECT 1 FROM ack_owner o WHERE o.kind=n.kind AND o.owner=n.owner))
+ FROM (VALUES """ + tables + """) t(table_name)
+ UNION ALL SELECT 'baseline_rows_changed', count(*) FROM base_row b
+ WHERE NOT EXISTS(SELECT 1 FROM durable n WHERE n.table_name=b.table_name AND n.id=b.id AND n.hash=b.hash)
  UNION ALL SELECT 'completed_header_version', count(*) FROM completed WHERE version<3
  UNION ALL SELECT 'completed_asset_count', count(*) FROM completed c
  WHERE (SELECT count(*) FROM asset a WHERE a.penerimaan_aset_id=c.id)<>c.quantity
@@ -105,47 +281,90 @@ WITH input AS (
  ) duplicates
 )
 SELECT json_build_object('checks',(SELECT count(*) FROM failures),
- 'completed_receipts',(SELECT count(*) FROM completed),
+ 'acknowledged_completed',(SELECT count(*) FROM ack WHERE outcome='completed'),
+ 'new_rows',(SELECT count(*) FROM new_row),
  'failures',coalesce((SELECT json_agg(row_to_json(failures)) FROM failures WHERE violations>0),'[]'::json));
 """
 
 
-def evaluate(fixture: dict, database: str, selftest: bool = False) -> dict:
+def evaluate(fixture: dict, database: str, acknowledgements: list[dict], baseline: dict, mutation: str = "") -> dict:
     validate_database(database)
-    statement = query(fixture)
-    if selftest:
-        statement = """
-BEGIN;
-UPDATE aset_tr_aset SET acquisition_value=acquisition_value+0.01
-WHERE id=(SELECT a.id FROM aset_tr_aset a JOIN aset_tr_penerimaan_aset r ON r.id=a.penerimaan_aset_id
-          WHERE r.status='selesai' AND a.deleted_at IS NULL ORDER BY a.id LIMIT 1);
-""" + statement + "\nROLLBACK;"
+    statement = query(fixture, acknowledgements, baseline)
+    if mutation:
+        statement = "BEGIN;\n" + mutation + ";\n" + statement + "\nROLLBACK;"
     result = json.loads(sql(statement, database))
     result["database"] = database
-    result["selftest"] = selftest
+    result["baseline_seed_sha256"] = baseline["seed_sha256"]
     return result
 
 
-if __name__ == "__main__":
+def probes(acknowledgements: list[dict], baseline: dict) -> list[tuple[str, str, list[dict], set[str]]]:
+    """Kerusakan yang wajib merah: mutasi SQL dibatalkan ROLLBACK, mutasi ledger hanya di memori."""
+    receipt = acknowledgements[0]["receipt_id"]
+    seed = next(identifier for identifier in baseline["tables"]["aset_tr_penerimaan_aset"] if ULID.fullmatch(identifier))
+    phantom = copy.deepcopy(acknowledgements[0])
+    phantom.update(receipt_id="7" * 26, creation_key="phantom-acknowledgement", asset_ids=[], asset_codes=[], posting_id=None, outcome="draft")
+    return [
+        ("asset_value_cent", f"UPDATE aset_tr_aset SET acquisition_value=acquisition_value+0.01 WHERE id=(SELECT min(id) FROM aset_tr_aset WHERE penerimaan_aset_id='{receipt}')",
+         acknowledgements, {"asset_value_sum", "asset_allocation", "ledger_matches_asset"}),
+        ("soft_deleted_receipt", f"UPDATE aset_tr_penerimaan_aset SET deleted_at=now() WHERE id='{receipt}'", acknowledgements, {"ack_receipt_stored"}),
+        ("header_input", f"UPDATE aset_tr_penerimaan_aset SET tanggal_siap_pakai=tanggal_siap_pakai+1 WHERE id='{receipt}'", acknowledgements, {"ack_header_input"}),
+        ("detail_input", f"UPDATE aset_tr_penerimaan_aset_details SET nama=nama||' diubah' WHERE penerimaan_aset_id='{receipt}'", acknowledgements, {"ack_detail_input"}),
+        ("asset_actor", f"UPDATE aset_tr_aset SET created_by_user_id=created_by_user_id+1 WHERE penerimaan_aset_id='{receipt}'", acknowledgements, {"ack_actor"}),
+        ("seed_row_changed", f"UPDATE aset_tr_penerimaan_aset SET keterangan='diubah' WHERE id='{seed}'", acknowledgements, {"baseline_rows_changed"}),
+        ("missing_acknowledgement", "", acknowledgements[1:], {"unacknowledged_aset_tr_penerimaan_aset", "unacknowledged_aset_tr_aset", "unacknowledged_finance_postings", "unacknowledged_number_sequence_issues"}),
+        ("phantom_acknowledgement", "", acknowledgements + [phantom], {"ack_receipt_stored"}),
+        ("no_new_work", "", [], {"ack_nonempty_completed"}),
+    ]
+
+
+def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--fixture", required=True, type=Path)
-    parser.add_argument("--database", required=True)
-    parser.add_argument("--selftest", action="store_true")
-    parser.add_argument("--output", type=Path)
+    actions = parser.add_subparsers(dest="action", required=True)
+    capture = actions.add_parser("baseline", help="Rekam hash baris tahan lama dari clone seed yang belum disentuh.")
+    capture.add_argument("--database", required=True)
+    capture.add_argument("--seed", required=True, type=Path)
+    capture.add_argument("--output", required=True, type=Path)
+    check = actions.add_parser("check", help="Rekonsiliasi acknowledgement HTTP dengan database dan fixture.")
+    check.add_argument("--fixture", required=True, type=Path)
+    check.add_argument("--database", required=True)
+    check.add_argument("--baseline", required=True, type=Path)
+    check.add_argument("--acknowledgements", required=True, type=Path, nargs="+")
+    check.add_argument("--selftest", action="store_true")
+    check.add_argument("--output", type=Path)
     args = parser.parse_args()
+    if args.action == "baseline":
+        baseline = capture_baseline(args.database, args.seed)
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(json.dumps(baseline, indent=1) + "\n", encoding="utf-8")
+        print(json.dumps({"database": args.database, "rows": {table: len(rows) for table, rows in baseline["tables"].items()}}))
+        return
     fixture = json.loads(args.fixture.read_text(encoding="utf-8"))
-    result = evaluate(fixture, args.database, args.selftest)
+    baseline = json.loads(args.baseline.read_text(encoding="utf-8"))
+    acknowledgements = bind(load_acknowledgements(args.acknowledgements), fixture)
+    result = evaluate(fixture, args.database, acknowledgements, baseline)
+    if args.selftest:
+        if result["failures"]:
+            raise SystemExit("Selftest butuh fixture bersih lebih dulu: " + json.dumps(result["failures"]))
+        result["probes"] = []
+        for name, mutation, ledger, expected in probes(acknowledgements, baseline):
+            probe = evaluate(fixture, args.database, ledger, baseline, mutation)
+            detected = {failure["label"] for failure in probe["failures"]}
+            result["probes"].append({"probe": name, "expected": sorted(expected), "detected": sorted(detected), "red": expected <= detected})
+        restored = evaluate(fixture, args.database, acknowledgements, baseline)
+        result["rollback_restored"] = not restored["failures"]
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps(result))
+    print(json.dumps({key: value for key, value in result.items() if key != "probes"}))
     if args.selftest:
-        detected = {failure["label"] for failure in result["failures"]}
-        if not {"asset_value_sum", "asset_allocation", "ledger_matches_asset"}.issubset(detected):
-            raise SystemExit("Oracle tidak mendeteksi semua efek perubahan satu sen.")
-        restored = evaluate(fixture, args.database)
-        if restored["failures"]:
-            raise SystemExit("Rollback selftest tidak mengembalikan fixture bersih.")
-        print(json.dumps({"selftest_detected_corruption": True, "rollback_restored": True}))
+        missed = [probe["probe"] for probe in result["probes"] if not probe["red"]]
+        print(json.dumps({"probes": len(result["probes"]), "missed": missed, "rollback_restored": result["rollback_restored"]}))
+        if missed or not result["rollback_restored"]:
+            raise SystemExit(1)
     elif result["failures"]:
         raise SystemExit(1)
+
+
+if __name__ == "__main__":
+    main()

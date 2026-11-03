@@ -33,7 +33,8 @@ def valid_run(offset: int = 0) -> dict:
                 details = [{"id": f"{201 + offset:026d}"}]
             body = {"data": {"id": record_id, "creation_key": "compare-unit", "details": copy.deepcopy(details), "created_at": "2026-11-03 00:00:00", "updated_at": "2026-11-03 00:00:00", "amount": "1000000.00"}}
         events.append({"operation": operation, "status": 201 if operation == "receipt-create" else 200, "headers": {}, "body": body, "started_at": "2026-11-03T00:00:00+00:00", "finished_at": "2026-11-03T00:00:20+00:00"})
-    return {"source_sha": profile["source_sha"], "profile_id": profile["id"], "fixture_id": "unit", "fixture_hash": "unit-fixture-hash", "run_id": "unit", "authentication": [{"status": 200}] * 3, "events": events}
+    account = {"index": 0, "user_id": 1, "tenant_id": "unit-tenant", "legal_entity_id": "unit-company", "membership_id": "unit-membership"}
+    return {"source_sha": profile["source_sha"], "profile_id": profile["id"], "fixture_id": "unit", "fixture_hash": "unit-fixture-hash", "run_id": "unit", "account": account, "authentication": [{"status": 200}] * 3, "events": events}
 
 
 class HarnessTests(unittest.TestCase):
@@ -54,6 +55,10 @@ class HarnessTests(unittest.TestCase):
         other = valid_run(10)
         other["authentication"][0] = {"status": 401}
         self.assertEqual(compare_runs(valid_run(), other)["verdict"], "NOT VERIFIED")
+        for account in [None, {**valid_run()["account"], "index": 1, "user_id": 2}]:
+            other = valid_run(10)
+            other["account"] = account
+            self.assertEqual(compare_runs(valid_run(), other)["verdict"], "NOT VERIFIED", account)
 
     def test_money_types_and_missing_fields_are_not_normalized(self):
         for replacement in [999999.99, "999999.99", None]:
