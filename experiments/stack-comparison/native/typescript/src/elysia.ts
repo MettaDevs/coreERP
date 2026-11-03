@@ -15,6 +15,8 @@ app.listen({
     hostname: config.HOST,
     port: config.PORT ?? 18645,
     reusePort: true,
+    // Bawaan Bun memutus koneksi sesudah 10 detik; PHP, Go, dan Rust tetap menjawab request lambat.
+    idleTimeout: 255,
 });
 process.stderr.write(
     JSON.stringify({

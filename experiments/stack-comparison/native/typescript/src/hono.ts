@@ -17,6 +17,8 @@ const server = Bun.serve({
     hostname: config.HOST,
     port: config.PORT ?? 18644,
     reusePort: true,
+    // Bawaan Bun memutus koneksi sesudah 10 detik; PHP, Go, dan Rust tetap menjawab request lambat.
+    idleTimeout: 255,
     fetch: (request, server) => app.fetch(request, { server }),
 });
 process.stderr.write(
