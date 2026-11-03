@@ -1,3 +1,4 @@
+use crate::db::{Cached, Client};
 use crate::{
     auth::Context,
     db::{self, Error, Result},
@@ -9,7 +10,6 @@ use base64::{
 use regex::Regex;
 use serde_json::{Value, json};
 use std::collections::HashMap;
-use tokio_postgres::Client;
 use unicode_normalization::UnicodeNormalization;
 
 pub const RECEIPT_SELECT: &str = r#"select r.*,

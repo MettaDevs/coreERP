@@ -1,3 +1,4 @@
+use crate::db::{Cached, Client};
 use crate::{
     auth::Context,
     db::{self, Error, Result, flag, nullable, number, text},
@@ -7,7 +8,6 @@ use rust_decimal::Decimal;
 use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap};
-use tokio_postgres::Client;
 
 pub struct Evaluation {
     pub preview: Value,
@@ -647,7 +647,7 @@ pub async fn evaluate(
         }
         let fields = "id,tenant_id,finance_posting_id,line_no,account_id,account_external_id,account_code,debit,credit,description,org_unit_id,business_unit_code,department_code,created_at,updated_at";
         for chunk in table_lines.chunks(500) {
-            db.execute(&format!("insert into finance_posting_lines({fields}) select {fields} from json_populate_recordset(null::finance_posting_lines,$1)"),&[&json!(chunk)]).await?;
+            db.cached_execute(&format!("insert into finance_posting_lines({fields}) select {fields} from json_populate_recordset(null::finance_posting_lines,$1)"),&[&json!(chunk)]).await?;
         }
         db::insert(db,"finance_posting_events",json!({"id":db::id(),"tenant_id":ctx.tenant_id,"finance_posting_id":posting_id,"event":"published","from_status":null,"to_status":state,"integration_client_id":null,"user_id":null,"data":{"problems":if state=="held"{problems.len()}else{0}},"created_at":db::now()}),false).await?;
         db.batch_execute("release savepoint finance_publication")

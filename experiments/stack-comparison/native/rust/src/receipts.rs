@@ -1,3 +1,4 @@
+use crate::db::{Cached, Client};
 use crate::{
     auth::Context,
     db::{self, Error, Result, flag, nullable, number, text},
@@ -12,7 +13,6 @@ use chrono::{Datelike, Duration, NaiveDate};
 use rust_decimal::Decimal;
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, HashMap, HashSet};
-use tokio_postgres::Client;
 
 pub async fn route(
     db: &Client,
@@ -591,7 +591,7 @@ pub fn expected_version(headers: &HeaderMap, body: &Value) -> Result<i32> {
     parsed.ok_or_else(||Error::coded(428,"version_required","Versi data yang sedang diubah wajib dikirim: header If-Match berisi ETag, atau field version."))
 }
 async fn claim(db: &Client, ctx: &Context, id: &str, version: i32) -> Result<()> {
-    let changed=db.execute("update aset_tr_penerimaan_aset set version=$3 where tenant_id=$1 and id=$2 and deleted_at is null and version=$3",&[&ctx.tenant_id,&id,&version]).await?;
+    let changed=db.cached_execute("update aset_tr_penerimaan_aset set version=$3 where tenant_id=$1 and id=$2 and deleted_at is null and version=$3",&[&ctx.tenant_id,&id,&version]).await?;
     if changed == 0 {
         return Err(Error::coded(
             409,
@@ -628,14 +628,14 @@ async fn replace(
         .map(|field| format!("\"{field}\"=x.\"{field}\""))
         .collect::<Vec<_>>()
         .join(",");
-    let changed=db.execute(&format!("update aset_tr_penerimaan_aset r set {fields},updated_at=now() from json_populate_record(null::aset_tr_penerimaan_aset,$3) x where r.tenant_id=$1 and r.id=$2 and r.status='draft'"),&[&ctx.tenant_id,&id,&input.header]).await?;
+    let changed=db.cached_execute(&format!("update aset_tr_penerimaan_aset r set {fields},updated_at=now() from json_populate_record(null::aset_tr_penerimaan_aset,$3) x where r.tenant_id=$1 and r.id=$2 and r.status='draft'"),&[&ctx.tenant_id,&id,&input.header]).await?;
     if changed == 0 {
         return Err(Error::new(
             422,
             "Penerimaan yang sudah selesai tidak dapat diubah; asetnya sudah terdaftar dan bernomor.",
         ));
     }
-    db.execute(
+    db.cached_execute(
         "delete from aset_tr_penerimaan_aset_details where tenant_id=$1 and penerimaan_aset_id=$2",
         &[&ctx.tenant_id, &id],
     )
@@ -702,7 +702,7 @@ async fn complete(
     }
     db.batch_execute("begin").await?;
     claim(db, ctx, id, version).await?;
-    let changed=db.execute("update aset_tr_penerimaan_aset set status='selesai',updated_at=now() where tenant_id=$1 and id=$2 and status='draft'",&[&ctx.tenant_id,&id]).await?;
+    let changed=db.cached_execute("update aset_tr_penerimaan_aset set status='selesai',updated_at=now() where tenant_id=$1 and id=$2 and status='draft'",&[&ctx.tenant_id,&id]).await?;
     if changed == 0 {
         return Err(Error::new(422, "Penerimaan ini sudah diselesaikan."));
     }
@@ -985,7 +985,7 @@ async fn create_asset(
     db::insert(db,"aset_tr_penempatan_aset",json!({"id":db::id().to_uppercase(),"tenant_id":ctx.tenant_id,"aset_id":asset_id,"receiving_org_unit_id":receipt["receiving_org_unit_id"],"usage_org_unit_id":receipt["responsible_org_unit_id"],"received_by_user_id":receipt["diterima_oleh_user_id"],"custodian_user_id":receipt["penanggung_jawab_user_id"],"lokasi_aset_id":location,"effective_on":receipt["tanggal"],"reason":"Penerimaan aset"}),true).await?;
     let receipt_code=db::one(db,"select kode from aset_tr_penerimaan_aset where tenant_id=$1 and id=$2 and deleted_at is null",&[&ctx.tenant_id,&text(receipt,"id")]).await?;
     let context=json!({"type":"acquisition","date":receipt["tanggal"],"source_type":"penerimaan-aset","source_id":receipt["id"],"document_number":receipt_code["kode"],"description":"Perolehan aset"}).to_string();
-    db.query_one(
+    db.cached_query_one(
         "select set_config('coreerp.fa_ledger_context',$1,true)",
         &[&context],
     )
@@ -1034,7 +1034,7 @@ async fn create_asset(
         db::insert(db, "aset_tr_aset_atribut", row, true).await?;
     }
     if !types.is_empty() {
-        db.execute("update aset_m_tipe_atribut set data_type_locked=true,updated_at=now() where tenant_id=$1 and id=any($2)",&[&ctx.tenant_id,&types]).await?;
+        db.cached_execute("update aset_m_tipe_atribut set data_type_locked=true,updated_at=now() where tenant_id=$1 and id=any($2)",&[&ctx.tenant_id,&types]).await?;
     }
     Ok(())
 }

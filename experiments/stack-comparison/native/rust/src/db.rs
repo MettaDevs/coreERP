@@ -4,10 +4,72 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use serde_json::{Value, json};
-use tokio_postgres::{Client, types::ToSql};
+use tokio_postgres::{Row, types::ToSql};
 
 pub type Result<T> = std::result::Result<T, Error>;
 pub type Params<'a> = &'a [&'a (dyn ToSql + Sync)];
+/// Koneksi pool. Statement disimpan per koneksi seperti pgx dan postgres.js prepare; tanpa cache setiap
+/// query di-parse dan di-plan ulang (A/B Bun 200 VU: CPU database per request turun 49%).
+pub type Client = deadpool_postgres::ClientWrapper;
+
+#[allow(async_fn_in_trait)]
+pub trait Cached {
+    async fn cached_execute(
+        &self,
+        sql: &str,
+        params: Params<'_>,
+    ) -> std::result::Result<u64, tokio_postgres::Error>;
+    async fn cached_query(
+        &self,
+        sql: &str,
+        params: Params<'_>,
+    ) -> std::result::Result<Vec<Row>, tokio_postgres::Error>;
+    async fn cached_query_one(
+        &self,
+        sql: &str,
+        params: Params<'_>,
+    ) -> std::result::Result<Row, tokio_postgres::Error>;
+    async fn cached_query_opt(
+        &self,
+        sql: &str,
+        params: Params<'_>,
+    ) -> std::result::Result<Option<Row>, tokio_postgres::Error>;
+}
+
+impl Cached for Client {
+    async fn cached_execute(
+        &self,
+        sql: &str,
+        params: Params<'_>,
+    ) -> std::result::Result<u64, tokio_postgres::Error> {
+        let statement = self.prepare_cached(sql).await?;
+        self.execute(&statement, params).await
+    }
+    async fn cached_query(
+        &self,
+        sql: &str,
+        params: Params<'_>,
+    ) -> std::result::Result<Vec<Row>, tokio_postgres::Error> {
+        let statement = self.prepare_cached(sql).await?;
+        self.query(&statement, params).await
+    }
+    async fn cached_query_one(
+        &self,
+        sql: &str,
+        params: Params<'_>,
+    ) -> std::result::Result<Row, tokio_postgres::Error> {
+        let statement = self.prepare_cached(sql).await?;
+        self.query_one(&statement, params).await
+    }
+    async fn cached_query_opt(
+        &self,
+        sql: &str,
+        params: Params<'_>,
+    ) -> std::result::Result<Option<Row>, tokio_postgres::Error> {
+        let statement = self.prepare_cached(sql).await?;
+        self.query_opt(&statement, params).await
+    }
+}
 
 #[derive(Debug)]
 pub struct Error {
@@ -67,7 +129,7 @@ impl IntoResponse for Error {
 pub async fn rows(db: &Client, sql: &str, params: Params<'_>) -> Result<Vec<Value>> {
     let statement = format!("select row_to_json(result) from ({sql}) result");
     Ok(db
-        .query(&statement, params)
+        .cached_query(&statement, params)
         .await?
         .into_iter()
         .map(|row| row.get(0))
@@ -99,7 +161,7 @@ pub async fn insert(db: &Client, table: &str, mut data: Value, timestamps: bool)
     let sql = format!(
         "insert into {table} ({fields}) select {fields} from json_populate_record(null::{table}, $1) returning row_to_json({table})"
     );
-    Ok(db.query_one(&sql, &[&data]).await?.get(0))
+    Ok(db.cached_query_one(&sql, &[&data]).await?.get(0))
 }
 
 pub fn now() -> String {

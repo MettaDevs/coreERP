@@ -1,3 +1,4 @@
+use crate::db::{Cached, Client};
 use crate::{
     auth::Context,
     db::{self, Error, Result, flag, nullable, number, text},
@@ -5,7 +6,6 @@ use crate::{
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
-use tokio_postgres::Client;
 
 pub async fn asset_context(
     db: &Client,
@@ -244,7 +244,7 @@ async fn next_number(db: &Client, sequence: &Value, scope: &str, period: &str) -
     if !flag(sequence, "preallocation_enabled") {
         if let Some(row)=db::optional(db,"select numeric_value from number_sequence_reusable_numbers where sequence_id=$1 and scope_key=$2 and period_key=$3 order by numeric_value for update limit 1",&[&sequence_id,&scope,&period]).await?{
             let numeric=number(&row,"numeric_value");
-            db.execute("delete from number_sequence_reusable_numbers where sequence_id=$1 and scope_key=$2 and period_key=$3 and numeric_value=$4",&[&sequence_id,&scope,&period,&numeric]).await?;
+            db.cached_execute("delete from number_sequence_reusable_numbers where sequence_id=$1 and scope_key=$2 and period_key=$3 and numeric_value=$4",&[&sequence_id,&scope,&period,&numeric]).await?;
             return Ok(numeric);
         }
     }
@@ -252,7 +252,7 @@ async fn next_number(db: &Client, sequence: &Value, scope: &str, period: &str) -
     if counter.is_none() {
         let id = db::id().to_uppercase();
         let minimum = number(sequence, "minimum_number");
-        db.execute("insert into number_sequence_counters(id,sequence_id,scope_key,period_key,next_number,created_at,updated_at) values($1,$2,$3,$4,$5,now(),now()) on conflict do nothing",&[&id,&sequence_id,&scope,&period,&minimum]).await?;
+        db.cached_execute("insert into number_sequence_counters(id,sequence_id,scope_key,period_key,next_number,created_at,updated_at) values($1,$2,$3,$4,$5,now(),now()) on conflict do nothing",&[&id,&sequence_id,&scope,&period,&minimum]).await?;
         counter=Some(db::one(db,"select * from number_sequence_counters where sequence_id=$1 and scope_key=$2 and period_key=$3 for update",&[&sequence_id,&scope,&period]).await?);
     }
     let counter = counter.unwrap();
@@ -260,7 +260,7 @@ async fn next_number(db: &Client, sequence: &Value, scope: &str, period: &str) -
     let next = number(&counter, "next_number");
     if !flag(sequence, "preallocation_enabled") {
         check_max(sequence, next)?;
-        db.execute(
+        db.cached_execute(
             "update number_sequence_counters set next_number=$2,updated_at=now() where id=$1",
             &[&counter_id, &(next + 1)],
         )
@@ -269,14 +269,14 @@ async fn next_number(db: &Client, sequence: &Value, scope: &str, period: &str) -
     }
     let mut allocation=db::optional(db,"select * from number_sequence_allocations where sequence_id=$1 and scope_key=$2 and period_key=$3 and next_number<=last_number order by created_at for update limit 1",&[&sequence_id,&scope,&period]).await?;
     if allocation.is_none() {
-        db.execute("delete from number_sequence_allocations where sequence_id=$1 and scope_key=$2 and period_key=$3 and next_number>last_number",&[&sequence_id,&scope,&period]).await?;
+        db.cached_execute("delete from number_sequence_allocations where sequence_id=$1 and scope_key=$2 and period_key=$3 and next_number>last_number",&[&sequence_id,&scope,&period]).await?;
         check_max(sequence, next)?;
         let mut last = next + number(sequence, "preallocation_quantity") - 1;
         if !sequence["maximum_number"].is_null() {
             last = last.min(number(sequence, "maximum_number"));
         }
         allocation=Some(db::insert(db,"number_sequence_allocations",json!({"id":db::id(),"sequence_id":sequence_id,"scope_key":scope,"period_key":period,"first_number":next,"last_number":last,"next_number":next}),true).await?);
-        db.execute(
+        db.cached_execute(
             "update number_sequence_counters set next_number=$2,updated_at=now() where id=$1",
             &[&counter_id, &(last + 1)],
         )
@@ -294,7 +294,7 @@ async fn next_number(db: &Client, sequence: &Value, scope: &str, period: &str) -
     let allocation = allocation.unwrap();
     let numeric = number(&allocation, "next_number");
     check_max(sequence, numeric)?;
-    db.execute(
+    db.cached_execute(
         "update number_sequence_allocations set next_number=$2,updated_at=now() where id=$1",
         &[&text(&allocation, "id"), &(numeric + 1)],
     )

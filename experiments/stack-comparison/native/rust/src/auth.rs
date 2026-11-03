@@ -1,3 +1,4 @@
+use crate::db::{Cached, Client};
 use crate::{
     App,
     crypto::{constant_eq, random_token},
@@ -13,7 +14,6 @@ use md5::{Digest, Md5};
 use rand::Rng;
 use serde_json::{Value, json};
 use std::collections::{HashMap, HashSet};
-use tokio_postgres::Client;
 
 pub struct Session {
     pub id: String,
@@ -142,7 +142,7 @@ impl Session {
             .await?;
             if let Some(user) = &session.user {
                 let actor = text(user, "id");
-                db.query_one("select set_config('coreerp.user_id',$1,false)", &[&actor])
+                db.cached_query_one("select set_config('coreerp.user_id',$1,false)", &[&actor])
                     .await?;
             }
         }
@@ -277,20 +277,20 @@ impl Session {
         if !second {
             return Err(login_failed(limiter, fortify_key).await);
         }
-        db.execute("delete from sessions where id=$1", &[&self.id])
+        db.cached_execute("delete from sessions where id=$1", &[&self.id])
             .await?;
         self.id = random_token();
         self.data[guard_key()] = user["id"].clone();
         self.data["password_hash_web"] = json!(hash);
         self.data["_token"] = json!(random_token());
         let user_id = user["id"].as_i64().unwrap();
-        db.execute(
+        db.cached_execute(
             "update users set last_login_at=now(),updated_at=now() where id=$1",
             &[&user_id],
         )
         .await?;
         let actor = user_id.to_string();
-        db.query_one("select set_config('coreerp.user_id',$1,false)", &[&actor])
+        db.cached_query_one("select set_config('coreerp.user_id',$1,false)", &[&actor])
             .await?;
         self.id = random_token();
         self.user = Some(user);
@@ -310,9 +310,9 @@ impl Session {
             .and_then(|v| v.to_str().ok())
             .unwrap_or("");
         let epoch = chrono::Utc::now().timestamp() as i32;
-        db.execute("insert into sessions (id,user_id,ip_address,user_agent,payload,last_activity) values ($1,$2,$3,$4,$5,$6) on conflict (id) do update set user_id=excluded.user_id,ip_address=excluded.ip_address,user_agent=excluded.user_agent,payload=excluded.payload,last_activity=excluded.last_activity", &[&self.id,&user_id,&ip,&agent,&payload,&epoch]).await?;
+        db.cached_execute("insert into sessions (id,user_id,ip_address,user_agent,payload,last_activity) values ($1,$2,$3,$4,$5,$6) on conflict (id) do update set user_id=excluded.user_id,ip_address=excluded.ip_address,user_agent=excluded.user_agent,payload=excluded.payload,last_activity=excluded.last_activity", &[&self.id,&user_id,&ip,&agent,&payload,&epoch]).await?;
         if rand::thread_rng().gen_range(1..=100) <= 2 {
-            db.execute(
+            db.cached_execute(
                 "delete from sessions where last_activity < $1",
                 &[&(epoch - 7200)],
             )
@@ -388,7 +388,7 @@ impl Limiter<'_> {
         let (prefixed, flexible) = self.keys(key);
         let Some(row) = self
             .db
-            .query_opt("select * from cache where key in ($1)", &[&prefixed])
+            .cached_query_opt("select * from cache where key in ($1)", &[&prefixed])
             .await?
         else {
             return Ok(None);
@@ -396,7 +396,7 @@ impl Limiter<'_> {
         let now = epoch();
         if row.try_get::<_, i64>("expiration")? <= now {
             self.db
-                .execute(
+                .cached_execute(
                     "delete from cache where key in ($1,$2) and expiration <= $3",
                     &[&prefixed, &flexible, &now],
                 )
@@ -415,7 +415,7 @@ impl Limiter<'_> {
         let (prefixed, _) = self.keys(key);
         let inserted = self
             .db
-            .execute(
+            .cached_execute(
                 "insert into cache (key,value,expiration) values ($1,$2,$3) on conflict do nothing",
                 &[&prefixed, &serialize(value), &(epoch() + DECAY_SECONDS)],
             )
@@ -430,7 +430,7 @@ impl Limiter<'_> {
         let result = async {
             let Some(row) = self
                 .db
-                .query_opt(
+                .cached_query_opt(
                     "select * from cache where key = $1 limit 1 for update",
                     &[&prefixed],
                 )
@@ -443,7 +443,7 @@ impl Limiter<'_> {
             };
             let hits = current + 1;
             self.db
-                .execute(
+                .cached_execute(
                     "update cache set value = $1 where key = $2",
                     &[&serialize(hits), &prefixed],
                 )
@@ -465,14 +465,14 @@ impl Limiter<'_> {
 
     async fn put(&self, key: &str, value: i64) -> Result<()> {
         let (prefixed, _) = self.keys(key);
-        self.db.execute("insert into cache (key,value,expiration) values ($1,$2,$3) on conflict (key) do update set value=excluded.value,expiration=excluded.expiration", &[&prefixed, &serialize(value), &(epoch() + DECAY_SECONDS)]).await?;
+        self.db.cached_execute("insert into cache (key,value,expiration) values ($1,$2,$3) on conflict (key) do update set value=excluded.value,expiration=excluded.expiration", &[&prefixed, &serialize(value), &(epoch() + DECAY_SECONDS)]).await?;
         Ok(())
     }
 
     async fn forget(&self, key: &str) -> Result<()> {
         let (prefixed, flexible) = self.keys(key);
         self.db
-            .execute(
+            .cached_execute(
                 "delete from cache where key in ($1,$2)",
                 &[&prefixed, &flexible],
             )

@@ -14,6 +14,7 @@ use axum::{
     http::{HeaderValue, Method, StatusCode},
     response::{Html, IntoResponse, Response},
 };
+use db::Cached;
 use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
 use serde_json::{Value, json};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
@@ -108,7 +109,7 @@ async fn handle(
             return db::Error::new(503, "Service Unavailable").into_response();
         }
     };
-    let db: &tokio_postgres::Client = &connection;
+    let db: &db::Client = &connection;
     let mut session = match auth::Session::load(&app, db, &parts.headers).await {
         Ok(session) => session,
         Err(error) => {
@@ -132,7 +133,7 @@ async fn handle(
             if parts.method==Method::POST {return session.login(&app,db,&body,&ip).await;}
         }
         if path=="/logout" && parts.method==Method::POST {
-            db.execute("delete from sessions where id=$1",&[&session.id]).await?;
+            db.cached_execute("delete from sessions where id=$1",&[&session.id]).await?;
             session.id=crypto::random_token();session.user=None;session.data=json!({"_token":crypto::random_token()});
             return Ok(StatusCode::NO_CONTENT.into_response());
         }
