@@ -58,6 +58,21 @@
       "kind": "transaction-other:reset all",
       "reason": "Rust mengirim RESET ALL bersama ROLLBACK untuk membersihkan setting sesi koneksi pool. Kerja tambahan; lihat catatan tuning pada transaction-rollback.",
       "evidence": ""
+    },
+    {
+      "candidates": ["go", "hono", "elysia", "rust"],
+      "operations": ["login-page"],
+      "kind": "read-missing",
+      "match": "sessions",
+      "reason": "Request tanpa cookie sesi. PHP membaca ID acak yang baru dibangkitkan dan baris itu pasti tidak ada; kandidat langsung membuat sesi baru.",
+      "evidence": "private/l4-*-login-compare.json VERIFIED dengan bacaan sesi tanpa cookie diperlakukan opsional"
+    },
+    {
+      "candidates": ["go", "hono", "elysia", "rust"],
+      "operations": ["login-page"],
+      "kind": "transaction-other:set search_path to \"public\"",
+      "reason": "Laravel mengirim SET search_path sekali saat membuka koneksi PDO baru; kandidat memakai search_path bawaan database. Bukan kerja per request.",
+      "evidence": ""
     }
   ]
 }

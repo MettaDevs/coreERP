@@ -138,6 +138,9 @@ def cache_rows(database: str, fixture: dict, email: str) -> dict:
     return {"rows": sorted(shaped), "route_keys_verified": not unexplained}
 
 
+NO_COOKIE = {"login-page", "guest-page"}
+
+
 def compare(expected: dict, actual: dict) -> list[dict]:
     differences = []
     if expected.get("cache") != actual.get("cache"):
@@ -148,14 +151,19 @@ def compare(expected: dict, actual: dict) -> list[dict]:
             differences.append({"scenario": scenario, "reason": "missing"})
             continue
         for key in ["status", "outside_writes", "outside_reads", "transactions", "open_at_end"]:
-            if left[key] != right[key]:
-                differences.append({"scenario": scenario, "field": key, "expected": left[key], "actual": right[key]})
+            expected_value, actual_value = left[key], right[key]
+            # Tanpa cookie sesi, PHP membaca ID acak yang baru dibangkitkan; baris itu pasti tidak ada, jadi bacaannya opsional.
+            if key == "outside_reads" and scenario in NO_COOKIE:
+                expected_value, actual_value = ([read for read in reads if read != "select sessions"] for reads in [expected_value, actual_value])
+            if expected_value != actual_value:
+                differences.append({"scenario": scenario, "field": key, "expected": expected_value, "actual": actual_value})
     return differences
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["enable", "capture", "disable"])
+    parser.add_argument("action", choices=["enable", "capture", "disable", "compare"])
+    parser.add_argument("--actual", type=Path, help="Tangkapan kandidat untuk aksi compare.")
     parser.add_argument("--database", required=True)
     parser.add_argument("--base")
     parser.add_argument("--fixture", type=Path, default=LAB / "private" / "fixture.json")
@@ -167,6 +175,13 @@ if __name__ == "__main__":
     DATABASE = args.database
     if args.action == "enable":
         sql(f"ALTER DATABASE \"{args.database}\" SET log_statement='all';")
+    elif args.action == "compare":
+        differences = compare(json.loads(args.expected.read_text(encoding="utf-8")), json.loads(args.actual.read_text(encoding="utf-8")))
+        verdict = {"verdict": "NOT VERIFIED" if differences else "VERIFIED", "expected": str(args.expected), "actual": str(args.actual), "differences": differences}
+        args.output.write_text(json.dumps(verdict, indent=2) + "\n", encoding="utf-8")
+        print(json.dumps({"verdict": verdict["verdict"], "differences": len(differences)}))
+        if differences:
+            raise SystemExit(1)
     elif args.action == "disable":
         sql(f"ALTER DATABASE \"{args.database}\" RESET log_statement;")
     else:

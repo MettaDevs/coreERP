@@ -1,4 +1,4 @@
-"""Satu golden run kandidat native: start dingin dengan PHP mati, alur HTTP, lalu ketiga gate."""
+"""Satu golden run kandidat native: start dingin dengan PHP mati, alur HTTP, lalu keempat gate."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ import subprocess
 import sys
 
 import native
+import sql_observer
 
 SCRIPTS = Path(__file__).resolve().parent
 PRIVATE = SCRIPTS.parent / "private"
@@ -26,6 +27,7 @@ if __name__ == "__main__":
     parser.add_argument("--database", required=True)
     parser.add_argument("--expected", required=True, type=Path, help="Flow PHP pada run-id yang sama.")
     parser.add_argument("--expected-database", required=True)
+    parser.add_argument("--expected-traces", required=True, type=Path, help="Folder trace PHP dari flow yang sama.")
     parser.add_argument("--prefix", required=True, help="Awalan berkas evidence di private/, misalnya g2-go.")
     parser.add_argument("--run-id", required=True)
     args = parser.parse_args()
@@ -33,6 +35,8 @@ if __name__ == "__main__":
     flow = Path(str(base) + "-flow.json")
     if flow.exists():
         raise SystemExit("Evidence sudah ada; golden run tidak menimpa artifact lama.")
+    # Cluster uji memuat puluhan clone; tanpa reset, pg_stat_statements.max mengusir fingerprint di tengah trace.
+    sql_observer.reset()
     started = native.up(args.candidate, args.database, PRIVATE / "runtime.env")
     try:
         steps = [tool("http_baseline.py", "--base", started["base"], "--fixture", PRIVATE / "fixture.json", "--env", PRIVATE / "runtime.env",
@@ -49,8 +53,10 @@ if __name__ == "__main__":
                  "--baseline", PRIVATE / "seed-baseline.json", "--acknowledgements", flow, "--output", str(base) + "-oracle.json"),
             tool("compare_posting.py", "--expected-database", args.expected_database, "--actual-database", args.database,
                  "--expected-http", args.expected, "--actual-http", flow, "--output", str(base) + "-posting.json"),
+            tool("compare_queries.py", "--expected", args.expected_traces, "--actual", str(base) + "-traces",
+                 "--candidate", args.candidate, "--output", str(base) + "-queries.json"),
         ]
-    summary = {"verdict": "VERIFIED" if len(steps) == 4 and all(step["exit"] == 0 for step in steps) else "NOT VERIFIED",
+    summary = {"verdict": "VERIFIED" if len(steps) == 5 and all(step["exit"] == 0 for step in steps) else "NOT VERIFIED",
                "runtime": started, "steps": steps}
     Path(str(base) + "-summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({"verdict": summary["verdict"], "steps": [(step["tool"], step["exit"]) for step in steps]}))
