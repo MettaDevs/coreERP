@@ -1,0 +1,82 @@
+name: coreerp-stack-comparison
+
+x-php: &php
+  image: ${PHP_IMAGE:?Set PHP_IMAGE to an inspected local image}
+  working_dir: /repo/apps/core
+  cpus: 2
+  mem_limit: 1g
+  env_file: ../private/runtime.env
+  environment:
+    APP_ENV: production
+    APP_DEBUG: "false"
+    APP_URL: http://127.0.0.1:18641
+    LOG_CHANNEL: stderr
+    LOG_LEVEL: warning
+    DB_CONNECTION: pgsql
+    DB_HOST: database
+    DB_PORT: "5432"
+    DB_DATABASE: ${COMPARE_DATABASE:-erp_compare}
+    DB_USERNAME: compare_admin
+    SESSION_DRIVER: database
+    CACHE_STORE: database
+    QUEUE_CONNECTION: database
+    OTEL_SDK_DISABLED: "true"
+    COREERP_PASSWORD_BREACH_CHECK: "false"
+    APP_PACKAGES_CACHE: /tmp/compare-packages.php
+    APP_SERVICES_CACHE: /tmp/compare-services.php
+  volumes:
+    - source:/repo
+    - vendor:/repo/apps/core/vendor:ro
+    - ../:/comparison:ro
+
+services:
+  database:
+    image: ${POSTGRES_IMAGE:?Set POSTGRES_IMAGE to an inspected digest}
+    cpus: 2
+    mem_limit: 1g
+    environment:
+      POSTGRES_DB: erp_compare
+      POSTGRES_USER: compare_admin
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set private fixture password}
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - pg_stat_statements.track=all
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - max_connections=100
+      - -c
+      - synchronous_commit=on
+      - -c
+      - log_parameter_max_length=0
+      - -c
+      - log_parameter_max_length_on_error=0
+    volumes:
+      - database:/var/lib/postgresql/data
+    ports:
+      - 127.0.0.1:18640:5432
+    healthcheck:
+      test: [CMD, pg_isready, -U, compare_admin, -d, erp_compare]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  tools:
+    <<: *php
+    entrypoint: [sleep, infinity]
+  php:
+    <<: *php
+    entrypoint: [php, artisan, octane:frankenphp, --host=0.0.0.0, --port=8000, --workers=4, --max-requests=500]
+    ports:
+      - 127.0.0.1:18641:8000
+
+volumes:
+  source:
+    name: coreerp-stack-comparison-source
+  database:
+    name: coreerp-stack-comparison-database
+  vendor:
+    external: true
+    name: ${PHP_VENDOR_VOLUME:?Set PHP_VENDOR_VOLUME to the inspected dependency volume}
