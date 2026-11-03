@@ -153,18 +153,29 @@ trait HoldsEnvironmentOperation
             return false;
         }
 
-        $expired->update([
-            'status' => 'failed',
-            'finished_at' => now(),
-            'lease_until' => null,
-            'failure_message' => sprintf(
-                'Tenggatnya habis pada %s tanpa pernah ditutup — prosesnya berhenti tanpa sempat '
-                .'melaporkan apa pun. Operasi ini diambil alih percobaan berikutnya, dan langkah '
-                .'terakhir yang sempat tercapai adalah "%s".',
-                (string) $expired->getOriginal('lease_until'),
-                $expired->step ?? 'tidak tercatat',
-            ),
-        ]);
+        return $this->retireExpiredOperation($expired);
+    }
+
+    protected function retireExpiredOperation(EnvironmentOperation $expired): bool
+    {
+        // Heartbeat dapat memperpanjang tenggat sesudah SELECT. Periksa lagi saat menulis.
+        $changed = EnvironmentOperation::query()->whereKey($expired->id)
+            ->where('status', 'running')->where('lease_until', '<', now())->update([
+                'status' => 'failed',
+                'finished_at' => now(),
+                'lease_until' => null,
+                'failure_message' => sprintf(
+                    'Tenggatnya habis pada %s tanpa pernah ditutup — prosesnya berhenti tanpa sempat '
+                    .'melaporkan apa pun. Operasi ini diambil alih percobaan berikutnya, dan langkah '
+                    .'terakhir yang sempat tercapai adalah "%s".',
+                    (string) $expired->getOriginal('lease_until'),
+                    $expired->step ?? 'tidak tercatat',
+                ),
+            ]);
+
+        if ($changed === 0) {
+            return false;
+        }
 
         $this->warn(sprintf(
             'Operasi %s yang tenggatnya sudah lewat ditandai gagal dan diambil alih.',
@@ -184,7 +195,7 @@ trait HoldsEnvironmentOperation
      * Tenggatnya dilepas bersamaan. Ia hanya berarti selama operasinya berjalan, dan baris selesai
      * yang masih membawa tenggat terbaca seolah ia masih memegang sesuatu.
      */
-    protected function closeOperationAsFailed(EnvironmentOperation $operation, string $step, Throwable $cause): void
+    protected function closeOperationAsFailed(EnvironmentOperation $operation, string $step, Throwable $cause, ?string $environmentStatus = null): void
     {
         $message = trim($cause->getMessage());
 
@@ -192,12 +203,21 @@ trait HoldsEnvironmentOperation
             $message = $cause::class;
         }
 
-        $operation->update([
-            'status' => 'failed',
-            'step' => $step,
-            'failure_message' => mb_substr($message, 0, 2000),
-            'finished_at' => now(),
-            'lease_until' => null,
-        ]);
+        $connection = DB::connection($operation->getConnectionName());
+        $connection->transaction(function () use ($operation, $step, $message, $environmentStatus): void {
+            $changed = EnvironmentOperation::query()->whereKey($operation->id)->where('status', 'running')->update([
+                'status' => 'failed',
+                'step' => $step,
+                'failure_message' => mb_substr($message, 0, 2000),
+                'finished_at' => now(),
+                'lease_until' => null,
+            ]);
+
+            // Penutupan operasi dan status lingkungan harus commit bersamaan. Pengganti baru
+            // boleh masuk setelah itu; callback operasi yang sudah diambil alih tidak menulis.
+            if ($changed === 1 && $environmentStatus !== null) {
+                Environment::query()->whereKey($operation->environment_id)->update(['status' => $environmentStatus]);
+            }
+        });
     }
 }

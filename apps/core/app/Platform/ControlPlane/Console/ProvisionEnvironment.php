@@ -330,9 +330,7 @@ final class ProvisionEnvironment extends Command
      */
     private function markFailed(Environment $environment, EnvironmentOperation $operation, string $step, Throwable $e): void
     {
-        $this->closeOperationAsFailed($operation, $step, $e);
-
-        $environment->update(['status' => 'degraded']);
+        $this->closeOperationAsFailed($operation, $step, $e, 'degraded');
     }
 
     /** Mengubah sepotong slug menjadi bagian identifier yang sah, tanpa membuatnya unik. */

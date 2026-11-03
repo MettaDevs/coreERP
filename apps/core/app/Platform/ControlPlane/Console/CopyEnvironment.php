@@ -348,8 +348,7 @@ final class CopyEnvironment extends Command
 
             return self::SUCCESS;
         } catch (Throwable $e) {
-            $this->closeOperationAsFailed($operation, $step, $e);
-            $target->update(['status' => 'degraded']);
+            $this->closeOperationAsFailed($operation, $step, $e, 'degraded');
 
             $this->error(sprintf('Penyalinan berhenti di langkah "%s": %s', $step, $e->getMessage()));
             $this->line(sprintf(
@@ -562,22 +561,7 @@ final class CopyEnvironment extends Command
             return false;
         }
 
-        $running->update([
-            'status' => 'failed',
-            'finished_at' => now(),
-            'lease_until' => null,
-            'failure_message' => sprintf(
-                'Tenggatnya habis pada %s tanpa pernah ditutup — prosesnya berhenti tanpa sempat '
-                .'melaporkan apa pun. Penyalinan berikutnya dari sumber yang sama mengambil alih, '
-                .'dan langkah terakhir yang sempat tercapai adalah "%s".',
-                (string) $running->getOriginal('lease_until'),
-                $running->step ?? 'tidak tercatat',
-            ),
-        ]);
-
-        $this->warn(sprintf('Penyalinan %s yang tenggatnya sudah lewat ditandai gagal dan diambil alih.', $running->id));
-
-        return true;
+        return $this->retireExpiredOperation($running);
     }
 
     /**
@@ -817,7 +801,11 @@ final class CopyEnvironment extends Command
         }
 
         $this->nextRenewalAt = $now + self::LEASE_RENEWAL_SECONDS;
-        $this->operation->update(['lease_until' => now()->addMinutes($this->operationLeaseMinutes())]);
+        $changed = EnvironmentOperation::query()->whereKey($this->operation->id)->where('status', 'running')
+            ->update(['lease_until' => now()->addMinutes($this->operationLeaseMinutes())]);
+        if ($changed === 0) {
+            throw new RuntimeException('Penyalinan dihentikan karena operasinya sudah diambil alih atau ditutup.');
+        }
     }
 
     // ------------------------------------------------------------------ pelucutan

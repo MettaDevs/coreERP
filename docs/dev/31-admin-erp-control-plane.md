@@ -378,6 +378,17 @@ reservasi unik per sumber dan middleware `WithoutOverlapping`; visibility timeou
 boleh menjalankan copy kedua. Pelepasan karena overlap mempunyai batas retry tetap; error copy
 pertama dicatat sebagai gagal dan dilanjutkan operator setelah sebabnya diperbaiki.
 
+Pengambilalihan lease memeriksa kembali `status = running` dan tenggat yang sudah lewat pada
+UPDATE yang sama. Heartbeat yang memperpanjang tenggat sesudah pembacaan awal membatalkan
+pengambilalihan. Copy memakai aturan yang sama untuk kunci sasaran dan kunci sumber.
+Heartbeat operasi yang sudah ditutup atau diambil alih berhenti tanpa menghidupkan lease kembali.
+
+Callback gagal hanya menutup operasi yang masih `running`. Penutupan riwayat dan perubahan status
+lingkungan commit dalam satu transaksi, sehingga worker lama tidak dapat menurunkan lingkungan
+yang sudah diselesaikan penggantinya. Aturan bersama ini dipakai penyiapan, copy, dan upgrade.
+Regresi ada di `apps/core/tests/Feature/Platform/ControlPlane/EnvironmentLeaseTest.php`, termasuk
+heartbeat di antara pembacaan dan takeover serta callback worker lama setelah pengganti berhasil.
+
 Keputusan penemuan fitur: pemiliknya coordinator Core dan konsol operator, data per tenant/sumber
 lingkungan, tanpa legal entity atau unit organisasi. Tidak memerlukan nomor bisnis baru, workflow
 approval, atau SoD baru. Audit operator berada dalam transaksi registry/permintaan. Pola ini
