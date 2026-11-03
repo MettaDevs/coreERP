@@ -78,7 +78,7 @@ func (q *request) attributeRows(assetType string, submitted []object) ([]object,
 		typeIDs = append(typeIDs, str(id["tipe_atribut_id"]))
 	}
 	if len(typeIDs) > 0 {
-		if _, e = q.rows("select id from aset_m_tipe_atribut where tenant_id=$1 and id=any($2::text[]) order by id for update", q.authority.tenant, typeIDs); e != nil {
+		if _, e = q.rows("select id from aset_m_tipe_atribut where tenant_id=$1 and id=any($2) order by id for update", q.authority.tenant, typeIDs); e != nil {
 			return nil, e
 		}
 	}
@@ -88,7 +88,7 @@ func (q *request) attributeRows(assetType string, submitted []object) ([]object,
 	}
 	choices := []object{}
 	if len(typeIDs) > 0 {
-		choices, e = q.rows("select id,tipe_atribut_id,nilai from aset_m_tipe_atribut_nilai where tenant_id=$1 and tipe_atribut_id=any($2::text[]) and deleted_at is null order by urutan,nilai", q.authority.tenant, typeIDs)
+		choices, e = q.rows("select id,tipe_atribut_id,nilai from aset_m_tipe_atribut_nilai where tenant_id=$1 and tipe_atribut_id=any($2) and deleted_at is null order by urutan,nilai", q.authority.tenant, typeIDs)
 		if e != nil {
 			return nil, e
 		}
@@ -188,7 +188,7 @@ func (q *request) blockers(h object, lines []object) (object, error) {
 	for _, d := range lines {
 		ids = append(ids, str(d["group_aset_id"]))
 	}
-	groups, e := q.rows("select id,kode,nama from aset_m_group_aset where tenant_id=$1 and id=any($2::text[])", q.authority.tenant, ids)
+	groups, e := q.rows("select id,kode,nama from aset_m_group_aset where tenant_id=$1 and id=any($2)", q.authority.tenant, ids)
 	if e != nil {
 		return nil, e
 	}
@@ -445,7 +445,7 @@ func (q *request) createAsset(h, d object, key, code, value string) error {
 		ids = append(ids, str(a["tipe_atribut_id"]))
 	}
 	if len(ids) > 0 {
-		return q.exec("update aset_m_tipe_atribut set data_type_locked=true,updated_at=now() where tenant_id=$1 and id=any($2::text[])", q.authority.tenant, ids)
+		return q.exec("update aset_m_tipe_atribut set data_type_locked=true,updated_at=now() where tenant_id=$1 and id=any($2)", q.authority.tenant, ids)
 	}
 	return nil
 }

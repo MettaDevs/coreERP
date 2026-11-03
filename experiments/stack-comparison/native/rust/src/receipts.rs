@@ -836,13 +836,13 @@ async fn attribute_rows(
 ) -> Result<Vec<Value>> {
     let ids:Vec<String>=db::rows(db,"select tipe_atribut_id from aset_m_jenis_aset_atribut where tenant_id=$1 and jenis_aset_id=$2 and deleted_at is null order by tipe_atribut_id",&[&ctx.tenant_id,&kind]).await?.iter().map(|row|text(row,"tipe_atribut_id")).collect();
     if !ids.is_empty() {
-        db::rows(db,"select id from aset_m_tipe_atribut where tenant_id=$1 and id::text=any($2) order by id for update",&[&ctx.tenant_id,&ids]).await?;
+        db::rows(db,"select id from aset_m_tipe_atribut where tenant_id=$1 and id=any($2) order by id for update",&[&ctx.tenant_id,&ids]).await?;
     }
     let definitions=db::rows(db,"select t.*,a.wajib,a.urutan from aset_m_jenis_aset_atribut a join aset_m_tipe_atribut t on t.id=a.tipe_atribut_id and t.tenant_id=a.tenant_id where a.tenant_id=$1 and a.jenis_aset_id=$2 and a.deleted_at is null and t.deleted_at is null and t.aktif order by a.urutan,t.nama",&[&ctx.tenant_id,&kind]).await?;
     let choices = if ids.is_empty() {
         vec![]
     } else {
-        db::rows(db,"select id,tipe_atribut_id,nilai from aset_m_tipe_atribut_nilai where tenant_id=$1 and tipe_atribut_id::text=any($2) and deleted_at is null order by urutan,nilai",&[&ctx.tenant_id,&ids]).await?
+        db::rows(db,"select id,tipe_atribut_id,nilai from aset_m_tipe_atribut_nilai where tenant_id=$1 and tipe_atribut_id=any($2) and deleted_at is null order by urutan,nilai",&[&ctx.tenant_id,&ids]).await?
     };
     for (index, value) in submitted.iter().enumerate() {
         let id = text(value, "tipe_atribut_id");
@@ -1034,7 +1034,7 @@ async fn create_asset(
         db::insert(db, "aset_tr_aset_atribut", row, true).await?;
     }
     if !types.is_empty() {
-        db.execute("update aset_m_tipe_atribut set data_type_locked=true,updated_at=now() where tenant_id=$1 and id::text=any($2)",&[&ctx.tenant_id,&types]).await?;
+        db.execute("update aset_m_tipe_atribut set data_type_locked=true,updated_at=now() where tenant_id=$1 and id=any($2)",&[&ctx.tenant_id,&types]).await?;
     }
     Ok(())
 }

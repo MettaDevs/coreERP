@@ -442,7 +442,7 @@ func (q *request) resolveAuthority(selected string) error {
 	for _, r := range assigned {
 		ids = append(ids, str(r["role_id"]))
 	}
-	roles, e := q.rows("with recursive reachable(role_id) as (select r.id from roles r where r.tenant_id=$1 and r.is_active=true and r.id=any($2::text[]) union select link.child_role_id from security_role_children link join reachable on reachable.role_id=link.parent_role_id join roles child on child.id=link.child_role_id and child.is_active=true where link.tenant_id=$1) select role_id from reachable", a.tenant, ids)
+	roles, e := q.rows("with recursive reachable(role_id) as (select r.id from roles r where r.tenant_id=$1 and r.is_active=true and r.id=any($2) union select link.child_role_id from security_role_children link join reachable on reachable.role_id=link.parent_role_id join roles child on child.id=link.child_role_id and child.is_active=true where link.tenant_id=$1) select role_id from reachable", a.tenant, ids)
 	if e != nil {
 		return e
 	}
@@ -450,7 +450,7 @@ func (q *request) resolveAuthority(selected string) error {
 	for _, r := range roles {
 		ids = append(ids, str(r["role_id"]))
 	}
-	perms, e := q.rows("select distinct p.code from security_role_duties rd join security_duty_privileges dp on dp.duty_code=rd.duty_code join security_privilege_permissions pp on pp.privilege_code=dp.privilege_code join permissions p on p.code=pp.permission_code where rd.role_id=any($1::text[]) and p.app_id='management-aset' order by p.code", ids)
+	perms, e := q.rows("select distinct p.code from security_role_duties rd join security_duty_privileges dp on dp.duty_code=rd.duty_code join security_privilege_permissions pp on pp.privilege_code=dp.privilege_code join permissions p on p.code=pp.permission_code where rd.role_id=any($1) and p.app_id='management-aset' order by p.code", ids)
 	if e != nil {
 		return e
 	}
@@ -486,7 +486,7 @@ func (q *request) resolveAuthority(selected string) error {
 				candidates = append(candidates, str(d["descendant_organization_id"]))
 			}
 		}
-		units, e := q.rows("select id from organizations where tenant_id=$1 and classification='operating_unit' and id=any($2::text[])", a.tenant, candidates)
+		units, e := q.rows("select id from organizations where tenant_id=$1 and classification='operating_unit' and id=any($2)", a.tenant, candidates)
 		if e != nil {
 			return e
 		}

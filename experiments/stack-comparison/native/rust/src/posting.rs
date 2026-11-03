@@ -108,7 +108,7 @@ async fn blocker_values(
         .collect();
     let groups = db::rows(
         db,
-        "select id,kode,nama from aset_m_group_aset where tenant_id=$1 and id::text=any($2)",
+        "select id,kode,nama from aset_m_group_aset where tenant_id=$1 and id=any($2)",
         &[&ctx.tenant_id, &ids],
     )
     .await?;
@@ -195,7 +195,7 @@ pub async fn evaluate(
         .collect();
     let groups = db::rows(
         db,
-        "select * from aset_m_group_aset where tenant_id=$1 and id::text=any($2)",
+        "select * from aset_m_group_aset where tenant_id=$1 and id=any($2)",
         &[&ctx.tenant_id, &groups],
     )
     .await?;
@@ -426,7 +426,7 @@ pub async fn evaluate(
         .collect();
     let accounts: HashMap<String, Value> = db::rows(
         db,
-        "select * from finance_reference_accounts where tenant_id=$1 and id::text=any($2)",
+        "select * from finance_reference_accounts where tenant_id=$1 and id=any($2)",
         &[&ctx.tenant_id, &accounts],
     )
     .await?
@@ -437,7 +437,7 @@ pub async fn evaluate(
         .iter()
         .filter_map(|line| nullable(line, "org_unit_id"))
         .collect();
-    let units:HashMap<String,Value>=db::rows(db,"select o.id,o.name,o.classification,u.type,u.number from organizations o left join operating_units u on u.organization_id=o.id where o.tenant_id=$1 and o.id::text=any($2)",&[&ctx.tenant_id,&units]).await?.into_iter().map(|unit|(text(&unit,"id"),unit)).collect();
+    let units:HashMap<String,Value>=db::rows(db,"select o.id,o.name,o.classification,u.type,u.number from organizations o left join operating_units u on u.organization_id=o.id where o.tenant_id=$1 and o.id=any($2)",&[&ctx.tenant_id,&units]).await?.into_iter().map(|unit|(text(&unit,"id"),unit)).collect();
     let unit_ids: Vec<String> = units.keys().cloned().collect();
     let business_units = business_units(db, ctx, &unit_ids, &date).await?;
     let mut problems = Vec::new();
@@ -705,7 +705,7 @@ async fn business_units(
     if versions.is_empty() || units.is_empty() {
         return Ok(result);
     }
-    let rows=db::rows(db,"select c.version_id,c.descendant_organization_id,a.id,a.name,u.number,c.distance from organization_hierarchy_closures c join operating_units u on u.organization_id=c.ancestor_organization_id join organizations a on a.id=c.ancestor_organization_id where c.version_id::text=any($1) and c.descendant_organization_id::text=any($2) and u.type='business_unit' and a.tenant_id=$3 order by c.distance",&[&versions,&units,&ctx.tenant_id]).await?;
+    let rows=db::rows(db,"select c.version_id,c.descendant_organization_id,a.id,a.name,u.number,c.distance from organization_hierarchy_closures c join operating_units u on u.organization_id=c.ancestor_organization_id join organizations a on a.id=c.ancestor_organization_id where c.version_id=any($1) and c.descendant_organization_id=any($2) and u.type='business_unit' and a.tenant_id=$3 order by c.distance",&[&versions,&units,&ctx.tenant_id]).await?;
     let mut nearest = HashMap::new();
     for row in rows {
         nearest

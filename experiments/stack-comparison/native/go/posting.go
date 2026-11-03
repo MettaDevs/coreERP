@@ -38,7 +38,7 @@ func (q *request) businessUnits(ids []string, date string) (map[string]object, e
 	if len(selected) == 0 {
 		return result, nil
 	}
-	ancestors, e := q.rows("select c.version_id,c.descendant_organization_id,c.ancestor_organization_id,o.name,u.number from organization_hierarchy_closures c join operating_units u on u.organization_id=c.ancestor_organization_id join organizations o on o.id=c.ancestor_organization_id where c.version_id=any($1::text[]) and c.descendant_organization_id=any($2::text[]) and u.type='business_unit' and o.tenant_id=$3 order by c.distance", selected, ids, q.authority.tenant)
+	ancestors, e := q.rows("select c.version_id,c.descendant_organization_id,c.ancestor_organization_id,o.name,u.number from organization_hierarchy_closures c join operating_units u on u.organization_id=c.ancestor_organization_id join organizations o on o.id=c.ancestor_organization_id where c.version_id=any($1) and c.descendant_organization_id=any($2) and u.type='business_unit' and o.tenant_id=$3 order by c.distance", selected, ids, q.authority.tenant)
 	if e != nil {
 		return nil, e
 	}
@@ -80,7 +80,7 @@ func (q *request) buildPosting(h object, lines, assets []object, persist bool) (
 	for _, d := range lines {
 		groupIDs = append(groupIDs, str(d["group_aset_id"]))
 	}
-	groupRows, e := q.rows("select id,kode,nama,lokasi_aset_id from aset_m_group_aset where tenant_id=$1 and id=any($2::text[])", tenant, groupIDs)
+	groupRows, e := q.rows("select id,kode,nama,lokasi_aset_id from aset_m_group_aset where tenant_id=$1 and id=any($2)", tenant, groupIDs)
 	if e != nil {
 		return nil, e
 	}
@@ -297,7 +297,7 @@ func (q *request) publishPosting(input object, persist bool) (object, error) {
 		}
 		return object{"posting_id": postingID, "status": existing["status"], "problems": problems, "payload": existing["payload"], "created": false}, nil
 	}
-	accountRows, e := q.rows("select * from finance_reference_accounts where tenant_id=$1 and id=any($2::text[])", tenant, accountIDs)
+	accountRows, e := q.rows("select * from finance_reference_accounts where tenant_id=$1 and id=any($2)", tenant, accountIDs)
 	if e != nil {
 		return nil, e
 	}
@@ -305,7 +305,7 @@ func (q *request) publishPosting(input object, persist bool) (object, error) {
 	for _, a := range accountRows {
 		accounts[str(a["id"])] = a
 	}
-	unitRows, e := q.rows("select o.id,o.name,o.classification,u.type,u.number from organizations o left join operating_units u on u.organization_id=o.id where o.tenant_id=$1 and o.id=any($2::text[])", tenant, unitIDs)
+	unitRows, e := q.rows("select o.id,o.name,o.classification,u.type,u.number from organizations o left join operating_units u on u.organization_id=o.id where o.tenant_id=$1 and o.id=any($2)", tenant, unitIDs)
 	if e != nil {
 		return nil, e
 	}

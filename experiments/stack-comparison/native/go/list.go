@@ -51,7 +51,7 @@ func (q *request) scopeFilter(f *sqlFilter, alias string) {
 			for id := range g.units {
 				ids = append(ids, id)
 			}
-			parts = append(parts, alias+".responsible_org_unit_id=any("+f.bind(ids)+"::text[])")
+			parts = append(parts, alias+".responsible_org_unit_id=any("+f.bind(ids)+")")
 		}
 		if len(parts) > 0 {
 			grants = append(grants, "("+strings.Join(parts, " and ")+")")
@@ -212,7 +212,7 @@ func (q *request) paginate(base string, args []any, columns map[string]string, s
 		if len(recordIDs) > 100 {
 			return response{}, invalid("record_ids", "Paling banyak 100 ID.")
 		}
-		f.add("id=any(?::text[])", recordIDs)
+		f.add("id=any(?)", recordIDs)
 	}
 	if e := searchFilter(f, query.Get("q"), search); e != nil {
 		return response{}, e

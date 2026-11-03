@@ -591,7 +591,7 @@ impl Context {
                     for row in db::rows(db,"select descendant_organization_id as id from organization_hierarchy_closures where version_id=$1 and ancestor_organization_id=$2", &[&version,&organization]).await? {units.push(text(&row,"id"));}
                 }
             }
-            let actual_units=db::rows(db,"select id from organizations where tenant_id=$1 and classification='operating_unit' and id::text=any($2)",&[&tenant_id,&units]).await?;
+            let actual_units=db::rows(db,"select id from organizations where tenant_id=$1 and classification='operating_unit' and id=any($2)",&[&tenant_id,&units]).await?;
             let units: Vec<String> = actual_units.iter().map(|row| text(row, "id")).collect();
             visible_ids.extend(units.iter().cloned());
             scope["operating_unit_ids"] = json!(units);
