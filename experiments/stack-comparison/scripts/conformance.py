@@ -78,7 +78,10 @@ def revocation(base: str, fixture: dict, password: str, database: str) -> list[d
             f"SELECT id,status FROM tenant_memberships WHERE id='{membership}'",
             lambda row: f"UPDATE tenant_memberships SET status={literal(row['status'])} WHERE id={literal(row['id'])};")
     observe("membership-restored")
-    run(f"UPDATE sessions SET last_activity=extract(epoch FROM now())::integer-7201 WHERE user_id={user_id};")
+    # Margin 60 detik di kedua sisi lifetime 120 menit; ::integer membulatkan, jadi -7201 jatuh tepat di batas detik.
+    run(f"UPDATE sessions SET last_activity=floor(extract(epoch FROM now()))::integer-7140 WHERE user_id={user_id};")
+    observe("database-session-near-lifetime")
+    run(f"UPDATE sessions SET last_activity=floor(extract(epoch FROM now()))::integer-7260 WHERE user_id={user_id};")
     observe("database-session-expired")
     client.login(account, password)
     run(f"DELETE FROM sessions WHERE user_id={user_id};")

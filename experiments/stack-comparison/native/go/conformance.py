@@ -69,7 +69,7 @@ def run(base: str, fixture: dict, password: str) -> dict:
     path = receipts + "/" + created["id"]
     replay = check("changed-body-replay", client.request("POST", receipts, {"unexpected": True}, {"Idempotency-Key": key}), 200)
     assert replay[1]["data"]["id"] == created["id"] and "details" not in replay[1]["data"]
-    assert replay[2].get("Idempotent-Replayed") == "true"
+    assert {key.lower(): value for key, value in replay[2].items()}.get("idempotent-replayed") == "true"
     check("missing-version", client.request("POST", path + "/selesaikan", {}), 428)
     check("bad-version-header", client.request("POST", path + "/selesaikan", {"version": created["version"]}, {"If-Match": "wrong"}), 428)
     check("stale-zero-version", client.request("POST", path + "/selesaikan", {"version": 0}), 409)
