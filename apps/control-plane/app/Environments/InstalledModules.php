@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace ControlPlane\Environments;
 
 use ControlPlane\Models\Environment;
+use Illuminate\Support\ConfigurationUrlParser;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -39,9 +41,8 @@ final class InstalledModules
             /*
              * Tidak punya database sendiri, dan artinya bercabang dua.
              *
-             * Lingkungan **produksi** yang `database_name`-nya kosong memang tinggal di database
-             * bawaan — itu keadaan produksi hari ini, keadaan on-prem, dan keadaan pooled. Tabelnya
-             * ada di tempat kita sudah berdiri.
+             * Lingkungan **produksi** yang `database_name`-nya kosong tinggal di database bisnis
+             * bersama. Koneksi baca bisnis dipilih terpisah dari koneksi pusat milik konsol.
              *
              * Lingkungan lain yang `database_name`-nya kosong **belum punya database sama sekali**,
              * jadi ia belum memuat satu pun module. Membacanya dari database bawaan akan memulangkan
@@ -55,13 +56,18 @@ final class InstalledModules
             if ($environment->kind !== 'production') {
                 return [];
             }
-
-            $connection = (string) config('database.default');
-        } else {
-            $connection = $this->register($database);
         }
 
         try {
+            $business = config('database.business_read_connection');
+
+            if (! is_string($business) || $business === '') {
+                throw new RuntimeException('Koneksi baca bisnis belum dikonfigurasi.');
+            }
+
+            $connection = is_string($database) && $database !== ''
+                ? $this->register($database, $business)
+                : $business;
             $rows = DB::connection($connection)
                 ->table('core_module_installations')
                 ->where('tenant_id', $environment->tenant_id)
@@ -126,26 +132,35 @@ final class InstalledModules
     }
 
     /**
-     * Koneksi ke database lingkungan, disalin dari koneksi bawaan.
+     * Koneksi ke database lingkungan, disalin dari koneksi baca bisnis.
      *
-     * Host, kredensial, dan `search_path` diambil dari koneksi bawaan supaya tidak pernah
-     * menyimpang darinya. `url` dikosongkan karena Laravel mendahulukannya di atas `database` bila
+     * Host, kredensial, dan `search_path` diambil dari koneksi baca bisnis. URL diurai sebelum
+     * `database` diganti, lalu dikosongkan karena Laravel mendahulukannya di atas `database` bila
      * ia terisi — dan bila itu terjadi, layar ini akan membaca database pusat sambil mengaku
      * membaca database lingkungan.
      */
-    private function register(string $database): string
+    private function register(string $database, string $business): string
     {
-        $default = (string) config('database.default');
         $name = 'environment_'.md5($database);
+        $config = config('database.connections.'.$business);
 
-        if (config('database.connections.'.$name.'.database') === $database) {
-            return $name;
+        if (! is_array($config)) {
+            throw new RuntimeException(sprintf('Koneksi baca bisnis "%s" belum dikonfigurasi.', $business));
         }
 
-        $config = config('database.connections.'.$default);
-        $config = is_array($config) ? $config : [];
+        $config = (new ConfigurationUrlParser)->parseConfiguration($config);
         $config['database'] = $database;
         $config['url'] = null;
+        foreach (['read', 'write'] as $direction) {
+            if (isset($config[$direction]) && is_array($config[$direction])) {
+                $config[$direction]['database'] = $database;
+                $config[$direction]['url'] = null;
+            }
+        }
+
+        if (config('database.connections.'.$name) === $config) {
+            return $name;
+        }
 
         config(['database.connections.'.$name => $config]);
         DB::purge($name);

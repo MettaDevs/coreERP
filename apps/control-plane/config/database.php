@@ -1,12 +1,8 @@
 <?php
 
 /*
- * Satu koneksi saja, dan ia menunjuk database yang sama dengan Core.
- *
- * Itu bukan kompromi sementara yang lupa dirapikan melainkan keadaan Irisan 1 apa adanya: batasnya
- * sudah ditarik di tingkat kode (penanda `OwnedByControlPlane` di Core), databasenya belum dipisah. Ketika
- * ia dipisah kelak, yang berubah hanya isi `DB_DATABASE` di berkas env ini — bukan satu baris pun
- * kode di sini.
+ * Koneksi bawaan membaca data pusat. InstalledModules mempunyai koneksi baca bisnis tersendiri.
+ * Konsol tidak memegang credential migration atau provisioning dan tidak memiliki schema sendiri.
  */
 return [
     /*
@@ -25,10 +21,13 @@ return [
      * yang benar-benar dipakai), dan hanya yang kedua yang menjaga apa pun.
      */
     'default' => env('DB_CONNECTION', 'pgsql'),
+    'mode' => env('COREERP_DATABASE_MODE', 'combined'),
+    'business_read_connection' => env('DB_BUSINESS_READ_CONNECTION', env('COREERP_DATABASE_MODE', 'combined') === 'combined' ? env('DB_CONNECTION', 'pgsql') : 'business_read'),
 
     'connections' => [
         'pgsql' => [
             'driver' => 'pgsql',
+            'url' => env('DB_URL'),
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', '5432'),
             'database' => env('DB_DATABASE', 'core_erp'),
@@ -37,6 +36,19 @@ return [
             'charset' => 'utf8',
             'search_path' => 'public',
             'sslmode' => 'prefer',
+        ],
+
+        'business_read' => [
+            'driver' => 'pgsql',
+            'url' => env('DB_BUSINESS_READ_URL'),
+            'host' => env('DB_BUSINESS_READ_HOST', '127.0.0.1'),
+            'port' => env('DB_BUSINESS_READ_PORT', '5432'),
+            'database' => env('DB_BUSINESS_READ_DATABASE', 'core_erp'),
+            'username' => env('DB_BUSINESS_READ_USERNAME'),
+            'password' => env('DB_BUSINESS_READ_PASSWORD'),
+            'charset' => 'utf8',
+            'search_path' => env('DB_BUSINESS_READ_SCHEMA', 'public'),
+            'sslmode' => env('DB_BUSINESS_READ_SSLMODE', 'prefer'),
         ],
 
         /*
