@@ -77,15 +77,15 @@ def seed_source() -> None:
     print("Source snapshot dimuat; belum ada fixture bisnis atau uji kapasitas.")
 
 
-def clone(database: str) -> None:
+def clone(database: str, seed: Path = PRIVATE / "seed.dump") -> None:
     validate_database(database)
     exists = sql("SELECT count(*) FROM pg_database WHERE datname='" + database + "';")
     if exists != "0":
         raise SystemExit("Database sudah ada. Alat tidak menimpa atau menghapus database.")
-    command("docker", "cp", str(PRIVATE / "seed.dump"), "coreerp-stack-comparison-database-1:/tmp/compare-baseline.dump")
+    command("docker", "cp", str(seed), "coreerp-stack-comparison-database-1:/tmp/compare-baseline.dump")
     sql('CREATE DATABASE "' + database + '";')
     command("docker", "exec", "coreerp-stack-comparison-database-1", "pg_restore", "-U", "compare_admin", "-d", database, "--no-owner", "--no-acl", "--exit-on-error", "/tmp/compare-baseline.dump")
-    print(json.dumps({"database_created": database, "source": "private/seed.dump", "php_used": False}))
+    print(json.dumps({"database_created": database, "source": seed.name, "php_used": False}))
 
 
 def wait_php() -> None:
@@ -105,6 +105,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["init", "source", "up", "stop", "clone"])
     parser.add_argument("--database")
+    parser.add_argument("--seed", type=Path, default=PRIVATE / "seed.dump")
     arguments = parser.parse_args()
     if arguments.action == "init":
         initialize()
@@ -119,6 +120,6 @@ if __name__ == "__main__":
     elif arguments.action == "clone":
         if not arguments.database:
             parser.error("clone membutuhkan --database.")
-        clone(arguments.database)
+        clone(arguments.database, arguments.seed)
     elif arguments.action == "stop":
         compose("stop")
