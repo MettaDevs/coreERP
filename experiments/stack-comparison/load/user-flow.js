@@ -1,5 +1,6 @@
 // Profil pending-purchase-v1 sebagai pengguna: satu sesi nyata per VU, jeda Uniform(1,9) detik sesudah
-// setiap aksi, start Uniform(0,10). Model closed; offered load turun bila server melambat.
+// setiap aksi, start siklus Uniform(0,10) sesudah jendela login. Model closed; offered load turun bila
+// server melambat. Login (bcrypt dua kali) diukur di jendela sendiri agar tidak tumpang tindih plateau.
 import http from 'k6/http';
 import exec from 'k6/execution';
 import { sleep } from 'k6';
@@ -8,6 +9,7 @@ import { Counter, Trend } from 'k6/metrics';
 const BASE = __ENV.BASE;
 const RUN_ID = __ENV.RUN_ID;
 const PASSWORD = __ENV.COMPARE_PASSWORD;
+const LOGIN = Number(__ENV.LOGIN_SECONDS || 60);
 const WARMUP = Number(__ENV.WARMUP_SECONDS || 30);
 const PLATEAU = Number(__ENV.PLATEAU_SECONDS || 90);
 const DRAIN = Number(__ENV.DRAIN_SECONDS || 300);
@@ -19,7 +21,7 @@ export const options = {
         users: {
             executor: 'constant-vus',
             vus: Number(__ENV.VUS),
-            duration: `${WARMUP + PLATEAU}s`,
+            duration: `${LOGIN + WARMUP + PLATEAU}s`,
             gracefulStop: `${DRAIN}s`,
         },
     },
@@ -34,11 +36,17 @@ const cycleBusy = new Trend('cycle_busy', true);
 
 let account = null;
 let accountIndex = -1;
+let cycling = false;
+
+function elapsed() {
+    return (Date.now() - exec.scenario.startTime) / 1000;
+}
 
 function phase() {
-    const elapsed = (Date.now() - exec.scenario.startTime) / 1000;
-    if (elapsed < WARMUP) return 'warmup';
-    return elapsed < WARMUP + PLATEAU ? 'plateau' : 'drain';
+    const seconds = elapsed();
+    if (seconds < LOGIN) return 'login';
+    if (seconds < LOGIN + WARMUP) return 'warmup';
+    return seconds < LOGIN + WARMUP + PLATEAU ? 'plateau' : 'drain';
 }
 
 function think() {
@@ -93,21 +101,37 @@ function acknowledge(receipt, outcome, assets) {
 }
 
 function login() {
-    sleep(Math.random() * 10);
-    accountIndex = (exec.vu.idInTest - 1) % fixture.accounts.length;
-    account = fixture.accounts[accountIndex];
+    if (!cycling) sleep(Math.random() * LOGIN * 0.5);
+    const index = (exec.vu.idInTest - 1) % fixture.accounts.length;
+    const candidate = fixture.accounts[index];
     call('login-page', 'login', 'GET', `${BASE}/login`, null, 200);
-    call('login', 'login', 'POST', `${BASE}/login`, { email: account.email, password: PASSWORD }, 200);
+    call('login', 'login', 'POST', `${BASE}/login`, { email: candidate.email, password: PASSWORD }, 200);
     call('workspace', 'login', 'PUT', `${BASE}/api/v1/workspace-context`, {
-        membership_id: account.membership_id,
-        legal_entity_id: account.legal_entity_id,
-        org_unit_id: account.department_id,
+        membership_id: candidate.membership_id,
+        legal_entity_id: candidate.legal_entity_id,
+        org_unit_id: candidate.department_id,
     }, 200);
-    think();
+    accountIndex = index;
+    account = candidate;
 }
 
 export default function () {
-    if (account === null) login();
+    try {
+        if (account === null) login();
+        if (!cycling) {
+            sleep(Math.max(0, LOGIN - elapsed()) + Math.random() * 10);
+            cycling = true;
+        }
+        cycle();
+    } catch (error) {
+        // Respons tak terduga sudah dihitung di call(); sesi yang ditolak harus login ulang, dan
+        // jeda tetap dijalankan agar VU yang gagal tidak berputar tanpa think time.
+        if (/HTTP (0|401|419)$/.test(String(error.message))) account = null;
+        think();
+    }
+}
+
+function cycle() {
     const document = fixture.tenants.find((tenant) => tenant.tenant_id === account.tenant_id).receipt_body;
     const receipts = `${prefix}/penerimaan-aset`;
     const started = Date.now();

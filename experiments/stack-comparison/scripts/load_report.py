@@ -42,7 +42,7 @@ def cpu_series(run: Path, manifest: dict) -> dict:
     path = run / "cgroups.jsonl"
     if not path.exists():
         return {}
-    start = datetime.fromisoformat(manifest["started_at"]).timestamp() + manifest["phases"]["warmup"]
+    start = datetime.fromisoformat(manifest["started_at"]).timestamp() + manifest["phases"].get("login", 0) + manifest["phases"]["warmup"]
     finish = start + manifest["phases"]["plateau"]
     samples: dict[str, list[dict]] = defaultdict(list)
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -82,6 +82,7 @@ def report(run: Path) -> dict:
               for (phase, kind, op), values in sorted(latency.items()) if phase == "plateau"}
     by_kind = {kind: summary([value for (phase, k, _), values in latency.items() if phase == "plateau" and k == kind for value in values]) for kind in ["read", "write"]}
     login = summary([value for (_, kind, _), values in latency.items() if kind == "login" for value in values])
+    login_in_plateau = sum(len(values) + failed[(phase, kind, op)] for (phase, kind, op), values in latency.items() if kind == "login" and phase == "plateau")
     slo = profile["slo"]
     minimum = slo["percentile_minimum_samples_per_operation"]
     plateau_failed = sum(count for (phase, _, _), count in failed.items() if phase == "plateau")
@@ -98,7 +99,7 @@ def report(run: Path) -> dict:
         "k6_exit_zero": manifest.get("k6_exit") == 0,
     }
     enough = all(entry["count"] >= minimum for entry in per_op.values()) and bool(per_op)
-    verdict = "FAIL" if not all(checks.values()) else "PASS" if enough else "PASS_LOW_SAMPLES"
+    verdict = "FAIL" if not all(checks.values()) else "INCONCLUSIVE_LOGIN_OVERLAP" if login_in_plateau else "PASS" if enough else "PASS_LOW_SAMPLES"
     successful = sum(len(values) for (phase, _, _), values in latency.items() if phase == "plateau")
     cpu = cpu_series(run, manifest)
     loadgen = cpu.get("coreerp-loadgen", {})
@@ -106,7 +107,7 @@ def report(run: Path) -> dict:
         "run_id": manifest["run_id"], "candidate": manifest["candidate"], "vus": manifest["vus"], "verdict": verdict,
         "checks": checks, "samples_sufficient": enough, "minimum_samples_per_operation": minimum,
         "plateau_successful_rps": round(successful / plateau_seconds, 2), "plateau_requests": successful,
-        "read": by_kind["read"], "write": by_kind["write"], "login_all_phases": login, "per_operation": per_op,
+        "read": by_kind["read"], "write": by_kind["write"], "login_all_phases": login, "login_requests_in_plateau": login_in_plateau, "per_operation": per_op,
         "failed_by_status": dict(statuses), "acknowledged_receipts": manifest.get("acknowledged_receipts"),
         "completed_cycles": oracle.get("acknowledged_completed"),
         "cycle_ms_with_think": summary(cycles["cycle_total"]), "cycle_ms_without_think": summary(cycles["cycle_busy"]),

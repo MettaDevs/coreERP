@@ -38,6 +38,11 @@ def docker(*args: str, environment: dict | None = None) -> str:
     return subprocess.run(["docker", *args], check=True, capture_output=True, text=True, env=environment).stdout.strip()
 
 
+def listening(container: str) -> int:
+    logs = subprocess.run(["docker", "logs", container], capture_output=True, text=True)
+    return (logs.stdout + logs.stderr).count('"event":"listening"')
+
+
 def php_state() -> dict:
     status = docker("ps", "-a", "--filter", "name=^coreerp-stack-comparison-php-1$", "--format", "{{.Status}}")
     return {"container": "coreerp-stack-comparison-php-1", "status": status or "absent", "running": status.startswith("Up")}
@@ -75,6 +80,12 @@ def up(name: str, database: str, runtime_env: Path) -> dict:
         if time.monotonic() > deadline:
             logs = subprocess.run(["docker", "logs", "--tail", "20", container], capture_output=True, text=True)
             raise SystemExit("Kandidat tidak menjawab HTTP dalam 30 detik:\n" + logs.stdout + logs.stderr)
+        time.sleep(0.25)
+    # Dua proses Bun berbagi port lewat reusePort; satu respons belum membuktikan proses kedua siap.
+    expected = BUN_PROCESSES if name in {"hono", "elysia"} else 1
+    while expected > 1 and listening(container) < expected:
+        if time.monotonic() > deadline:
+            raise SystemExit(f"Hanya sebagian proses {name} yang siap dalam 30 detik.")
         time.sleep(0.25)
     inspect = json.loads(docker("inspect", container))[0]
     return {

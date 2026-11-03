@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import json
+import math
 import os
 from pathlib import Path
 import subprocess
@@ -114,6 +115,7 @@ if __name__ == "__main__":
     parser.add_argument("--database", required=True)
     parser.add_argument("--vus", required=True, type=int)
     parser.add_argument("--run-id", required=True)
+    parser.add_argument("--login", type=int, help="Jendela login detik; bawaan max(60, 0.4 x VU) karena bcrypt dua kali per login.")
     parser.add_argument("--warmup", type=int, default=30)
     parser.add_argument("--plateau", type=int, default=90)
     parser.add_argument("--drain", type=int, default=300)
@@ -122,13 +124,14 @@ if __name__ == "__main__":
     parser.add_argument("--baseline", type=Path, default=PRIVATE / "seed-baseline.json")
     args = parser.parse_args()
     validate_database(args.database)
+    login_seconds = args.login or max(60, math.ceil(0.4 * args.vus))
     out = PRIVATE / "load" / args.run_id
     if out.exists():
         raise SystemExit("Folder run sudah ada; run beban tidak menimpa evidence lama.")
     out.mkdir(parents=True)
-    manifest = {"run_id": args.run_id, "candidate": args.candidate, "vus": args.vus, "phases": {"warmup": args.warmup, "plateau": args.plateau, "drain": args.drain},
+    manifest = {"run_id": args.run_id, "candidate": args.candidate, "vus": args.vus, "phases": {"login": login_seconds, "warmup": args.warmup, "plateau": args.plateau, "drain": args.drain},
                 "fixture": str(args.fixture), "baseline": str(args.baseline),
-                "think_time": "Uniform(1,9) s sesudah setiap aksi", "initial_offset": "Uniform(0,10) s", "k6_image": K6_IMAGE,
+                "think_time": "Uniform(1,9) s sesudah setiap aksi", "login_offset": "Uniform(0, 0.5 x jendela login) s", "initial_offset": "Uniform(0,10) s sesudah jendela login", "k6_image": K6_IMAGE,
                 "loadgen": {"cpus": args.loadgen_cpus, "memory": "2g", "network": native.NETWORK}, "host": os.uname().nodename if hasattr(os, "uname") else ""}
     sut = start(args.candidate, args.database)
     manifest["sut"] = sut
@@ -145,7 +148,7 @@ if __name__ == "__main__":
     command = ["docker", "run", "--rm", "--name", LOADGEN, "--network", native.NETWORK, "--cpus", args.loadgen_cpus, "--memory", "2g",
                "--user", f"{os.getuid()}:{os.getgid()}" if hasattr(os, "getuid") else "0:0", "--ulimit", "nofile=65536:65536",
                "-e", "BASE=" + sut["internal"], "-e", "RUN_ID=" + args.run_id, "-e", f"VUS={args.vus}", "-e", "COMPARE_PASSWORD",
-               "-e", f"WARMUP_SECONDS={args.warmup}", "-e", f"PLATEAU_SECONDS={args.plateau}", "-e", f"DRAIN_SECONDS={args.drain}",
+               "-e", f"LOGIN_SECONDS={login_seconds}", "-e", f"WARMUP_SECONDS={args.warmup}", "-e", f"PLATEAU_SECONDS={args.plateau}", "-e", f"DRAIN_SECONDS={args.drain}",
                "-v", f"{LAB / 'load'}:/scripts:ro", "-v", f"{args.fixture.resolve()}:/fixture/fixture.json:ro", "-v", f"{out}:/out",
                K6_IMAGE, "run", "--quiet", "--log-format", "json", "--log-output", "file=/out/k6.log", "--out", "csv=/out/points.csv.gz", "/scripts/user-flow.js"]
     manifest["started_at"] = datetime.now(timezone.utc).isoformat()
