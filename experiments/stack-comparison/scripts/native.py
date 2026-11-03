@@ -66,7 +66,9 @@ def up(name: str, database: str, runtime_env: Path) -> dict:
         arguments += ["-e", f"{key}={value}"]
     for key in SECRETS:
         arguments += ["-e", key]
-    container = docker(*arguments, candidate["image"], *candidate["command"], environment=environment)
+    # Uji A/B memasang image lain lewat <KANDIDAT>_IMAGE tanpa mengubah tabel kandidat.
+    image = os.environ.get(f"{name.upper()}_IMAGE", candidate["image"])
+    container = docker(*arguments, image, *candidate["command"], environment=environment)
     deadline = time.monotonic() + 30
     while True:
         try:
@@ -89,7 +91,7 @@ def up(name: str, database: str, runtime_env: Path) -> dict:
         time.sleep(0.25)
     inspect = json.loads(docker("inspect", container))[0]
     return {
-        "candidate": name, "container": container[:12], "image": candidate["image"], "image_id": inspect["Image"],
+        "candidate": name, "container": container[:12], "image": image, "image_id": inspect["Image"],
         "database": database, "base": f"http://127.0.0.1:{candidate['port']}", "settings": settings,
         "cpus": 2, "memory": "1g", "network": NETWORK, "php_before_start": php,
     }

@@ -60,7 +60,10 @@ export class Database {
         const started = performance.now();
         let failed = false;
         try {
-            return read(await this.sql.unsafe(query, parameters));
+            // unsafe() tidak memakai prepared statement secara bawaan, sehingga setiap query di-parse dan di-plan ulang.
+            return read(
+                await this.sql.unsafe(query, parameters, { prepare: true }),
+            );
         } catch (error) {
             failed = true;
             throw error;
