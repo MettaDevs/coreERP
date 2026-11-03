@@ -2,6 +2,20 @@
 
 Dicatat 3 November 2026, sekitar 16:22 WITA. Pengguna meminta berhenti dan menyerahkan pekerjaan kepada agent lain. Semua agent, listener uji, dan build milik eksperimen sudah dihentikan. Belum ada benchmark server, keputusan pemenang, merge, push, atau deploy aplikasi aktif.
 
+## Lanjutan 3 November, 16:40 sampai 17:06 WITA
+
+Bagian ini menggantikan status pada bagian di bawahnya bila bertentangan. Bukti per baris ada di `.audit/native-stack/decisions.tsv`.
+
+- **Checkpoint.** Harness, patch Go, Rust `06a711b8` (cherry-pick `d5d7d78b`), dan checker posting sudah ber-commit lokal di `codex/native-stack-comparison`. Tidak ada push. Berkas `private/` tidak pernah di-stage.
+- **PostgreSQL uji.** Recovery selesai normal dari WAL. Kedua belas database terbaca penuh lewat `pg_dump`. Index tidak diperiksa dan data checksums mati. Service database kini memakai `stop_grace_period: 120s`.
+- **P1 rekonsiliasi ditutup.** `sql_oracle.py check` wajib menerima `--acknowledgements` dan `--baseline private/seed-baseline.json`. Setiap entri ledger diikat ke akun dan `receipt_body` fixture. Baris tahan lama baru tanpa pemilik yang diakui, baris seed yang berubah, atau ledger tanpa completion baru menjadi merah. Sembilan probe kerusakan merah semua pada golden PHP.
+- **Golden ulang lulus.** PHP, Go, Hono, Elysia, dan Rust lulus HTTP differential, oracle rekonsiliasi, dan checker posting pada clone `erp_compare_g2_*` / `erp_compare_ts_g2*` dengan run-id `golden-20261103`. Kandidat dijalankan dari image hasil `git archive` commit `936498de` lewat `scripts/golden.py`. Container PHP uji mati sebelum dan sesudah setiap alur native. Image Go dan Bun tidak berisi berkas PHP, image Rust hanya satu binary. Ini juga bukti PHP-off cold start dari snapshot SQL untuk profil utama.
+- **Elysia INCONCLUSIVE sekali.** Percobaan pertama: completion ter-commit, driver tidak menerima respons, log hilang. Tiga Elysia dan tiga Hono ulang lulus. `golden.py` kini menyimpan stderr dan log container.
+- **Conformance bersama.** `scripts/conformance.py` menjalankan 31 probe HTTP Go, 11 probe pencabutan akses, dan 5 probe rollback (INSERT posting dipaksa gagal lewat constraint sementara). Acuan PHP terekam di `private/c1-php-conformance.json`. Temuan acuan: sesi dengan `last_activity` mundur 7.201 detik tetap 200 di PHP, jadi harapan 401 pada probe Rust lama tidak sesuai PHP. Kandidat belum dijalankan karena Docker Desktop berhenti.
+- **Docker Desktop berhenti pukul 17:04:52** saat container Go conformance dibuat. Log backend putus tanpa pesan shutdown dan tidak ada event Windows. Agent tidak menyalakannya ulang karena Docker Desktop juga melayani stack sesi lain. Clone `erp_compare_c1_*` / `erp_compare_ts_c1*` sudah dibuat; `erp_compare_c1_php` sudah memuat receipt conformance PHP.
+
+Lanjutkan dari sini: nyalakan Docker Desktop bila pengguna setuju, periksa recovery PostgreSQL uji lagi, lalu jalankan per kandidat `native.py up`, `conformance.py --expected private/c1-php-conformance.json`, dan `native.py down` pada clone `c1` masing-masing. Sesudah itu load runner (langkah 7 di bawah).
+
 ## Mandat pengguna
 
 Bangun pembanding Bun + Hono + oRPC OpenAPI, Bun + Elysia + oRPC OpenAPI, Go, dan Rust, dengan PHP existing sebagai baseline. Alur bisnis, aturan, query, transaksi, audit, penomoran, serta hasil tersimpan harus setara. Empat kandidat menjalankan auth sampai readback secara native tanpa memanggil PHP. Mulai dengan correctness lokal, baru uji terisolasi di dev1/dev2. Windows ditunda. Analytics tetap hold.
@@ -128,8 +142,12 @@ Perintah lokal yang tersedia setelah memastikan database/runtime siap:
 python experiments/stack-comparison/scripts/lab.py clone --database erp_compare_fresh_case
 python experiments/stack-comparison/scripts/http_baseline.py --base <URL> --fixture experiments/stack-comparison/private/fixture.json --env experiments/stack-comparison/private/runtime.env --output <private-new-flow.json> --run-id golden-20261103 --trace-database <owned-db> --trace-directory <private-new-traces>
 python experiments/stack-comparison/scripts/compare_http.py --expected <new-php-flow.json> --actual <new-native-flow.json> --output <private-differences.json>
-python experiments/stack-comparison/scripts/sql_oracle.py --fixture experiments/stack-comparison/private/fixture.json --database <owned-db> --output <private-oracle.json>
+python experiments/stack-comparison/scripts/sql_oracle.py check --fixture experiments/stack-comparison/private/fixture.json --database <owned-db> --baseline experiments/stack-comparison/private/seed-baseline.json --acknowledgements <private-new-flow.json> --output <private-oracle.json>
+python experiments/stack-comparison/scripts/golden.py --candidate <go|hono|elysia|rust> --database <fresh-clone> --expected <php-flow.json> --expected-database <php-db> --prefix <private-prefix> --run-id golden-20261103
+python experiments/stack-comparison/scripts/conformance.py --base <URL> --database <fresh-clone> --expected experiments/stack-comparison/private/c1-php-conformance.json --output <private-conformance.json>
 ```
+
+`seed-baseline.json` direkam sekali dari clone seed yang belum disentuh (`sql_oracle.py baseline --database erp_compare_seed_reference --seed private/seed.dump`). Rekam ulang bila seed berubah.
 
 Parent driver/harness tests terakhir delapan test lulus. Checker posting memakai CLI `--expected-database`, `--actual-database`, `--expected-http`, `--actual-http`, `--output`. Jalankan dari lingkungan yang dapat mengimpor script observer, atau setelah dua file checker diintegrasikan.
 
