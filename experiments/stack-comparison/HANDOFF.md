@@ -2,6 +2,17 @@
 
 Dicatat 3 November 2026, sekitar 16:22 WITA. Pengguna meminta berhenti dan menyerahkan pekerjaan kepada agent lain. Semua agent, listener uji, dan build milik eksperimen sudah dihentikan. Belum ada benchmark server, keputusan pemenang, merge, push, atau deploy aplikasi aktif.
 
+## Correctness selesai di dev1, 3 November 20:46 WITA
+
+Cluster uji dev1 berjalan dari compose eksperimen (`coreerp-stack-comparison`, port loopback 18640/18641). `runtime.env` di dev1 sudah LF dan `PHP_IMAGE` menunjuk ID dev1. Evidence dev1 berawalan `d1-` (PHP dan Go/Hono/Elysia) serta `d2-` (Rust sesudah perbaikan reset).
+
+- PHP dev1 identik dengan PHP laptop: baseline 760 hash baris, HTTP golden, kewajiban SQL, conformance, dan urutan login.
+- Go, Hono, Elysia, dan Rust VERIFIED pada golden lima gate (HTTP, oracle rekonsiliasi, graph posting, kewajiban SQL termasuk login), conformance 48 probe + 6 throttle, dan urutan login per transaksi.
+- Rust kini mereset koneksi seperti `ResetDatabaseConnections` PHP; `ROLLBACK; RESET ALL` hilang. Satu-satunya ROLLBACK tersisa ada di jalur error.
+- Skrip run berurutan: `~/coreerp-stack-comparison/run-gates.sh` dan `run-rust.sh`. Jalankan terlepas (`setsid nohup ... &`) karena sesi SSH panjang bisa menggantung.
+
+Sisa sebelum angka kapasitas: load runner pengguna, fixture 128 tenant × 8 akun, budget pool/CPU/RAM yang setara (pool sekarang Go 10, Bun 10, Rust 8, PHP 4 worker Octane), lalu ramp per stack di dev1, dev2, dan `dev-windows1`.
+
 ## Pindah ke dev1, 3 November malam
 
 Atas permintaan pengguna (RAM laptop habis), pekerjaan pindah ke dev1. Lokasinya `/home/claude/coreerp-stack-comparison/CoreERP` (folder 0700), branch `codex/native-stack-comparison`. Repo itu snapshot satu commit, karena checkout laptop shallow dan bundle tidak bisa di-clone. Hash tree-nya `754d6c0491e58fbfb63167f118641c0487172e6b`, sama dengan commit laptop `e646a411`. Commit sesudahnya dikerjakan di dev1. Push ke GitHub belum pernah dilakukan.
