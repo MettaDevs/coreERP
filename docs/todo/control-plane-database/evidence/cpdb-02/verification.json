@@ -114,6 +114,20 @@
       "scope": "healthcare neutrality checker",
       "status": "passed",
       "evidence_origin": "owner-recorded local tool output"
+    },
+    {
+      "scope": "CI serial fresh-business-history regression",
+      "status": "passed",
+      "empty_business": {
+        "tests": 7,
+        "assertions": 112
+      },
+      "existing_business": {
+        "tests": 1,
+        "assertions": 97
+      },
+      "evidence_origin": "owner-recorded local tool output",
+      "note": "Reproduced missing migrations table before fix. Assert business default and optional history remain unchanged; no application change."
     }
   ],
   "role_fixture": "6 synthetic roles; four target databases; credentials private",

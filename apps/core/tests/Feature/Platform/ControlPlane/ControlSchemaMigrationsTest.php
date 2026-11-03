@@ -81,7 +81,9 @@ final class ControlSchemaMigrationsTest extends TestCase
 
     public function test_fresh_baseline_and_original_pf01_upgrade_are_isolated_and_idempotent(): void
     {
-        $businessHistory = DB::table('migrations')->count();
+        $businessConnection = (string) config('database.default');
+        $businessHistory = DB::connection()->getSchemaBuilder()->hasTable('migrations')
+            ? DB::table('migrations')->count() : null;
         $migrator = $this->migrator();
         $paths = require database_path('control-plane/manifest.php');
         $migrator->usingConnection('control_schema_target', fn () => $migrator->run([$paths[0]]));
@@ -110,7 +112,9 @@ final class ControlSchemaMigrationsTest extends TestCase
         $this->assertSame('Synthetic fixture', $this->target->table('product_customers')->where('id', $customerId)->value('name'));
         $this->assertSame([], $migrator->usingConnection('control_schema_target', fn () => $migrator->run($paths)));
         $this->assertSame(2, $this->target->table(ControlMigrate::HISTORY)->count());
-        $this->assertSame($businessHistory, DB::table('migrations')->count());
+        $this->assertSame($businessConnection, config('database.default'));
+        $this->assertSame($businessHistory, DB::connection()->getSchemaBuilder()->hasTable('migrations')
+            ? DB::table('migrations')->count() : null);
         $foreign = $this->target->selectOne(<<<'SQL'
             select count(*) as total from pg_constraint k
             join pg_class source on source.oid = k.conrelid join pg_namespace sn on sn.oid = source.relnamespace
