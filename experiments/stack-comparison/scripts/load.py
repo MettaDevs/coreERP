@@ -50,6 +50,31 @@ def stamped(command: list[str], target: Path, stop: threading.Event) -> threadin
     return thread
 
 
+def cgroups(names: list[str], target: Path, stop: threading.Event) -> threading.Thread:
+    """CPU kumulatif dan memori per container dari cgroup v2 setiap dua detik; container yang belum ada dicari ulang."""
+    def run() -> None:
+        found: dict[str, Path] = {}
+        with target.open("w", encoding="utf-8") as handle:
+            while not stop.is_set():
+                for name in names:
+                    if name not in found:
+                        identifier = subprocess.run(["docker", "ps", "-q", "--no-trunc", "--filter", f"name=^{name}$"], capture_output=True, text=True).stdout.strip()
+                        if identifier:
+                            found[name] = Path(f"/sys/fs/cgroup/system.slice/docker-{identifier}.scope")
+                for name, base in found.items():
+                    try:
+                        usage = next(int(line.split()[1]) for line in (base / "cpu.stat").read_text().splitlines() if line.startswith("usage_usec"))
+                        memory = int((base / "memory.current").read_text())
+                    except (OSError, StopIteration, ValueError):
+                        continue
+                    handle.write(json.dumps({"t": time.time(), "name": name, "cpu_usec": usage, "memory": memory}) + "\n")
+                handle.flush()
+                stop.wait(2)
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+    return thread
+
+
 def start(candidate: str, database: str) -> dict:
     if candidate == "php":
         os.environ["COMPARE_DATABASE"] = database
@@ -113,7 +138,7 @@ if __name__ == "__main__":
                    "('shared_buffers','effective_cache_size','max_connections','synchronous_commit','work_mem');")
     manifest["database"] = {"cpus": limits["NanoCpus"] / 1e9, "memory_bytes": limits["Memory"], "settings": json.loads(settings)}
     stop_sampling = threading.Event()
-    samplers = [stamped(["docker", "stats", "--format", "{{json .}}", sut["container"], "coreerp-stack-comparison-database-1", LOADGEN], out / "docker-stats.tsv", stop_sampling)]
+    samplers = [cgroups([sut["container"], "coreerp-stack-comparison-database-1", LOADGEN], out / "cgroups.jsonl", stop_sampling)]
     if sys.platform != "win32":
         samplers.append(stamped(["vmstat", "-n", "2"], out / "vmstat.tsv", stop_sampling))
     environment = {**os.environ, "COMPARE_PASSWORD": secret("COMPARE_PASSWORD")}

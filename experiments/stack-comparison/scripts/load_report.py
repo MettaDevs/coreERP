@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from collections import defaultdict
 import csv
+from datetime import datetime
 import gzip
 import json
 import math
@@ -35,18 +36,27 @@ def points(run: Path):
             yield row
 
 
-def cpu_series(run: Path) -> dict:
-    """Persentase CPU per container dari docker stats; 100% sama dengan satu core."""
-    series: dict[str, list[float]] = defaultdict(list)
-    path = run / "docker-stats.tsv"
-    if path.exists():
-        for line in path.read_text(encoding="utf-8").splitlines():
-            try:
-                stat = json.loads(line.split("\t", 1)[1])
-                series[stat["Name"]].append(float(stat["CPUPerc"].rstrip("%")))
-            except (IndexError, ValueError, KeyError, json.JSONDecodeError):
-                continue
-    return {name: {"samples": len(values), "mean": round(statistics.fmean(values), 1), "max": round(max(values), 1)} for name, values in series.items() if values}
+def cpu_series(run: Path, manifest: dict) -> dict:
+    """CPU per container di jendela plateau dari cgroup; 100% sama dengan satu core. Jendela dihitung dari
+    waktu start k6, jadi selisih start container k6 (beberapa detik) ikut menjadi ketidakpastian."""
+    path = run / "cgroups.jsonl"
+    if not path.exists():
+        return {}
+    start = datetime.fromisoformat(manifest["started_at"]).timestamp() + manifest["phases"]["warmup"]
+    finish = start + manifest["phases"]["plateau"]
+    samples: dict[str, list[dict]] = defaultdict(list)
+    for line in path.read_text(encoding="utf-8").splitlines():
+        sample = json.loads(line)
+        samples[sample["name"]].append(sample)
+    result = {}
+    for name, rows in samples.items():
+        rates = [(b["cpu_usec"] - a["cpu_usec"]) / (b["t"] - a["t"]) / 1e4 for a, b in zip(rows, rows[1:])
+                 if start <= a["t"] and b["t"] <= finish and b["t"] > a["t"]]
+        memory = [row["memory"] for row in rows if start <= row["t"] <= finish]
+        if rates:
+            result[name] = {"samples": len(rates), "mean": round(statistics.fmean(rates), 1), "max": round(max(rates), 1),
+                            "memory_max_mb": round(max(memory) / 2**20, 1) if memory else None}
+    return result
 
 
 def report(run: Path) -> dict:
@@ -90,7 +100,7 @@ def report(run: Path) -> dict:
     enough = all(entry["count"] >= minimum for entry in per_op.values()) and bool(per_op)
     verdict = "FAIL" if not all(checks.values()) else "PASS" if enough else "PASS_LOW_SAMPLES"
     successful = sum(len(values) for (phase, _, _), values in latency.items() if phase == "plateau")
-    cpu = cpu_series(run)
+    cpu = cpu_series(run, manifest)
     loadgen = cpu.get("coreerp-loadgen", {})
     return {
         "run_id": manifest["run_id"], "candidate": manifest["candidate"], "vus": manifest["vus"], "verdict": verdict,
