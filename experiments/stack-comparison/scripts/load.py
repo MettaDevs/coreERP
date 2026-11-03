@@ -147,7 +147,7 @@ if __name__ == "__main__":
     parser.add_argument("--database", required=True)
     parser.add_argument("--vus", required=True, type=int)
     parser.add_argument("--run-id", required=True)
-    parser.add_argument("--login", type=int, help="Jendela login detik; bawaan max(60, 0.4 x VU) karena bcrypt dua kali per login.")
+    parser.add_argument("--login", type=int, help="Jendela login detik; bawaan max(60, 0.5 x VU), jadi login tiba sekitar 4 per detik.")
     parser.add_argument("--warmup", type=int, default=30)
     parser.add_argument("--plateau", type=int, default=90)
     parser.add_argument("--drain", type=int, default=300)
@@ -158,7 +158,7 @@ if __name__ == "__main__":
     validate_database(args.database)
     if sql(f"SELECT count(*) FROM pg_database WHERE datname='{args.database}';") != "1":
         raise SystemExit("Database run belum ada; buat clone dulu agar run tidak berjalan terhadap database kosong.")
-    login_seconds = args.login or max(60, math.ceil(0.4 * args.vus))
+    login_seconds = args.login or max(60, math.ceil(0.5 * args.vus))
     out = PRIVATE / "load" / args.run_id
     if out.exists():
         raise SystemExit("Folder run sudah ada; run beban tidak menimpa evidence lama.")

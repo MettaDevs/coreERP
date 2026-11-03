@@ -37,6 +37,7 @@ const cycleBusy = new Trend('cycle_busy', true);
 let account = null;
 let accountIndex = -1;
 let cycling = false;
+let loginAttempted = false;
 
 function elapsed() {
     return (Date.now() - exec.scenario.startTime) / 1000;
@@ -101,7 +102,9 @@ function acknowledge(receipt, outcome, assets) {
 }
 
 function login() {
-    if (!cycling) sleep(Math.random() * LOGIN * 0.5);
+    // Sebaran login hanya untuk percobaan pertama; login yang gagal diulang sesudah think time.
+    if (!loginAttempted) sleep(Math.random() * LOGIN * 0.5);
+    loginAttempted = true;
     const index = (exec.vu.idInTest - 1) % fixture.accounts.length;
     const candidate = fixture.accounts[index];
     call('login-page', 'login', 'GET', `${BASE}/login`, null, 200);

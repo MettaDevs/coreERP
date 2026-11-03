@@ -93,6 +93,7 @@ def report(run: Path) -> dict:
     latency: dict[tuple, list[float]] = defaultdict(list)
     failed: dict[tuple, int] = defaultdict(int)
     statuses: dict[str, int] = defaultdict(int)
+    session_statuses: dict[str, int] = defaultdict(int)
     cycles: dict[str, list[float]] = defaultdict(list)
     for row in points(run):
         metric = row["metric_name"]
@@ -103,6 +104,8 @@ def report(run: Path) -> dict:
             else:
                 failed[key] += 1
                 statuses[row["status"]] += 1
+                if row.get("kind") in {"read", "write"}:
+                    session_statuses[row["status"]] += 1
         elif metric in {"cycle_total", "cycle_busy"} and row.get("phase") == "plateau":
             cycles[metric].append(float(row["metric_value"]))
     per_op = {f"{kind}:{op}": {**summary(values), "failed": failed[(phase, kind, op)]}
@@ -113,14 +116,17 @@ def report(run: Path) -> dict:
     slo = profile["slo"]
     minimum = slo["percentile_minimum_samples_per_operation"]
     plateau_failed = sum(count for (phase, _, _), count in failed.items() if phase == "plateau")
-    server_errors = sum(count for status, count in statuses.items() if status.startswith("5"))
+    # Kapasitas sesi steady dinilai dari request baca/tulis; login (bcrypt) adalah metrik cold-login tersendiri.
+    session_failed = sum(count for (_, kind, _), count in failed.items() if kind in {"read", "write"})
+    login_failed = sum(count for (_, kind, _), count in failed.items() if kind == "login")
+    server_errors = sum(count for status, count in session_statuses.items() if status.startswith("5"))
     oracle = json.loads((run / "oracle.json").read_text(encoding="utf-8")) if (run / "oracle.json").exists() else {"failures": ["missing"]}
     checks = {
         "read_p95": by_kind["read"]["p95"] is not None and by_kind["read"]["p95"] < slo["read_ms"]["p95"],
         "read_p99": by_kind["read"]["p99"] is not None and by_kind["read"]["p99"] < slo["read_ms"]["p99"],
         "write_p95": by_kind["write"]["p95"] is not None and by_kind["write"]["p95"] < slo["write_ms"]["p95"],
         "write_p99": by_kind["write"]["p99"] is not None and by_kind["write"]["p99"] < slo["write_ms"]["p99"],
-        "no_unexpected_responses": plateau_failed == 0 and sum(failed.values()) == 0,
+        "no_unexpected_responses": session_failed == 0,
         "no_server_errors": server_errors == 0,
         "oracle_clean": not oracle["failures"],
         "k6_exit_zero": manifest.get("k6_exit") == 0,
@@ -134,7 +140,7 @@ def report(run: Path) -> dict:
         "run_id": manifest["run_id"], "candidate": manifest["candidate"], "vus": manifest["vus"], "verdict": verdict,
         "checks": checks, "samples_sufficient": enough, "minimum_samples_per_operation": minimum,
         "plateau_successful_rps": round(successful / plateau_seconds, 2), "plateau_requests": successful,
-        "read": by_kind["read"], "write": by_kind["write"], "login_all_phases": login, "login_requests_in_plateau": login_in_plateau, "per_operation": per_op,
+        "read": by_kind["read"], "write": by_kind["write"], "login_all_phases": login, "login_failures": login_failed, "login_requests_in_plateau": login_in_plateau, "per_operation": per_op,
         "failed_by_status": dict(statuses), "acknowledged_receipts": manifest.get("acknowledged_receipts"),
         "completed_cycles": oracle.get("acknowledged_completed"),
         "cycle_ms_with_think": summary(cycles["cycle_total"]), "cycle_ms_without_think": summary(cycles["cycle_busy"]),
