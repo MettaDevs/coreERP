@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Platform\ChangeLog\Support\AuditActor;
+use App\Platform\ChangeLog\Support\ChangeLogSwitch;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Support\ActiveEnvironment;
 use App\Platform\Environment\Support\EnvironmentConnection;
@@ -565,7 +567,7 @@ function fixtureFramework(string $phase, string $mode): array
     $user = (new User)->forceFill(['email' => $state['prefix'].'@example.invalid']);
     $lanes = [];
     foreach (['session', 'password_reset', 'cache', 'lock', 'scheduler', 'queue_success', 'queue_failure', 'batch'] as $lane) {
-        $lanes[$lane] = fixtureLane(function () use (&$state, $phase, $lane, $managers, $event, $eventMutex, $scheduleMutex, $user): void {
+        $lanes[$lane] = fixtureLane(function () use (&$state, $phase, $lane, $managers, $event, $eventMutex, $scheduleMutex, $user, $connections): void {
             fixtureAssert($phase === 'produce' || $state['process_id'] !== getmypid(), 'fresh_process');
             $prefix = $state['prefix'];
             if ($lane === 'session') {
@@ -627,11 +629,15 @@ function fixtureFramework(string $phase, string $mode): array
                     }
                     fixtureStoredOnlyOnControl('jobs', 'queue', $queue);
                 } else {
+                    $connections->reset();
+                    DB::connection('business')->select('select set_config(?, ?, false), set_config(?, ?, false)', [AuditActor::SETTING, '777', ChangeLogSwitch::SETTING, 'off']);
                     fixtureAssert(Artisan::call('queue:work', ['connection' => 'database', '--queue' => $queue, '--once' => true, '--tries' => 1, '--timeout' => 0, '--sleep' => 0]) === 0, 'real_worker_completed');
                     $receipt = $managers['cache']->get($prefix.'-'.$kind.'-receipt');
                     fixtureAssert(is_array($receipt) && $receipt['database'] === 'core_erp_cpdb02_test_environment_'.($kind === 'failure' ? 'b' : 'a') && $receipt['role'] === 'cpdb02_business_runtime', 'worker_business_context');
                     $GLOBALS['lane']['identities'][] = $receipt;
                     fixtureAssert(config('database.default') === 'business' && ! app()->bound(ActiveEnvironment::KEY), 'worker_context_cleaned');
+                    $settings = DB::connection('business')->selectOne('select coalesce(current_setting(?, true), ?) as actor, coalesce(current_setting(?, true), ?) as change_log', [AuditActor::SETTING, '', ChangeLogSwitch::SETTING, '']);
+                    fixtureAssert($settings->actor === '' && $settings->change_log === '', 'worker_actor_cleaned');
                     fixtureStoredOnlyOnControl('jobs', 'queue', $queue, 0);
                     fixtureStoredOnlyOnControl('failed_jobs', 'queue', $queue, $kind === 'failure' ? 1 : 0);
                     if ($kind === 'batch') {

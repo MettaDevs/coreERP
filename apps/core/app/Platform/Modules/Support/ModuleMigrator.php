@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Platform\Modules\Support;
 
 use App\Platform\ChangeLog\Support\ChangeLogSwitch;
+use App\Platform\Database\Support\DatabasePrivileges;
+use App\Platform\Environment\Support\EnvironmentConnection;
 use Closure;
 use Illuminate\Database\Connection;
 use Illuminate\Database\DatabaseManager;
@@ -28,6 +30,8 @@ final class ModuleMigrator
     public function __construct(
         private readonly DatabaseManager $database,
         private readonly Filesystem $file,
+        private readonly EnvironmentConnection $connections,
+        private readonly DatabasePrivileges $privileges,
     ) {}
 
     /**
@@ -37,30 +41,44 @@ final class ModuleMigrator
      */
     public function migrate(ModuleManifest $module, ?string $connection = null): array
     {
+        $runtime = $connection ?? $this->database->getDefaultConnection();
+        $connection = $this->connections->migrationFor($runtime);
+        try {
+            return $this->runMigrations($module, $runtime, $connection);
+        } finally {
+            $this->connections->releaseMigrationFor($runtime);
+        }
+    }
+
+    /** @return list<string> */
+    private function runMigrations(ModuleManifest $module, string $runtime, string $connection): array
+    {
+        $this->privileges->prepare($connection, $runtime);
         $database = $this->database->connection($connection);
 
         $migrator = $this->migrator($module, $connection);
 
         if (! $migrator->repositoryExists()) {
             // Riwayat dipakai semua module; lock ini diambil sebelum lock module agar urutannya tetap.
-            $this->withLock($database, 'module-migration-repository', function () use ($module, $connection): void {
+            $this->withLock($database, 'module-migration-repository', function () use ($module, $connection, $runtime, $database): void {
                 $repository = $this->migrator($module, $connection)->getRepository();
 
                 if (! $repository->repositoryExists()) {
-                    $repository->createRepository();
+                    $database->transaction(function () use ($repository, $connection, $runtime): void {
+                        $repository->createRepository();
+                        $this->privileges->protectHistory($connection, $runtime, self::HISTORY_TABLE);
+                    });
                 }
             });
         }
 
-        return $this->withLock($database, 'module-migrations:'.$module->id, function () use ($module, $connection, $migrator): array {
+        return $this->withLock($database, 'module-migrations:'.$module->id, fn (): array => $migrator->usingConnection($connection, function () use ($module, $connection, $migrator): array {
             $before = $migrator->getRepository()->getRan();
-            // Migrator ini dibuat tanpa dispatcher, jadi event migrasi yang mematikan log di migrate Core tidak
-            // menyala di sini; log perubahan dimatikan langsung.
             ChangeLogSwitch::pausedOn($connection, fn () => $migrator->run([$module->migrationFolder()]));
             $after = $migrator->getRepository()->getRan();
 
             return array_values(array_diff($after, $before));
-        });
+        }));
     }
 
     /**
@@ -109,15 +127,13 @@ final class ModuleMigrator
 
     private function migrator(ModuleManifest $module, ?string $connection): Migrator
     {
+        $repository = new ModuleMigrationRepository($this->database, self::HISTORY_TABLE, $module->id);
+        $repository->setSource($connection);
         $migrator = new Migrator(
-            new ModuleMigrationRepository($this->database, self::HISTORY_TABLE, $module->id),
+            $repository,
             $this->database,
             $this->file,
         );
-
-        if ($connection !== null) {
-            $migrator->setConnection($connection);
-        }
 
         return $migrator;
     }

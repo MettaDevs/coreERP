@@ -128,7 +128,7 @@ def expected_checks(verb: str, lane: str) -> set[str]:
         return checks | assertions | row_checks("cache_locks")
     checks |= row_checks("jobs")
     if verb.startswith("consume_"):
-        checks |= {"real_worker_completed", "worker_business_context", "worker_context_cleaned"} | row_checks("failed_jobs")
+        checks |= {"real_worker_completed", "worker_business_context", "worker_context_cleaned", "worker_actor_cleaned"} | row_checks("failed_jobs")
     if lane == "batch":
         checks |= {"batch_pending" if verb.startswith("produce_") else "batch_finished"} | row_checks("job_batches")
     return checks

@@ -952,21 +952,6 @@ final class CopyEnvironment extends Command
             ->update(['status' => 'cancelled', 'cancelled_at' => now(), 'updated_at' => now()]);
     }
 
-    /**
-     * Mengosongkan antrean job yang ikut tersalin.
-     *
-     * ::: Rencananya menyebut ini gratis, dan hari ini ia tidak
-     * Tabel pelucutan di rencana menulis "Job antrean dan kredensial layanan — tidak ikut tersalin
-     * sama sekali; keduanya di sisi pusat". Dalam mode gabungan, `jobs` masih hidup di database
-     * environment dan ikut tersalin utuh. Barisnya adalah pekerjaan produksi yang **belum** dikerjakan, dan worker
-     * sandbox akan mengerjakannya untuk kedua kalinya.
-     * :::
-     *
-     * Dihapus, bukan ditandai. Baris antrean bukan catatan siapa pun — ia instruksi yang belum
-     * dijalankan, dan tidak ada kolom yang dapat menyatakan "jangan jalankan yang ini". Larangan
-     * hapus fisik repo ini menjaga data pelanggan; ini bukan data, dan ia berada di dalam database
-     * yang baru saja lahir.
-     */
     private function disarmJobQueue(Connection $db): int
     {
         return $db->table('jobs')->delete();
@@ -989,26 +974,6 @@ final class CopyEnvironment extends Command
         return $db->table('app_service_credentials')->delete();
     }
 
-    /**
-     * Melucuti registry yang ikut tersalin ke dalam salinannya sendiri.
-     *
-     * ::: Lubang yang paling mudah terlewat, dan yang paling berbahaya
-     * Dalam mode gabungan, `environments` masih hidup di database bisnis. Salinan sebuah produksi karena itu membawa **salinan
-     * tabel `environments` milik produksi**, dan di dalam salinan itu tertulis `kind = 'production'`
-     * dengan `outbound_allowed = true`.
-     *
-     * `ActiveEnvironment` membaca tabel itu. Begitu ada satu jalur yang menjadikan database sandbox
-     * sebagai koneksi bawaan — dan itulah persis yang dituju middleware pemilih environment —
-     * sandbox akan membaca registry miliknya sendiri, menyimpulkan bahwa ia produksi, lalu
-     * membuka seluruh sambungan keluarnya. Seluruh pelucutan di atas menjadi sia-sia oleh satu
-     * tabel yang tidak ada yang mengira ikut tersalin.
-     * :::
-     *
-     * Barisnya diturunkan menjadi sandbox, bukan dihapus. Dihapus, `ActiveEnvironment` tidak
-     * menemukan apa pun — dan "tidak tahu berarti boleh" adalah aturan yang tertulis di kelas itu,
-     * sehingga menghapusnya justru membuka sambungan keluar alih-alih menutupnya. Yang aman adalah
-     * registry yang menjawab "bukan produksi" dari sudut mana pun ia dibaca.
-     */
     private function disarmCopiedRegistry(Connection $db): int
     {
         $schema = DB::connection($this->connections->migrationFor(self::CONNECTION_TARGET));

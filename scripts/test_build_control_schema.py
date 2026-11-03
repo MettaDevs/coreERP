@@ -1,5 +1,3 @@
-"""Regresi offline plan ownership dan hasil baseline control. Tidak membuka database."""
-
 import copy
 import importlib.util
 import json

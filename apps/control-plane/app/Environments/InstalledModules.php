@@ -136,8 +136,7 @@ final class InstalledModules
      *
      * Host, kredensial, dan `search_path` diambil dari koneksi baca bisnis. URL diurai sebelum
      * `database` diganti, lalu dikosongkan karena Laravel mendahulukannya di atas `database` bila
-     * ia terisi — dan bila itu terjadi, layar ini akan membaca database pusat sambil mengaku
-     * membaca database lingkungan.
+     * ia terisi.
      */
     private function register(string $database, string $business): string
     {

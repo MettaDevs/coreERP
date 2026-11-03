@@ -7,8 +7,10 @@ use App\Platform\Access\Support\CoreSecurityCatalog;
 use App\Platform\Access\Support\DataPolicyAccessResolver;
 use App\Platform\ChangeLog\Support\AuditActor;
 use App\Platform\ChangeLog\Support\ChangeLogSwitch;
+use App\Platform\Environment\Listeners\ResetDatabaseConnections;
 use App\Platform\Environment\Support\ActiveEnvironment;
 use App\Platform\Environment\Support\CurrentWorkspace;
+use App\Platform\Environment\Support\EnvironmentConnection;
 use App\Platform\Environment\Support\OutboundGuard;
 use App\Platform\Identity\Models\Passkey;
 use App\Platform\Identity\Models\User;
@@ -30,6 +32,9 @@ use Illuminate\Foundation\Events\DiagnosingHealth;
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
 use Illuminate\Log\Events\MessageLogged;
+use Illuminate\Queue\Events\JobExceptionOccurred;
+use Illuminate\Queue\Events\JobProcessed;
+use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -75,6 +80,8 @@ class AppServiceProvider extends ServiceProvider
          * berikutnya mendapat ikatan yang bersih, persis seperti permintaan HTTP berikutnya.
          */
         $this->app->scoped(ActiveEnvironment::class);
+        $this->app->scoped(EnvironmentConnection::class);
+        $this->app->scoped(ResetDatabaseConnections::class);
 
         // Berkas lisensi dibaca sekali per permintaan, bukan sekali per pembaca — ada empat pintu app
         // dan satu middleware kunci yang menanyakannya. Scoped, bukan singleton, supaya lisensi baru
@@ -130,6 +137,9 @@ class AppServiceProvider extends ServiceProvider
         Passkeys::usePasskeyModel(Passkey::class);
 
         $this->configureDefaults();
+        Event::listen(JobProcessing::class, [ResetDatabaseConnections::class, 'begin']);
+        Event::listen(JobProcessed::class, ResetDatabaseConnections::class);
+        Event::listen(JobExceptionOccurred::class, ResetDatabaseConnections::class);
         $this->stopForwardingLogsToOtel();
 
         // Dipasang tanpa syarat, termasuk on-prem dan di dalam test. Yang menentukan apakah ia

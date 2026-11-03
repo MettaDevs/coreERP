@@ -1,5 +1,3 @@
-"""Regresi guard CPDB-02 tanpa Docker, PostgreSQL, atau bootstrap Laravel."""
-
 from __future__ import annotations
 
 import importlib.util
