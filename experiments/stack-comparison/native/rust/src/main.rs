@@ -40,7 +40,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         database,
         NoTls,
         ManagerConfig {
-            recycling_method: RecyclingMethod::Custom("ROLLBACK; RESET ALL".into()),
+            recycling_method: RecyclingMethod::Fast,
         },
     );
     let pool = Pool::builder(manager)
@@ -71,6 +71,18 @@ fn env(name: &str, fallback: &str) -> String {
     std::env::var(name).unwrap_or_else(|_| fallback.to_owned())
 }
 
+/// Sama dengan `ResetDatabaseConnections` PHP: actor audit dan saklar change-log dikosongkan di akhir
+/// setiap request, termasuk request tamu. Koneksi yang gagal dibereskan dibuang dari pool.
+async fn reset(connection: deadpool_postgres::Object) {
+    if let Err(error) = connection
+        .batch_execute("select set_config('coreerp.user_id','',false), set_config('coreerp.change_log','',false)")
+        .await
+    {
+        eprintln!("connection cleanup failed: {error}");
+        drop(deadpool_postgres::Object::take(connection));
+    }
+}
+
 async fn handle(
     State(app): State<Arc<App>>,
     ConnectInfo(address): ConnectInfo<SocketAddr>,
@@ -99,7 +111,10 @@ async fn handle(
     let db: &tokio_postgres::Client = &connection;
     let mut session = match auth::Session::load(&app, db, &parts.headers).await {
         Ok(session) => session,
-        Err(error) => return error.into_response(),
+        Err(error) => {
+            reset(connection).await;
+            return error.into_response();
+        }
     };
     let ip = address.ip().to_string();
     let output=async {
@@ -149,9 +164,7 @@ async fn handle(
     if let Err(error) = session.save(db, &parts.headers, &ip).await {
         response = error.into_response();
     }
-    if let Err(error) = db.batch_execute("ROLLBACK; RESET ALL").await {
-        eprintln!("connection cleanup failed: {error}");
-    }
+    reset(connection).await;
     for (name, value, http_only) in [
         (app.cookie_name.as_str(), session.id.as_str(), true),
         (
