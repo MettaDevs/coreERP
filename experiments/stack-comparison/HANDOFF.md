@@ -2,6 +2,24 @@
 
 Dicatat 3 November 2026, sekitar 16:22 WITA. Pengguna meminta berhenti dan menyerahkan pekerjaan kepada agent lain. Semua agent, listener uji, dan build milik eksperimen sudah dihentikan. Belum ada benchmark server, keputusan pemenang, merge, push, atau deploy aplikasi aktif.
 
+## Pindah ke dev1, 3 November malam
+
+Atas permintaan pengguna (RAM laptop habis), pekerjaan pindah ke dev1. Lokasinya `/home/claude/coreerp-stack-comparison/CoreERP` (folder 0700), branch `codex/native-stack-comparison`. Repo itu snapshot satu commit, karena checkout laptop shallow dan bundle tidak bisa di-clone. Hash tree-nya `754d6c0491e58fbfb63167f118641c0487172e6b`, sama dengan commit laptop `e646a411`. Commit sesudahnya dikerjakan di dev1. Push ke GitHub belum pernah dilakukan.
+
+- `private/` (391 berkas, termasuk `runtime.env`, `seed.dump` `2a8145dc…`, dan semua evidence) tersalin dengan izin 0700/0600 dan sha256 per berkas cocok.
+- Image PHP `coreerp-pf01-test:local` dimuat ke dev1. ID-nya `b601344b…` karena Docker 28 memakai digest config, sedangkan Docker Desktop memakai `25260e58…` (digest manifest). Diff-ID ke-30 layer, config, dan env identik. **`PHP_IMAGE` di `runtime.env` masih ID laptop; ganti ke ID dev1 sebelum `lab.py`.**
+- Volume `coreerp-pf01-vendor` dibuat di dev1, 17.487 berkas dengan manifest sha256 sama.
+- Database belum dibuat di dev1. Buat cluster baru lewat compose dan restore dari `seed.dump`; jangan memakai cluster SaaS dev.
+- Di laptop, container, jaringan, dan volume eksperimen (`coreerp-stack-comparison-database`, `-source`, `coreerp-native-rust-build`, `-cargo`) sudah dihapus atas permintaan pengguna. Volume `coreerp-pf01-*` milik pekerjaan lain dibiarkan.
+- Di laptop, uji dijalankan satu stack bergantian. Di VPS paralel boleh.
+
+Keadaan verifikasi limiter login saat pindah:
+- Limiter Go, Bun, dan Rust sudah disamakan dengan `login-limiter.md` (commit `cf42173d`, `25a2a9d7`, `1df3187a`).
+- `login_sequence.py` VERIFIED untuk Go, Hono, dan Elysia terhadap PHP l4 (`private/l4-*-login-compare.json`).
+- Conformance lengkap Go (48 probe + 6 throttle) VERIFIED (`private/c3-go-conformance.json`).
+- Golden Go g3 gagal karena observer kehilangan fingerprint (`pg_stat_statements.max` 5000 penuh oleh puluhan clone), bukan karena Go. `golden.py` kini me-reset statistik sebelum alur.
+- Belum dijalankan dengan kode baru: golden g3 dan conformance c3 Hono/Elysia, image Rust baru, serta seluruh gate Rust.
+
 ## Lanjutan 3 November, 16:40 sampai 17:06 WITA
 
 Bagian ini menggantikan status pada bagian di bawahnya bila bertentangan. Bukti per baris ada di `.audit/native-stack/decisions.tsv`.
