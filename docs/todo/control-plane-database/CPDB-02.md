@@ -1,5 +1,7 @@
 # CPDB-02: koneksi, schema, dan role
 
+Hasil diserahkan melalui [PR #377](https://github.com/MettaDevs/coreERP/pull/377), branch `codex/cpdb-02-connections`.
+
 CPDB-02 menyiapkan tujuan koneksi, store framework, runner migration dan privilege database. Pembuktian memakai PostgreSQL terisolasi dengan database serta login berbeda. Unit ini tidak menjalankan cutover server. Projection, transaksi lintas database, directory Foundation dan revoke tetap pekerjaan CPDB-03. PF-02 tetap menunggu CPDB-05.
 
 Status unit adalah `in_review`. Implementasi teruji berada pada `f278e3dc`; [ringkasan verifikasi](evidence/cpdb-02/verification.json), [hasil runtime](evidence/cpdb-02/runtime.json), [fresh/copy](evidence/cpdb-02/fresh-copy.json) dan [keputusan](evidence/cpdb-02/decisions.tsv) memuat bukti serta batasnya. Basis pekerjaan adalah main `6b3cf584`, hasil merge PF-01 melalui [PR #376](https://github.com/MettaDevs/coreERP/pull/376). Source fisik dan key runtime server tidak dipindahkan.

@@ -44,6 +44,8 @@ Centang CPDB-01 membuktikan keluaran inventaris/kontrak yang diminta, bukan acce
 
 ## CPDB-02. Pisahkan koneksi dan migration
 
+Owner integrasi Codex, branch `codex/cpdb-02-connections`, [PR #377](https://github.com/MettaDevs/coreERP/pull/377). Backend teruji `f278e3dc`; lihat [CPDB-02](CPDB-02.md) dan batas bukti fixture.
+
 - [x] CPDB-02a. Resolusi authority/business/environment/maintenance memakai tujuan eksplisit. [Runtime](evidence/cpdb-02/runtime.json) merekam current_database dan login berbeda; sentinel config serta missing-alias guard juga diuji.
 - [x] CPDB-02b. Pooled tetap business pada nested/failed context. PDO runtime dan migrator mempunyai ownership; ancestor dipertahankan dan derived connection ditutup. [Feature test](CPDB-02.md#bukti-dan-pengulangan) serta review mencatat regresinya.
 - [x] CPDB-02c. SQL store dipilih saat boot. Producer/consumer baru memeriksa session, reset, cache, locks, queue sukses/gagal/batch dan scheduler; Valkey juga diuji melalui proses berbeda. Bukti berada pada [ringkasan](evidence/cpdb-02/verification.json).
