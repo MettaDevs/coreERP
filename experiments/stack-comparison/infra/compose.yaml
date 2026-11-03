@@ -32,8 +32,9 @@ x-php: &php
 services:
   database:
     image: ${POSTGRES_IMAGE:?Set POSTGRES_IMAGE to an inspected digest}
-    cpus: 2
-    mem_limit: 1g
+    # Bawaan laptop untuk uji kesetaraan; server benchmark memasok DB_CPUS, DB_MEMORY, DB_SHARED_BUFFERS.
+    cpus: ${DB_CPUS:-2}
+    mem_limit: ${DB_MEMORY:-1g}
     stop_grace_period: 120s
     environment:
       POSTGRES_DB: erp_compare
@@ -46,7 +47,9 @@ services:
       - -c
       - pg_stat_statements.track=all
       - -c
-      - shared_buffers=128MB
+      - shared_buffers=${DB_SHARED_BUFFERS:-128MB}
+      - -c
+      - effective_cache_size=${DB_EFFECTIVE_CACHE_SIZE:-512MB}
       - -c
       - max_connections=100
       - -c

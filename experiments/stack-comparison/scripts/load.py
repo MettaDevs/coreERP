@@ -14,7 +14,7 @@ import time
 
 import lab
 import native
-from sql_observer import validate_database
+from sql_observer import sql, validate_database
 
 LAB = Path(__file__).resolve().parents[1]
 PRIVATE = LAB / "private"
@@ -107,6 +107,11 @@ if __name__ == "__main__":
                 "loadgen": {"cpus": args.loadgen_cpus, "memory": "2g", "network": native.NETWORK}, "host": os.uname().nodename if hasattr(os, "uname") else ""}
     sut = start(args.candidate, args.database)
     manifest["sut"] = sut
+    limits = json.loads(subprocess.run(["docker", "inspect", "coreerp-stack-comparison-database-1", "--format", "{{json .HostConfig}}"],
+                                       capture_output=True, text=True, check=True).stdout)
+    settings = sql("SELECT json_object_agg(name, setting || coalesce(unit, '')) FROM pg_settings WHERE name IN "
+                   "('shared_buffers','effective_cache_size','max_connections','synchronous_commit','work_mem');")
+    manifest["database"] = {"cpus": limits["NanoCpus"] / 1e9, "memory_bytes": limits["Memory"], "settings": json.loads(settings)}
     stop_sampling = threading.Event()
     samplers = [stamped(["docker", "stats", "--format", "{{json .}}", sut["container"], "coreerp-stack-comparison-database-1", LOADGEN], out / "docker-stats.tsv", stop_sampling)]
     if sys.platform != "win32":

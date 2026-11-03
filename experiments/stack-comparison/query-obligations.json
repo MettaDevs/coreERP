@@ -106,6 +106,19 @@
       "kind": "transaction-other:set search_path to \"public\"",
       "reason": "Laravel mengirim SET search_path sekali saat membuka koneksi PDO baru; kandidat memakai search_path bawaan database. Bukan kerja per request.",
       "evidence": ""
+    },
+    {
+      "candidates": [
+        "hono",
+        "elysia"
+      ],
+      "operations": [
+        "login-page"
+      ],
+      "kind": "read-extra",
+      "match": "pg_type",
+      "reason": "Bun berjalan dua proses reusePort; proses yang membuka koneksi pertamanya membaca katalog pg_type untuk pemetaan tipe postgres.js. Metadata driver, bukan kerja bisnis.",
+      "evidence": "private/d3-hono-queries.json satu-satunya temuan terbuka"
     }
   ]
 }
