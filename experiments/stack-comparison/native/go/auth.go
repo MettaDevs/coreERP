@@ -18,7 +18,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -202,10 +201,40 @@ func (q *request) login() (response, error) {
 	ip, _, _ := net.SplitHostPort(q.r.RemoteAddr)
 	throttleKey := email + "|" + ip
 	namedKey := fmt.Sprintf("%x", md5.Sum([]byte("login"+throttleKey)))
-	hits, e := q.rateHit(namedKey, true)
+	throttled, e := q.tooManyAttempts(namedKey)
 	if e != nil {
 		return response{}, e
 	}
+	if throttled {
+		timer, _, e := q.cacheGet(namedKey + ":timer")
+		if e != nil {
+			return response{}, e
+		}
+		now := time.Now().Unix()
+		retry := max(0, timer-now)
+		return response{}, &failure{status: 429, message: "Too Many Attempts.", headers: http.Header{"X-RateLimit-Limit": {"5"}, "X-RateLimit-Remaining": {"0"}, "Retry-After": {fmt.Sprint(retry)}, "X-RateLimit-Reset": {fmt.Sprint(now + retry)}}}
+	}
+	if _, e = q.rateHit(namedKey); e != nil {
+		return response{}, e
+	}
+	res, e := q.authenticate(email, password, throttleKey)
+	var f *failure
+	if e != nil && !errors.As(e, &f) {
+		return res, e
+	}
+	attempts, _, readError := q.cacheGet(namedKey)
+	if readError != nil {
+		return response{}, readError
+	}
+	headers := http.Header{"X-RateLimit-Limit": {"5"}, "X-RateLimit-Remaining": {fmt.Sprint(max(0, 5-attempts))}}
+	if f != nil {
+		f.headers = headers
+		return res, e
+	}
+	res.headers = headers
+	return res, nil
+}
+func (q *request) authenticate(email, password, throttleKey string) (response, error) {
 	u, e := q.row("select * from users where email=$1 and account_type='person' limit 1", email)
 	if e != nil && !errors.Is(e, pgx.ErrNoRows) {
 		return response{}, e
@@ -226,7 +255,7 @@ func (q *request) login() (response, error) {
 		}
 	}
 	if !valid {
-		if _, e = q.rateHit(throttleKey, false); e != nil {
+		if _, e = q.rateHit(throttleKey); e != nil {
 			return response{}, e
 		}
 		return response{}, invalid("email", "These credentials do not match our records.")
@@ -245,52 +274,81 @@ func (q *request) login() (response, error) {
 	if e = q.exec("select set_config('coreerp.user_id',$1,false)", str(u["id"])); e != nil {
 		return response{}, e
 	}
-	if e = q.exec("delete from sessions where id=$1", q.sessionID); e != nil {
-		return response{}, e
+	for _, key := range []string{throttleKey, throttleKey + ":timer"} {
+		if e = q.cacheForget(key); e != nil {
+			return response{}, e
+		}
 	}
-	q.sessionID = randomToken()
-	cacheKey := env("CACHE_PREFIX", "laravel-cache-") + throttleKey
-	if e = q.exec("delete from cache where key=$1 or key=$2", cacheKey, cacheKey+":timer"); e != nil {
-		return response{}, e
-	}
-	return response{body: object{"two_factor": false}, headers: http.Header{"X-RateLimit-Limit": []string{"5"}, "X-RateLimit-Remaining": []string{fmt.Sprint(max(0, 5-hits))}}}, nil
+	return response{body: object{"two_factor": false}}, nil
 }
 
-func (q *request) rateHit(key string, enforce bool) (int64, error) {
-	prefix := os.Getenv("CACHE_PREFIX")
-	if prefix == "" {
-		prefix = "laravel-cache-"
+// Primitif cache dan limiter meniru DatabaseStore dan RateLimiter Laravel per statement; lihat ../../login-limiter.md.
+const flexibleCreated = "illuminate:cache:flexible:created:"
+
+func cacheKey(key string) string { return env("CACHE_PREFIX", "laravel-cache-") + key }
+func cacheInteger(v any) int64 {
+	n := int64(0)
+	fmt.Sscanf(str(v), "i:%d;", &n)
+	return n
+}
+func (q *request) cacheGet(key string) (int64, bool, error) {
+	entry, e := q.row("select * from cache where key in ($1)", cacheKey(key))
+	if errors.Is(e, pgx.ErrNoRows) {
+		return 0, false, nil
+	} else if e != nil {
+		return 0, false, e
 	}
-	key = prefix + key
+	if now := time.Now().Unix(); integer(entry["expiration"]) <= now {
+		return 0, false, q.exec("delete from cache where key in ($1,$2) and expiration<=$3", cacheKey(key), cacheKey(flexibleCreated+key), now)
+	}
+	return cacheInteger(entry["value"]), true, nil
+}
+func (q *request) cacheAdd(key string, value int64) (bool, error) {
+	if _, found, e := q.cacheGet(key); e != nil || found {
+		return false, e
+	}
+	tag, e := q.db.Exec(q.ctx, "insert into cache(key,value,expiration) values($1,$2,$3) on conflict do nothing", cacheKey(key), fmt.Sprintf("i:%d;", value), time.Now().Unix()+60)
+	return e == nil && tag.RowsAffected() > 0, e
+}
+func (q *request) cacheIncrement(key string) (int64, error) {
 	hits := int64(0)
 	err := q.transaction(func() error {
-		if e := q.exec("insert into cache(key,value,expiration) values($1,'i:0;',$2) on conflict(key) do nothing", key, time.Now().Unix()+60); e != nil {
+		entry, e := q.row("select * from cache where key=$1 limit 1 for update", cacheKey(key))
+		if errors.Is(e, pgx.ErrNoRows) {
+			return nil
+		} else if e != nil {
 			return e
 		}
-		entry, e := q.row("select value,expiration from cache where key=$1 for update", key)
-		if e != nil && !errors.Is(e, pgx.ErrNoRows) {
-			return e
-		}
-		now := time.Now().Unix()
-		expiry := now + 60
-		if entry != nil && integer(entry["expiration"]) > now {
-			fmt.Sscanf(str(entry["value"]), "i:%d;", &hits)
-			expiry = integer(entry["expiration"])
-		} else if entry != nil {
-			if e = q.exec("delete from cache where key=$1 or key=$2", key, key+":timer"); e != nil {
-				return e
-			}
-		}
-		if enforce && hits >= 5 {
-			return fail(429, "Too Many Attempts.")
-		}
-		if e = q.exec("insert into cache(key,value,expiration) values($1,$2,$3) on conflict(key) do nothing", key+":timer", fmt.Sprintf("i:%d;", expiry), expiry); e != nil {
-			return e
-		}
-		hits++
-		return q.exec("insert into cache(key,value,expiration) values($1,$2,$3) on conflict(key) do update set value=excluded.value,expiration=excluded.expiration", key, fmt.Sprintf("i:%d;", hits), expiry)
+		hits = cacheInteger(entry["value"]) + 1
+		return q.exec("update cache set value=$1 where key=$2", fmt.Sprintf("i:%d;", hits), cacheKey(key))
 	})
 	return hits, err
+}
+func (q *request) cacheForget(key string) error {
+	return q.exec("delete from cache where key in ($1,$2)", cacheKey(key), cacheKey(flexibleCreated+key))
+}
+func (q *request) rateHit(key string) (int64, error) {
+	if _, e := q.cacheAdd(key+":timer", time.Now().Unix()+60); e != nil {
+		return 0, e
+	}
+	added, e := q.cacheAdd(key, 0)
+	if e != nil {
+		return 0, e
+	}
+	hits, e := q.cacheIncrement(key)
+	if e != nil || added || hits != 1 {
+		return hits, e
+	}
+	return hits, q.exec("insert into cache(key,value,expiration) values($1,$2,$3) on conflict(key) do update set value=excluded.value,expiration=excluded.expiration", cacheKey(key), "i:1;", time.Now().Unix()+60)
+}
+func (q *request) tooManyAttempts(key string) (bool, error) {
+	if attempts, _, e := q.cacheGet(key); e != nil || attempts < 5 {
+		return false, e
+	}
+	if _, found, e := q.cacheGet(key + ":timer"); e != nil || found {
+		return found, e
+	}
+	return false, q.cacheForget(key)
 }
 func (q *request) restoreUser() error {
 	id := q.session[guardKey]

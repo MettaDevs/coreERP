@@ -63,6 +63,7 @@ type failure struct {
 	message string
 	code    string
 	errors  object
+	headers http.Header
 }
 
 func (e *failure) Error() string            { return e.message }
@@ -267,7 +268,7 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		var f *failure
 		if errors.As(err, &f) {
-			res = response{status: f.status, body: object{"message": f.message}}
+			res = response{status: f.status, body: object{"message": f.message}, headers: f.headers}
 			b := res.body.(object)
 			if f.errors != nil {
 				b["errors"] = f.errors
