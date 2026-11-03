@@ -124,6 +124,8 @@ if __name__ == "__main__":
     parser.add_argument("--baseline", type=Path, default=PRIVATE / "seed-baseline.json")
     args = parser.parse_args()
     validate_database(args.database)
+    if sql(f"SELECT count(*) FROM pg_database WHERE datname='{args.database}';") != "1":
+        raise SystemExit("Database run belum ada; buat clone dulu agar run tidak berjalan terhadap database kosong.")
     login_seconds = args.login or max(60, math.ceil(0.4 * args.vus))
     out = PRIVATE / "load" / args.run_id
     if out.exists():
