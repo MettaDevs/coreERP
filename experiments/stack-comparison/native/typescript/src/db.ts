@@ -47,11 +47,20 @@ export class Database {
         query: string,
         parameters: Bind[] = [],
     ): Promise<z.output<S>[]> {
+        return this.run(query, parameters, (rows) =>
+            z.array(schema).parse(rows),
+        );
+    }
+
+    private async run<T>(
+        query: string,
+        parameters: Bind[],
+        read: (rows: postgres.RowList<postgres.Row[]>) => T,
+    ): Promise<T> {
         const started = performance.now();
         let failed = false;
         try {
-            const rows = await this.sql.unsafe(query, parameters);
-            return z.array(schema).parse(rows);
+            return read(await this.sql.unsafe(query, parameters));
         } catch (error) {
             failed = true;
             throw error;
@@ -84,8 +93,8 @@ export class Database {
         return (await this.rows(schema, query, parameters))[0];
     }
 
-    async execute(query: string, parameters: Bind[] = []): Promise<void> {
-        await this.rows(z.unknown(), query, parameters);
+    async execute(query: string, parameters: Bind[] = []): Promise<number> {
+        return this.run(query, parameters, (rows) => rows.count);
     }
 
     async insert(table: string, data: Record<string, Bind>): Promise<void> {

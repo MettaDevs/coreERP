@@ -16,6 +16,7 @@ const environmentSchema = z.object({
     SESSION_DRIVER: z.literal('database').default('database'),
     SESSION_ENCRYPT: z.literal('false').default('false'),
     CACHE_STORE: z.literal('database').default('database'),
+    CACHE_PREFIX: z.string().default('laravel-cache-'),
     COREERP_LICENSE_REQUIRED: z.literal('false').default('false'),
     COREERP_BASE_DOMAIN: z.literal('').default(''),
     HOST: z.string().default('127.0.0.1'),

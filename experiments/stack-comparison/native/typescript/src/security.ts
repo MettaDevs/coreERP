@@ -11,6 +11,7 @@ import { z } from 'zod';
 import type { Config } from './config.ts';
 import { Database } from './db.ts';
 import { abort, HttpFailure, validation } from './errors.ts';
+import { RateLimiter } from './limiter.ts';
 
 const envelopeSchema = z.object({
     iv: z.string(),
@@ -264,46 +265,49 @@ export class Session {
         }
         const credentials = result.data;
         const email = credentials.email.toLowerCase();
-        const key =
-            'native-login:' +
-            createHash('sha1')
-                .update(
-                    email.normalize('NFKD').replace(/\p{M}/gu, '') +
-                        '|' +
-                        this.ip(),
-                )
-                .digest('hex');
-        const attempts = await this.db.one(
-            z.object({ value: z.string(), expiration: z.coerce.number() }),
-            'select value,expiration from cache where key=$1',
-            [key],
-        );
-        const now = Math.floor(Date.now() / 1000);
-        if (
-            attempts &&
-            attempts.expiration > now &&
-            Number(attempts.value) >= 5
-        ) {
-            const seconds = attempts.expiration - now;
+        const throttleKey =
+            email.normalize('NFKD').replace(/\p{M}/gu, '') + '|' + this.ip();
+        const routeKey = createHash('md5')
+            .update('login' + throttleKey)
+            .digest('hex');
+        const limiter = new RateLimiter(this.db, this.config.CACHE_PREFIX);
+        if (await limiter.tooManyAttempts(routeKey)) {
+            const seconds = await limiter.availableIn(routeKey);
             throw new HttpFailure(
                 429,
                 { message: 'Too Many Attempts.' },
                 {
-                    'Retry-After': String(seconds),
                     'X-RateLimit-Limit': '5',
                     'X-RateLimit-Remaining': '0',
+                    'Retry-After': String(seconds),
+                    'X-RateLimit-Reset': String(
+                        Math.floor(Date.now() / 1000) + seconds,
+                    ),
                 },
             );
         }
-        const hit = await this.db.one(
-            z.object({ value: z.string(), expiration: z.coerce.number() }),
-            'insert into cache (key,value,expiration) values ($1,$2,$3) on conflict(key) do update set value=case when cache.expiration<=$4 then $2 else (cache.value::integer+1)::text end,expiration=case when cache.expiration<=$4 then $3 else cache.expiration end returning value,expiration',
-            [key, '1', now + 60, now],
-        );
-        this.responseHeaders['X-RateLimit-Limit'] = '5';
-        this.responseHeaders['X-RateLimit-Remaining'] = String(
-            Math.max(0, 5 - Number(hit?.value ?? '1')),
-        );
+        await limiter.hit(routeKey);
+        try {
+            return await this.authenticate(
+                email,
+                credentials.password,
+                limiter,
+                throttleKey,
+            );
+        } finally {
+            this.responseHeaders['X-RateLimit-Limit'] = '5';
+            this.responseHeaders['X-RateLimit-Remaining'] = String(
+                await limiter.remaining(routeKey),
+            );
+        }
+    }
+
+    private async authenticate(
+        email: string,
+        password: string,
+        limiter: RateLimiter,
+        throttleKey: string,
+    ): Promise<object> {
         const find = () =>
             this.db.one(
                 userSchema,
@@ -312,13 +316,9 @@ export class Session {
             );
         const first = await find();
         const verified =
-            first &&
-            (await Bun.password.verify(credentials.password, first.password));
+            first && (await Bun.password.verify(password, first.password));
         if (!verified) {
-            await this.db.execute(
-                'insert into cache (key,value,expiration) values ($1,$2,$3) on conflict(key) do update set value=case when cache.expiration<=$4 then $2 else (cache.value::integer+1)::text end,expiration=case when cache.expiration<=$4 then $3 else cache.expiration end',
-                [key + ':failed', '1', now + 60, now],
-            );
+            await limiter.hit(throttleKey);
             validation({
                 email: 'These credentials do not match our records.',
             });
@@ -331,8 +331,9 @@ export class Session {
         const second = await find();
         if (
             !second ||
-            !(await Bun.password.verify(credentials.password, second.password))
+            !(await Bun.password.verify(password, second.password))
         ) {
+            await limiter.hit(throttleKey);
             validation({
                 email: 'These credentials do not match our records.',
             });
@@ -349,9 +350,7 @@ export class Session {
         );
         await this.db.actor(second.id);
         this.id = randomToken();
-        await this.db.execute('delete from cache where key=$1', [
-            key + ':failed',
-        ]);
+        await limiter.clear(throttleKey);
         return { two_factor: false };
     }
 
