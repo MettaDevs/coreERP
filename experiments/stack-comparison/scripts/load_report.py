@@ -53,10 +53,37 @@ def cpu_series(run: Path, manifest: dict) -> dict:
         rates = [(b["cpu_usec"] - a["cpu_usec"]) / (b["t"] - a["t"]) / 1e4 for a, b in zip(rows, rows[1:])
                  if start <= a["t"] and b["t"] <= finish and b["t"] > a["t"]]
         memory = [row["memory"] for row in rows if start <= row["t"] <= finish]
+        window = [row for row in rows if start <= row["t"] <= finish]
         if rates:
+            periods = window[-1].get("nr_periods", 0) - window[0].get("nr_periods", 0) if len(window) > 1 else 0
+            throttled = window[-1].get("nr_throttled", 0) - window[0].get("nr_throttled", 0) if len(window) > 1 else 0
             result[name] = {"samples": len(rates), "mean": round(statistics.fmean(rates), 1), "max": round(max(rates), 1),
-                            "memory_max_mb": round(max(memory) / 2**20, 1) if memory else None}
+                            "memory_max_mb": round(max(memory) / 2**20, 1) if memory else None,
+                            "throttled_period_share": round(throttled / periods, 3) if periods else None}
     return result
+
+
+def connection_states(run: Path, manifest: dict) -> dict:
+    path = run / "connections.jsonl"
+    if not path.exists():
+        return {}
+    start = datetime.fromisoformat(manifest["started_at"]).timestamp() + manifest["phases"].get("login", 0) + manifest["phases"]["warmup"]
+    finish = start + manifest["phases"]["plateau"]
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    rows = [row for row in rows if start <= row["t"] <= finish]
+    if not rows:
+        return {}
+    states = sorted({state for row in rows for state in row["states"]})
+    return {"samples": len(rows), "max_by_state": {state: max(row["states"].get(state, 0) for row in rows) for state in states},
+            "max_lock_waiting": max(row["waiting"] for row in rows), "max_idle_in_transaction_s": round(max(row["oldest_idle_xact_s"] for row in rows), 3)}
+
+
+def counter_delta(manifest: dict) -> dict:
+    before, after = manifest.get("database_counters_before"), manifest.get("database_counters_after")
+    if not before or not after:
+        return {}
+    return {group: {key: (round(after[group][key] - before[group][key], 3) if isinstance(after[group][key], (int, float)) else None)
+                    for key in after[group]} for group in after if after[group] and before.get(group)}
 
 
 def report(run: Path) -> dict:
@@ -111,7 +138,7 @@ def report(run: Path) -> dict:
         "failed_by_status": dict(statuses), "acknowledged_receipts": manifest.get("acknowledged_receipts"),
         "completed_cycles": oracle.get("acknowledged_completed"),
         "cycle_ms_with_think": summary(cycles["cycle_total"]), "cycle_ms_without_think": summary(cycles["cycle_busy"]),
-        "cpu_percent": cpu,
+        "cpu_percent": cpu, "connections": connection_states(run, manifest), "database_delta": counter_delta(manifest),
         "loadgen_saturated": bool(loadgen) and loadgen["mean"] > 0.8 * 100 * float(manifest["loadgen"]["cpus"]),
         "oracle_failures": oracle["failures"],
         "limitations": "Closed model with think time; VU count is not concurrent request count. Percentiles use nearest rank. PASS_LOW_SAMPLES means some operation had fewer samples than the profile minimum, so p99 is not claimable.",

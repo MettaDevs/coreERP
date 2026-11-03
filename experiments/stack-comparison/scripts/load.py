@@ -64,16 +64,48 @@ def cgroups(names: list[str], target: Path, stop: threading.Event) -> threading.
                             found[name] = Path(f"/sys/fs/cgroup/system.slice/docker-{identifier}.scope")
                 for name, base in found.items():
                     try:
-                        usage = next(int(line.split()[1]) for line in (base / "cpu.stat").read_text().splitlines() if line.startswith("usage_usec"))
+                        stat = dict(line.split() for line in (base / "cpu.stat").read_text().splitlines())
                         memory = int((base / "memory.current").read_text())
-                    except (OSError, StopIteration, ValueError):
+                    except (OSError, ValueError):
                         continue
-                    handle.write(json.dumps({"t": time.time(), "name": name, "cpu_usec": usage, "memory": memory}) + "\n")
+                    # nr_throttled dan throttled_usec membuktikan container mentok di kuota CPU-nya.
+                    handle.write(json.dumps({"t": time.time(), "name": name, "cpu_usec": int(stat["usage_usec"]), "memory": memory,
+                                             "nr_periods": int(stat.get("nr_periods", 0)), "nr_throttled": int(stat.get("nr_throttled", 0)),
+                                             "throttled_usec": int(stat.get("throttled_usec", 0))}) + "\n")
                 handle.flush()
                 stop.wait(2)
     thread = threading.Thread(target=run, daemon=True)
     thread.start()
     return thread
+
+
+def connections(database: str, target: Path, stop: threading.Event) -> threading.Thread:
+    """Koneksi database run per state setiap dua detik, termasuk transaksi idle yang menahan snapshot."""
+    statement = ("SELECT json_build_object('states', coalesce((SELECT json_object_agg(state, n) FROM (SELECT coalesce(state, 'none') AS state, count(*) AS n "
+                 f"FROM pg_stat_activity WHERE datname='{database}' GROUP BY 1) s), '{{}}'::json), 'waiting', (SELECT count(*) FROM pg_stat_activity "
+                 f"WHERE datname='{database}' AND wait_event_type IN ('Lock','LWLock')), 'oldest_idle_xact_s', (SELECT coalesce(max(extract(epoch FROM now()-xact_start)), 0) "
+                 f"FROM pg_stat_activity WHERE datname='{database}' AND state LIKE 'idle in transaction%'));")
+    def run() -> None:
+        with target.open("w", encoding="utf-8") as handle:
+            while not stop.is_set():
+                try:
+                    handle.write(json.dumps({"t": time.time(), **json.loads(sql(statement))}) + "\n")
+                    handle.flush()
+                except (subprocess.CalledProcessError, json.JSONDecodeError):
+                    pass
+                stop.wait(2)
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+    return thread
+
+
+def database_counters(database: str) -> dict:
+    """Checkpoint, WAL, dan statistik database sebelum/sesudah run; selisihnya dihitung di laporan."""
+    return json.loads(sql(
+        "SELECT json_build_object("
+        "'checkpointer', (SELECT row_to_json(c) FROM (SELECT num_timed, num_requested, write_time, sync_time, buffers_written FROM pg_stat_checkpointer) c), "
+        "'wal', (SELECT row_to_json(w) FROM (SELECT wal_records, wal_fpi, wal_bytes::bigint, wal_buffers_full FROM pg_stat_wal) w), "
+        f"'database', (SELECT row_to_json(d) FROM (SELECT xact_commit, xact_rollback, blks_read, blks_hit, deadlocks, temp_bytes, conflicts FROM pg_stat_database WHERE datname='{database}') d));"))
 
 
 def start(candidate: str, database: str) -> dict:
@@ -143,7 +175,9 @@ if __name__ == "__main__":
                    "('shared_buffers','effective_cache_size','max_connections','synchronous_commit','work_mem');")
     manifest["database"] = {"cpus": limits["NanoCpus"] / 1e9, "memory_bytes": limits["Memory"], "settings": json.loads(settings)}
     stop_sampling = threading.Event()
-    samplers = [cgroups([sut["container"], "coreerp-stack-comparison-database-1", LOADGEN], out / "cgroups.jsonl", stop_sampling)]
+    samplers = [cgroups([sut["container"], "coreerp-stack-comparison-database-1", LOADGEN], out / "cgroups.jsonl", stop_sampling),
+                connections(args.database, out / "connections.jsonl", stop_sampling)]
+    manifest["database_counters_before"] = database_counters(args.database)
     if sys.platform != "win32":
         samplers.append(stamped(["vmstat", "-n", "2"], out / "vmstat.tsv", stop_sampling))
     environment = {**os.environ, "COMPARE_PASSWORD": secret("COMPARE_PASSWORD")}
@@ -163,6 +197,7 @@ if __name__ == "__main__":
         stop(args.candidate)
         stop_sampling.set()
         time.sleep(3)
+    manifest["database_counters_after"] = database_counters(args.database)
     manifest["k6_exit"] = k6.returncode
     (out / "k6.stderr").write_text(k6.stdout + k6.stderr, encoding="utf-8")
     acknowledgements = ledger(out / "k6.log") if (out / "k6.log").exists() else []
