@@ -82,7 +82,7 @@ def clone(database: str, seed: Path = PRIVATE / "seed.dump") -> None:
     exists = sql("SELECT count(*) FROM pg_database WHERE datname='" + database + "';")
     if exists != "0":
         raise SystemExit("Database sudah ada. Alat tidak menimpa atau menghapus database.")
-    command("docker", "cp", str(seed), "coreerp-stack-comparison-database-1:/tmp/compare-baseline.dump")
+    command("docker", "cp", str(seed.resolve()), "coreerp-stack-comparison-database-1:/tmp/compare-baseline.dump")
     sql('CREATE DATABASE "' + database + '";')
     command("docker", "exec", "coreerp-stack-comparison-database-1", "pg_restore", "-U", "compare_admin", "-d", database, "--no-owner", "--no-acl", "--exit-on-error", "/tmp/compare-baseline.dump")
     print(json.dumps({"database_created": database, "source": seed.name, "php_used": False}))
