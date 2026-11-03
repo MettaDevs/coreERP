@@ -1,0 +1,24 @@
+{
+  "generator_version": 1,
+  "source": {
+    "commit": "6b3cf5846fd4442c3e895cacf2ba58275f9dd75e",
+    "schema": "coreerp_test",
+    "server_version": "16.14",
+    "migration_count": 151,
+    "migration_sources_sha256": "c9ff09e685cc95c782d9c028d23a4b4eb09d557d48170961d8d19f3e80db82ea",
+    "catalog_sha256": "4cebf2e40587475ecbd329ce70fd5e79f729ba56e8f9c4068e5f047a407d5ad8"
+  },
+  "plan_sha256": "15dc60a22b48131c9ab9a6bae4f7efa8cb463ac75da7eece8afb8fe5aec6198e",
+  "routine_sources_sha256": {
+    "routines/coreerp_log_change.sql": "44c1f4826cf8f1c2fb4bbcf29db3a20870db8b49b31ad0dea43d1daa79d65e82"
+  },
+  "baseline_sha256": "3f20051d1da68d2f930ce2c9628f61f4ee647d602e2aba4b32665147247e37a5",
+  "catalog_sha256": "f72be2d9d1b8f947558076699e476df98fcd33c6b550e593482938d4698504d5",
+  "objects": {
+    "tables": 77,
+    "routines": 5,
+    "sequences": 6,
+    "types": 0
+  },
+  "rows_imported": 0
+}
