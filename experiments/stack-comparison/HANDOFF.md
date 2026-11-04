@@ -71,6 +71,20 @@ Throughput seluruh native mentok ±198-217 req/s di dev1; batasnya disk (fsync W
 - Kampanye teroptimasi: `run-o1.sh` memasang `staging-o1`. Sebelum dijalankan, isi ulang staging dari commit laptop terbaru (`git diff --name-only 2150f77f HEAD`) dan perbarui `EXPECTED` ke tree commit itu. Ia menunggu penanda `S4-DONE` di `run-s4.log`.
 - Kewajiban beres-beres tersisa: lab dan secret fixture sintetis di dev2 (`~/coreerp-stack-comparison`, `~/coreerp-dev2-*.sh`), serta folder `staging*` dan skrip `run-*.sh` di home dev1.
 
+## Stack terpilih: Bun + Elysia, 4 November
+
+Keputusan pengguna, diteruskan lewat sesi "Perbedaan disk write dev 1 dan dev 2": "kami memutuskan memakai bun elysia sesuai perkiraan awal". Hono tidak diuji lagi di Cue, karena hampir 3k VU dinilai "sudah lebih dari cukup".
+
+Dasarnya load test sesi itu di server Cue (tree dasar `4f52fd8e`, sesi siap pakai, nofile 65536, satu run per langkah, belum lima ulangan). Angka Cue tidak dicampur dengan angka dev1: fsync di Cue ±65 µs karena disk write-through (kemungkinan cache Firecracker Unsafe), jadi itu batas atas "fsync gratis", bukan angka durabel.
+- Berkuota (app 2 CPU, DB 4 CPU, generator 2): Elysia gagal di 1.600 VU (baca p95 411 ms, CPU app 184%, 24% periode ter-throttle); Hono dan Go lulus 1.600.
+- Tanpa kuota (8 proses Bun reusePort, pool 32): Elysia lulus 1.600, 2.000, dan 2.400 VU (baca/tulis p95 109/228 ms, 476 req/dtk di 2.400); di 2.800 load host 8,3 dari 8 core.
+
+Angka dev1 di atas tidak bertentangan: Elysia 900/1.000 di dev1 tertahan disk yang sama dengan semua native. Yang dibawa ke refactor dari eksperimen ini:
+- **Biaya CPU Elysia lebih tinggi dari Go** (6,2 vs 4,3 ms app per request di dev1). Pada core yang sama, Elysia butuh lebih banyak proses reusePort untuk VU yang sama; batasnya CPU, bukan event loop tunggal.
+- **Belum ada cara menaikkan VU yang terbukti.** Daftar wajib-bila-terbukti di atas baru lolos smoke test fungsi (varian teroptimasi, VERIFIED 0 perbedaan); A/B performanya belum berjalan. Kewajiban "wajib dipakai pada refactor" belum mengikat butir mana pun.
+- **PgBouncer transaction pooling tidak aman dengan bentuk actor sekarang.** Actor audit dipasang `set_config(..., false)` pada level sesi koneksi; di transaction pooling actor satu user dapat terbawa ke request user lain. Bila PgBouncer dipakai di refactor, actor wajib `SET LOCAL` per transaksi dan prepared statement diatur ulang (rincian di `optimized.md`).
+- Kapasitas produksi tetap diukur di server dengan disk lokal yang fsync-nya durabel; angka Cue bukan jaminan.
+
 ## Gangguan I/O di dev1 dan perubahan di luar folder eksperimen, 4 November
 
 dev1 dipakai bersama. Job backup milik rekan pengguna (root, `/usr/local/libexec/metta-backup/registry-drill.py` dari sesi SSH, plus timer `metta-*`) membaca disk 18-220 MB/s selama `r8n-go-900` dan `r8n-rust-1000`. Database run sendiri hampir tidak membaca disk. Penanganannya:
