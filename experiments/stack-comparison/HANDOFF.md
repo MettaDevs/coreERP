@@ -48,6 +48,29 @@ Keputusan pengguna 4 November, diteruskan lewat sesi "Perbedaan disk write dev 1
 
 Dilarang: `fsync=off`, `full_page_writes=off`, unlogged table untuk data penting. Butir 1, 2, 3, 4, dan 6 mengubah perilaku yang dijaga gate kesetaraan, jadi diterapkan ke PHP juga agar perbandingan tetap adil. Urutan uji mengikuti bottleneck yang terbukti: 6 dan 3 dulu (menghapus fsync per request), lalu 1 dan 2 bila CPU menjadi limiter berikutnya.
 
+## Dihentikan atas permintaan pengguna, 4 November ±12:20 WIB
+
+Semua run, antrean, dan kampanye teroptimasi di dev1 dihentikan. Container run dibersihkan. Batas I/O backup dicabut lebih awal, timer `coreerp-io-limit-revert` dihentikan, dan `/root/AGENTS.md` serta `/root/CLAUDE.md` dihapus. Setelan PostgreSQL masih bawaan, karena pg-tuning belum sempat dipasang. Di dev2, container lab kita dihentikan (volume dan image tetap ada), dan alat uji tim cyber security aktif tanpa batas.
+
+**Hasil dasar mode sesi** (ramp r9n/r9b/r9c/r9p/r9r, satu run per titik, profil Uniform(0,60), nofile 65536):
+
+| Stack | Last-pass | First-fail | Catatan |
+| --- | ---: | ---: | --- |
+| Rust | 1.000 | 1.100 | r9n-rust-1100 disisihkan (nofile 1024); r9r-rust-1100 gagal sah, baca p95 364 ms |
+| Go | 900 | 1.000 | ulangan: 1.000 lulus sekali (q1, 143 ms), gagal sekali (q3, 254 ms) |
+| Elysia | 900 | 1.000 | 900: baca p95 180 ms, mepet batas |
+| Hono | 800 | 900 | |
+| PHP | 300 | 400 | 200/300 PASS_LOW_SAMPLES |
+
+Throughput seluruh native mentok ±198-217 req/s di dev1; batasnya disk (fsync WAL), bukan runtime. Lima ulangan dasar (q3) baru 4 dari 50 run: go 900/1000 dan rust 1000/1100 putaran 1.
+
+**Varian teroptimasi:** kode kelima stack selesai, dan smoke test fungsi di dev2 lolos untuk kelima stack. Kampanye performanya belum berjalan.
+
+**Melanjutkan:**
+- Lima ulangan dasar: `~/coreerp-stack-comparison/run-s6.sh` di dev1. Ia me-ramp ulang Rust lalu menjalankan lima ulangan; ganti `--name q3` bila folder q3 sudah ada.
+- Kampanye teroptimasi: `run-o1.sh` memasang `staging-o1`. Sebelum dijalankan, isi ulang staging dari commit laptop terbaru (`git diff --name-only 2150f77f HEAD`) dan perbarui `EXPECTED` ke tree commit itu. Ia menunggu penanda `S4-DONE` di `run-s4.log`.
+- Kewajiban beres-beres tersisa: lab dan secret fixture sintetis di dev2 (`~/coreerp-stack-comparison`, `~/coreerp-dev2-*.sh`), serta folder `staging*` dan skrip `run-*.sh` di home dev1.
+
 ## Gangguan I/O di dev1 dan perubahan di luar folder eksperimen, 4 November
 
 dev1 dipakai bersama. Job backup milik rekan pengguna (root, `/usr/local/libexec/metta-backup/registry-drill.py` dari sesi SSH, plus timer `metta-*`) membaca disk 18-220 MB/s selama `r8n-go-900` dan `r8n-rust-1000`. Database run sendiri hampir tidak membaca disk. Penanganannya:
