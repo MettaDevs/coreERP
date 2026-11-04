@@ -10,12 +10,17 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 import json
+import os
 from pathlib import Path
 import re
 
 LAB = Path(__file__).resolve().parents[1]
 AUTHORITY = {"sessions", "users", "tenant_memberships", "role_assignments", "roles", "security_role_duties",
              "security_duty_privileges", "security_privilege_permissions", "role_assignment_data_policy_scopes"}
+# Varian teroptimasi (optimized.md): konteks di-cache per proses dan sesi di Valkey. Pemeriksaan ulang hak akses per
+# request berpindah ke query versi; tabel konteks hanya terbaca saat cache dingin.
+if os.environ.get("COMPARE_VARIANT") == "optimized":
+    AUTHORITY = {"security_context_versions"}
 IDENTIFIER = r'"?([a-z_][a-z0-9_]*)(?![a-z0-9_])"?(?:\."?([a-z_][a-z0-9_]*)(?![a-z0-9_])"?)?'
 LOCK = re.compile(r"\bfor (update|no key update|share|key share)\b")
 
@@ -126,7 +131,12 @@ def waived(finding: dict, operation: str, waivers: list[dict], candidate: str) -
     detail = finding["detail"]
     for waiver in waivers:
         match = waiver.get("match")
-        matches = match is None or (all(detail.get(key) == value for key, value in match.items()) if isinstance(match, dict) and isinstance(detail, dict) else detail == match)
+        if isinstance(match, list):
+            matches = detail in match
+        elif isinstance(match, dict) and isinstance(detail, dict):
+            matches = all(detail.get(key) == value for key, value in match.items())
+        else:
+            matches = match is None or detail == match
         if candidate in waiver["candidates"] and ("*" in waiver["operations"] or operation in waiver["operations"]) and waiver["kind"] == finding["kind"] and matches:
             return waiver
     return None
@@ -137,10 +147,14 @@ if __name__ == "__main__":
     parser.add_argument("--expected", required=True, type=Path, help="Folder trace PHP.")
     parser.add_argument("--actual", required=True, type=Path, help="Folder trace kandidat.")
     parser.add_argument("--candidate", required=True)
-    parser.add_argument("--waivers", type=Path, default=LAB / "query-obligations.json")
+    default_waivers = "query-obligations-optimized.json" if os.environ.get("COMPARE_VARIANT") == "optimized" else "query-obligations.json"
+    parser.add_argument("--waivers", type=Path, default=LAB / default_waivers)
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
-    waivers = json.loads(args.waivers.read_text(encoding="utf-8"))["waivers"] if args.waivers.exists() else []
+    register = json.loads(args.waivers.read_text(encoding="utf-8")) if args.waivers.exists() else {"waivers": []}
+    waivers = register["waivers"]
+    if register.get("extends"):
+        waivers = json.loads((args.waivers.parent / register["extends"]).read_text(encoding="utf-8"))["waivers"] + waivers
     for waiver in waivers:
         waiver["operations"] = set(waiver["operations"])
     report = []

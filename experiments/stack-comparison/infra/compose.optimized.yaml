@@ -1,0 +1,33 @@
+# Varian teroptimasi (optimized.md): Valkey untuk sesi, sumber PHP dengan overlay cache konteks.
+# Dipakai sebagai -f tambahan sesudah compose.yaml bila COMPARE_VARIANT=optimized.
+services:
+  valkey:
+    image: ${VALKEY_IMAGE:?Set VALKEY_IMAGE to an inspected local image}
+    cpus: 1
+    mem_limit: 256m
+    # AOF everysec: sesi bertahan sampai satu detik terakhir bila Valkey mati; tanpa snapshot RDB (fork).
+    command: [valkey-server, --appendonly, "yes", --appendfsync, everysec, --save, "", --maxmemory, 200mb, --maxmemory-policy, noeviction]
+    volumes:
+      - valkey:/data
+    ports:
+      - 127.0.0.1:18646:6379
+    healthcheck:
+      test: [CMD, valkey-cli, ping]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  php:
+    environment:
+      SESSION_DRIVER: redis
+      REDIS_CLIENT: phpredis
+      REDIS_HOST: valkey
+      REDIS_PORT: "6379"
+      CONTEXT_CACHE: "on"
+    volumes:
+      - source-optimized:/repo
+
+volumes:
+  valkey:
+    name: coreerp-stack-comparison-valkey
+  source-optimized:
+    name: coreerp-stack-comparison-source-optimized

@@ -23,6 +23,7 @@ import time
 
 import lab
 import native
+from valkey import Valkey
 from load import K6_IMAGE, LOADGEN, PRIVATE, SCRIPTS, LAB, secret, start, stop
 from ramp import database
 
@@ -83,6 +84,11 @@ def prepare(candidate: str, name: str, seed: Path, fixture: Path, directory: Pat
     out = directory / f"{name}-{candidate}-login"
     out.mkdir(exist_ok=True)
     started = time.monotonic()
+    optimized = native.variant() == "optimized"
+    if optimized:
+        lab.compose("up", "-d", "--wait", "valkey")
+        with Valkey() as store:
+            store.command("FLUSHALL")
     sut = start(candidate, db)
     try:
         login_all(sut["internal"], fixture, out, vus)
@@ -90,6 +96,12 @@ def prepare(candidate: str, name: str, seed: Path, fixture: Path, directory: Pat
         stop(candidate)
     accounts = len(json.loads(fixture.read_text(encoding="utf-8"))["accounts"])
     sessions = collect(out / "k6.log", accounts)
+    valkey_entries = None
+    if optimized:
+        with Valkey() as store:
+            valkey_entries = store.snapshot()
+        if len(valkey_entries) < accounts:
+            raise SystemExit(f"Valkey hanya memuat {len(valkey_entries)} kunci untuk {accounts} akun; snapshot tidak dibuat.")
     (out / "k6.log").unlink()
     target = directory / f"{candidate}.dump"
     dump(db, target)
@@ -100,7 +112,8 @@ def prepare(candidate: str, name: str, seed: Path, fixture: Path, directory: Pat
         raise SystemExit("Baseline oracle gagal: " + (oracle.stderr or oracle.stdout)[-800:])
     private_write(directory / f"{candidate}-sessions.json", json.dumps({
         "candidate": candidate, "database": db, "seed": seed.name, "dump": target.name,
-        "created_at": datetime.now(timezone.utc).isoformat(), "sessions": sessions}) + "\n")
+        "created_at": datetime.now(timezone.utc).isoformat(), "variant": native.variant(), "sessions": sessions,
+        **({"valkey": valkey_entries} if optimized else {})}) + "\n")
     return {"candidate": candidate, "database": db, "sessions": len(sessions), "dump": str(target), "baseline": str(baseline),
             "seconds": round(time.monotonic() - started, 1), "sut_image": sut.get("image_id") or sut.get("image")}
 

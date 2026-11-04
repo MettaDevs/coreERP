@@ -11,6 +11,7 @@ import time
 import urllib.error
 import urllib.request
 
+import lab
 from sql_observer import validate_database
 
 LAB = Path(__file__).resolve().parents[1]
@@ -32,6 +33,12 @@ CANDIDATES = {
              "environment": {"BIND_HOST": "0.0.0.0", "PORT": "8000", "DB_POOL": "8"}},
 }
 SECRETS = ["DB_PASSWORD", "APP_KEY"]
+# Varian teroptimasi (optimized.md): image yang sama, saklar lewat environment.
+OPTIMIZED = {"SESSION_BACKEND": "valkey", "CONTEXT_CACHE": "on", "VALKEY_HOST": "valkey", "VALKEY_PORT": "6379"}
+
+
+def variant() -> str:
+    return os.environ.get("COMPARE_VARIANT", "baseline")
 
 
 def docker(*args: str, environment: dict | None = None) -> str:
@@ -60,6 +67,9 @@ def up(name: str, database: str, runtime_env: Path) -> dict:
         if key in SECRETS:
             environment[key] = value
     settings = {"DB_HOST": "database", "DB_PORT": "5432", "DB_USERNAME": "compare_admin", "DB_DATABASE": database, **candidate["environment"]}
+    if variant() == "optimized":
+        settings.update(OPTIMIZED)
+        lab.compose("up", "-d", "--wait", "valkey")
     arguments = ["run", "-d", "--name", "coreerp-native-" + name, "--network", NETWORK, "--cpus", "2", "--memory", "1g",
                  "-p", f"127.0.0.1:{candidate['port']}:8000"]
     for key, value in settings.items():
@@ -93,7 +103,7 @@ def up(name: str, database: str, runtime_env: Path) -> dict:
     return {
         "candidate": name, "container": container[:12], "image": image, "image_id": inspect["Image"],
         "database": database, "base": f"http://127.0.0.1:{candidate['port']}", "settings": settings,
-        "cpus": 2, "memory": "1g", "network": NETWORK, "php_before_start": php,
+        "cpus": 2, "memory": "1g", "network": NETWORK, "php_before_start": php, "variant": variant(),
     }
 
 

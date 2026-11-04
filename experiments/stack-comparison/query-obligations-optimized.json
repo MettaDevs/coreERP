@@ -1,0 +1,64 @@
+{
+ "purpose": "Pengecualian kewajiban SQL tambahan untuk varian teroptimasi; menambah register dasar lewat extends.",
+ "extends": "query-obligations.json",
+ "waivers": [
+  {
+   "candidates": [
+    "go",
+    "hono",
+    "elysia",
+    "rust"
+   ],
+   "operations": [
+    "*"
+   ],
+   "kind": "read-missing",
+   "match": [
+    "users",
+    "tenants",
+    "tenant_memberships",
+    "role_assignments",
+    "role_assignment_data_policy_scopes",
+    "organization_hierarchy_closures",
+    "organizations",
+    "roles",
+    "security_role_children",
+    "security_role_duties",
+    "security_duty_privileges",
+    "security_privilege_permissions",
+    "permissions"
+   ],
+   "reason": "Cache konteks per proses (optimized.md butir 1-2): tabel konteks hanya dibaca saat cache proses dingin. PHP punya 8 worker yang masing-masing dingin di awal, Go/Rust satu proses dan Bun dua, jadi aksi yang sama bisa membaca tabel ini di satu sisi saja. Pemeriksaan ulang hak akses per request dijaga query security_context_versions (wajib di semua aksi terautentikasi); pencabutan dibuktikan conformance revocation.",
+   "evidence": ""
+  },
+  {
+   "candidates": [
+    "go",
+    "hono",
+    "elysia",
+    "rust"
+   ],
+   "operations": [
+    "*"
+   ],
+   "kind": "read-extra",
+   "match": [
+    "users",
+    "tenants",
+    "tenant_memberships",
+    "role_assignments",
+    "role_assignment_data_policy_scopes",
+    "organization_hierarchy_closures",
+    "organizations",
+    "roles",
+    "security_role_children",
+    "security_role_duties",
+    "security_duty_privileges",
+    "security_privilege_permissions",
+    "permissions"
+   ],
+   "reason": "Cache konteks per proses (optimized.md butir 1-2): tabel konteks hanya dibaca saat cache proses dingin. PHP punya 8 worker yang masing-masing dingin di awal, Go/Rust satu proses dan Bun dua, jadi aksi yang sama bisa membaca tabel ini di satu sisi saja. Pemeriksaan ulang hak akses per request dijaga query security_context_versions (wajib di semua aksi terautentikasi); pencabutan dibuktikan conformance revocation.",
+   "evidence": ""
+  }
+ ]
+}

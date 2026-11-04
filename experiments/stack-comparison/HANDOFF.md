@@ -57,7 +57,8 @@ dev1 dipakai bersama. Job backup milik rekan pengguna (root, `/usr/local/libexec
 
 **Perubahan di dev1 di luar folder eksperimen, wajib dibereskan sesudah pengujian:**
 
-- Atas keputusan pengguna, batas I/O runtime 4 MB/s baca dan tulis di `/dev/vda` untuk `user-0.slice` dan unit `metta-native-upload`, `metta-native-pg-backup`, `metta-native-config-backup`, `metta-jowhost-backup-metrics`. Pasang/cabut lewat `~/coreerp-stack-comparison/io-limit.sh apply|revert`. Pencabutan otomatis terjadwal pukul 22:00 WIB lewat `coreerp-io-limit-revert.timer` (transient). Cabut lebih awal begitu pengujian selesai.
+- Atas keputusan pengguna, batas **baca** runtime 4 MB/s di `/dev/vda` untuk `user-0.slice` dan unit `metta-native-upload`, `metta-native-pg-backup`, `metta-native-config-backup`, `metta-jowhost-backup-metrics`. Pasang/cabut lewat `~/coreerp-stack-comparison/io-limit.sh apply|revert`. Pencabutan otomatis terjadwal pukul 22:00 WIB lewat `coreerp-io-limit-revert.timer` (transient). Cabut lebih awal begitu pengujian selesai.
+- Batas **tulis** 4 MB/s sempat dipasang lalu dicabut pukul 09:10 WIB. Halaman kotor dari drill menumpuk (Dirty 103 MB, Writeback 120 MB) karena writeback cgroup ikut tertahan, dan batas dirty global lalu menahan proses lain: `docker rm` tersangkut lebih dari satu menit, iowait 35% pada util disk 8%. Sesudah dicabut, Dirty turun ke 12 MB dan Writeback ke 0 dalam lima detik. Jangan membatasi tulis lewat `io.max` tanpa batas memori cgroup yang sama. Sebagai gantinya, penjaga `host_io` dan penantian sebelum run juga memeriksa tulis host (> 12 MB/s rata-rata; run sendiri 3-7 MB/s).
 - `/root/AGENTS.md` dan `/root/CLAUDE.md`: catatan sementara untuk agent rekan pengguna (apa yang berjalan, cara mengecek, batas I/O, cara mencabut). Hapus sesudah pengujian.
 - Scheduler disk dev1 `mq-deadline`, jadi `ionice`/`IOWeight` tidak berefek; hanya `io.max` yang membatasi.
 

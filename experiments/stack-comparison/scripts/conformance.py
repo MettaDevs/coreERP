@@ -7,17 +7,46 @@ yang sudah dibuktikan pada PHP. Probe baru merekam hasil, lalu `--expected` memb
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import importlib.util
 import json
+import os
 from pathlib import Path
 import re
 import uuid
 
 from http_baseline import Client, fixture_password
 from sql_observer import sql, validate_database
+from valkey import Valkey
 
 LAB = Path(__file__).resolve().parents[1]
 ID = re.compile(r"[A-Za-z0-9]{26}")
+
+
+def owns_session(value: bytes, user_id: int) -> bool:
+    """Payload sesi milik user: kandidat native menyimpan base64 JSON, Laravel menyimpan serialize PHP."""
+    try:
+        data = json.loads(base64.b64decode(value, validate=True))
+    except (binascii.Error, ValueError):
+        data = None
+    if isinstance(data, dict):
+        return any(key.startswith("login_web_") and str(item) == str(user_id) for key, item in data.items())
+    return re.search(rb'login_web_[0-9a-f]{40}";i:%d;' % user_id, value) is not None
+
+
+def valkey_sessions(user_id: int) -> list[bytes]:
+    with Valkey() as store:
+        return [key for key in store.keys() if owns_session(store.command("GET", key) or b"", user_id)]
+
+
+def age_sessions(user_id: int, remaining_seconds: int | None) -> int:
+    """Padanan Valkey untuk UPDATE/DELETE sessions: sisa TTL tertentu, atau hapus bila None."""
+    keys = valkey_sessions(user_id)
+    with Valkey() as store:
+        for key in keys:
+            store.command("DEL", key) if remaining_seconds is None else store.command("EXPIRE", key, remaining_seconds)
+    return len(keys)
 
 
 def http_probes():
@@ -79,12 +108,24 @@ def revocation(base: str, fixture: dict, password: str, database: str) -> list[d
             lambda row: f"UPDATE tenant_memberships SET status={literal(row['status'])} WHERE id={literal(row['id'])};")
     observe("membership-restored")
     # Margin 60 detik di kedua sisi lifetime 120 menit; ::integer membulatkan, jadi -7201 jatuh tepat di batas detik.
-    run(f"UPDATE sessions SET last_activity=floor(extract(epoch FROM now()))::integer-7140 WHERE user_id={user_id};")
+    # Varian teroptimasi menyimpan sesi di Valkey: sisa TTL 60 detik dan DEL adalah padanan kedua UPDATE dan DELETE.
+    valkey = os.environ.get("COMPARE_VARIANT") == "optimized"
+    if valkey:
+        if not age_sessions(user_id, 60):
+            raise RuntimeError("Sesi Valkey milik probe tidak ditemukan.")
+    else:
+        run(f"UPDATE sessions SET last_activity=floor(extract(epoch FROM now()))::integer-7140 WHERE user_id={user_id};")
     observe("database-session-near-lifetime")
-    run(f"UPDATE sessions SET last_activity=floor(extract(epoch FROM now()))::integer-7260 WHERE user_id={user_id};")
+    if valkey:
+        age_sessions(user_id, None)
+    else:
+        run(f"UPDATE sessions SET last_activity=floor(extract(epoch FROM now()))::integer-7260 WHERE user_id={user_id};")
     observe("database-session-expired")
     client.login(account, password)
-    run(f"DELETE FROM sessions WHERE user_id={user_id};")
+    if valkey:
+        age_sessions(user_id, None)
+    else:
+        run(f"DELETE FROM sessions WHERE user_id={user_id};")
     observe("database-session-deleted")
     client.login(account, password)
     observe("new-session-after-revocation")

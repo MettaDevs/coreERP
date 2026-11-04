@@ -15,6 +15,7 @@ import time
 
 import lab
 import native
+from valkey import Valkey
 from load_report import HOST_READ_LIMIT_MB_S, HOST_WRITE_LIMIT_MB_S
 from sql_observer import sql, validate_database
 
@@ -136,13 +137,16 @@ def database_counters(database: str) -> dict:
 
 
 def start(candidate: str, database: str) -> dict:
+    if native.variant() == "optimized":
+        lab.compose("up", "-d", "--wait", "valkey")
     if candidate == "php":
         os.environ["COMPARE_DATABASE"] = database
         os.environ["PHP_WORKERS"] = str(PHP_WORKERS)
         lab.compose("up", "-d", "php")
         lab.wait_php()
         return {"candidate": "php", "container": "coreerp-stack-comparison-php-1", "internal": "http://php:8000",
-                "database": database, "settings": {"octane_workers": PHP_WORKERS, "max_requests": 500, "cpus": 2, "memory": "1g"}}
+                "database": database, "variant": native.variant(),
+                "settings": {"octane_workers": PHP_WORKERS, "max_requests": 500, "cpus": 2, "memory": "1g"}}
     started = native.up(candidate, database, PRIVATE / "runtime.env")
     return {**started, "container": "coreerp-native-" + candidate, "internal": f"http://coreerp-native-{candidate}:8000"}
 
@@ -196,7 +200,7 @@ if __name__ == "__main__":
     if out.exists():
         raise SystemExit("Folder run sudah ada; run beban tidak menimpa evidence lama.")
     out.mkdir(parents=True)
-    manifest = {"run_id": args.run_id, "candidate": args.candidate, "vus": args.vus, "phases": {"login": login_seconds, "start_spread": args.start_spread, "warmup": args.warmup, "plateau": args.plateau, "drain": args.drain},
+    manifest = {"run_id": args.run_id, "candidate": args.candidate, "variant": native.variant(), "vus": args.vus, "phases": {"login": login_seconds, "start_spread": args.start_spread, "warmup": args.warmup, "plateau": args.plateau, "drain": args.drain},
                 "fixture": str(args.fixture), "baseline": str(args.baseline),
                 "think_time": "Uniform(1,9) s sesudah setiap aksi",
                 "login_offset": "sesi siap pakai, tanpa login" if sessions is not None else "Uniform(0, 0.5 x jendela login) s",
@@ -207,6 +211,12 @@ if __name__ == "__main__":
         refreshed = sql("WITH s AS (UPDATE sessions SET last_activity = extract(epoch FROM now())::int RETURNING 1) SELECT count(*) FROM s;", args.database)
         manifest["sessions"] = {"file": args.sessions.name, "created_at": sessions["created_at"], "count": len(sessions["sessions"]),
                                 "rows_refreshed": int(refreshed), "dump": sessions["dump"]}
+        if native.variant() == "optimized":
+            if not sessions.get("valkey"):
+                raise SystemExit("Sesi siap pakai ini dibuat tanpa Valkey; varian teroptimasi butuh snapshot Valkey.")
+            lab.compose("up", "-d", "--wait", "valkey")
+            with Valkey() as store:
+                manifest["sessions"]["valkey_keys_restored"] = store.restore(sessions["valkey"], 7200)
     if sys.platform != "win32":
         manifest["host_quiet_wait"] = wait_for_quiet_host(HOST_READ_LIMIT_MB_S, HOST_WRITE_LIMIT_MB_S)
     sut = start(args.candidate, args.database)
@@ -214,10 +224,13 @@ if __name__ == "__main__":
     limits = json.loads(subprocess.run(["docker", "inspect", "coreerp-stack-comparison-database-1", "--format", "{{json .HostConfig}}"],
                                        capture_output=True, text=True, check=True).stdout)
     settings = sql("SELECT json_object_agg(name, setting || coalesce(unit, '')) FROM pg_settings WHERE name IN "
-                   "('shared_buffers','effective_cache_size','max_connections','synchronous_commit','work_mem');")
+                   "('shared_buffers','effective_cache_size','max_connections','synchronous_commit','work_mem','max_wal_size','checkpoint_timeout','random_page_cost');")
     manifest["database"] = {"cpus": limits["NanoCpus"] / 1e9, "memory_bytes": limits["Memory"], "settings": json.loads(settings)}
     stop_sampling = threading.Event()
-    samplers = [cgroups([sut["container"], "coreerp-stack-comparison-database-1", LOADGEN], out / "cgroups.jsonl", stop_sampling),
+    sampled = [sut["container"], "coreerp-stack-comparison-database-1", LOADGEN]
+    if native.variant() == "optimized":
+        sampled.append("coreerp-stack-comparison-valkey-1")
+    samplers = [cgroups(sampled, out / "cgroups.jsonl", stop_sampling),
                 connections(args.database, out / "connections.jsonl", stop_sampling)]
     manifest["database_counters_before"] = database_counters(args.database)
     if sys.platform != "win32":
