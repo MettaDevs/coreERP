@@ -130,7 +130,8 @@ ledger.
 
 ## Sumber
 
-- Kode dan harness eksperimen ada di `experiments/stack-comparison/` pada branch `codex/native-stack-comparison`:
+- Kode dan harness eksperimen ada di
+  [`experiments/stack-comparison/` pada branch `codex/native-stack-comparison`](https://github.com/MettaDevs/coreERP/tree/codex/native-stack-comparison/experiments/stack-comparison):
   implementasi TypeScript di `native/typescript/`, rancangan varian teroptimasi di `optimized.md` dan
   `infra/optimized-schema.sql`, serta jejak keputusan di `HANDOFF.md` dan `.audit/native-stack/decisions.tsv`.
 - Hasil setiap run ada di folder `private/load/` eksperimen itu, di dev1 dan di Cue. Folder itu tidak masuk repo.
