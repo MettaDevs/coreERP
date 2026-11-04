@@ -205,6 +205,7 @@ export default withMermaid({
             { text: 'Query scope dan schema', link: '/dev/08-query-scopes-and-schema' },
             { text: 'Identity dan access', link: '/dev/09-identity-and-access' },
             { text: 'Gate fondasi Core', link: '/dev/10-core-foundation-gates' },
+            { text: 'Pindah ke Bun + Elysia', link: '/dev/39-pindah-ke-bun-elysia' },
           ],
         },
         {
