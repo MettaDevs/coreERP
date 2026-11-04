@@ -17,12 +17,18 @@ services:
       timeout: 3s
       retries: 30
   php:
+    # Rincian tiap variabel di php/optimized/README.md. SESSION_STORE dan SESSION_CONNECTION sengaja tidak disetel.
     environment:
       SESSION_DRIVER: redis
+      SESSION_ENCRYPT: "false"
+      SESSION_CACHE_PREFIX: "coreerp-session:"
       REDIS_CLIENT: phpredis
       REDIS_HOST: valkey
       REDIS_PORT: "6379"
+      REDIS_PREFIX: ""
+      VALKEY_SESSION_DB: "0"
       CONTEXT_CACHE: "on"
+      CONTEXT_CACHE_TTL_SECONDS: "300"
     volumes:
       - source-optimized:/repo
 

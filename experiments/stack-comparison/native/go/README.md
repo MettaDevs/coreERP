@@ -25,6 +25,11 @@ Sesi memakai database JSON/base64 dengan cookie `laravel-session`, `XSRF-TOKEN`,
 `SESSION_COOKIE`, `SESSION_LIFETIME`, dan `CACHE_PREFIX` mengikuti konfigurasi yang diberikan.
 Driver sesi selain database atau sesi database terenkripsi ditolak saat startup.
 
+Varian teroptimasi mengikuti [`../../optimized.md`](../../optimized.md) dan memakai image yang sama.
+`SESSION_BACKEND=valkey` memindahkan payload sesi ke Valkey (`VALKEY_HOST`, `VALKEY_PORT`, `SESSION_KEY_PREFIX`) tanpa menyentuh tabel `sessions`; kegagalan Valkey menjadi 503.
+`CONTEXT_CACHE=on` menyimpan user, keanggotaan, kebijakan data, organisasi, dan izin di memori proses selama `CONTEXT_CACHE_TTL_SECONDS` atau sampai batas validitas penugasan, dan mengosongkannya bila `security_context_versions` berubah.
+Bawaan keduanya (`database`, `off`) menjalankan SQL dan urutan query pembanding dasar.
+
 ## Perilaku yang dijalankan
 
 Profil utama menjalankan receipt list, create, draft show, PATCH penggantian detail penuh, preview, complete, completed show, generated assets, asset list, serta show setiap aset.

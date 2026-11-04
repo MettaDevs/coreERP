@@ -25,11 +25,18 @@ ID = re.compile(r"[A-Za-z0-9]{26}")
 
 
 def owns_session(value: bytes, user_id: int) -> bool:
-    """Payload sesi milik user: kandidat native menyimpan base64 JSON, Laravel menyimpan serialize PHP."""
+    """Payload sesi milik user. Kandidat native menyimpan base64 JSON; Laravel (cache store redis) membungkus payload
+    dengan serialize PHP, dan payload itu sendiri JSON (session.serialization) atau serialize PHP."""
     try:
         data = json.loads(base64.b64decode(value, validate=True))
     except (binascii.Error, ValueError):
         data = None
+    wrapped = re.fullmatch(rb's:\d+:"(.*)";', value, flags=re.S)
+    if data is None and wrapped:
+        try:
+            data = json.loads(wrapped.group(1))
+        except ValueError:
+            data = None
     if isinstance(data, dict):
         return any(key.startswith("login_web_") and str(item) == str(user_id) for key, item in data.items())
     return re.search(rb'login_web_[0-9a-f]{40}";i:%d;' % user_id, value) is not None

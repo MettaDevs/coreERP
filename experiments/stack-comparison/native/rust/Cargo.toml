@@ -16,6 +16,7 @@ hex = "0.4"
 hmac = "0.12"
 md-5 = "0.11"
 rand = "0.8"
+redis = { version = "=1.7.1", default-features = false, features = ["tokio-comp", "connection-manager"] }
 regex = "1"
 rust_decimal = "1"
 serde = { version = "1", features = ["derive"] }

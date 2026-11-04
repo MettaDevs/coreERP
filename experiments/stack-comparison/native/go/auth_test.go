@@ -1,11 +1,18 @@
 package main
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"net"
+	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/redis/go-redis/v9"
 )
 
 func TestCookieRejectsTamperingAndWrongCookieName(t *testing.T) {
@@ -85,5 +92,48 @@ func TestDetailObjectsKeepRequestOrder(t *testing.T) {
 	details := objects(b["details"])
 	if len(details) != 2 || str(details[0]["nama"]) != "first" || str(details[1]["nama"]) != "second" {
 		t.Fatalf("details=%v", details)
+	}
+}
+func TestValkeyFailureIsServiceUnavailableWithoutRewritingSession(t *testing.T) {
+	// Server palsu yang menutup setiap koneksi: setiap perintah Valkey gagal tanpa menunggu timeout.
+	listener, e := net.Listen("tcp", "127.0.0.1:0")
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer listener.Close()
+	go func() {
+		for {
+			conn, e := listener.Accept()
+			if e != nil {
+				return
+			}
+			conn.Close()
+		}
+	}()
+	client := redis.NewClient(&redis.Options{Addr: listener.Addr().String(), MaxRetries: -1, DialerRetries: 1})
+	defer client.Close()
+	key := []byte("0123456789abcdef0123456789abcdef")
+	s := &server{key: key, cookie: "laravel-session", lifetime: 7200, valkey: client, sessionPrefix: "coreerp-session:"}
+	value, e := encryptCookie("laravel-session", strings.Repeat("a", 40), key)
+	if e != nil {
+		t.Fatal(e)
+	}
+	r := httptest.NewRequest("GET", "/api/modules/management-aset/v1/aset", nil)
+	r.AddCookie(&http.Cookie{Name: "laravel-session", Value: url.QueryEscape(value)})
+	q := &request{server: s, ctx: context.Background(), r: r}
+	var f *failure
+	if e = q.loadSession(); !errors.As(e, &f) || f.status != 503 {
+		t.Fatalf("load error=%v", e)
+	}
+	if q.session != nil {
+		t.Fatal("unreadable session would be overwritten at the end of the request")
+	}
+	q.session = object{"_token": "token"}
+	w := httptest.NewRecorder()
+	if e = q.saveSession(w); !errors.As(e, &f) || f.status != 503 {
+		t.Fatalf("save error=%v", e)
+	}
+	if cookies := w.Result().Cookies(); len(cookies) != 0 {
+		t.Fatalf("cookies set after failed write: %v", cookies)
 	}
 }

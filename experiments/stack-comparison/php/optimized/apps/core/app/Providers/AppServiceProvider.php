@@ -1,0 +1,295 @@
+<?php
+
+namespace App\Providers;
+
+use App\Platform\Access\Support\ContextCache;
+use App\Platform\Access\Support\CorePermissions;
+use App\Platform\Access\Support\CoreSecurityCatalog;
+use App\Platform\Access\Support\DataPolicyAccessResolver;
+use App\Platform\ChangeLog\Support\AuditActor;
+use App\Platform\ChangeLog\Support\ChangeLogSwitch;
+use App\Platform\Environment\Support\ActiveEnvironment;
+use App\Platform\Environment\Support\CurrentWorkspace;
+use App\Platform\Environment\Support\OutboundGuard;
+use App\Platform\Identity\Models\Passkey;
+use App\Platform\Identity\Models\User;
+use App\Platform\Identity\Support\ContextCachedUserProvider;
+use App\Platform\Identity\Support\SessionRevocation;
+use App\Platform\License\Support\SiteLicense;
+use App\Platform\Observability\Support\ErrorReporter;
+use Carbon\CarbonImmutable;
+use Illuminate\Auth\EloquentUserProvider;
+use Illuminate\Auth\Events\Authenticated;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Events\MigrationsEnded;
+use Illuminate\Database\Events\MigrationsStarted;
+use Illuminate\Foundation\Events\DiagnosingHealth;
+use Illuminate\Http\Middleware\TrustProxies;
+use Illuminate\Http\Request;
+use Illuminate\Log\Events\MessageLogged;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Redis;
+use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\Rules\Password;
+use Laravel\Passkeys\Passkeys;
+
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * Register any application services.
+     */
+    public function register(): void
+    {
+        /*
+         * Konteks permintaan dihitung sekali, bukan sekali per penanya.
+         *
+         * Keduanya ditanyai berkali-kali dalam satu permintaan oleh pihak yang berbeda, dan tiap
+         * pemanggilan dulu berujung query baru dengan parameter yang sama persis. Diukur pada satu
+         * permintaan daftar module yang paling sederhana: **22 query, hanya satu di antaranya
+         * mengambil data yang diminta.** `tenant_memberships` dibaca empat kali, lingkup kebijakan
+         * enam kali, `organizations` lima kali.
+         *
+         * `scoped()`, bukan `singleton()`. Bedanya menentukan pada pekerja yang hidup lama: ikatan
+         * scoped dibuang di antara permintaan, sedangkan singleton akan membawa keanggotaan
+         * pengguna sebelumnya ke permintaan berikutnya — kesalahan yang tidak pernah gagal, hanya
+         * salah.
+         */
+        $this->app->scoped(CurrentWorkspace::class);
+        $this->app->scoped(CorePermissions::class);
+        $this->app->scoped(DataPolicyAccessResolver::class);
+
+        /*
+         * Scoped juga, dan yang scoped di sini hanya penanda "versi sudah dicocokkan pada permintaan
+         * ini". Isi cache-nya hidup di properti statis kelas itu, selama worker. Dengan `singleton()`,
+         * nasib penanda itu bergantung pada di mana instansnya pertama kali dibuat: di container milik
+         * worker ia bertahan ke permintaan berikutnya dan query versi berhenti berjalan, sehingga
+         * pencabutan akses tidak pernah sampai ke worker itu. Scoped selalu dibuang di antara
+         * permintaan, job antrean, dan tick.
+         */
+        $this->app->scoped(ContextCache::class);
+
+        /*
+         * Scoped, dan itu yang membuat `forget()` pada kelas itu jarang diperlukan.
+         *
+         * Jawabannya ditanyakan ulang oleh setiap titik yang menjaga sambungan keluar, dan
+         * setiap pertanyaan berarti satu query kalau instansnya baru tiap kali. Scoped juga
+         * yang menjaga ingatannya tidak menyeberang: pekerja antrean yang memungut job
+         * berikutnya mendapat ikatan yang bersih, persis seperti permintaan HTTP berikutnya.
+         */
+        $this->app->scoped(ActiveEnvironment::class);
+
+        // Berkas lisensi dibaca sekali per permintaan, bukan sekali per pembaca — ada empat pintu app
+        // dan satu middleware kunci yang menanyakannya. Scoped, bukan singleton, supaya lisensi baru
+        // yang dipasang agen membuka kunci pada permintaan berikutnya tanpa menunggu pekerja PHP
+        // diganti. Alasan lengkapnya di kelas itu.
+        $this->app->scoped(SiteLicense::class);
+    }
+
+    /**
+     * Bootstrap any application services.
+     */
+    public function boot(): void
+    {
+        Model::preventLazyLoading(! $this->app->isProduction());
+
+        /*
+         * Proxy tepercaya disetel DI SINI, bukan di `bootstrap/app.php`.
+         *
+         * Closure `withMiddleware()` dijalankan `afterResolving(HttpKernel::class)`, dan kernel
+         * di-resolve SEBELUM `LoadEnvironmentVariables` berjalan. Akibatnya `env()` di dalam closure
+         * itu selalu memulangkan null, dan pemanggilan `trustProxies()` di sana tidak pernah
+         * melakukan apa pun. Ia terbaca benar dan terbukti mati.
+         *
+         * Gejalanya hanya muncul di belakang proxy: Laravel membaca alamat dari koneksi ke proxy —
+         * yang memang `http` — lalu menerbitkan setiap pengalihan sebagai `http://`. Peramban
+         * dilempar ke porta 80, dan yang terlihat bukan "salah setel proxy" melainkan galat milik
+         * apa pun yang kebetulan mendengar di sana.
+         *
+         * Ditemukan dengan membukanya lewat Traefik, bukan oleh test.
+         */
+        $proxies = config('coreerp.trusted_proxies');
+
+        if (is_string($proxies) && $proxies !== '') {
+            TrustProxies::at($proxies === '*' ? '*' : array_map(trim(...), explode(',', $proxies)));
+        }
+
+        // Prevent touch() utime warning from crashing Blade view rendering on containerized environments
+        set_error_handler(function ($severity, $message) {
+            if (str_contains($message, 'touch(): Utime failed')) {
+                return true;
+            }
+
+            return false;
+        }, E_WARNING);
+
+        /*
+         * Passkey dibaca dari database pusat, bukan dari database lingkungan.
+         *
+         * Dipasang di sini karena satu-satunya pintunya milik paket, dan alasan lengkapnya beserta
+         * kenapa menandai `User` saja tidak cukup ada di {@see Passkey}. Tanpa baris ini, pelanggan
+         * yang masuk dengan passkey dari alamat lingkungannya tidak menemukan passkey miliknya.
+         */
+        Passkeys::usePasskeyModel(Passkey::class);
+
+        $this->configureDefaults();
+        $this->stopForwardingLogsToOtel();
+
+        // Dipasang tanpa syarat, termasuk on-prem dan di dalam test. Yang menentukan apakah ia
+        // menolak sesuatu adalah baris `environments`, bukan pemasangannya — dan selama satu
+        // tenant hanya punya produksi, ia tidak pernah menolak apa pun.
+        OutboundGuard::install();
+
+        // Gate lama tetap bernama sama, tetapi kini membaca permission ubah kelompok layarnya masing-masing
+        // lewat rantai security role (SEC-22), bukan penanda owner/admin.
+        foreach ([
+            'manage-access' => CoreSecurityCatalog::ACCESS_UPDATE,
+            'manage-number-sequences' => CoreSecurityCatalog::NUMBER_SEQUENCE_UPDATE,
+            'manage-report-layouts' => CoreSecurityCatalog::REPORT_LAYOUT_UPDATE,
+            'manage-reference-data' => CoreSecurityCatalog::REFERENCE_DATA_UPDATE,
+        ] as $gate => $permission) {
+            Gate::define($gate, fn (User $user): bool => app(CurrentWorkspace::class)->membership(request())?->hasCorePermission($permission) ?? false);
+        }
+        // Gate umum untuk rute layar Core: `->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::VENDOR_READ))`.
+        // Kode permission-nya dari `CoreSecurityCatalog`, jadi penjaga sebuah rute terbaca di berkas rutenya sendiri.
+        Gate::define('core', fn (User $user, string $permission): bool => app(CurrentWorkspace::class)->membership(request())?->hasCorePermission($permission) ?? false);
+        Gate::define('monitor-identities', fn (User $user): bool => $user->providerAccess()->where('role', 'provider_admin')->exists());
+        Gate::define('manage-app-catalog', fn (User $user): bool => $user->providerAccess()->where('role', 'provider_admin')->exists());
+        // Dokumen API internal di portal `/docs`: referensi Scramble untuk layar CoreERP dan
+        // kontrak app serta pusat admin. Nama gate ditentukan Scramble (`RestrictedDocsAccess`).
+        // Kontrak integrasi untuk sistem luar tidak dijaga gate ini; ia terbit tanpa login.
+        Gate::define('viewApiDocs', fn (?User $user): bool => $user?->providerAccess()->where('role', 'provider_admin')->exists() ?? false);
+
+        // Penyedia pengguna yang hanya membaca akun orang. Akun aplikasi klien integrasi tidak pernah
+        // dapat masuk: login kata sandi, pemulihan sesi, remember-me, dan tautan reset kata sandi
+        // semuanya mencari pengguna lewat penyedia ini (`config/auth.php`).
+        Auth::provider('people', fn (Application $app, array $config): EloquentUserProvider => (new ContextCachedUserProvider($app->make('hash'), $config['model']))
+            ->withQuery(fn (Builder $query) => $query->where('account_type', User::PERSON)));
+
+        Event::listen(Login::class, function (Login $event): void {
+            $event->user->forceFill(['last_login_at' => now()])->saveQuietly();
+            app(SessionRevocation::class)->stamp(request(), $event->user->getAuthIdentifier());
+        });
+
+        Event::listen(DiagnosingHealth::class, function (): void {
+            if (config('cache.default') === 'redis') {
+                Redis::connection('cache')->ping();
+            }
+            if (config('session.driver') === 'redis') {
+                Redis::connection('sessions')->ping();
+            }
+        });
+
+        // Pelaku untuk kolom jejak: dipasang setiap kali guard memegang pengguna, termasuk saat
+        // sesi dipulihkan di tiap permintaan, dan dilepas saat keluar.
+        Event::listen(Authenticated::class, fn (Authenticated $event) => AuditActor::set($event->user->getAuthIdentifier()));
+        Event::listen(Logout::class, fn () => AuditActor::clear());
+
+        // Log perubahan tidak mencatat migration dan upgrade versi. `migrate --database` menjalankan
+        // migration dengan koneksi itu sebagai bawaan, jadi koneksi bawaan saat event ini yang dimatikan.
+        Event::listen(MigrationsStarted::class, fn () => ChangeLogSwitch::pause());
+        Event::listen(MigrationsEnded::class, fn () => ChangeLogSwitch::resume());
+
+        // Keyed per app and tenant so one noisy app cannot starve another, and so a stolen token cannot burn a
+        // tenant's number range as fast as the network allows. Credential checks are bcrypt, so this also bounds
+        // the CPU an unauthenticated caller can spend.
+        RateLimiter::for('internal-app', fn (Request $request): Limit => Limit::perMinute(
+            (int) config('coreerp.internal_api_rate_limit', 600)
+        )->by(implode(':', [
+            $request->header('X-CoreERP-App-Id', 'unknown'),
+            $request->header('X-CoreERP-Tenant-Id', 'unknown'),
+        ])));
+
+        // Per klien integrasi, dikunci pada id di depan token — bukan per alamat IP, karena satu
+        // aplikasi finance biasanya memanggil dari satu alamat dan yang perlu dibatasi adalah
+        // kliennya. Permintaan tanpa token dibatasi per alamat supaya tebakan token tetap murah
+        // untuk ditolak.
+        RateLimiter::for('integration-client', fn (Request $request): Limit => Limit::perMinute(
+            (int) config('coreerp.integration_api_rate_limit', 120)
+        )->by(self::integrationClientKey($request)));
+
+        // Rute yang dibaca module dan sistem luar sekaligus memakai kunci milik jalur yang dipilih.
+        RateLimiter::for('internal-caller', fn (Request $request): Limit => $request->hasHeader('X-CoreERP-App-Id')
+            ? Limit::perMinute((int) config('coreerp.internal_api_rate_limit', 600))->by(implode(':', [
+                $request->header('X-CoreERP-App-Id', 'unknown'),
+                $request->header('X-CoreERP-Tenant-Id', 'unknown'),
+            ]))
+            : Limit::perMinute((int) config('coreerp.integration_api_rate_limit', 120))->by(self::integrationClientKey($request)));
+    }
+
+    /**
+     * Configure default behaviors for production-ready applications.
+     */
+    protected function configureDefaults(): void
+    {
+        Date::use(CarbonImmutable::class);
+
+        DB::prohibitDestructiveCommands(
+            app()->isProduction(),
+        );
+
+        Password::defaults(function (): ?Password {
+            if (! app()->isProduction()) {
+                return null;
+            }
+
+            $password = Password::min(12)
+                ->mixedCase()
+                ->letters()
+                ->numbers()
+                ->symbols();
+
+            return config('coreerp.password_breach_check', true)
+                ? $password->uncompromised()
+                : $password;
+        });
+    }
+
+    /**
+     * Menghentikan `opentelemetry-auto-laravel` meneruskan setiap panggilan `Log::` ke OTLP.
+     *
+     * Paket itu memasang `LogWatcher`, yang mendengarkan `MessageLogged` dan mengubah setiap
+     * catatan log menjadi satu catatan OTLP. Akibatnya satu kesalahan tiba di SigNoz sebagai
+     * **dua** catatan: log exception bawaan Laravel, dan laporan yang dikirim
+     * {@see ErrorReporter} dengan sengaja.
+     *
+     * Yang dipertahankan adalah yang kedua, dan itu bukan sekadar soal jumlah. Laporan terkurasi
+     * membawa tenant, module, pengguna, batas organisasi, SQL yang gagal, dan `trace_id` sebagai
+     * atribut yang bisa disaring; salinan dari `LogWatcher` membawa empat atribut dan tidak satu
+     * pun di antaranya bisa dipakai menyaring. Menyimpan keduanya berarti membayar dua kali
+     * untuk satu kejadian, dan yang lebih miskin justru yang muncul lebih dulu saat dicari.
+     *
+     * Panggilan `Log::` biasa tetap berjalan seperti sedia kala dan tetap masuk `laravel.log`.
+     * Yang hilang hanya penerusannya ke SigNoz — dan sampai basis kode ini benar-benar menulis
+     * log terstruktur di jalur permintaan (lihat `LIFE-14`), yang diteruskan itu hampir tidak
+     * ada isinya.
+     *
+     * Mengembalikannya cukup dengan menghapus pemanggilan metode ini.
+     */
+    private function stopForwardingLogsToOtel(): void
+    {
+        // Tidak ada pendengar `MessageLogged` lain di basis kode ini — sudah diperiksa — jadi
+        // melupakan seluruh pendengarnya setara dengan melepas satu pendengar milik paket itu.
+        // Kalau suatu saat CoreERP menambah pendengarnya sendiri, baris ini harus berubah
+        // menjadi pelepasan yang lebih tepat sasaran.
+        Event::forget(MessageLogged::class);
+    }
+
+    /** Id klien di depan token `Bearer <id>.<rahasia>`, atau alamat IP bila tidak ada token. */
+    private static function integrationClientKey(Request $request): string
+    {
+        $token = (string) $request->bearerToken();
+        $id = str_contains($token, '.') ? strstr($token, '.', true) : '';
+
+        return is_string($id) && $id !== '' ? 'klien:'.$id : 'ip:'.$request->ip();
+    }
+}

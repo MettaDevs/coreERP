@@ -46,6 +46,14 @@ rahasia tidak disimpan dalam source maupun image.
 | `PORT` | `18643` | Port listener. |
 | `SESSION_COOKIE` | `laravel-session` | Nama cookie sesi fixture PHP aktual. |
 | `CACHE_PREFIX` | `laravel-cache-` | Awalan kunci tabel `cache` untuk limiter login, sama dengan PHP. |
+| `SESSION_BACKEND` | `database` | `database` (tabel `sessions`) atau `valkey`; lihat `../../optimized.md`. |
+| `VALKEY_HOST`, `VALKEY_PORT` | `valkey`, `6379` | Valkey untuk `SESSION_BACKEND=valkey`. Kegagalannya menjadi 503. |
+| `SESSION_KEY_PREFIX` | `coreerp-session:` | Awalan kunci sesi di Valkey; nilai sama dengan `sessions.payload`, TTL 7200 detik. |
+| `CONTEXT_CACHE` | `off` | `on` menyimpan konteks per proses, dikosongkan saat `security_context_versions` berubah. |
+| `CONTEXT_CACHE_TTL_SECONDS` | `300` | Umur maksimum entri; entri kebijakan dan izin juga berakhir pada batas validitas berikutnya. |
+
+Dengan `SESSION_BACKEND` dan `CONTEXT_CACHE` pada bawaannya, query dan urutannya sama dengan pembanding
+dasar. `CONTEXT_CACHE=on` membutuhkan `../../infra/optimized-schema.sql` pada database kandidat.
 
 Untuk Docker pada server Linux, pasok host database yang dapat dijangkau dari
 container dan konfigurasi resource/pool dari rencana pembanding. Script lokal
@@ -99,7 +107,7 @@ atribut wajib, buku straight-line bulanan dengan tahun kalender, dan posting
 
 Cabang yang belum dicakup mencakup upload dan pewarisan lampiran, tautan
 permintaan pembelian, hibah, saldo awal, perintah pembatalan, challenge 2FA,
-rotasi previous key, sesi Redis, alamat environment dengan database khusus,
+rotasi previous key, alamat environment dengan database khusus,
 UI Inertia lengkap, nomor fiskal/continuous, dan metode penyusutan lainnya.
 Cabang domain tersebut ditolak dengan `unsupported_profile` atau tidak memiliki
 route. Tidak ada jawaban 200 pengganti operasi yang belum dijalankan.
@@ -107,7 +115,9 @@ route. Tidak ada jawaban 200 pengganti operasi yang belum dijalankan.
 Bootstrap `/login` menyediakan HTML dan cookie untuk klien HTTP. Bootstrap itu
 bukan implementasi seluruh halaman login CoreERP. `X-Inertia: true` tanpa versi
 menghasilkan 409. Pemilihan workspace dan seluruh akses module membaca ulang
-otoritas dari database pada setiap request. Pemeriksaan lisensi wajib di luar
+otoritas dari database pada setiap request; dengan `CONTEXT_CACHE=on`, otoritas
+dibaca dari cache proses sesudah query versi konteks pada request yang sama,
+sedangkan pemilihan workspace tetap dihitung per request. Pemeriksaan lisensi wajib di luar
 konfigurasi fixture belum diimplementasikan.
 
 Publisher juga menghitung `held` dan `manual` dari mapping dan setting yang
@@ -120,7 +130,8 @@ diatribusikan hanya ke runtime Rust.
 
 `main.rs` memiliki adapter HTTP dan pool. `auth.rs` memiliki sesi JSON/base64,
 cookie/CSRF, password, limiter login (primitif cache Laravel menurut
-`../../login-limiter.md`), workspace, role hierarchy, dan data scope. `numbering.rs`
+`../../login-limiter.md`), workspace, role hierarchy, dan data scope. `context_cache.rs`
+memiliki cache konteks per proses untuk `CONTEXT_CACHE=on`. `numbering.rs`
 memiliki scope/context, preallocation, lock, replay, dan audit nomor. `receipts.rs`
 memiliki transaksi penerimaan, aset, placement, buku, atribut, dan attachment
 callback. `posting.rs` memiliki normalisasi, mapping akun, dimensi historis,

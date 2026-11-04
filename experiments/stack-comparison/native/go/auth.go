@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math/big"
 	"net"
 	"net/http"
@@ -22,6 +23,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -124,13 +126,7 @@ func (q *request) loadSession() error {
 		id, e := decryptCookie(q.cookie, value, q.key)
 		if e == nil && len(id) == 40 {
 			q.sessionID = id
-			s, e := q.row("select payload,last_activity from sessions where id=$1", id)
-			if e == nil && integer(s["last_activity"]) >= time.Now().Unix()-q.lifetime {
-				b, e := base64.StdEncoding.DecodeString(str(s["payload"]))
-				if e == nil {
-					_ = decode(b, &q.session)
-				}
-			} else if e != nil && !errors.Is(e, pgx.ErrNoRows) {
+			if e = q.readSession(id); e != nil {
 				return e
 			}
 		}
@@ -143,18 +139,73 @@ func (q *request) loadSession() error {
 	}
 	return nil
 }
-func (q *request) saveSession(w http.ResponseWriter) error {
-	var user any
-	if q.user != nil {
-		user = q.user["id"]
+
+// readSession membaca payload sesi dari Valkey atau tabel sessions sesuai SESSION_BACKEND. Di Valkey, TTL
+// menggantikan pemeriksaan last_activity: kunci yang tidak ada berarti sesi tidak ada atau kedaluwarsa.
+func (q *request) readSession(id string) error {
+	if q.valkey != nil {
+		payload, e := q.valkey.Get(q.ctx, q.sessionPrefix+id).Result()
+		if errors.Is(e, redis.Nil) {
+			return nil
+		}
+		if e != nil {
+			// Sesi yang gagal dibaca tidak boleh ditimpa sesi kosong di akhir request.
+			q.session = nil
+			return sessionUnavailable(e)
+		}
+		q.decodeSession(payload)
+		return nil
 	}
-	ip, _, e := net.SplitHostPort(q.r.RemoteAddr)
-	if e != nil {
-		ip = q.r.RemoteAddr
-	}
-	e = q.exec("insert into sessions(id,user_id,ip_address,user_agent,payload,last_activity) values($1,$2,$3,$4,$5,$6) on conflict(id) do update set user_id=excluded.user_id,ip_address=excluded.ip_address,user_agent=excluded.user_agent,payload=excluded.payload,last_activity=excluded.last_activity", q.sessionID, user, ip, q.r.UserAgent(), base64.StdEncoding.EncodeToString([]byte(jsonText(q.session))), time.Now().Unix())
-	if e != nil {
+	s, e := q.row("select payload,last_activity from sessions where id=$1", id)
+	if e == nil && integer(s["last_activity"]) >= time.Now().Unix()-q.lifetime {
+		q.decodeSession(str(s["payload"]))
+	} else if e != nil && !errors.Is(e, pgx.ErrNoRows) {
 		return e
+	}
+	return nil
+}
+func (q *request) decodeSession(payload string) {
+	b, e := base64.StdEncoding.DecodeString(payload)
+	if e == nil {
+		_ = decode(b, &q.session)
+	}
+}
+
+// sessionUnavailable: kegagalan Valkey menjadi 503 untuk request itu, tidak jatuh diam-diam ke database.
+func sessionUnavailable(e error) error {
+	log.Printf("session store unavailable: %v", e)
+	return fail(503, "Sesi tidak tersedia.")
+}
+
+// forgetSession menghapus sesi lama saat logout dan saat id diganti waktu login.
+func (q *request) forgetSession() error {
+	if q.valkey != nil {
+		if e := q.valkey.Del(q.ctx, q.sessionPrefix+q.sessionID).Err(); e != nil {
+			return sessionUnavailable(e)
+		}
+		return nil
+	}
+	return q.exec("delete from sessions where id=$1", q.sessionID)
+}
+func (q *request) saveSession(w http.ResponseWriter) error {
+	payload := base64.StdEncoding.EncodeToString([]byte(jsonText(q.session)))
+	if q.valkey != nil {
+		if e := q.valkey.Set(q.ctx, q.sessionPrefix+q.sessionID, payload, time.Duration(q.lifetime)*time.Second).Err(); e != nil {
+			return sessionUnavailable(e)
+		}
+	} else {
+		var user any
+		if q.user != nil {
+			user = q.user["id"]
+		}
+		ip, _, e := net.SplitHostPort(q.r.RemoteAddr)
+		if e != nil {
+			ip = q.r.RemoteAddr
+		}
+		e = q.exec("insert into sessions(id,user_id,ip_address,user_agent,payload,last_activity) values($1,$2,$3,$4,$5,$6) on conflict(id) do update set user_id=excluded.user_id,ip_address=excluded.ip_address,user_agent=excluded.user_agent,payload=excluded.payload,last_activity=excluded.last_activity", q.sessionID, user, ip, q.r.UserAgent(), payload, time.Now().Unix())
+		if e != nil {
+			return e
+		}
 	}
 	for name, value := range map[string]string{q.cookie: q.sessionID, "XSRF-TOKEN": str(q.session["_token"])} {
 		v, e := encryptCookie(name, value, q.key)
@@ -162,6 +213,10 @@ func (q *request) saveSession(w http.ResponseWriter) error {
 			return e
 		}
 		http.SetCookie(w, &http.Cookie{Name: name, Value: url.QueryEscape(v), Path: "/", HttpOnly: name == q.cookie, SameSite: http.SameSiteLaxMode, MaxAge: int(q.lifetime)})
+	}
+	// Valkey membuang sesi lewat TTL; GC tabel sessions hanya berlaku pada mode database.
+	if q.valkey != nil {
+		return nil
 	}
 	lottery, lotteryError := rand.Int(rand.Reader, big.NewInt(100))
 	if lotteryError == nil && lottery.Int64() < 2 {
@@ -260,7 +315,7 @@ func (q *request) authenticate(email, password, throttleKey string) (response, e
 		}
 		return response{}, invalid("email", "These credentials do not match our records.")
 	}
-	if e = q.exec("delete from sessions where id=$1", q.sessionID); e != nil {
+	if e = q.forgetSession(); e != nil {
 		return response{}, e
 	}
 	q.sessionID = randomToken()
@@ -355,7 +410,13 @@ func (q *request) restoreUser() error {
 	if id == nil {
 		return fail(401, "Unauthenticated.")
 	}
-	u, e := q.row("select * from users where id=$1 and account_type='person' limit 1", id)
+	// Satu-satunya query versi konteks pada request ini; semua bacaan konteks berjalan sesudahnya.
+	if e := q.observeContextVersion(); e != nil {
+		return e
+	}
+	u, e := cachedContext(q, "user:"+str(id), nil, func() (object, error) {
+		return q.row("select * from users where id=$1 and account_type='person' limit 1", id)
+	})
 	if errors.Is(e, pgx.ErrNoRows) {
 		return fail(401, "Unauthenticated.")
 	}
@@ -369,7 +430,7 @@ func (q *request) restoreUser() error {
 	return q.exec("select set_config('coreerp.user_id',$1,false)", str(u["id"]))
 }
 func (q *request) logout() (response, error) {
-	if e := q.exec("delete from sessions where id=$1", q.sessionID); e != nil {
+	if e := q.forgetSession(); e != nil {
 		return response{}, e
 	}
 	q.sessionID = randomToken()
@@ -411,7 +472,9 @@ func (q *request) require(permission string) error {
 	return nil
 }
 func (q *request) resolveAuthority(selected string) error {
-	members, e := q.rows("select m.*,t.name as tenant_name from tenant_memberships m join tenants t on t.id=m.tenant_id where m.user_id=$1 and m.status='active' order by m.created_at", q.user["id"])
+	members, e := cachedContext(q, "memberships:"+str(q.user["id"]), nil, func() ([]object, error) {
+		return q.rows("select m.*,t.name as tenant_name from tenant_memberships m join tenants t on t.id=m.tenant_id where m.user_id=$1 and m.status='active' order by m.created_at", q.user["id"])
+	})
 	if e != nil {
 		return e
 	}
@@ -433,82 +496,29 @@ func (q *request) resolveAuthority(selected string) error {
 	if selected != "" && !found && q.r.URL.Path == "/api/v1/workspace-context" {
 		return invalid("membership_id", "Keanggotaan tidak tersedia.")
 	}
-	a := &authority{tenant: str(member["tenant_id"]), membership: str(member["id"]), permissions: map[string]bool{}}
-	assigned, e := q.rows("select assignment.role_id from role_assignments assignment join roles on roles.id=assignment.role_id where assignment.membership_id=$1 and assignment.status='active' and roles.is_active=true and assignment.valid_from<=now() and (assignment.valid_until is null or assignment.valid_until>now())", a.membership)
+	a := &authority{tenant: str(member["tenant_id"]), membership: str(member["id"])}
+	scope := a.membership + "|" + a.tenant
+	boundary := q.contextBoundary(a.membership, a.tenant)
+	if a.permissions, e = cachedContext(q, "permissions:"+scope, boundary, func() (map[string]bool, error) {
+		return q.loadPermissions(a.tenant, a.membership)
+	}); e != nil {
+		return e
+	}
+	policy, e := cachedContext(q, "policy:"+scope, boundary, func() (*dataPolicy, error) {
+		return q.loadDataPolicy(a.tenant, a.membership)
+	})
 	if e != nil {
 		return e
 	}
-	ids := []string{}
-	for _, r := range assigned {
-		ids = append(ids, str(r["role_id"]))
-	}
-	roles, e := q.rows("with recursive reachable(role_id) as (select r.id from roles r where r.tenant_id=$1 and r.is_active=true and r.id=any($2) union select link.child_role_id from security_role_children link join reachable on reachable.role_id=link.parent_role_id join roles child on child.id=link.child_role_id and child.is_active=true where link.tenant_id=$1) select role_id from reachable", a.tenant, ids)
-	if e != nil {
-		return e
-	}
-	ids = []string{}
-	for _, r := range roles {
-		ids = append(ids, str(r["role_id"]))
-	}
-	perms, e := q.rows("select distinct p.code from security_role_duties rd join security_duty_privileges dp on dp.duty_code=rd.duty_code join security_privilege_permissions pp on pp.privilege_code=dp.privilege_code join permissions p on p.code=pp.permission_code where rd.role_id=any($1) and p.app_id='management-aset' order by p.code", ids)
-	if e != nil {
-		return e
-	}
-	for _, p := range perms {
-		a.permissions[str(p["code"])] = true
-	}
-	scopes, e := q.rows("select s.policy_code,s.legal_entity_id,s.organization_id,s.hierarchy_version_id,s.include_descendants from role_assignment_data_policy_scopes s join role_assignments a on a.id=s.role_assignment_id where s.tenant_id=$1 and a.membership_id=$2 and a.status='active' and a.valid_from<=now() and (a.valid_until is null or a.valid_until>now()) and s.valid_from<=now() and (s.valid_until is null or s.valid_until>now())", a.tenant, a.membership)
-	if e != nil {
-		return e
-	}
-	anyAll := false
-	organizationIDs := map[string]bool{}
-	for _, s := range scopes {
-		all := s["legal_entity_id"] == nil && s["organization_id"] == nil
-		if all {
-			anyAll = true
-		}
-		g := grant{company: str(s["legal_entity_id"]), units: map[string]bool{}}
-		if g.company != "" {
-			organizationIDs[g.company] = true
-		}
-		id := str(s["organization_id"])
-		candidates := []string{}
-		if id != "" {
-			candidates = append(candidates, id)
-		}
-		if boolean(s["include_descendants"]) {
-			desc, e := q.rows("select descendant_organization_id from organization_hierarchy_closures where version_id=$1 and ancestor_organization_id=$2", s["hierarchy_version_id"], s["organization_id"])
-			if e != nil {
-				return e
-			}
-			for _, d := range desc {
-				candidates = append(candidates, str(d["descendant_organization_id"]))
-			}
-		}
-		units, e := q.rows("select id from organizations where tenant_id=$1 and classification='operating_unit' and id=any($2)", a.tenant, candidates)
-		if e != nil {
-			return e
-		}
-		for _, u := range units {
-			g.units[str(u["id"])] = true
-			organizationIDs[str(u["id"])] = true
-		}
-		if str(s["policy_code"]) == "management-aset.asset-responsibility" {
-			if all {
-				a.all = true
-			}
-			if g.company != "" || len(g.units) > 0 {
-				a.grants = append(a.grants, g)
-			}
-		}
-	}
-	orgs, e := q.rows("select * from organizations where tenant_id=$1 and status='active' order by name", a.tenant)
+	a.all, a.grants = policy.all, policy.grants
+	orgs, e := cachedContext(q, "organizations:"+a.tenant, nil, func() ([]object, error) {
+		return q.rows("select * from organizations where tenant_id=$1 and status='active' order by name", a.tenant)
+	})
 	if e != nil {
 		return e
 	}
 	for _, o := range orgs {
-		if anyAll || organizationIDs[str(o["id"])] {
+		if policy.anyAll || policy.organizationIDs[str(o["id"])] {
 			a.organizations = append(a.organizations, o)
 		}
 	}
@@ -536,6 +546,85 @@ func (q *request) resolveAuthority(selected string) error {
 		return fail(403, "Tidak ada izin untuk module ini.")
 	}
 	return nil
+}
+
+// loadPermissions menghitung kode izin dari penugasan aktif dan role rekursif.
+func (q *request) loadPermissions(tenant, membership string) (map[string]bool, error) {
+	permissions := map[string]bool{}
+	assigned, e := q.rows("select assignment.role_id from role_assignments assignment join roles on roles.id=assignment.role_id where assignment.membership_id=$1 and assignment.status='active' and roles.is_active=true and assignment.valid_from<=now() and (assignment.valid_until is null or assignment.valid_until>now())", membership)
+	if e != nil {
+		return nil, e
+	}
+	ids := []string{}
+	for _, r := range assigned {
+		ids = append(ids, str(r["role_id"]))
+	}
+	roles, e := q.rows("with recursive reachable(role_id) as (select r.id from roles r where r.tenant_id=$1 and r.is_active=true and r.id=any($2) union select link.child_role_id from security_role_children link join reachable on reachable.role_id=link.parent_role_id join roles child on child.id=link.child_role_id and child.is_active=true where link.tenant_id=$1) select role_id from reachable", tenant, ids)
+	if e != nil {
+		return nil, e
+	}
+	ids = []string{}
+	for _, r := range roles {
+		ids = append(ids, str(r["role_id"]))
+	}
+	perms, e := q.rows("select distinct p.code from security_role_duties rd join security_duty_privileges dp on dp.duty_code=rd.duty_code join security_privilege_permissions pp on pp.privilege_code=dp.privilege_code join permissions p on p.code=pp.permission_code where rd.role_id=any($1) and p.app_id='management-aset' order by p.code", ids)
+	if e != nil {
+		return nil, e
+	}
+	for _, p := range perms {
+		permissions[str(p["code"])] = true
+	}
+	return permissions, nil
+}
+
+// loadDataPolicy membaca scope kebijakan data aktif beserta unit kerja hasil closure hierarki.
+func (q *request) loadDataPolicy(tenant, membership string) (*dataPolicy, error) {
+	p := &dataPolicy{organizationIDs: map[string]bool{}}
+	scopes, e := q.rows("select s.policy_code,s.legal_entity_id,s.organization_id,s.hierarchy_version_id,s.include_descendants from role_assignment_data_policy_scopes s join role_assignments a on a.id=s.role_assignment_id where s.tenant_id=$1 and a.membership_id=$2 and a.status='active' and a.valid_from<=now() and (a.valid_until is null or a.valid_until>now()) and s.valid_from<=now() and (s.valid_until is null or s.valid_until>now())", tenant, membership)
+	if e != nil {
+		return nil, e
+	}
+	for _, s := range scopes {
+		all := s["legal_entity_id"] == nil && s["organization_id"] == nil
+		if all {
+			p.anyAll = true
+		}
+		g := grant{company: str(s["legal_entity_id"]), units: map[string]bool{}}
+		if g.company != "" {
+			p.organizationIDs[g.company] = true
+		}
+		id := str(s["organization_id"])
+		candidates := []string{}
+		if id != "" {
+			candidates = append(candidates, id)
+		}
+		if boolean(s["include_descendants"]) {
+			desc, e := q.rows("select descendant_organization_id from organization_hierarchy_closures where version_id=$1 and ancestor_organization_id=$2", s["hierarchy_version_id"], s["organization_id"])
+			if e != nil {
+				return nil, e
+			}
+			for _, d := range desc {
+				candidates = append(candidates, str(d["descendant_organization_id"]))
+			}
+		}
+		units, e := q.rows("select id from organizations where tenant_id=$1 and classification='operating_unit' and id=any($2)", tenant, candidates)
+		if e != nil {
+			return nil, e
+		}
+		for _, u := range units {
+			g.units[str(u["id"])] = true
+			p.organizationIDs[str(u["id"])] = true
+		}
+		if str(s["policy_code"]) == "management-aset.asset-responsibility" {
+			if all {
+				p.all = true
+			}
+			if g.company != "" || len(g.units) > 0 {
+				p.grants = append(p.grants, g)
+			}
+		}
+	}
+	return p, nil
 }
 func (q *request) workspace() (response, error) {
 	b, e := q.body()

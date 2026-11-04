@@ -19,6 +19,8 @@ bun run build
 
 Hono memakai port 18644. Elysia memakai port 18645. `PORT` dan `HOST` mengganti alamat listener. `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`, dan `DB_POOL_SIZE` mengatur pool. Default lokal hanya menunjuk database eksperimen `erp_compare_ts` pada `127.0.0.1:18640`. Clone verifikasi akhir bernama `erp_compare_final_hono` dan `erp_compare_final_elysia`. Database pengembangan tambahan harus berawalan `erp_compare_ts_`.
 
+Versi teroptimasi ([`../../optimized.md`](../../optimized.md)) dinyalakan dengan `SESSION_BACKEND=valkey` dan `CONTEXT_CACHE=on`; bawaannya `database` dan `off`, yaitu perilaku pembanding dasar dengan SQL dan urutan yang sama. `VALKEY_HOST`, `VALKEY_PORT`, dan `SESSION_KEY_PREFIX` menunjuk Valkey sesi lewat klien Redis bawaan Bun. `CONTEXT_CACHE_TTL_SECONDS` membatasi umur entri cache konteks. Setiap proses Bun memegang klien Valkey dan cache konteksnya sendiri.
+
 `COMPARE_ENV` menunjuk berkas privat berisi `APP_KEY` dan `DB_PASSWORD`. Variabel proses mengalahkan nilai berkas. Cookie menggunakan AES-256-CBC Laravel, MAC envelope, prefix nama cookie, dan sesi database JSON yang dibungkus base64. Setiap login memeriksa password dua kali dengan biaya hash yang tersimpan. Pilihan workspace tidak memberi izin baru. Setiap request memulihkan membership, role aktif dan hierarkinya, duty, privilege, permission, serta policy organisasi dari database.
 
 Build Linux menggunakan konteks root repository.

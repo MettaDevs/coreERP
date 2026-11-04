@@ -9,9 +9,15 @@ import {
 } from 'node:crypto';
 import { z } from 'zod';
 import type { Config } from './config.ts';
+import {
+    utcInstant,
+    type ContextCache,
+    type ContextCacheView,
+} from './context-cache.ts';
 import { Database } from './db.ts';
 import { abort, HttpFailure, validation } from './errors.ts';
 import { RateLimiter } from './limiter.ts';
+import type { ValkeySessions } from './valkey.ts';
 
 const envelopeSchema = z.object({
     iv: z.string(),
@@ -64,6 +70,11 @@ type Membership = z.infer<typeof membershipSchema>;
 type Organization = z.infer<typeof organizationSchema>;
 type Grant = { legalEntityId: string | null; operatingUnitIds: string[] };
 export type Policy = { kind: 'all' } | { kind: 'grants'; grants: Grant[] };
+// Penyimpanan versi teroptimasi (optimized.md); null berarti perilaku pembanding dasar.
+export type SessionStores = {
+    valkey: ValkeySessions | null;
+    contextCache: ContextCache | null;
+};
 
 export function randomToken(): string {
     return randomBytes(48)
@@ -141,6 +152,9 @@ export class Session {
         private readonly request: Request,
         private readonly clientAddress: string,
         private readonly cipher: CookieCipher,
+        private readonly valkey: ValkeySessions | null,
+        // Terisi hanya bila query versi sudah berjalan pada request ini (CONTEXT_CACHE=on dan sesi membawa user).
+        readonly context: ContextCacheView | null,
         public id: string,
         public data: z.infer<typeof sessionSchema>,
         public user: z.infer<typeof userSchema> | null,
@@ -151,6 +165,7 @@ export class Session {
         config: Config,
         request: Request,
         clientAddress: string,
+        stores: SessionStores,
     ) {
         const cipher = new CookieCipher(config.key);
         const cookies = new Map(
@@ -175,22 +190,17 @@ export class Session {
         }
         let data: z.infer<typeof sessionSchema> = { _token: randomToken() };
         if (sessionId && /^[A-Za-z0-9]{40}$/.test(sessionId)) {
-            const stored = await db.one(
-                z.object({ payload: z.string(), last_activity: z.number() }),
-                'select payload,last_activity from sessions where id=$1 limit 1',
-                [sessionId],
+            const payload = await this.payload(
+                db,
+                config,
+                stores.valkey,
+                sessionId,
             );
-            if (
-                stored &&
-                stored.last_activity >=
-                    Math.floor(Date.now() / 1000) - config.SESSION_LIFETIME * 60
-            ) {
+            if (payload !== null) {
                 try {
                     const parsed = sessionSchema.safeParse(
                         JSON.parse(
-                            Buffer.from(stored.payload, 'base64').toString(
-                                'utf8',
-                            ),
+                            Buffer.from(payload, 'base64').toString('utf8'),
                         ),
                     );
                     if (parsed.success) data = parsed.data;
@@ -200,14 +210,20 @@ export class Session {
             }
         } else sessionId = null;
         const principal = data[guardKey];
-        const user =
-            typeof principal === 'number' || typeof principal === 'string'
-                ? await db.one(
-                      userSchema,
-                      "select * from users where id=$1 and account_type='person' limit 1",
-                      [principal],
-                  )
-                : undefined;
+        let user: z.infer<typeof userSchema> | undefined;
+        let context: ContextCacheView | null = null;
+        if (typeof principal === 'number' || typeof principal === 'string') {
+            const find = () =>
+                db.one(
+                    userSchema,
+                    "select * from users where id=$1 and account_type='person' limit 1",
+                    [principal],
+                );
+            if (stores.contextCache) {
+                context = await stores.contextCache.open(db);
+                user = await context.remember(`user:${principal}`, find);
+            } else user = await find();
+        }
         if (user) await db.actor(user.id);
         return new Session(
             db,
@@ -215,10 +231,33 @@ export class Session {
             request,
             clientAddress,
             cipher,
+            stores.valkey,
+            context,
             sessionId ?? randomToken(),
             data,
             user ?? null,
         );
+    }
+
+    // Payload sesi yang masih hidup, atau null bila tidak ada atau kedaluwarsa. Di Valkey, TTL kunci
+    // menggantikan pemeriksaan last_activity.
+    private static async payload(
+        db: Database,
+        config: Config,
+        valkey: ValkeySessions | null,
+        id: string,
+    ): Promise<string | null> {
+        if (valkey) return valkey.read(id);
+        const stored = await db.one(
+            z.object({ payload: z.string(), last_activity: z.number() }),
+            'select payload,last_activity from sessions where id=$1 limit 1',
+            [id],
+        );
+        return stored &&
+            stored.last_activity >=
+                Math.floor(Date.now() / 1000) - config.SESSION_LIFETIME * 60
+            ? stored.payload
+            : null;
     }
 
     requireUser() {
@@ -338,7 +377,7 @@ export class Session {
                 email: 'These credentials do not match our records.',
             });
         }
-        await this.db.execute('delete from sessions where id=$1', [this.id]);
+        await this.forget();
         this.id = randomToken();
         this.data[guardKey] = second.id;
         this.data.password_hash_web = second.password;
@@ -356,7 +395,7 @@ export class Session {
 
     async logout(input: unknown): Promise<void> {
         this.csrf(input);
-        await this.db.execute('delete from sessions where id=$1', [this.id]);
+        await this.forget();
         this.id = randomToken();
         this.data = { _token: randomToken() };
         this.user = null;
@@ -367,7 +406,28 @@ export class Session {
         return this.clientAddress;
     }
 
+    private async forget(): Promise<void> {
+        if (this.valkey) await this.valkey.forget(this.id);
+        else
+            await this.db.execute('delete from sessions where id=$1', [
+                this.id,
+            ]);
+    }
+
     async save(): Promise<string[]> {
+        const payload = Buffer.from(JSON.stringify(this.data)).toString(
+            'base64',
+        );
+        if (this.valkey) await this.valkey.write(this.id, payload);
+        else await this.persist(payload);
+        const suffix = `; Path=/; Max-Age=${this.config.SESSION_LIFETIME * 60}; SameSite=Lax${this.config.SESSION_SECURE_COOKIE === 'true' ? '; Secure' : ''}`;
+        return [
+            `XSRF-TOKEN=${encodeURIComponent(this.cipher.encrypt('XSRF-TOKEN', this.data._token))}${suffix}`,
+            `${this.config.SESSION_COOKIE}=${encodeURIComponent(this.cipher.encrypt(this.config.SESSION_COOKIE, this.id))}${suffix}; HttpOnly`,
+        ];
+    }
+
+    private async persist(payload: string): Promise<void> {
         await this.db.execute(
             'insert into sessions(id,user_id,ip_address,user_agent,payload,last_activity) values($1,$2,$3,$4,$5,$6) on conflict(id) do update set user_id=excluded.user_id,ip_address=excluded.ip_address,user_agent=excluded.user_agent,payload=excluded.payload,last_activity=excluded.last_activity',
             [
@@ -375,7 +435,7 @@ export class Session {
                 this.user?.id ?? null,
                 this.ip(),
                 (this.request.headers.get('user-agent') ?? '').slice(0, 500),
-                Buffer.from(JSON.stringify(this.data)).toString('base64'),
+                payload,
                 Math.floor(Date.now() / 1000),
             ],
         );
@@ -391,11 +451,6 @@ export class Session {
                 ],
             );
         }
-        const suffix = `; Path=/; Max-Age=${this.config.SESSION_LIFETIME * 60}; SameSite=Lax${this.config.SESSION_SECURE_COOKIE === 'true' ? '; Secure' : ''}`;
-        return [
-            `XSRF-TOKEN=${encodeURIComponent(this.cipher.encrypt('XSRF-TOKEN', this.data._token))}${suffix}`,
-            `${this.config.SESSION_COOKIE}=${encodeURIComponent(this.cipher.encrypt(this.config.SESSION_COOKIE, this.id))}${suffix}; HttpOnly`,
-        ];
     }
 }
 
@@ -411,30 +466,70 @@ export class Workspace {
         readonly moduleId: string,
     ) {}
 
+    // Tanpa cache konteks, query yang sama persis dengan pembanding dasar langsung berjalan.
+    private static cached<T>(
+        session: Session,
+        key: string,
+        load: () => Promise<T>,
+        boundary?: () => Promise<number | null>,
+    ): Promise<T> {
+        return session.context
+            ? session.context.remember(key, load, boundary)
+            : load();
+    }
+
     private static async memberships(
         db: Database,
         session: Session,
     ): Promise<Membership[]> {
         const user = session.requireUser();
-        const memberships = await db.rows(
-            membershipSchema,
-            "select m.id,m.tenant_id from tenant_memberships m where m.user_id=$1 and m.status='active' order by m.created_at",
-            [user.id],
-        );
-        if (memberships.length) {
-            const tenantIds = memberships.map(
-                (membership) => membership.tenant_id,
+        return this.cached(session, `memberships:${user.id}`, async () => {
+            const memberships = await db.rows(
+                membershipSchema,
+                "select m.id,m.tenant_id from tenant_memberships m where m.user_id=$1 and m.status='active' order by m.created_at",
+                [user.id],
             );
-            await db.rows(
-                z.object({ id: z.string() }),
-                `select id from tenants where id in (${tenantIds.map((_, index) => `$${index + 1}`).join(',')})`,
-                tenantIds,
-            );
-        }
-        return memberships;
+            if (memberships.length) {
+                const tenantIds = memberships.map(
+                    (membership) => membership.tenant_id,
+                );
+                await db.rows(
+                    z.object({ id: z.string() }),
+                    `select id from tenants where id in (${tenantIds.map((_, index) => `$${index + 1}`).join(',')})`,
+                    tenantIds,
+                );
+            }
+            return memberships;
+        });
     }
 
-    private static async policies(
+    // Batas validitas berikutnya penugasan dan scope keanggotaan ini (optimized.md, bagian 2), dalam milidetik.
+    private static async boundary(
+        db: Database,
+        membership: Membership,
+    ): Promise<number | null> {
+        const row = await db.one(
+            z.object({ min: z.string().nullable() }),
+            "select min(t) from ( select a.valid_until as t from role_assignments a where a.membership_id = $1 and a.status = 'active' and a.valid_until > now() union all select a.valid_from from role_assignments a where a.membership_id = $1 and a.status = 'active' and a.valid_from > now() union all select s.valid_until from role_assignment_data_policy_scopes s join role_assignments a on a.id = s.role_assignment_id where a.membership_id = $1 and s.tenant_id = $2 and s.valid_until > now() union all select s.valid_from from role_assignment_data_policy_scopes s join role_assignments a on a.id = s.role_assignment_id where a.membership_id = $1 and s.tenant_id = $2 and s.valid_from > now() ) boundaries",
+            [membership.id, membership.tenant_id],
+        );
+        return row?.min ? utcInstant(row.min) : null;
+    }
+
+    private static policies(
+        db: Database,
+        session: Session,
+        membership: Membership,
+    ): Promise<Map<string, Policy>> {
+        return this.cached(
+            session,
+            `policies:${membership.id}:${membership.tenant_id}`,
+            () => this.readPolicies(db, membership),
+            () => this.boundary(db, membership),
+        );
+    }
+
+    private static async readPolicies(
         db: Database,
         membership: Membership,
     ): Promise<Map<string, Policy>> {
@@ -498,6 +593,7 @@ export class Workspace {
 
     private static async organizations(
         db: Database,
+        session: Session,
         membership: Membership,
         policies: Map<string, Policy>,
     ): Promise<Organization[]> {
@@ -519,11 +615,63 @@ export class Workspace {
             ),
         ];
         if (!all && !ids.length) return [];
-        return db.rows(
-            organizationSchema,
-            `select id,tenant_id,name,classification from organizations where tenant_id=$1 and status='active' ${all ? '' : `and id in (${ids.map((_, index) => `$${index + 2}`).join(',')})`} order by name`,
-            [membership.tenant_id, ...(all ? [] : ids)],
+        const read = (scoped: string[] | null) =>
+            db.rows(
+                organizationSchema,
+                `select id,tenant_id,name,classification from organizations where tenant_id=$1 and status='active' ${scoped ? `and id in (${scoped.map((_, index) => `$${index + 2}`).join(',')})` : ''} order by name`,
+                [membership.tenant_id, ...(scoped ?? [])],
+            );
+        if (!session.context) return read(all ? null : ids);
+        // Entri organisasi dikunci tenant saja, jadi yang disimpan seluruh organisasi aktif tenant; saringan scope
+        // keanggotaan dihitung per request dan urutan nama tetap.
+        const active = await session.context.remember(
+            `organizations:${membership.tenant_id}`,
+            () => read(null),
         );
+        if (all) return active;
+        const allowed = new Set(ids);
+        return active.filter((item) => allowed.has(item.id));
+    }
+
+    private static permissions(
+        db: Database,
+        session: Session,
+        membership: Membership,
+        moduleId: string,
+    ): Promise<Set<string>> {
+        return this.cached(
+            session,
+            `permissions:${membership.id}:${membership.tenant_id}:${moduleId}`,
+            () => this.readPermissions(db, membership, moduleId),
+            () => this.boundary(db, membership),
+        );
+    }
+
+    private static async readPermissions(
+        db: Database,
+        membership: Membership,
+        moduleId: string,
+    ): Promise<Set<string>> {
+        const assigned = await db.rows(
+            z.object({ role_id: z.string() }),
+            "select a.role_id from role_assignments a join roles r on r.id=a.role_id where a.membership_id=$1 and a.status='active' and r.is_active=true and a.valid_from<=current_timestamp and (a.valid_until is null or a.valid_until>current_timestamp)",
+            [membership.id],
+        );
+        const effective = assigned.length
+            ? await db.rows(
+                  z.object({ role_id: z.string() }),
+                  `with recursive reachable(role_id) as (select r.id from roles r where r.tenant_id=$1 and r.is_active=true and r.id in (${assigned.map((_, index) => `$${index + 2}`).join(',')}) union select link.child_role_id from security_role_children link join reachable on reachable.role_id=link.parent_role_id join roles child on child.id=link.child_role_id and child.is_active=true where link.tenant_id=$1) select role_id from reachable`,
+                  [membership.tenant_id, ...assigned.map((row) => row.role_id)],
+              )
+            : [];
+        const permissionRows = effective.length
+            ? await db.rows(
+                  z.object({ code: z.string() }),
+                  `select distinct p.code from security_role_duties rd join security_duty_privileges dp on dp.duty_code=rd.duty_code join security_privilege_permissions pp on pp.privilege_code=dp.privilege_code join permissions p on p.code=pp.permission_code where p.app_id=$1 and rd.role_id in (${effective.map((_, index) => `$${index + 2}`).join(',')}) order by p.code`,
+                  [moduleId, ...effective.map((row) => row.role_id)],
+              )
+            : [];
+        return new Set(permissionRows.map((row) => row.code));
     }
 
     static async select(db: Database, session: Session, input: unknown) {
@@ -546,9 +694,10 @@ export class Workspace {
             validation({
                 membership_id: 'Tenant tidak tersedia untuk identity ini.',
             });
-        const policies = await this.policies(db, membership);
+        const policies = await this.policies(db, session, membership);
         const organizations = await this.organizations(
             db,
+            session,
             membership,
             policies,
         );
@@ -610,30 +759,17 @@ export class Workspace {
             delete session.data.workspace;
             abort(403, 'Tidak ada tenant aktif untuk permintaan ini.');
         }
-        const assigned = await db.rows(
-            z.object({ role_id: z.string() }),
-            "select a.role_id from role_assignments a join roles r on r.id=a.role_id where a.membership_id=$1 and a.status='active' and r.is_active=true and a.valid_from<=current_timestamp and (a.valid_until is null or a.valid_until>current_timestamp)",
-            [membership.id],
+        const permissions = await this.permissions(
+            db,
+            session,
+            membership,
+            moduleId,
         );
-        const effective = assigned.length
-            ? await db.rows(
-                  z.object({ role_id: z.string() }),
-                  `with recursive reachable(role_id) as (select r.id from roles r where r.tenant_id=$1 and r.is_active=true and r.id in (${assigned.map((_, index) => `$${index + 2}`).join(',')}) union select link.child_role_id from security_role_children link join reachable on reachable.role_id=link.parent_role_id join roles child on child.id=link.child_role_id and child.is_active=true where link.tenant_id=$1) select role_id from reachable`,
-                  [membership.tenant_id, ...assigned.map((row) => row.role_id)],
-              )
-            : [];
-        const permissionRows = effective.length
-            ? await db.rows(
-                  z.object({ code: z.string() }),
-                  `select distinct p.code from security_role_duties rd join security_duty_privileges dp on dp.duty_code=rd.duty_code join security_privilege_permissions pp on pp.privilege_code=dp.privilege_code join permissions p on p.code=pp.permission_code where p.app_id=$1 and rd.role_id in (${effective.map((_, index) => `$${index + 2}`).join(',')}) order by p.code`,
-                  [moduleId, ...effective.map((row) => row.role_id)],
-              )
-            : [];
-        if (!permissionRows.length)
-            abort(403, 'Tidak ada izin untuk module ini.');
-        const policies = await this.policies(db, membership);
+        if (!permissions.size) abort(403, 'Tidak ada izin untuk module ini.');
+        const policies = await this.policies(db, session, membership);
         const organizations = await this.organizations(
             db,
+            session,
             membership,
             policies,
         );
@@ -661,7 +797,7 @@ export class Workspace {
             user.id,
             company?.id ?? null,
             unit?.id ?? null,
-            new Set(permissionRows.map((row) => row.code)),
+            permissions,
             policies.get(moduleId + '.asset-responsibility') ?? {
                 kind: 'grants',
                 grants: [],

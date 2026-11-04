@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -19,6 +20,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/oklog/ulid/v2"
+	"github.com/redis/go-redis/v9"
 	"github.com/shopspring/decimal"
 )
 
@@ -35,6 +37,10 @@ type server struct {
 	key      []byte
 	cookie   string
 	lifetime int64
+	// valkey nil berarti SESSION_BACKEND=database; contextCache nil berarti CONTEXT_CACHE=off.
+	valkey        *redis.Client
+	sessionPrefix string
+	contextCache  *contextCache
 }
 
 type request struct {
@@ -50,6 +56,7 @@ type request struct {
 	payload       object
 	payloadParsed bool
 	payloadError  error
+	cacheVersion  int64
 }
 
 type response struct {
@@ -99,6 +106,27 @@ func main() {
 		log.Fatal("this comparison requires unencrypted database JSON sessions")
 	}
 	s := &server{pool: pool, key: key, cookie: env("SESSION_COOKIE", "laravel-session"), lifetime: integer(env("SESSION_LIFETIME", "120")) * 60}
+	// Saklar varian teroptimasi (../../optimized.md); bawaannya perilaku pembanding dasar.
+	switch env("SESSION_BACKEND", "database") {
+	case "database":
+	case "valkey":
+		s.valkey = redis.NewClient(&redis.Options{Addr: net.JoinHostPort(env("VALKEY_HOST", "valkey"), env("VALKEY_PORT", "6379"))})
+		defer s.valkey.Close()
+		s.sessionPrefix = env("SESSION_KEY_PREFIX", "coreerp-session:")
+	default:
+		log.Fatal("SESSION_BACKEND must be database or valkey")
+	}
+	switch env("CONTEXT_CACHE", "off") {
+	case "off":
+	case "on":
+		ttl := integer(env("CONTEXT_CACHE_TTL_SECONDS", "300"))
+		if ttl <= 0 {
+			log.Fatal("CONTEXT_CACHE_TTL_SECONDS must be a positive integer")
+		}
+		s.contextCache = newContextCache(time.Duration(ttl) * time.Second)
+	default:
+		log.Fatal("CONTEXT_CACHE must be off or on")
+	}
 	h := &http.Server{Addr: env("LISTEN_ADDR", "127.0.0.1:18642"), Handler: s, ReadHeaderTimeout: 10 * time.Second}
 	log.Printf("native Go HTTP listening on %s", h.Addr)
 	log.Fatal(h.ListenAndServe())
@@ -285,8 +313,14 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if q.session != nil {
 		if saveErr := q.saveSession(w); saveErr != nil {
-			log.Printf("session write failed: %v", saveErr)
-			res = response{status: 500, body: object{"message": "Server Error"}}
+			// Hanya kegagalan Valkey yang berbentuk failure (503); kegagalan database tetap 500.
+			var f *failure
+			if errors.As(saveErr, &f) {
+				res = response{status: f.status, body: object{"message": f.message}}
+			} else {
+				log.Printf("session write failed: %v", saveErr)
+				res = response{status: 500, body: object{"message": "Server Error"}}
+			}
 		}
 	}
 	for k, values := range res.headers {

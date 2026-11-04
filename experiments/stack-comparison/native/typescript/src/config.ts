@@ -29,6 +29,13 @@ const environmentSchema = z.object({
     SESSION_LOTTERY_OUT_OF: z.coerce.number().int().positive().default(100),
     DB_POOL_SIZE: z.coerce.number().int().min(1).max(100).default(10),
     TRACE_FILE: z.string().optional(),
+    // Saklar versi teroptimasi (optimized.md); bawaannya perilaku pembanding dasar.
+    SESSION_BACKEND: z.enum(['database', 'valkey']).default('database'),
+    VALKEY_HOST: z.string().min(1).default('valkey'),
+    VALKEY_PORT: z.coerce.number().int().positive().default(6379),
+    SESSION_KEY_PREFIX: z.string().default('coreerp-session:'),
+    CONTEXT_CACHE: z.enum(['off', 'on']).default('off'),
+    CONTEXT_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(300),
 });
 
 export function loadConfig() {

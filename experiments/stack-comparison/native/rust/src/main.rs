@@ -1,4 +1,5 @@
 mod auth;
+mod context_cache;
 mod crypto;
 mod db;
 mod lists;
@@ -14,7 +15,6 @@ use axum::{
     http::{HeaderValue, Method, StatusCode},
     response::{Html, IntoResponse, Response},
 };
-use db::Cached;
 use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
 use serde_json::{Value, json};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
@@ -25,6 +25,8 @@ pub struct App {
     pub crypto: crypto::CookieCrypto,
     pub cookie_name: String,
     pub cache_prefix: String,
+    pub session_backend: auth::SessionBackend,
+    pub context_cache: Option<context_cache::ContextCache>,
 }
 
 #[tokio::main]
@@ -49,11 +51,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()?;
     let crypto =
         crypto::CookieCrypto::new(&std::env::var("APP_KEY")?).map_err(std::io::Error::other)?;
+    // Saklar versi teroptimasi (`../../optimized.md`); bawaannya perilaku pembanding dasar.
+    let session_backend = match env("SESSION_BACKEND", "database").as_str() {
+        "database" => auth::SessionBackend::Database,
+        "valkey" => {
+            let port: u16 = env("VALKEY_PORT", "6379").parse()?;
+            let client =
+                redis::Client::open(format!("redis://{}:{port}/", env("VALKEY_HOST", "valkey")))?;
+            auth::SessionBackend::Valkey {
+                connection: client.get_connection_manager().await?,
+                prefix: env("SESSION_KEY_PREFIX", "coreerp-session:"),
+            }
+        }
+        other => return Err(format!("SESSION_BACKEND tidak dikenal: {other}").into()),
+    };
+    let context_cache = match env("CONTEXT_CACHE", "off").as_str() {
+        "off" => None,
+        "on" => Some(context_cache::ContextCache::new(
+            env("CONTEXT_CACHE_TTL_SECONDS", "300").parse()?,
+        )),
+        other => return Err(format!("CONTEXT_CACHE tidak dikenal: {other}").into()),
+    };
     let state = Arc::new(App {
         pool,
         crypto,
         cookie_name: env("SESSION_COOKIE", "laravel-session"),
         cache_prefix: env("CACHE_PREFIX", "laravel-cache-"),
+        session_backend,
+        context_cache,
     });
     let address = format!("{}:{}", env("BIND_HOST", "127.0.0.1"), env("PORT", "18643"));
     let listener = tokio::net::TcpListener::bind(&address).await?;
@@ -133,17 +158,17 @@ async fn handle(
             if parts.method==Method::POST {return session.login(&app,db,&body,&ip).await;}
         }
         if path=="/logout" && parts.method==Method::POST {
-            db.cached_execute("delete from sessions where id=$1",&[&session.id]).await?;
+            session.forget(&app,db).await?;
             session.id=crypto::random_token();session.user=None;session.data=json!({"_token":crypto::random_token()});
             return Ok(StatusCode::NO_CONTENT.into_response());
         }
         if path=="/api/v1/workspace-context" && parts.method==Method::PUT {
-            let context=auth::Context::resolve(db,&mut session,Some(&body)).await?;
+            let context=auth::Context::resolve(&app,db,&mut session,Some(&body)).await?;
             return Ok(Json(json!({"data":{"membership_id":context.membership_id,"tenant_id":context.tenant_id,"legal_entity_id":context.company_id,"org_unit_id":context.org_id}})).into_response());
         }
         let prefix="/api/modules/management-aset/v1";
         if let Some(path)=path.strip_prefix(prefix) {
-            let context=auth::Context::resolve(db,&mut session,None).await?;
+            let context=auth::Context::resolve(&app,db,&mut session,None).await?;
             if context.permissions.is_empty(){return Err(db::Error::new(403,"Tidak ada izin untuk module ini."));}
             let mut query:HashMap<String,String>=HashMap::new();
             let mut record_ids=Vec::new();
@@ -162,7 +187,7 @@ async fn handle(
             error.into_response()
         }
     };
-    if let Err(error) = session.save(db, &parts.headers, &ip).await {
+    if let Err(error) = session.save(&app, db, &parts.headers, &ip).await {
         response = error.into_response();
     }
     reset(connection).await;

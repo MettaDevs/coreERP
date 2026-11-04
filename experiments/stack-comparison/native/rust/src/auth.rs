@@ -1,6 +1,7 @@
 use crate::db::{Cached, Client};
 use crate::{
     App,
+    context_cache::{self, State},
     crypto::{constant_eq, random_token},
     db::{self, Error, Result, flag, nullable, text},
 };
@@ -12,13 +13,41 @@ use axum::{
 use base64::{Engine, engine::general_purpose::STANDARD};
 use md5::{Digest, Md5};
 use rand::Rng;
+use redis::{Cmd, FromRedisValue, aio::ConnectionManager};
 use serde_json::{Value, json};
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 pub struct Session {
     pub id: String,
     pub data: Value,
     pub user: Option<Value>,
+    /// Versi konteks yang dibaca request ini saat memulihkan user (`CONTEXT_CACHE=on`).
+    pub context_version: Option<i64>,
+}
+
+/// Tempat payload sesi (`SESSION_BACKEND`). Cookie, enkripsi, CSRF, dan isi payload sama di keduanya.
+pub enum SessionBackend {
+    /// Tabel `sessions`, perilaku pembanding dasar.
+    Database,
+    /// Kunci `prefix + id` di Valkey dengan TTL lifetime sesi. Tabel `sessions` tidak disentuh sama sekali.
+    Valkey {
+        connection: ConnectionManager,
+        prefix: String,
+    },
+}
+
+/// Satu perintah Valkey. Kegagalannya menjadi 503 untuk request itu, tidak jatuh diam-diam ke database.
+async fn valkey<T: FromRedisValue>(connection: &ConnectionManager, command: &Cmd) -> Result<T> {
+    command
+        .query_async(&mut connection.clone())
+        .await
+        .map_err(|error| {
+            eprintln!("valkey error: {error}");
+            Error::new(503, "Service Unavailable")
+        })
 }
 
 #[cfg(test)]
@@ -101,27 +130,33 @@ impl Session {
             id: random_token(),
             data: json!({}),
             user: None,
+            context_version: None,
         };
         if let Some(id) = cookie
             .filter(|id| id.len() == 40 && id.bytes().all(|byte| byte.is_ascii_alphanumeric()))
         {
-            if let Some(row) = db::optional(
-                db,
-                "select payload,last_activity from sessions where id=$1",
-                &[&id],
-            )
-            .await?
-            {
-                if row["last_activity"].as_i64().unwrap_or(0)
-                    >= chrono::Utc::now().timestamp() - 7200
-                {
-                    if let Ok(bytes) = STANDARD.decode(text(&row, "payload")) {
-                        if let Ok(data) = serde_json::from_slice::<Value>(&bytes) {
-                            if data.is_object() {
-                                session.id = id;
-                                session.data = data;
-                            }
-                        }
+            let payload: Option<Vec<u8>> = match &app.session_backend {
+                SessionBackend::Database => db::optional(
+                    db,
+                    "select payload,last_activity from sessions where id=$1",
+                    &[&id],
+                )
+                .await?
+                .filter(|row| {
+                    row["last_activity"].as_i64().unwrap_or(0)
+                        >= chrono::Utc::now().timestamp() - 7200
+                })
+                .map(|row| text(&row, "payload").into_bytes()),
+                // Kunci yang tidak ada berarti sesi tidak ada atau kedaluwarsa; TTL menggantikan `last_activity`.
+                SessionBackend::Valkey { connection, prefix } => {
+                    valkey(connection, redis::cmd("GET").arg(format!("{prefix}{id}"))).await?
+                }
+            };
+            if let Some(Ok(bytes)) = payload.map(|payload| STANDARD.decode(payload)) {
+                if let Ok(data) = serde_json::from_slice::<Value>(&bytes) {
+                    if data.is_object() {
+                        session.id = id;
+                        session.data = data;
                     }
                 }
             }
@@ -134,12 +169,23 @@ impl Session {
                 .as_i64()
                 .or_else(|| value.as_str().and_then(|s| s.parse().ok()))
         }) {
-            session.user = db::optional(
-                db,
-                "select * from users where id=$1 and account_type='person'",
-                &[&user_id],
+            let lookup = match &app.context_cache {
+                Some(cache) => Some(cache.observe(db).await?),
+                None => None,
+            };
+            session.context_version = lookup.map(|lookup| lookup.version);
+            let user = context_cache::fetch(
+                lookup,
+                State::users,
+                user_id,
+                db::optional(
+                    db,
+                    "select * from users where id=$1 and account_type='person'",
+                    &[&user_id],
+                ),
             )
             .await?;
+            session.user = Arc::unwrap_or_clone(user);
             if let Some(user) = &session.user {
                 let actor = text(user, "id");
                 db.cached_query_one("select set_config('coreerp.user_id',$1,false)", &[&actor])
@@ -210,7 +256,14 @@ impl Session {
         }
         limiter.hit(&route).await?;
         let outcome = self
-            .authenticate(db, &limiter, &fortify_key(&email, ip), &email, password)
+            .authenticate(
+                app,
+                db,
+                &limiter,
+                &fortify_key(&email, ip),
+                &email,
+                password,
+            )
             .await;
         if outcome
             .as_ref()
@@ -231,6 +284,7 @@ impl Session {
 
     async fn authenticate(
         &mut self,
+        app: &App,
         db: &Client,
         limiter: &Limiter<'_>,
         fortify_key: &str,
@@ -277,8 +331,7 @@ impl Session {
         if !second {
             return Err(login_failed(limiter, fortify_key).await);
         }
-        db.cached_execute("delete from sessions where id=$1", &[&self.id])
-            .await?;
+        self.forget(app, db).await?;
         self.id = random_token();
         self.data[guard_key()] = user["id"].clone();
         self.data["password_hash_web"] = json!(hash);
@@ -298,12 +351,45 @@ impl Session {
         Ok(json!({"two_factor":false}))
     }
 
-    pub async fn save(&mut self, db: &Client, headers: &HeaderMap, ip: &str) -> Result<()> {
+    /// Logout dan regenerasi id saat login menghapus payload sesi `self.id`.
+    pub async fn forget(&self, app: &App, db: &Client) -> Result<()> {
+        match &app.session_backend {
+            SessionBackend::Database => {
+                db.cached_execute("delete from sessions where id=$1", &[&self.id])
+                    .await?;
+            }
+            SessionBackend::Valkey { connection, prefix } => {
+                valkey::<()>(
+                    connection,
+                    redis::cmd("DEL").arg(format!("{prefix}{}", self.id)),
+                )
+                .await?;
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn save(
+        &mut self,
+        app: &App,
+        db: &Client,
+        headers: &HeaderMap,
+        ip: &str,
+    ) -> Result<()> {
         self.data["_flash"] = json!({"old":[],"new":[]});
         let payload = STANDARD.encode(
             serde_json::to_vec(&self.data)
                 .map_err(|_| Error::new(500, "Session encoding failed"))?,
         );
+        if let SessionBackend::Valkey { connection, prefix } = &app.session_backend {
+            // TTL sama dengan lifetime sesi; kunci kedaluwarsa sendiri, jadi tidak ada GC.
+            let key = format!("{prefix}{}", self.id);
+            return valkey(
+                connection,
+                redis::cmd("SET").arg(key).arg(payload).arg("EX").arg(7200),
+            )
+            .await;
+        }
         let user_id = self.user.as_ref().and_then(|user| user["id"].as_i64());
         let agent = headers
             .get("user-agent")
@@ -535,8 +621,67 @@ pub struct Context {
     pub policies: HashMap<String, Vec<Value>>,
 }
 
+/// Scope kebijakan data satu keanggotaan pada tenant, beserta turunannya untuk memilih organisasi.
+#[derive(Clone)]
+pub struct Policies {
+    pub by_code: HashMap<String, Vec<Value>>,
+    pub all_organizations: bool,
+    pub visible_ids: HashSet<String>,
+}
+
+/// Scope aktif beserta `operating_unit_ids` hasil closure, dengan query dan urutan yang sama seperti sebelum cache.
+async fn load_policies(db: &Client, tenant_id: &str, membership_id: &str) -> Result<Policies> {
+    let scopes = db::rows(db, "select s.policy_code,s.legal_entity_id,s.organization_id,s.hierarchy_version_id,s.include_descendants from role_assignment_data_policy_scopes s join role_assignments a on a.id=s.role_assignment_id where s.tenant_id=$1 and a.membership_id=$2 and a.status='active' and a.valid_from<=now() and (a.valid_until is null or a.valid_until>now()) and s.valid_from<=now() and (s.valid_until is null or s.valid_until>now())", &[&tenant_id,&membership_id]).await?;
+    let mut policies = Policies {
+        by_code: HashMap::new(),
+        all_organizations: false,
+        visible_ids: HashSet::new(),
+    };
+    for mut scope in scopes {
+        if scope["legal_entity_id"].is_null() && scope["organization_id"].is_null() {
+            policies.all_organizations = true;
+        }
+        if let Some(company) = nullable(&scope, "legal_entity_id") {
+            policies.visible_ids.insert(company);
+        }
+        let mut units = Vec::new();
+        if let Some(organization) = nullable(&scope, "organization_id") {
+            units.push(organization.clone());
+            if flag(&scope, "include_descendants") {
+                let version = nullable(&scope, "hierarchy_version_id");
+                for row in db::rows(db,"select descendant_organization_id as id from organization_hierarchy_closures where version_id=$1 and ancestor_organization_id=$2", &[&version,&organization]).await? {units.push(text(&row,"id"));}
+            }
+        }
+        let actual_units=db::rows(db,"select id from organizations where tenant_id=$1 and classification='operating_unit' and id=any($2)",&[&tenant_id,&units]).await?;
+        let units: Vec<String> = actual_units.iter().map(|row| text(row, "id")).collect();
+        policies.visible_ids.extend(units.iter().cloned());
+        scope["operating_unit_ids"] = json!(units);
+        policies
+            .by_code
+            .entry(text(&scope, "policy_code"))
+            .or_default()
+            .push(scope);
+    }
+    Ok(policies)
+}
+
+/// Kode izin module dari role yang dicapai secara rekursif.
+async fn load_permissions(
+    db: &Client,
+    membership_id: &str,
+    tenant_id: &str,
+) -> Result<HashSet<String>> {
+    Ok(db::rows(db,r#"with recursive reachable(role_id) as (
+            select r.id from role_assignments a join roles r on r.id=a.role_id where a.membership_id=$1 and r.tenant_id=$2 and a.status='active' and r.is_active and a.valid_from<=now() and (a.valid_until is null or a.valid_until>now())
+            union select link.child_role_id from security_role_children link join reachable on reachable.role_id=link.parent_role_id join roles child on child.id=link.child_role_id and child.tenant_id=$2 and child.is_active where link.tenant_id=$2)
+            select distinct p.code from reachable r join security_role_duties rd on rd.role_id=r.role_id join security_duty_privileges dp on dp.duty_code=rd.duty_code join security_privilege_permissions pp on pp.privilege_code=dp.privilege_code join permissions p on p.code=pp.permission_code where p.app_id='management-aset' order by p.code"#,&[&membership_id,&tenant_id]).await?.iter().map(|row|text(row,"code")).collect())
+}
+
 impl Context {
+    /// Data konteks diambil dari cache bila `CONTEXT_CACHE=on`; pemilihan tempat kerja dari body atau
+    /// session data tetap dihitung di sini pada setiap request dan tidak pernah disimpan di cache.
     pub async fn resolve(
+        app: &App,
         db: &Client,
         session: &mut Session,
         requested: Option<&Value>,
@@ -549,7 +694,13 @@ impl Context {
             return Err(Error::new(403, "Ganti password terlebih dahulu."));
         }
         let user_id = user["id"].as_i64().unwrap();
-        let memberships = db::rows(db, "select m.*,row_to_json(t) as tenant from tenant_memberships m join tenants t on t.id=m.tenant_id where m.user_id=$1 and m.status='active' order by m.created_at", &[&user_id]).await?;
+        // Versi sudah dibaca saat user dipulihkan pada request ini; tidak ada query versi kedua.
+        let lookup = app
+            .context_cache
+            .as_ref()
+            .zip(session.context_version)
+            .map(|(cache, version)| cache.lookup(version));
+        let memberships = context_cache::fetch(lookup, State::memberships, user_id, db::rows(db, "select m.*,row_to_json(t) as tenant from tenant_memberships m join tenants t on t.id=m.tenant_id where m.user_id=$1 and m.status='active' order by m.created_at", &[&user_id])).await?;
         let selected = requested
             .map(|body| text(body, "membership_id"))
             .unwrap_or_else(|| text(&session.data, "workspace.membership_id"));
@@ -572,43 +723,31 @@ impl Context {
             })?;
         let membership_id = text(membership, "id");
         let tenant_id = text(membership, "tenant_id");
-        let scopes = db::rows(db, "select s.policy_code,s.legal_entity_id,s.organization_id,s.hierarchy_version_id,s.include_descendants from role_assignment_data_policy_scopes s join role_assignments a on a.id=s.role_assignment_id where s.tenant_id=$1 and a.membership_id=$2 and a.status='active' and a.valid_from<=now() and (a.valid_until is null or a.valid_until>now()) and s.valid_from<=now() and (s.valid_until is null or s.valid_until>now())", &[&tenant_id,&membership_id]).await?;
-        let mut policies: HashMap<String, Vec<Value>> = HashMap::new();
-        let mut all_organizations = false;
-        let mut visible_ids: HashSet<String> = HashSet::new();
-        for mut scope in scopes {
-            if scope["legal_entity_id"].is_null() && scope["organization_id"].is_null() {
-                all_organizations = true;
-            }
-            if let Some(company) = nullable(&scope, "legal_entity_id") {
-                visible_ids.insert(company);
-            }
-            let mut units = Vec::new();
-            if let Some(organization) = nullable(&scope, "organization_id") {
-                units.push(organization.clone());
-                if flag(&scope, "include_descendants") {
-                    let version = nullable(&scope, "hierarchy_version_id");
-                    for row in db::rows(db,"select descendant_organization_id as id from organization_hierarchy_closures where version_id=$1 and ancestor_organization_id=$2", &[&version,&organization]).await? {units.push(text(&row,"id"));}
-                }
-            }
-            let actual_units=db::rows(db,"select id from organizations where tenant_id=$1 and classification='operating_unit' and id=any($2)",&[&tenant_id,&units]).await?;
-            let units: Vec<String> = actual_units.iter().map(|row| text(row, "id")).collect();
-            visible_ids.extend(units.iter().cloned());
-            scope["operating_unit_ids"] = json!(units);
-            policies
-                .entry(text(&scope, "policy_code"))
-                .or_default()
-                .push(scope);
-        }
-        let organizations = db::rows(
+        let policies = context_cache::fetch_bounded(
+            lookup,
             db,
-            "select * from organizations where tenant_id=$1 and status='active' order by name",
-            &[&tenant_id],
+            State::policies,
+            &membership_id,
+            &tenant_id,
+            load_policies(db, &tenant_id, &membership_id),
+        )
+        .await?;
+        let organizations = context_cache::fetch(
+            lookup,
+            State::organizations,
+            tenant_id.clone(),
+            db::rows(
+                db,
+                "select * from organizations where tenant_id=$1 and status='active' order by name",
+                &[&tenant_id],
+            ),
         )
         .await?;
         let allowed: Vec<&Value> = organizations
             .iter()
-            .filter(|row| all_organizations || visible_ids.contains(&text(row, "id")))
+            .filter(|row| {
+                policies.all_organizations || policies.visible_ids.contains(&text(row, "id"))
+            })
             .collect();
         let select = |classification: &str, key: &str| -> Result<Option<String>> {
             let desired = requested
@@ -633,17 +772,22 @@ impl Context {
         session.data["workspace.membership_id"] = json!(membership_id);
         session.data["workspace.legal_entity_id"] = json!(company_id);
         session.data["workspace.org_unit_id"] = json!(org_id);
-        let permissions=db::rows(db,r#"with recursive reachable(role_id) as (
-            select r.id from role_assignments a join roles r on r.id=a.role_id where a.membership_id=$1 and r.tenant_id=$2 and a.status='active' and r.is_active and a.valid_from<=now() and (a.valid_until is null or a.valid_until>now())
-            union select link.child_role_id from security_role_children link join reachable on reachable.role_id=link.parent_role_id join roles child on child.id=link.child_role_id and child.tenant_id=$2 and child.is_active where link.tenant_id=$2)
-            select distinct p.code from reachable r join security_role_duties rd on rd.role_id=r.role_id join security_duty_privileges dp on dp.duty_code=rd.duty_code join security_privilege_permissions pp on pp.privilege_code=dp.privilege_code join permissions p on p.code=pp.permission_code where p.app_id='management-aset' order by p.code"#,&[&membership_id,&tenant_id]).await?.iter().map(|row|text(row,"code")).collect();
+        let permissions = context_cache::fetch_bounded(
+            lookup,
+            db,
+            State::permissions,
+            &membership_id,
+            &tenant_id,
+            load_permissions(db, &membership_id, &tenant_id),
+        )
+        .await?;
         Ok(Self {
             membership_id,
             tenant_id,
             company_id,
             org_id,
-            permissions,
-            policies,
+            permissions: Arc::unwrap_or_clone(permissions),
+            policies: Arc::unwrap_or_clone(policies).by_code,
         })
     }
     pub fn require(&self, permission: &str) -> Result<()> {
