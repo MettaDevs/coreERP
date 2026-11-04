@@ -25,6 +25,38 @@ def run(script: str, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run([sys.executable, "-B", str(SCRIPTS / script), *args], capture_output=True, text=True)
 
 
+# Run yang gagal latensi di tengah I/O disk dari proses lain (job backup di dev1) bukan bukti batas stack.
+HOST_RETRIES = 2
+
+
+def measure(prefix: str, candidate: str, index: int, vus: int, run_id: str, args: argparse.Namespace) -> dict:
+    """Satu run pada clone baru; seed dan sesi diambil dari folder --prepared bila ada."""
+    seed, baseline, extra = args.seed, args.baseline, []
+    if args.prepared:
+        seed, baseline = args.prepared / f"{candidate}.dump", args.prepared / f"{candidate}-baseline.json"
+        extra = ["--sessions", str(args.prepared / f"{candidate}-sessions.json")]
+    db = database(prefix, candidate, index)
+    cloned = run("lab.py", "clone", "--database", db, "--seed", str(seed))
+    result = run("load.py", "--candidate", candidate, "--database", db, "--vus", str(vus), "--run-id", run_id,
+                 "--fixture", str(args.fixture), "--baseline", str(baseline), *extra) if cloned.returncode == 0 else cloned
+    report_path = PRIVATE / "load" / run_id / "report.json"
+    report = json.loads(report_path.read_text(encoding="utf-8")) if report_path.exists() else {"verdict": "ERROR"}
+    verdict = "INCONCLUSIVE_LOADGEN" if report.get("loadgen_saturated") else report["verdict"]
+    return {"run_id": run_id, "verdict": verdict, "report": report,
+            "error": None if report_path.exists() else (result.stderr or result.stdout)[-800:]}
+
+
+def measure_retrying(prefix: str, candidate: str, index: int, vus: int, run_id: str, args: argparse.Namespace) -> list[dict]:
+    """Ulangi run yang terganggu I/O host dengan clone baru; percobaan terganggu tetap tercatat."""
+    attempts = []
+    for attempt in range(HOST_RETRIES + 1):
+        suffix = f"r{attempt}" if attempt else ""
+        attempts.append(measure(prefix + suffix, candidate, index, vus, run_id + (f"-{suffix}" if suffix else ""), args))
+        if attempts[-1]["verdict"] != "INCONCLUSIVE_HOST_IO":
+            break
+    return attempts
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--name", required=True, help="Awalan run, huruf kecil dan angka.")
@@ -44,23 +76,12 @@ if __name__ == "__main__":
         for candidate in order:
             if state[candidate]["first_fail"] is not None or state[candidate]["stopped"] is not None:
                 continue
-            db = database(args.name, candidate, index)
-            seed, baseline, extra = args.seed, args.baseline, []
-            if args.prepared:
-                seed, baseline = args.prepared / f"{candidate}.dump", args.prepared / f"{candidate}-baseline.json"
-                extra = ["--sessions", str(args.prepared / f"{candidate}-sessions.json")]
-            cloned = run("lab.py", "clone", "--database", db, "--seed", str(seed))
-            run_id = f"{args.name}-{candidate}-{vus}"
-            result = run("load.py", "--candidate", candidate, "--database", db, "--vus", str(vus), "--run-id", run_id,
-                         "--fixture", str(args.fixture), "--baseline", str(baseline), *extra) if cloned.returncode == 0 else cloned
-            report_path = PRIVATE / "load" / run_id / "report.json"
-            report = json.loads(report_path.read_text(encoding="utf-8")) if report_path.exists() else {"verdict": "ERROR"}
-            verdict = report["verdict"]
-            if report.get("loadgen_saturated"):
-                verdict = "INCONCLUSIVE_LOADGEN"
-            entry = {"vus": vus, "run_id": run_id, "verdict": verdict, "read_p95": report.get("read", {}).get("p95"),
+            attempts = measure_retrying(args.name, candidate, index, vus, f"{args.name}-{candidate}-{vus}", args)
+            final, report = attempts[-1], attempts[-1]["report"]
+            verdict = final["verdict"]
+            entry = {"vus": vus, "run_id": final["run_id"], "verdict": verdict, "read_p95": report.get("read", {}).get("p95"),
                      "write_p95": report.get("write", {}).get("p95"), "rps": report.get("plateau_successful_rps"),
-                     "error": None if report_path.exists() else (result.stderr or result.stdout)[-800:]}
+                     "host_io_retries": [attempt["run_id"] for attempt in attempts[:-1]], "error": final["error"]}
             state[candidate]["runs"].append(entry)
             # Hanya FAIL yang menjadi batas; run rusak atau tidak meyakinkan bukan bukti kapasitas.
             if verdict.startswith("PASS"):

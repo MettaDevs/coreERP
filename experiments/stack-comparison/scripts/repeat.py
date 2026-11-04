@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 from statistics import median
 
-from ramp import CANDIDATES, PRIVATE, database, run
+from ramp import CANDIDATES, PRIVATE, measure_retrying
 
 
 def points(values: list[str]) -> dict[str, list[int]]:
@@ -66,24 +66,16 @@ if __name__ == "__main__":
             # Arah titik juga dibalik tiap putaran agar tidak selalu run kecil lebih dulu.
             steps = plan[candidate] if repeat % 2 == 0 else list(reversed(plan[candidate]))
             for vus in steps:
-                db = database(f"{args.name}{repeat + 1}", candidate, plan[candidate].index(vus))
-                run_id = f"{args.name}-{candidate}-{vus}-{repeat + 1}"
-                seed, baseline, extra = args.seed, args.baseline, []
-                if args.prepared:
-                    seed, baseline = args.prepared / f"{candidate}.dump", args.prepared / f"{candidate}-baseline.json"
-                    extra = ["--sessions", str(args.prepared / f"{candidate}-sessions.json")]
-                cloned = run("lab.py", "clone", "--database", db, "--seed", str(seed))
-                result = run("load.py", "--candidate", candidate, "--database", db, "--vus", str(vus), "--run-id", run_id,
-                             "--fixture", str(args.fixture), "--baseline", str(baseline), *extra) if cloned.returncode == 0 else cloned
-                report_path = PRIVATE / "load" / run_id / "report.json"
-                report = json.loads(report_path.read_text(encoding="utf-8")) if report_path.exists() else {"verdict": "ERROR"}
-                verdict = "INCONCLUSIVE_LOADGEN" if report.get("loadgen_saturated") else report["verdict"]
-                entry = {"repeat": repeat + 1, "candidate": candidate, "vus": vus, "run_id": run_id, "verdict": verdict,
+                attempts = measure_retrying(f"{args.name}{repeat + 1}", candidate, plan[candidate].index(vus), vus,
+                                            f"{args.name}-{candidate}-{vus}-{repeat + 1}", args)
+                final, report = attempts[-1], attempts[-1]["report"]
+                verdict = final["verdict"]
+                entry = {"repeat": repeat + 1, "candidate": candidate, "vus": vus, "run_id": final["run_id"], "verdict": verdict,
                          "read_p95": report.get("read", {}).get("p95"), "read_p99": report.get("read", {}).get("p99"),
                          "write_p95": report.get("write", {}).get("p95"), "write_p99": report.get("write", {}).get("p99"),
                          "rps": report.get("plateau_successful_rps"),
                          "write_rate_cv": report.get("plateau_rates", {}).get("write", {}).get("cv"),
-                         "error": None if report_path.exists() else (result.stderr or result.stdout)[-800:]}
+                         "host_io_retries": [attempt["run_id"] for attempt in attempts[:-1]], "error": final["error"]}
                 runs.append(entry)
                 summary_path.write_text(json.dumps({"name": args.name, "points": plan, "repeats": args.repeats, "runs": runs,
                                                     "summary": summarize(runs)}, indent=2) + "\n", encoding="utf-8")
