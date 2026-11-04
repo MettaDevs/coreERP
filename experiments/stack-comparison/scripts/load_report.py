@@ -78,6 +78,37 @@ def connection_states(run: Path, manifest: dict) -> dict:
             "max_lock_waiting": max(row["waiting"] for row in rows), "max_idle_in_transaction_s": round(max(row["oldest_idle_xact_s"] for row in rows), 3)}
 
 
+# Database run hampir tidak membaca disk (blks_read kecil); baca disk host di atas batas ini berasal dari proses
+# lain di server (job backup dev1, 4 November) dan mengganggu bottleneck fsync yang sedang diukur.
+HOST_READ_LIMIT_MB_S = 5
+
+
+def host_io(run: Path, manifest: dict) -> dict:
+    """Baca/tulis disk dan iowait host selama plateau dari vmstat (kolom bi/bo dalam KiB per detik)."""
+    path = run / "vmstat.tsv"
+    if not path.exists():
+        return {}
+    start = datetime.fromisoformat(manifest["started_at"]).timestamp() + manifest["phases"].get("login", 0) + manifest["phases"]["warmup"]
+    finish = start + manifest["phases"]["plateau"]
+    rows = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stamp, _, values = line.partition("	")
+        fields = values.split()
+        if len(fields) < 17 or not fields[0].isdigit():
+            continue
+        if start <= datetime.fromisoformat(stamp).timestamp() <= finish:
+            rows.append([int(value) for value in fields])
+    if not rows:
+        return {}
+    read = [row[8] / 1024 for row in rows]
+    write = [row[9] / 1024 for row in rows]
+    iowait = [row[15] for row in rows]
+    result = {"samples": len(rows), "read_mb_s_mean": round(statistics.fmean(read), 1), "read_mb_s_max": round(max(read), 1),
+              "write_mb_s_mean": round(statistics.fmean(write), 1), "iowait_mean": round(statistics.fmean(iowait), 1), "iowait_max": max(iowait)}
+    result["noisy"] = result["read_mb_s_mean"] > HOST_READ_LIMIT_MB_S
+    return result
+
+
 def counter_delta(manifest: dict) -> dict:
     before, after = manifest.get("database_counters_before"), manifest.get("database_counters_after")
     if not before or not after:
@@ -155,7 +186,17 @@ def report(run: Path) -> dict:
         "k6_exit_zero": manifest.get("k6_exit") == 0,
     }
     enough = all(entry["count"] >= minimum for entry in per_op.values()) and bool(per_op)
-    verdict = "FAIL" if not all(checks.values()) else "INCONCLUSIVE_LOGIN_OVERLAP" if login_in_plateau else "PASS" if enough else "PASS_LOW_SAMPLES"
+    host = host_io(run, manifest)
+    latency_ok = all(checks[key] for key in ("read_p95", "read_p99", "write_p95", "write_p99"))
+    correct = all(value for key, value in checks.items() if key not in {"read_p95", "read_p99", "write_p95", "write_p99"})
+    # Gangguan disk dari proses lain hanya dapat membuat latensi lebih buruk: run yang lulus tetap sah, run yang gagal
+    # latensi di tengah gangguan tidak membuktikan batas stack. Pelanggaran kebenaran tetap FAIL.
+    if not correct:
+        verdict = "FAIL"
+    elif not latency_ok:
+        verdict = "INCONCLUSIVE_HOST_IO" if host.get("noisy") else "FAIL"
+    else:
+        verdict = "INCONCLUSIVE_LOGIN_OVERLAP" if login_in_plateau else "PASS" if enough else "PASS_LOW_SAMPLES"
     successful = sum(len(values) for (phase, _, _), values in latency.items() if phase == "plateau")
     cpu = cpu_series(run, manifest)
     loadgen = cpu.get("coreerp-loadgen", {})
@@ -168,7 +209,7 @@ def report(run: Path) -> dict:
         "failed_by_status": dict(statuses), "acknowledged_receipts": manifest.get("acknowledged_receipts"),
         "completed_cycles": oracle.get("acknowledged_completed"),
         "cycle_ms_with_think": summary(cycles["cycle_total"]), "cycle_ms_without_think": summary(cycles["cycle_busy"]),
-        "sessions_prepared": manifest.get("sessions") is not None, "plateau_rates": stationarity, "cpu_percent": cpu, "connections": connection_states(run, manifest), "database_delta": counter_delta(manifest),
+        "sessions_prepared": manifest.get("sessions") is not None, "host_io": host, "plateau_rates": stationarity, "cpu_percent": cpu, "connections": connection_states(run, manifest), "database_delta": counter_delta(manifest),
         "loadgen_saturated": bool(loadgen) and loadgen["mean"] > 0.8 * 100 * float(manifest["loadgen"]["cpus"]),
         "oracle_failures": oracle["failures"],
         "limitations": "Closed model with think time; VU count is not concurrent request count. Percentiles use nearest rank. PASS_LOW_SAMPLES means some operation had fewer samples than the profile minimum, so p99 is not claimable.",
