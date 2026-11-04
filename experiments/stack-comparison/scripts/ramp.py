@@ -33,6 +33,7 @@ if __name__ == "__main__":
     parser.add_argument("--baseline", type=Path, default=PRIVATE / "seed-128-baseline.json")
     parser.add_argument("--candidates", nargs="+", default=CANDIDATES, choices=CANDIDATES)
     parser.add_argument("--steps", nargs="+", type=int)
+    parser.add_argument("--prepared", type=Path, help="Folder scripts/sessions.py: <stack>.dump, -sessions.json, -baseline.json per stack.")
     args = parser.parse_args()
     profile = json.loads((LAB / "profile.json").read_text(encoding="utf-8"))
     steps = args.steps or profile["load"]["capacity_steps"]
@@ -44,10 +45,14 @@ if __name__ == "__main__":
             if state[candidate]["first_fail"] is not None or state[candidate]["stopped"] is not None:
                 continue
             db = database(args.name, candidate, index)
-            cloned = run("lab.py", "clone", "--database", db, "--seed", str(args.seed))
+            seed, baseline, extra = args.seed, args.baseline, []
+            if args.prepared:
+                seed, baseline = args.prepared / f"{candidate}.dump", args.prepared / f"{candidate}-baseline.json"
+                extra = ["--sessions", str(args.prepared / f"{candidate}-sessions.json")]
+            cloned = run("lab.py", "clone", "--database", db, "--seed", str(seed))
             run_id = f"{args.name}-{candidate}-{vus}"
             result = run("load.py", "--candidate", candidate, "--database", db, "--vus", str(vus), "--run-id", run_id,
-                         "--fixture", str(args.fixture), "--baseline", str(args.baseline)) if cloned.returncode == 0 else cloned
+                         "--fixture", str(args.fixture), "--baseline", str(baseline), *extra) if cloned.returncode == 0 else cloned
             report_path = PRIVATE / "load" / run_id / "report.json"
             report = json.loads(report_path.read_text(encoding="utf-8")) if report_path.exists() else {"verdict": "ERROR"}
             verdict = report["verdict"]
