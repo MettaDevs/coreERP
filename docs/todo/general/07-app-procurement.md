@@ -303,6 +303,11 @@ temuan, pemisahan app/database, service token, dan pembagian pemiliknya adalah s
 historis. Bagian itu **bukan desain teknis kanonik untuk implementasi baru**. Jika berbeda,
 ikuti arahan di atas dan [standar module](/dev/02-module-standard).
 
+::: warning Digantikan
+Rencana procurement yang berlaku ada di [Procurement (PRD)](/todo/procurement/). Audit ini ditulis
+untuk bentuk app terpisah yang sudah dibuang; temuannya hanya dipakai sebagai daftar periksa.
+:::
+
 > Dihasilkan dari audit 7 dimensi terhadap Dynamics 365 F&O. Setiap temuan sudah
 > melewati satu putaran verifikasi lawan yang membuka file aslinya; temuan yang
 > ditolak verifier tidak ikut ditulis di sini.
