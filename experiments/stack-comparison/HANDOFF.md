@@ -19,7 +19,22 @@ Angka sejauh ini, satu run per langkah, belum lima ulangan:
 - CPU per request pada 200 VU, sesudah perbaikan: database sekitar 7-8 ms untuk Go/Bun/Rust dan 17 ms untuk PHP; app 2,3 ms Rust, 4,3 ms Go, 6,2 ms Bun, 22 ms PHP.
 - Ramp `r7` (Go, Hono, Elysia, Rust yang sudah diperbaiki) berjalan dari 400 VU; log di `~/coreerp-stack-comparison/run-rust-cache.log` dan `private/load/r7-ramp.json`.
 
-Belum: lima ulangan di titik batas tiap stack, PHP diperhalus antara 200 dan 400 VU, profiling di titik batas, `dev-windows1`.
+Belum: lima ulangan di titik batas tiap stack, PHP diperhalus antara 200 dan 400 VU, `dev-windows1`.
+
+## Hasil r7 dan bottleneck yang terbukti, 4 November pagi
+
+Ramp `r7` selesai, satu run per langkah: Go dan Rust lulus 800 VU dan gagal 1.000 VU (baca p95 139 dan 385 ms, tulis p95 464 dan 601 ms; 444 login Go gagal, Rust 0). Hono dan Elysia lulus 400 dan gagal 800. Oracle bersih di semua run. Rata-rata CPU tidak jenuh (database 123-139% dari 400%, app sekitar 60% dari 200%), jadi rata-rata tidak menjelaskan kegagalan; deret per detik yang menjelaskan.
+
+Diagnosis memakai `scripts/probe.py` (CPU dan socket per proses SUT, state dan wait event setiap backend, per detik) pada `p1-rust-1000` dan `p4-hono-800`:
+
+- **Beban datang bergelombang, bukan rata.** Laju tulis berayun antara 3 dan 100 per detik dengan periode sekitar 65 detik, yaitu satu siklus 13 langkah × jeda rata-rata 5 detik. Semua VU memulai siklus dalam jendela 10 detik yang sama sesudah jendela login, dan 90 detik plateau tidak cukup untuk fasenya menyebar. Stall (detik dengan baca p95 di atas 200 ms) selalu jatuh di puncak gelombang complete. Pada Go/Rust 1.000 VU puncak itu tepat melintasi batas warmup-plateau, sehingga verdict bergantung pada letak jendela plateau terhadap gelombang.
+- **Yang ditunggu database adalah flush WAL, bukan kunci baris.** Wait event backend aktif: `LWLock:WALWrite` dan `IO:WalSync` (Rust 199/89 sampel, Hono 151/74), tanpa satu pun kunci yang belum diberikan. Kolom `waiting` di laporan lama menjumlahkan Lock dan LWLock, jadi tidak membedakan keduanya.
+- **Disk dev1 lambat untuk fsync.** `pg_test_fsync` di volume data: `fdatasync` 180 operasi per detik, 5,6 ms per operasi. Setiap request melakukan setidaknya satu commit karena sesi disimpan setiap request (sama dengan Laravel), dan setiap commit memegang satu dari 8 koneksi selama flush. Di puncak gelombang kedelapan koneksi habis menunggu disk, lalu request baca ikut antre di pool. Ini batas bersama semua stack di dev1, bukan sifat runtime.
+- **Dugaan distribusi `reusePort` Bun tidak merata terbantah.** Koneksi HTTP terbagi 397/403 dan CPU kedua proses naik-turun bersama. Di puncak gelombang tiap proses Bun memakai 77-92% satu core; Bun lebih cepat jenuh karena CPU app per request paling tinggi di antara kandidat native (6,2 ms).
+
+`load.py` kini mencatat `wal_write` dan `wal_sync` di penghitung run, dan `probe.py` mencatat laju commit serta fsync per detik.
+
+Keputusan terbuka untuk pengguna: profil awal siklus Uniform(0,10) di `profile.json` menghasilkan gelombang serempak di VU besar. Pilihannya mempertahankannya (mengukur ketahanan terhadap lonjakan serempak) atau menyebar awal siklus sepanjang satu siklus beserta warmup yang lebih panjang (mengukur keadaan tunak). Lima ulangan menunggu keputusan ini.
 
 ## Correctness selesai di dev1, 3 November 20:46 WITA
 

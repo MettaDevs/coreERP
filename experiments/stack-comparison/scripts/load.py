@@ -104,7 +104,7 @@ def database_counters(database: str) -> dict:
     return json.loads(sql(
         "SELECT json_build_object("
         "'checkpointer', (SELECT row_to_json(c) FROM (SELECT num_timed, num_requested, write_time, sync_time, buffers_written FROM pg_stat_checkpointer) c), "
-        "'wal', (SELECT row_to_json(w) FROM (SELECT wal_records, wal_fpi, wal_bytes::bigint, wal_buffers_full FROM pg_stat_wal) w), "
+        "'wal', (SELECT row_to_json(w) FROM (SELECT wal_records, wal_fpi, wal_bytes::bigint, wal_buffers_full, wal_write, wal_sync FROM pg_stat_wal) w), "
         f"'database', (SELECT row_to_json(d) FROM (SELECT xact_commit, xact_rollback, blks_read, blks_hit, deadlocks, temp_bytes, conflicts FROM pg_stat_database WHERE datname='{database}') d));"))
 
 
