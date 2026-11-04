@@ -6,7 +6,8 @@
         "go",
         "hono",
         "elysia",
-        "rust"
+        "rust",
+        "operations"
       ],
       "operations": [
         "*"
@@ -23,7 +24,8 @@
         "go",
         "hono",
         "elysia",
-        "rust"
+        "rust",
+        "operations"
       ],
       "operations": [
         "receipt-complete"
@@ -83,7 +85,8 @@
         "go",
         "hono",
         "elysia",
-        "rust"
+        "rust",
+        "operations"
       ],
       "operations": [
         "login-page"
@@ -98,7 +101,8 @@
         "go",
         "hono",
         "elysia",
-        "rust"
+        "rust",
+        "operations"
       ],
       "operations": [
         "login-page"
@@ -110,7 +114,8 @@
     {
       "candidates": [
         "hono",
-        "elysia"
+        "elysia",
+        "operations"
       ],
       "operations": [
         "*"
