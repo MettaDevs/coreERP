@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Str;
 use RedisException;
+use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
 class ValkeyStoreIntegrationTest extends TestCase
@@ -86,5 +87,27 @@ class ValkeyStoreIntegrationTest extends TestCase
     {
         $this->expectException(RedisException::class);
         Cache::store('redis')->flush();
+    }
+
+    public function test_sessions_and_cache_survive_context_switches_between_new_processes(): void
+    {
+        $id = Str::random(40);
+        $results = [];
+        foreach (['write', 'read'] as $action) {
+            $process = new Process([PHP_BINARY, base_path('tests/Fixtures/DatabaseConnections/valkey-process.php'), $action], base_path(), [
+                'REDIS_HOST' => '127.0.0.1', 'REDIS_PORT' => (string) getenv('VALKEY_TEST_PORT'),
+                'REDIS_USERNAME' => 'cache', 'REDIS_PASSWORD' => (string) getenv('VALKEY_CACHE_PASSWORD'),
+                'VALKEY_SESSION_USERNAME' => 'sessions', 'VALKEY_SESSION_PASSWORD' => (string) getenv('VALKEY_SESSION_PASSWORD'),
+                'SESSION_DRIVER' => 'redis', 'SESSION_CONNECTION' => 'sessions', 'SESSION_STORE' => 'sessions',
+                'CACHE_STORE' => 'redis',
+            ]);
+            $process->setInput(json_encode(['id' => $id], JSON_THROW_ON_ERROR));
+            $process->mustRun();
+            $result = json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+            $this->assertTrue($result['passed']);
+            $this->assertTrue($result['context_restored']);
+            $results[] = $result;
+        }
+        $this->assertNotSame($results[0]['process'], $results[1]['process']);
     }
 }

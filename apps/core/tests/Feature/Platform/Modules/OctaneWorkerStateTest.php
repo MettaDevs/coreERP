@@ -10,6 +10,11 @@ use App\Platform\Environment\Listeners\ResetDatabaseConnections;
 use App\Platform\Environment\Support\EnvironmentConnection;
 use App\Platform\Modules\Contracts\TenantRunner;
 use App\Platform\Modules\Support\TenantScope;
+use Illuminate\Contracts\Queue\Job;
+use Illuminate\Queue\Events\JobExceptionOccurred;
+use Illuminate\Queue\Events\JobProcessed;
+use Illuminate\Queue\Events\JobProcessing;
+use Illuminate\Queue\Jobs\SyncJob;
 use Illuminate\Support\Facades\DB;
 use Laravel\Octane\Contracts\OperationTerminated;
 use Laravel\Octane\CurrentApplication;
@@ -43,7 +48,7 @@ final class OctaneWorkerStateTest extends TestCase
         $this->assertContains(ResetDatabaseConnections::class, config('octane.listeners.'.OperationTerminated::class));
 
         try {
-            app(EnvironmentConnection::class)->register('environment_octane_test', DB::connection()->getDatabaseName());
+            config(['database.connections.environment_octane_test' => app(EnvironmentConnection::class)->configuration((string) config('database.default'))]);
             DB::connection('environment_octane_test')->select('select 1');
             $bawaan = DB::connection()->getPdo();
 
@@ -79,7 +84,7 @@ final class OctaneWorkerStateTest extends TestCase
     public function test_koneksi_dengan_transaksi_tertinggal_ditutup_bukan_dipakai_ulang(): void
     {
         try {
-            app(EnvironmentConnection::class)->register('pgsql_octane_test', DB::connection()->getDatabaseName());
+            config(['database.connections.pgsql_octane_test' => app(EnvironmentConnection::class)->configuration((string) config('database.default'))]);
             DB::connection('pgsql_octane_test')->beginTransaction();
 
             app(ResetDatabaseConnections::class)->handle(new \stdClass);
@@ -87,6 +92,75 @@ final class OctaneWorkerStateTest extends TestCase
             $this->assertArrayNotHasKey('pgsql_octane_test', DB::getConnections());
         } finally {
             DB::purge('pgsql_octane_test');
+        }
+    }
+
+    public function test_sync_job_cleanup_preserves_the_callers_transaction_and_pdo(): void
+    {
+        $connection = DB::connection();
+        $connection->beginTransaction();
+        $pdo = $connection->getPdo();
+        $job = new SyncJob($this->app, json_encode(['displayName' => 'fixture'], JSON_THROW_ON_ERROR), 'sync', 'default');
+        try {
+            app(ResetDatabaseConnections::class)->handle(new JobProcessed('sync', $job));
+            $this->assertSame($pdo, $connection->getRawPdo());
+            $this->assertSame(1, $connection->transactionLevel());
+        } finally {
+            if ($connection->transactionLevel() > 0) {
+                $connection->rollBack();
+            }
+        }
+    }
+
+    public function test_worker_cleanup_only_rolls_back_its_own_transaction_and_restores_the_caller_actor(): void
+    {
+        $connection = DB::connection();
+        $connection->beginTransaction();
+        AuditActor::set(42);
+        $pdo = $connection->getPdo();
+        $job = \Mockery::mock(Job::class);
+        $cleanup = app(ResetDatabaseConnections::class);
+        try {
+            $cleanup->begin(new JobProcessing('database', $job));
+            $connection->beginTransaction();
+            AuditActor::set(71);
+            $cleanup->handle(new JobProcessed('database', $job));
+            $this->assertSame($pdo, $connection->getRawPdo());
+            $this->assertSame(1, $connection->transactionLevel());
+            $this->assertSame('42', $connection->selectOne("select current_setting('coreerp.user_id', true) as actor")->actor);
+        } finally {
+            if ($connection->transactionLevel() > 0) {
+                $connection->rollBack();
+            }
+            AuditActor::clear();
+        }
+    }
+
+    public function test_worker_cleanup_preserves_a_caller_frame_without_a_transaction(): void
+    {
+        $connections = app(EnvironmentConnection::class);
+        try {
+            $connections->runWithin(null, function () use ($connections): void {
+                AuditActor::set(42);
+                ChangeLogSwitch::pause();
+                $connection = DB::connection();
+                $pdo = $connection->getPdo();
+                $job = \Mockery::mock(Job::class);
+                $cleanup = app(ResetDatabaseConnections::class);
+                $cleanup->begin(new JobProcessing('database', $job));
+                AuditActor::set(71);
+                ChangeLogSwitch::resume();
+                $cleanup->handle(new JobProcessed('database', $job));
+                $cleanup->handle(new JobExceptionOccurred('database', $job, new \RuntimeException('after-listener fixture failure')));
+                $this->assertSame($pdo, $connection->getRawPdo());
+                $this->assertSame(1, $connections->depth());
+                $state = $connection->selectOne("select current_setting('coreerp.user_id', true) as actor, current_setting('coreerp.change_log', true) as change_log");
+                $this->assertSame('42', $state->actor);
+                $this->assertSame('off', $state->change_log);
+            });
+        } finally {
+            AuditActor::clear();
+            ChangeLogSwitch::resume();
         }
     }
 

@@ -2,7 +2,7 @@
 
 Dokumen paket ini adalah spesifikasi dan backlog, bukan fitur yang sudah berjalan. PR dokumentasinya tidak menjalankan migration, membuat database, mengaktifkan trial, atau mengubah source Faskes.
 
-Hasil inventaris dan kontrak awal tersedia pada [CPDB-01](CPDB-01.md), dengan source/runtime SHA, manifest, dependency, batas bukti, dan blocker. Unit tersebut belum memisahkan database. PF-01 menggunakan hasil review kontrak itu; urutan CPDB-02 dan unit berikutnya tetap berlaku.
+Hasil inventaris dan kontrak awal tersedia pada [CPDB-01](CPDB-01.md). PF-01 telah merge melalui [PR #376](https://github.com/MettaDevs/coreERP/pull/376), main `6b3cf584`. [CPDB-02](CPDB-02.md) menyiapkan routing, schema target dan role; unit tersebut belum melakukan cutover atau mengganti coupling CPDB-03. PF-02 tetap menunggu CPDB-05.
 
 ## Mulai dari urutan yang sudah disepakati
 

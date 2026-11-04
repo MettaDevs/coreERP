@@ -6,7 +6,12 @@ namespace App\Platform\Environment\Listeners;
 
 use App\Platform\ChangeLog\Support\AuditActor;
 use App\Platform\ChangeLog\Support\ChangeLogSwitch;
+use App\Platform\Environment\Support\EnvironmentConnection;
 use Illuminate\Database\Connection;
+use Illuminate\Queue\Events\JobExceptionOccurred;
+use Illuminate\Queue\Events\JobProcessed;
+use Illuminate\Queue\Events\JobProcessing;
+use Illuminate\Queue\Jobs\SyncJob;
 use Illuminate\Support\Facades\DB;
 use PDO;
 use Throwable;
@@ -36,24 +41,73 @@ use Throwable;
  */
 final class ResetDatabaseConnections
 {
+    /** @var array<int, array{depth: int, connections: array<string, array{level: int, actor: string, change_log: string}>}> */
+    private array $boundaries = [];
+
+    public function begin(JobProcessing $event): void
+    {
+        if ($event->job instanceof SyncJob) {
+            return;
+        }
+        $depth = app(EnvironmentConnection::class)->depth();
+        $connections = [];
+        foreach (DB::getConnections() as $name => $connection) {
+            $level = $connection->transactionLevel();
+            $actor = $changeLog = '';
+            if (($level > 0 || $depth > 0) && $connection->getDriverName() === 'pgsql' && $connection->getRawPdo() instanceof PDO) {
+                $settings = $connection->selectOne('select coalesce(current_setting(?, true), ?) as actor, coalesce(current_setting(?, true), ?) as change_log', [AuditActor::SETTING, '', ChangeLogSwitch::SETTING, '']);
+                $actor = (string) $settings->actor;
+                $changeLog = (string) $settings->change_log;
+            }
+            $connections[(string) $name] = ['level' => $level, 'actor' => $actor, 'change_log' => $changeLog];
+        }
+        $this->boundaries[spl_object_id($event->job)] = ['depth' => $depth, 'connections' => $connections];
+    }
+
     public function handle(object $event): void
     {
+        if (($event instanceof JobProcessed || $event instanceof JobExceptionOccurred) && $event->job instanceof SyncJob) {
+            return;
+        }
+        $boundary = null;
+        if ($event instanceof JobProcessed || $event instanceof JobExceptionOccurred) {
+            $id = spl_object_id($event->job);
+            if (! isset($this->boundaries[$id])) {
+                return;
+            }
+            $boundary = $this->boundaries[$id];
+            unset($this->boundaries[$id]);
+        }
+        app(EnvironmentConnection::class)->reset($boundary['depth'] ?? 0);
         foreach (DB::getConnections() as $name => $connection) {
             if (! $connection->getRawPdo() instanceof PDO) {
                 continue;
             }
 
-            if (str_starts_with((string) $name, 'environment_') || $connection->transactionLevel() > 0) {
+            $previous = $boundary['connections'][$name] ?? null;
+            if (($previous['level'] ?? 0) > 0) {
+                if ($connection->transactionLevel() > $previous['level']) {
+                    $connection->rollBack($previous['level']);
+                }
+                $this->resetSessionSettings((string) $name, $connection, $previous['actor'], $previous['change_log']);
+
+                continue;
+            }
+            $ownedEnvironment = str_starts_with((string) $name, 'environment_') && ! (($boundary['depth'] ?? 0) > 0 && $previous !== null);
+            if ($ownedEnvironment || $connection->transactionLevel() > 0) {
                 DB::purge($name);
 
                 continue;
             }
 
-            $this->resetSessionSettings($name, $connection);
+            $this->resetSessionSettings((string) $name, $connection,
+                ($boundary['depth'] ?? 0) > 0 ? ($previous['actor'] ?? '') : '',
+                ($boundary['depth'] ?? 0) > 0 ? ($previous['change_log'] ?? '') : '',
+            );
         }
     }
 
-    private function resetSessionSettings(string $name, Connection $connection): void
+    private function resetSessionSettings(string $name, Connection $connection, string $actor = '', string $changeLog = ''): void
     {
         if ($connection->getDriverName() !== 'pgsql') {
             return;
@@ -61,8 +115,8 @@ final class ResetDatabaseConnections
 
         try {
             $connection->select('select set_config(?, ?, false), set_config(?, ?, false)', [
-                AuditActor::SETTING, '',
-                ChangeLogSwitch::SETTING, '',
+                AuditActor::SETTING, $actor,
+                ChangeLogSwitch::SETTING, $changeLog,
             ]);
         } catch (Throwable) {
             // Koneksi yang tidak dapat dibereskan tidak boleh dipakai ulang dengan keadaan lamanya.

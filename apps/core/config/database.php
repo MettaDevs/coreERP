@@ -3,6 +3,23 @@
 use Illuminate\Support\Str;
 use Pdo\Mysql;
 
+$postgres = static function (string $prefix, string $database, ?string $hostPrefix = null): array {
+    return [
+        'driver' => 'pgsql',
+        'url' => env($prefix.'_URL'),
+        'host' => env($prefix.'_HOST', env(($hostPrefix ?? $prefix).'_HOST', '127.0.0.1')),
+        'port' => env($prefix.'_PORT', env(($hostPrefix ?? $prefix).'_PORT', '5432')),
+        'database' => env($prefix.'_DATABASE', $database),
+        'username' => env($prefix.'_USERNAME'),
+        'password' => env($prefix.'_PASSWORD'),
+        'charset' => 'utf8',
+        'prefix' => '',
+        'prefix_indexes' => true,
+        'search_path' => env($prefix.'_SCHEMA', 'public'),
+        'sslmode' => env($prefix.'_SSLMODE', 'prefer'),
+    ];
+};
+
 return [
 
     /*
@@ -53,6 +70,12 @@ return [
      * sendiri.
      */
     'connections' => [
+
+        'control' => $postgres('DB_CONTROL', 'core_control_plane'),
+        'business' => $postgres('DB_BUSINESS', 'core_erp'),
+        'control_migration' => $postgres('DB_CONTROL_MIGRATION', (string) env('DB_CONTROL_DATABASE', 'core_control_plane'), 'DB_CONTROL'),
+        'business_migration' => $postgres('DB_BUSINESS_MIGRATION', (string) env('DB_BUSINESS_DATABASE', 'core_erp'), 'DB_BUSINESS'),
+        'provisioning' => $postgres('DB_PROVISIONING', 'postgres', 'DB_BUSINESS'),
 
         'sqlite' => [
             'driver' => 'sqlite',

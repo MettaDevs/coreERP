@@ -148,6 +148,12 @@ jobs:
       - name: Check tenant creation verifier
         run: python3 ../../scripts/test_tenant_creation_verifier.py
 
+      - name: Check control schema and connection verifiers
+        run: |
+          python3 ../../scripts/build-control-schema.py --offline
+          python3 -m unittest discover -s ../../scripts -p test_build_control_schema.py
+          python3 -m unittest discover -s ../../scripts -p test_database_connection_verifier.py
+
       # `cache: npm` menyimpan unduhan npm antar run. Lockfile-nya ada di akar repo, bukan
       # di folder app, jadi jalurnya disebut eksplisit — tanpa itu cache tidak pernah kena
       # dan langkah ini tetap mengunduh semuanya sambil terlihat seolah sudah di-cache.

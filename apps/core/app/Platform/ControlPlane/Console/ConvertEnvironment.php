@@ -7,6 +7,7 @@ namespace App\Platform\ControlPlane\Console;
 use App\Platform\ControlPlane\Console\Concerns\HoldsEnvironmentOperation;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Models\EnvironmentOperation;
+use App\Platform\Environment\Support\EnvironmentConnection;
 use Carbon\CarbonInterface;
 use Illuminate\Console\Command;
 use Illuminate\Database\ConnectionInterface;
@@ -101,9 +102,6 @@ final class ConvertEnvironment extends Command
     protected $signature = 'environment:convert {environment : Id baris environments yang dikonversi}';
 
     protected $description = 'Ubah sebuah lingkungan demo menjadi produksi di tempat, beserta datanya';
-
-    /** Koneksi sementara ke database lingkungan yang sedang dikonversi. */
-    private const CONNECTION = 'environment_convert';
 
     /**
      * Berapa lama operasi ini boleh memegang kuncinya sebelum boleh direbut.
@@ -258,7 +256,9 @@ final class ConvertEnvironment extends Command
 
             return self::FAILURE;
         } finally {
-            DB::purge(self::CONNECTION);
+            if ($environment->database_name !== null) {
+                DB::purge(app(EnvironmentConnection::class)->for($environment));
+            }
         }
     }
 
@@ -385,39 +385,8 @@ final class ConvertEnvironment extends Command
         }
     }
 
-    /**
-     * Koneksi ke database tempat data lingkungan ini benar-benar hidup.
-     *
-     * `database_name` yang kosong berarti "ikut koneksi bawaan", dan di situ ia **harus** memakai
-     * koneksi bawaan itu sendiri — bukan salinan konfigurasinya. PDO kedua ke database yang sama
-     * membuka transaksi sendiri, dan apa yang ditulis satu koneksi tidak terlihat oleh yang lain.
-     * Di suite test, tempat `RefreshDatabase` memegang transaksi pada koneksi bawaan, salinan
-     * seperti itu akan menemukan antrean yang kosong lalu melaporkan berhasil — penjaga yang hijau
-     * karena buta, bentuk kegagalan yang sudah dua kali membakar repo ini.
-     */
     private function environmentConnection(Environment $environment): ConnectionInterface
     {
-        $name = $environment->database_name;
-
-        if ($name === null) {
-            return DB::connection();
-        }
-
-        $default = (string) config('database.default');
-        $config = config('database.connections.'.$default);
-
-        if (! is_array($config)) {
-            throw new RuntimeException(sprintf('Koneksi bawaan "%s" tidak terbaca dari config.', $default));
-        }
-
-        $config['database'] = $name;
-        // Laravel mendahulukan `url` di atas `database` bila ia terisi. Dibiarkan, seluruh
-        // pelucutan di atas akan berjalan pada database pusat.
-        $config['url'] = null;
-
-        config(['database.connections.'.self::CONNECTION => $config]);
-        DB::purge(self::CONNECTION);
-
-        return DB::connection(self::CONNECTION);
+        return DB::connection(app(EnvironmentConnection::class)->for($environment));
     }
 }

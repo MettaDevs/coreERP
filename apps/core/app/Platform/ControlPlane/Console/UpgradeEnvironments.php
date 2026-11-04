@@ -234,19 +234,9 @@ final class UpgradeEnvironments extends Command
 
                 $fingerprint = $this->fingerprintOf($connection);
             } else {
-                /*
-                 * `database_name` kosong berarti lingkungan ini memang tinggal di database pusat —
-                 * keadaan produksi hari ini. Migration Corenya sudah dijalankan `php artisan migrate`
-                 * biasa sebelum perintah ini, jadi menjalankannya lagi di sini hanya menambah satu
-                 * koneksi tanpa menambah satu baris pun.
-                 *
-                 * Tetapi langkah module **tetap** dijalankan, dan itu bukan kelalaian yang kebetulan
-                 * benar: tanpa itu, app yang baru dibeli tidak akan pernah terpasang di produksi —
-                 * satu-satunya tempat kerja yang benar-benar dipakai pelanggan hari ini.
-                 */
                 $step = 'sidik-pusat';
-                $fingerprint = $this->fingerprintOf((string) config('database.default'));
-                $this->line('  memakai database pusat; migration Core dilewati.');
+                $fingerprint = $this->fingerprintOf($this->connections->business());
+                $this->line('  memakai database bisnis bersama; migration Core dilewati.');
             }
 
             $step = 'module';

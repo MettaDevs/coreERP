@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Platform\ControlPlane\Jobs\UpgradeEnvironment as UpgradeEnvironmentJob;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Models\EnvironmentOperation;
+use App\Platform\Environment\Support\EnvironmentConnection;
 use App\Platform\Identity\Models\User;
 use Illuminate\Bus\UniqueLock;
 use Illuminate\Contracts\Bus\Dispatcher;
@@ -47,7 +48,7 @@ final class FleetController extends Controller
     public function index(): JsonResponse
     {
         $platform = $this->platformFingerprint();
-        $central = $this->fingerprintOf((string) config('database.default'));
+        $central = $this->fingerprintOf(app(EnvironmentConnection::class)->business());
         $latest = $this->latestOperations();
 
         $rows = [];
@@ -121,7 +122,7 @@ final class FleetController extends Controller
         }
 
         $platform = $this->platformFingerprint();
-        $central = $this->fingerprintOf((string) config('database.default'));
+        $central = $this->fingerprintOf(app(EnvironmentConnection::class)->business());
         $latest = $this->latestOperations();
         $force = $request->boolean('force');
         $requestedBy = $this->requestedBy($request);

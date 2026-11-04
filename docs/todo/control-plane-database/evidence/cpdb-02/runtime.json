@@ -1,0 +1,1345 @@
+{
+  "kind": "cpdb02-database-connections",
+  "status": "passed",
+  "project": "coreerp-cpdb02",
+  "run_id": "8adfacae4f5a402c823fe8b3024e1d70",
+  "results": {
+    "preflight": {
+      "metadata": {
+        "profile_sha256": "177c2cb240dff79a6ef1a103b9c76cbd72616882159280f812b7035a716c2bbc",
+        "source_hashes": {
+          "app/Platform/Environment/Support/EnvironmentConnection.php": "7ae4e4057a48d2d58b9e08266c85936a6376db2e1c43fe8c90bb1e6065041715",
+          "app/Platform/Environment/Support/ConnectionFrame.php": "07208f91df1fd33d99abcd4890b0cbeda5cf9182acb607ea75b1b20fcc62673e",
+          "app/Platform/Environment/Listeners/ResetDatabaseConnections.php": "1443c6d830cb46ee163a5d482f8efec7bd135105fd0e43f516dd97075b78bcd1",
+          "app/Platform/Database/Support/DatabasePrivileges.php": "766f34ffa55ba63ebb788982ba32c44897cc0d63e30697235e9f80ecca523c38",
+          "app/Platform/Modules/Support/CoreMigrateCommand.php": "de9a8db46c8579150aaf9f453f10ce1b393fab21a8476cc4c3d97686591e46bc",
+          "app/Platform/Modules/Support/ModuleMigrator.php": "a916c5755343aa20c121011b33375ab1becbe4355a122567e8a8a48c3aeeed1b",
+          "app/Platform/Modules/Support/ModuleManifest.php": "832cc1a5b887b75d9f3f48715f3d5e651a02356fd01856168513a5692870cd78",
+          "app/Platform/Modules/Support/ModuleMigrationRepository.php": "f2865e1d760f5721a95543112d7a8e59cdd1483b9d84ed1f93e4891f38f8a33c",
+          "app/Platform/Modules/Support/ModuleSeeder.php": "5ec3a94c679b73fb34fda92cd58fcbda6875ff2d79628c5a674d0942db362e08",
+          "app/Platform/ControlPlane/Console/ControlMigrate.php": "41fb07642e828e622634815596b4408c1e1bdefdebd6229666c2ef37e28baf06",
+          "app/Platform/Reporting/Jobs/RunReportExport.php": "d4c51e855ed4f1b5b4ee07e6aced3104e29599616d8605eac79db99a4e4983c4",
+          "config/database.php": "6599d29fc6753a12cc8fa5656fc0f1469003c13e90ccfd434570074516188408",
+          "config/coreerp.php": "ce3c5fbaab39626044610b7586f7a346ebc4dd5439b9c6eeedccdaf83726237e",
+          "config/session.php": "b0d9dd8992d7a57c339918ca12cea26979603b1da1e20b24b57eab51e272c311",
+          "config/auth.php": "839b51b849b14513a4c8d29a7a956fce99e4334f178ba69dfe4fb8f18f8782a2",
+          "config/cache.php": "aab07c9ba924a024d9a7e7efc91bc8b312c0191b53dc368c75511c980b24153e",
+          "config/queue.php": "e66b0fb42fdb54044f1b62a6d5609396e1a334bc603afd31df51c80bb9726b6a",
+          "routes/console.php": "cecfcd5f616de04e7d32213359a145b59024060f60063e7bb552dcb29aaa2441"
+        },
+        "php_version": "8.4.27",
+        "postgres_version": "16.14",
+        "process_id": 1632
+      },
+      "lanes": {
+        "control": {
+          "status": "passed",
+          "checks": {
+            "database_role_match": true
+          },
+          "identities": [
+            {
+              "database": "core_control_plane",
+              "role": "cpdb02_control_runtime"
+            }
+          ],
+          "error": null
+        },
+        "business": {
+          "status": "passed",
+          "checks": {
+            "database_role_match": true
+          },
+          "identities": [
+            {
+              "database": "core_erp",
+              "role": "cpdb02_business_runtime"
+            }
+          ],
+          "error": null
+        },
+        "control_migration": {
+          "status": "passed",
+          "checks": {
+            "database_role_match": true
+          },
+          "identities": [
+            {
+              "database": "core_control_plane",
+              "role": "cpdb02_control_migrator"
+            }
+          ],
+          "error": null
+        },
+        "business_migration": {
+          "status": "passed",
+          "checks": {
+            "database_role_match": true
+          },
+          "identities": [
+            {
+              "database": "core_erp",
+              "role": "cpdb02_business_migrator"
+            }
+          ],
+          "error": null
+        },
+        "maintenance": {
+          "status": "passed",
+          "checks": {
+            "database_role_match": true
+          },
+          "identities": [
+            {
+              "database": "postgres",
+              "role": "cpdb02_provisioner"
+            }
+          ],
+          "error": null
+        },
+        "framework_pins": {
+          "status": "passed",
+          "checks": {
+            "framework_connection_0": true,
+            "framework_connection_1": true,
+            "framework_connection_2": true,
+            "framework_connection_3": true,
+            "framework_connection_4": true,
+            "framework_connection_5": true,
+            "framework_connection_6": true,
+            "scheduler_database_store": true
+          },
+          "identities": [],
+          "error": null
+        }
+      }
+    },
+    "routing": {
+      "metadata": {
+        "profile_sha256": "177c2cb240dff79a6ef1a103b9c76cbd72616882159280f812b7035a716c2bbc",
+        "source_hashes": {
+          "app/Platform/Environment/Support/EnvironmentConnection.php": "7ae4e4057a48d2d58b9e08266c85936a6376db2e1c43fe8c90bb1e6065041715",
+          "app/Platform/Environment/Support/ConnectionFrame.php": "07208f91df1fd33d99abcd4890b0cbeda5cf9182acb607ea75b1b20fcc62673e",
+          "app/Platform/Environment/Listeners/ResetDatabaseConnections.php": "1443c6d830cb46ee163a5d482f8efec7bd135105fd0e43f516dd97075b78bcd1",
+          "app/Platform/Database/Support/DatabasePrivileges.php": "766f34ffa55ba63ebb788982ba32c44897cc0d63e30697235e9f80ecca523c38",
+          "app/Platform/Modules/Support/CoreMigrateCommand.php": "de9a8db46c8579150aaf9f453f10ce1b393fab21a8476cc4c3d97686591e46bc",
+          "app/Platform/Modules/Support/ModuleMigrator.php": "a916c5755343aa20c121011b33375ab1becbe4355a122567e8a8a48c3aeeed1b",
+          "app/Platform/Modules/Support/ModuleManifest.php": "832cc1a5b887b75d9f3f48715f3d5e651a02356fd01856168513a5692870cd78",
+          "app/Platform/Modules/Support/ModuleMigrationRepository.php": "f2865e1d760f5721a95543112d7a8e59cdd1483b9d84ed1f93e4891f38f8a33c",
+          "app/Platform/Modules/Support/ModuleSeeder.php": "5ec3a94c679b73fb34fda92cd58fcbda6875ff2d79628c5a674d0942db362e08",
+          "app/Platform/ControlPlane/Console/ControlMigrate.php": "41fb07642e828e622634815596b4408c1e1bdefdebd6229666c2ef37e28baf06",
+          "app/Platform/Reporting/Jobs/RunReportExport.php": "d4c51e855ed4f1b5b4ee07e6aced3104e29599616d8605eac79db99a4e4983c4",
+          "config/database.php": "6599d29fc6753a12cc8fa5656fc0f1469003c13e90ccfd434570074516188408",
+          "config/coreerp.php": "ce3c5fbaab39626044610b7586f7a346ebc4dd5439b9c6eeedccdaf83726237e",
+          "config/session.php": "b0d9dd8992d7a57c339918ca12cea26979603b1da1e20b24b57eab51e272c311",
+          "config/auth.php": "839b51b849b14513a4c8d29a7a956fce99e4334f178ba69dfe4fb8f18f8782a2",
+          "config/cache.php": "aab07c9ba924a024d9a7e7efc91bc8b312c0191b53dc368c75511c980b24153e",
+          "config/queue.php": "e66b0fb42fdb54044f1b62a6d5609396e1a334bc603afd31df51c80bb9726b6a",
+          "routes/console.php": "cecfcd5f616de04e7d32213359a145b59024060f60063e7bb552dcb29aaa2441"
+        },
+        "php_version": "8.4.27",
+        "postgres_version": "16.14",
+        "process_id": 1638
+      },
+      "lanes": {
+        "control": {
+          "status": "passed",
+          "checks": {
+            "database_role_match": true
+          },
+          "identities": [
+            {
+              "database": "core_control_plane",
+              "role": "cpdb02_control_runtime"
+            }
+          ],
+          "error": null
+        },
+        "pooled": {
+          "status": "passed",
+          "checks": {
+            "database_role_match": true,
+            "default_restored": true
+          },
+          "identities": [
+            {
+              "database": "core_erp",
+              "role": "cpdb02_business_runtime"
+            }
+          ],
+          "error": null
+        },
+        "environment_a": {
+          "status": "passed",
+          "checks": {
+            "database_role_match": true,
+            "default_restored": true
+          },
+          "identities": [
+            {
+              "database": "core_erp_cpdb02_test_environment_a",
+              "role": "cpdb02_business_runtime"
+            }
+          ],
+          "error": null
+        },
+        "environment_b": {
+          "status": "passed",
+          "checks": {
+            "database_role_match": true,
+            "default_restored": true
+          },
+          "identities": [
+            {
+              "database": "core_erp_cpdb02_test_environment_b",
+              "role": "cpdb02_business_runtime"
+            }
+          ],
+          "error": null
+        },
+        "nested_transaction": {
+          "status": "passed",
+          "checks": {
+            "database_role_match": true,
+            "ancestor_pdo_transaction_preserved": true,
+            "middle_context_restored": true,
+            "ancestor_survives_inner_cleanup": true,
+            "outer_context_restored": true
+          },
+          "identities": [
+            {
+              "database": "core_erp_cpdb02_test_environment_b",
+              "role": "cpdb02_business_runtime"
+            },
+            {
+              "database": "core_erp_cpdb02_test_environment_a",
+              "role": "cpdb02_business_runtime"
+            }
+          ],
+          "error": null
+        },
+        "exception_cleanup": {
+          "status": "passed",
+          "checks": {
+            "exception_observed": true,
+            "exception_context_restored": true,
+            "owned_connection_purged": true,
+            "database_role_match": true
+          },
+          "identities": [
+            {
+              "database": "core_erp",
+              "role": "cpdb02_business_runtime"
+            }
+          ],
+          "error": null
+        },
+        "migration_guard": {
+          "status": "passed",
+          "checks": {
+            "physical_control_alias_rejected": true,
+            "business_migrator_selected": true,
+            "database_role_match": true
+          },
+          "identities": [
+            {
+              "database": "core_control_plane",
+              "role": "cpdb02_control_migrator"
+            },
+            {
+              "database": "postgres",
+              "role": "cpdb02_provisioner"
+            }
+          ],
+          "error": null
+        }
+      }
+    },
+    "control_upgrade": {
+      "metadata": {
+        "profile_sha256": "177c2cb240dff79a6ef1a103b9c76cbd72616882159280f812b7035a716c2bbc",
+        "source_hashes": {
+          "app/Platform/Environment/Support/EnvironmentConnection.php": "7ae4e4057a48d2d58b9e08266c85936a6376db2e1c43fe8c90bb1e6065041715",
+          "app/Platform/Environment/Support/ConnectionFrame.php": "07208f91df1fd33d99abcd4890b0cbeda5cf9182acb607ea75b1b20fcc62673e",
+          "app/Platform/Environment/Listeners/ResetDatabaseConnections.php": "1443c6d830cb46ee163a5d482f8efec7bd135105fd0e43f516dd97075b78bcd1",
+          "app/Platform/Database/Support/DatabasePrivileges.php": "766f34ffa55ba63ebb788982ba32c44897cc0d63e30697235e9f80ecca523c38",
+          "app/Platform/Modules/Support/CoreMigrateCommand.php": "de9a8db46c8579150aaf9f453f10ce1b393fab21a8476cc4c3d97686591e46bc",
+          "app/Platform/Modules/Support/ModuleMigrator.php": "a916c5755343aa20c121011b33375ab1becbe4355a122567e8a8a48c3aeeed1b",
+          "app/Platform/Modules/Support/ModuleManifest.php": "832cc1a5b887b75d9f3f48715f3d5e651a02356fd01856168513a5692870cd78",
+          "app/Platform/Modules/Support/ModuleMigrationRepository.php": "f2865e1d760f5721a95543112d7a8e59cdd1483b9d84ed1f93e4891f38f8a33c",
+          "app/Platform/Modules/Support/ModuleSeeder.php": "5ec3a94c679b73fb34fda92cd58fcbda6875ff2d79628c5a674d0942db362e08",
+          "app/Platform/ControlPlane/Console/ControlMigrate.php": "41fb07642e828e622634815596b4408c1e1bdefdebd6229666c2ef37e28baf06",
+          "app/Platform/Reporting/Jobs/RunReportExport.php": "d4c51e855ed4f1b5b4ee07e6aced3104e29599616d8605eac79db99a4e4983c4",
+          "config/database.php": "6599d29fc6753a12cc8fa5656fc0f1469003c13e90ccfd434570074516188408",
+          "config/coreerp.php": "ce3c5fbaab39626044610b7586f7a346ebc4dd5439b9c6eeedccdaf83726237e",
+          "config/session.php": "b0d9dd8992d7a57c339918ca12cea26979603b1da1e20b24b57eab51e272c311",
+          "config/auth.php": "839b51b849b14513a4c8d29a7a956fce99e4334f178ba69dfe4fb8f18f8782a2",
+          "config/cache.php": "aab07c9ba924a024d9a7e7efc91bc8b312c0191b53dc368c75511c980b24153e",
+          "config/queue.php": "e66b0fb42fdb54044f1b62a6d5609396e1a334bc603afd31df51c80bb9726b6a",
+          "routes/console.php": "cecfcd5f616de04e7d32213359a145b59024060f60063e7bb552dcb29aaa2441"
+        },
+        "php_version": "8.4.27",
+        "postgres_version": "16.14",
+        "process_id": 1644
+      },
+      "lanes": {
+        "runtime_restoration": {
+          "status": "passed",
+          "checks": {
+            "normal_control_upgrade_succeeded": true,
+            "runtime_default_restored": true,
+            "database_role_match": true,
+            "control_history_unchanged": true,
+            "business_history_unchanged": true,
+            "control_business_history_absent": true
+          },
+          "identities": [
+            {
+              "database": "core_erp",
+              "role": "cpdb02_business_runtime"
+            }
+          ],
+          "error": null
+        }
+      }
+    },
+    "migrate_environments": {
+      "metadata": {
+        "profile_sha256": "177c2cb240dff79a6ef1a103b9c76cbd72616882159280f812b7035a716c2bbc",
+        "source_hashes": {
+          "app/Platform/Environment/Support/EnvironmentConnection.php": "7ae4e4057a48d2d58b9e08266c85936a6376db2e1c43fe8c90bb1e6065041715",
+          "app/Platform/Environment/Support/ConnectionFrame.php": "07208f91df1fd33d99abcd4890b0cbeda5cf9182acb607ea75b1b20fcc62673e",
+          "app/Platform/Environment/Listeners/ResetDatabaseConnections.php": "1443c6d830cb46ee163a5d482f8efec7bd135105fd0e43f516dd97075b78bcd1",
+          "app/Platform/Database/Support/DatabasePrivileges.php": "766f34ffa55ba63ebb788982ba32c44897cc0d63e30697235e9f80ecca523c38",
+          "app/Platform/Modules/Support/CoreMigrateCommand.php": "de9a8db46c8579150aaf9f453f10ce1b393fab21a8476cc4c3d97686591e46bc",
+          "app/Platform/Modules/Support/ModuleMigrator.php": "a916c5755343aa20c121011b33375ab1becbe4355a122567e8a8a48c3aeeed1b",
+          "app/Platform/Modules/Support/ModuleManifest.php": "832cc1a5b887b75d9f3f48715f3d5e651a02356fd01856168513a5692870cd78",
+          "app/Platform/Modules/Support/ModuleMigrationRepository.php": "f2865e1d760f5721a95543112d7a8e59cdd1483b9d84ed1f93e4891f38f8a33c",
+          "app/Platform/Modules/Support/ModuleSeeder.php": "5ec3a94c679b73fb34fda92cd58fcbda6875ff2d79628c5a674d0942db362e08",
+          "app/Platform/ControlPlane/Console/ControlMigrate.php": "41fb07642e828e622634815596b4408c1e1bdefdebd6229666c2ef37e28baf06",
+          "app/Platform/Reporting/Jobs/RunReportExport.php": "d4c51e855ed4f1b5b4ee07e6aced3104e29599616d8605eac79db99a4e4983c4",
+          "config/database.php": "6599d29fc6753a12cc8fa5656fc0f1469003c13e90ccfd434570074516188408",
+          "config/coreerp.php": "ce3c5fbaab39626044610b7586f7a346ebc4dd5439b9c6eeedccdaf83726237e",
+          "config/session.php": "b0d9dd8992d7a57c339918ca12cea26979603b1da1e20b24b57eab51e272c311",
+          "config/auth.php": "839b51b849b14513a4c8d29a7a956fce99e4334f178ba69dfe4fb8f18f8782a2",
+          "config/cache.php": "aab07c9ba924a024d9a7e7efc91bc8b312c0191b53dc368c75511c980b24153e",
+          "config/queue.php": "e66b0fb42fdb54044f1b62a6d5609396e1a334bc603afd31df51c80bb9726b6a",
+          "routes/console.php": "cecfcd5f616de04e7d32213359a145b59024060f60063e7bb552dcb29aaa2441"
+        },
+        "php_version": "8.4.27",
+        "postgres_version": "16.14",
+        "process_id": 1652
+      },
+      "lanes": {
+        "environment_a": {
+          "status": "passed",
+          "checks": {
+            "normal_migration_succeeded": true,
+            "database_role_match": true,
+            "business_history_complete": true,
+            "control_history_absent": true,
+            "pooled_default_restored": true
+          },
+          "identities": [
+            {
+              "database": "core_erp_cpdb02_test_environment_a",
+              "role": "cpdb02_business_runtime"
+            },
+            {
+              "database": "core_erp",
+              "role": "cpdb02_business_runtime"
+            }
+          ],
+          "error": null
+        },
+        "environment_b": {
+          "status": "passed",
+          "checks": {
+            "normal_migration_succeeded": true,
+            "database_role_match": true,
+            "business_history_complete": true,
+            "control_history_absent": true,
+            "pooled_default_restored": true
+          },
+          "identities": [
+            {
+              "database": "core_erp_cpdb02_test_environment_b",
+              "role": "cpdb02_business_runtime"
+            },
+            {
+              "database": "core_erp",
+              "role": "cpdb02_business_runtime"
+            }
+          ],
+          "error": null
+        }
+      }
+    },
+    "modules": {
+      "metadata": {
+        "profile_sha256": "177c2cb240dff79a6ef1a103b9c76cbd72616882159280f812b7035a716c2bbc",
+        "source_hashes": {
+          "app/Platform/Environment/Support/EnvironmentConnection.php": "7ae4e4057a48d2d58b9e08266c85936a6376db2e1c43fe8c90bb1e6065041715",
+          "app/Platform/Environment/Support/ConnectionFrame.php": "07208f91df1fd33d99abcd4890b0cbeda5cf9182acb607ea75b1b20fcc62673e",
+          "app/Platform/Environment/Listeners/ResetDatabaseConnections.php": "1443c6d830cb46ee163a5d482f8efec7bd135105fd0e43f516dd97075b78bcd1",
+          "app/Platform/Database/Support/DatabasePrivileges.php": "766f34ffa55ba63ebb788982ba32c44897cc0d63e30697235e9f80ecca523c38",
+          "app/Platform/Modules/Support/CoreMigrateCommand.php": "de9a8db46c8579150aaf9f453f10ce1b393fab21a8476cc4c3d97686591e46bc",
+          "app/Platform/Modules/Support/ModuleMigrator.php": "a916c5755343aa20c121011b33375ab1becbe4355a122567e8a8a48c3aeeed1b",
+          "app/Platform/Modules/Support/ModuleManifest.php": "832cc1a5b887b75d9f3f48715f3d5e651a02356fd01856168513a5692870cd78",
+          "app/Platform/Modules/Support/ModuleMigrationRepository.php": "f2865e1d760f5721a95543112d7a8e59cdd1483b9d84ed1f93e4891f38f8a33c",
+          "app/Platform/Modules/Support/ModuleSeeder.php": "5ec3a94c679b73fb34fda92cd58fcbda6875ff2d79628c5a674d0942db362e08",
+          "app/Platform/ControlPlane/Console/ControlMigrate.php": "41fb07642e828e622634815596b4408c1e1bdefdebd6229666c2ef37e28baf06",
+          "app/Platform/Reporting/Jobs/RunReportExport.php": "d4c51e855ed4f1b5b4ee07e6aced3104e29599616d8605eac79db99a4e4983c4",
+          "config/database.php": "6599d29fc6753a12cc8fa5656fc0f1469003c13e90ccfd434570074516188408",
+          "config/coreerp.php": "ce3c5fbaab39626044610b7586f7a346ebc4dd5439b9c6eeedccdaf83726237e",
+          "config/session.php": "b0d9dd8992d7a57c339918ca12cea26979603b1da1e20b24b57eab51e272c311",
+          "config/auth.php": "839b51b849b14513a4c8d29a7a956fce99e4334f178ba69dfe4fb8f18f8782a2",
+          "config/cache.php": "aab07c9ba924a024d9a7e7efc91bc8b312c0191b53dc368c75511c980b24153e",
+          "config/queue.php": "e66b0fb42fdb54044f1b62a6d5609396e1a334bc603afd31df51c80bb9726b6a",
+          "routes/console.php": "cecfcd5f616de04e7d32213359a145b59024060f60063e7bb552dcb29aaa2441"
+        },
+        "php_version": "8.4.27",
+        "postgres_version": "16.14",
+        "process_id": 1660
+      },
+      "lanes": {
+        "success": {
+          "status": "passed",
+          "checks": {
+            "migration_recorded": true,
+            "runtime_restored": true,
+            "database_role_match": true,
+            "migration_used_owner": true,
+            "seed_ran": true,
+            "seed_used_runtime": true,
+            "seed_idempotent": true,
+            "migration_idempotent": true,
+            "core_history_unchanged": true,
+            "control_history_unchanged": true,
+            "change_log_restored": true
+          },
+          "identities": [
+            {
+              "database": "core_erp_cpdb02_test_environment_a",
+              "role": "cpdb02_business_runtime"
+            }
+          ],
+          "error": null
+        },
+        "failure": {
+          "status": "passed",
+          "checks": {
+            "expected_failure_observed": true,
+            "runtime_restored": true,
+            "database_role_match": true,
+            "ddl_rolled_back": true,
+            "failure_not_recorded": true,
+            "change_log_restored": true
+          },
+          "identities": [
+            {
+              "database": "core_erp_cpdb02_test_environment_a",
+              "role": "cpdb02_business_runtime"
+            }
+          ],
+          "error": null
+        },
+        "history": {
+          "status": "passed",
+          "checks": {
+            "database_role_match": true,
+            "history_readable": true,
+            "history_insert_grant_absent": true,
+            "history_update_grant_absent": true,
+            "history_delete_grant_absent": true,
+            "history_update_denied": true,
+            "history_delete_denied": true,
+            "history_insert_denied": true,
+            "history_nextval_denied": true,
+            "history_setval_denied": true
+          },
+          "identities": [
+            {
+              "database": "core_erp_cpdb02_test_environment_a",
+              "role": "cpdb02_business_runtime"
+            }
+          ],
+          "error": null
+        }
+      }
+    },
+    "privileges": {
+      "metadata": {
+        "profile_sha256": "177c2cb240dff79a6ef1a103b9c76cbd72616882159280f812b7035a716c2bbc",
+        "source_hashes": {
+          "app/Platform/Environment/Support/EnvironmentConnection.php": "7ae4e4057a48d2d58b9e08266c85936a6376db2e1c43fe8c90bb1e6065041715",
+          "app/Platform/Environment/Support/ConnectionFrame.php": "07208f91df1fd33d99abcd4890b0cbeda5cf9182acb607ea75b1b20fcc62673e",
+          "app/Platform/Environment/Listeners/ResetDatabaseConnections.php": "1443c6d830cb46ee163a5d482f8efec7bd135105fd0e43f516dd97075b78bcd1",
+          "app/Platform/Database/Support/DatabasePrivileges.php": "766f34ffa55ba63ebb788982ba32c44897cc0d63e30697235e9f80ecca523c38",
+          "app/Platform/Modules/Support/CoreMigrateCommand.php": "de9a8db46c8579150aaf9f453f10ce1b393fab21a8476cc4c3d97686591e46bc",
+          "app/Platform/Modules/Support/ModuleMigrator.php": "a916c5755343aa20c121011b33375ab1becbe4355a122567e8a8a48c3aeeed1b",
+          "app/Platform/Modules/Support/ModuleManifest.php": "832cc1a5b887b75d9f3f48715f3d5e651a02356fd01856168513a5692870cd78",
+          "app/Platform/Modules/Support/ModuleMigrationRepository.php": "f2865e1d760f5721a95543112d7a8e59cdd1483b9d84ed1f93e4891f38f8a33c",
+          "app/Platform/Modules/Support/ModuleSeeder.php": "5ec3a94c679b73fb34fda92cd58fcbda6875ff2d79628c5a674d0942db362e08",
+          "app/Platform/ControlPlane/Console/ControlMigrate.php": "41fb07642e828e622634815596b4408c1e1bdefdebd6229666c2ef37e28baf06",
+          "app/Platform/Reporting/Jobs/RunReportExport.php": "d4c51e855ed4f1b5b4ee07e6aced3104e29599616d8605eac79db99a4e4983c4",
+          "config/database.php": "6599d29fc6753a12cc8fa5656fc0f1469003c13e90ccfd434570074516188408",
+          "config/coreerp.php": "ce3c5fbaab39626044610b7586f7a346ebc4dd5439b9c6eeedccdaf83726237e",
+          "config/session.php": "b0d9dd8992d7a57c339918ca12cea26979603b1da1e20b24b57eab51e272c311",
+          "config/auth.php": "839b51b849b14513a4c8d29a7a956fce99e4334f178ba69dfe4fb8f18f8782a2",
+          "config/cache.php": "aab07c9ba924a024d9a7e7efc91bc8b312c0191b53dc368c75511c980b24153e",
+          "config/queue.php": "e66b0fb42fdb54044f1b62a6d5609396e1a334bc603afd31df51c80bb9726b6a",
+          "routes/console.php": "cecfcd5f616de04e7d32213359a145b59024060f60063e7bb552dcb29aaa2441"
+        },
+        "php_version": "8.4.27",
+        "postgres_version": "16.14",
+        "process_id": 1666
+      },
+      "lanes": {
+        "control": {
+          "status": "passed",
+          "checks": {
+            "database_role_match": true,
+            "migrator_table_schema_ddl": true,
+            "runtime_table_dml": true,
+            "future_schema_table_defaults": true,
+            "future_function_defaults": true,
+            "public_schema_access_absent": true,
+            "public_function_access_absent": true,
+            "runtime_nextval": true,
+            "runtime_setval_denied": true,
+            "runtime_create_table_denied": true,
+            "runtime_create_schema_denied": true,
+            "runtime_alter_table_denied": true,
+            "runtime_set_role_denied": true,
+            "history_readable": true,
+            "history_insert_grant_absent": true,
+            "history_update_grant_absent": true,
+            "history_delete_grant_absent": true,
+            "history_update_denied": true,
+            "history_delete_denied": true,
+            "history_insert_denied": true,
+            "history_nextval_denied": true,
+            "history_setval_denied": true,
+            "public_table_sequence_access_absent": true,
+            "runtime_delete": true
+          },
+          "identities": [
+            {
+              "database": "core_control_plane",
+              "role": "cpdb02_control_migrator"
+            },
+            {
+              "database": "core_control_plane",
+              "role": "cpdb02_control_runtime"
+            }
+          ],
+          "error": null
+        },
+        "business": {
+          "status": "passed",
+          "checks": {
+            "database_role_match": true,
+            "migrator_table_schema_ddl": true,
+            "runtime_table_dml": true,
+            "future_schema_table_defaults": true,
+            "future_function_defaults": true,
+            "public_schema_access_absent": true,
+            "public_function_access_absent": true,
+            "runtime_nextval": true,
+            "runtime_setval_denied": true,
+            "runtime_create_table_denied": true,
+            "runtime_create_schema_denied": true,
+            "runtime_alter_table_denied": true,
+            "runtime_set_role_denied": true,
+            "history_readable": true,
+            "history_insert_grant_absent": true,
+            "history_update_grant_absent": true,
+            "history_delete_grant_absent": true,
+            "history_update_denied": true,
+            "history_delete_denied": true,
+            "history_insert_denied": true,
+            "history_nextval_denied": true,
+            "history_setval_denied": true,
+            "public_table_sequence_access_absent": true,
+            "runtime_delete": true
+          },
+          "identities": [
+            {
+              "database": "core_erp",
+              "role": "cpdb02_business_migrator"
+            },
+            {
+              "database": "core_erp",
+              "role": "cpdb02_business_runtime"
+            }
+          ],
+          "error": null
+        },
+        "environment_a": {
+          "status": "passed",
+          "checks": {
+            "database_role_match": true,
+            "migrator_table_schema_ddl": true,
+            "runtime_table_dml": true,
+            "future_schema_table_defaults": true,
+            "future_function_defaults": true,
+            "public_schema_access_absent": true,
+            "public_function_access_absent": true,
+            "runtime_nextval": true,
+            "runtime_setval_denied": true,
+            "runtime_create_table_denied": true,
+            "runtime_create_schema_denied": true,
+            "runtime_alter_table_denied": true,
+            "runtime_set_role_denied": true,
+            "history_readable": true,
+            "history_insert_grant_absent": true,
+            "history_update_grant_absent": true,
+            "history_delete_grant_absent": true,
+            "history_update_denied": true,
+            "history_delete_denied": true,
+            "history_insert_denied": true,
+            "history_nextval_denied": true,
+            "history_setval_denied": true,
+            "public_table_sequence_access_absent": true,
+            "runtime_delete": true
+          },
+          "identities": [
+            {
+              "database": "core_erp_cpdb02_test_environment_a",
+              "role": "cpdb02_business_migrator"
+            },
+            {
+              "database": "core_erp_cpdb02_test_environment_a",
+              "role": "cpdb02_business_runtime"
+            }
+          ],
+          "error": null
+        },
+        "environment_b": {
+          "status": "passed",
+          "checks": {
+            "database_role_match": true,
+            "migrator_table_schema_ddl": true,
+            "runtime_table_dml": true,
+            "future_schema_table_defaults": true,
+            "future_function_defaults": true,
+            "public_schema_access_absent": true,
+            "public_function_access_absent": true,
+            "runtime_nextval": true,
+            "runtime_setval_denied": true,
+            "runtime_create_table_denied": true,
+            "runtime_create_schema_denied": true,
+            "runtime_alter_table_denied": true,
+            "runtime_set_role_denied": true,
+            "history_readable": true,
+            "history_insert_grant_absent": true,
+            "history_update_grant_absent": true,
+            "history_delete_grant_absent": true,
+            "history_update_denied": true,
+            "history_delete_denied": true,
+            "history_insert_denied": true,
+            "history_nextval_denied": true,
+            "history_setval_denied": true,
+            "public_table_sequence_access_absent": true,
+            "runtime_delete": true
+          },
+          "identities": [
+            {
+              "database": "core_erp_cpdb02_test_environment_b",
+              "role": "cpdb02_business_migrator"
+            },
+            {
+              "database": "core_erp_cpdb02_test_environment_b",
+              "role": "cpdb02_business_runtime"
+            }
+          ],
+          "error": null
+        },
+        "cross_connect": {
+          "status": "passed",
+          "checks": {
+            "cpdb02_control_runtime_business_connect_denied": true,
+            "cpdb02_control_runtime_environment_a_connect_denied": true,
+            "cpdb02_control_runtime_environment_b_connect_denied": true,
+            "cpdb02_control_migrator_business_connect_denied": true,
+            "cpdb02_control_migrator_environment_a_connect_denied": true,
+            "cpdb02_control_migrator_environment_b_connect_denied": true,
+            "cpdb02_business_runtime_control_connect_denied": true,
+            "cpdb02_business_migrator_control_connect_denied": true,
+            "outsider_connect_denied_0": true,
+            "outsider_connect_denied_1": true,
+            "outsider_connect_denied_2": true,
+            "outsider_connect_denied_3": true
+          },
+          "identities": [],
+          "error": null
+        },
+        "role_authority": {
+          "status": "passed",
+          "checks": {
+            "database_role_match": true,
+            "all_synthetic_roles_present": true,
+            "only_provisioner_createdb": true,
+            "no_inherited_role_memberships": true,
+            "provisioner_control_connect_denied": true,
+            "provisioner_pooled_connect_denied": true
+          },
+          "identities": [
+            {
+              "database": "postgres",
+              "role": "cpdb02_provisioner"
+            }
+          ],
+          "error": null
+        },
+        "control_routine": {
+          "status": "passed",
+          "checks": {
+            "database_role_match": true,
+            "runtime_actor_version_trigger": true,
+            "runtime_change_log_trigger": true,
+            "erp_security_tables_absent": true
+          },
+          "identities": [
+            {
+              "database": "core_control_plane",
+              "role": "cpdb02_control_runtime"
+            }
+          ],
+          "error": null
+        }
+      }
+    },
+    "produce_warm": {
+      "metadata": {
+        "profile_sha256": "177c2cb240dff79a6ef1a103b9c76cbd72616882159280f812b7035a716c2bbc",
+        "source_hashes": {
+          "app/Platform/Environment/Support/EnvironmentConnection.php": "7ae4e4057a48d2d58b9e08266c85936a6376db2e1c43fe8c90bb1e6065041715",
+          "app/Platform/Environment/Support/ConnectionFrame.php": "07208f91df1fd33d99abcd4890b0cbeda5cf9182acb607ea75b1b20fcc62673e",
+          "app/Platform/Environment/Listeners/ResetDatabaseConnections.php": "1443c6d830cb46ee163a5d482f8efec7bd135105fd0e43f516dd97075b78bcd1",
+          "app/Platform/Database/Support/DatabasePrivileges.php": "766f34ffa55ba63ebb788982ba32c44897cc0d63e30697235e9f80ecca523c38",
+          "app/Platform/Modules/Support/CoreMigrateCommand.php": "de9a8db46c8579150aaf9f453f10ce1b393fab21a8476cc4c3d97686591e46bc",
+          "app/Platform/Modules/Support/ModuleMigrator.php": "a916c5755343aa20c121011b33375ab1becbe4355a122567e8a8a48c3aeeed1b",
+          "app/Platform/Modules/Support/ModuleManifest.php": "832cc1a5b887b75d9f3f48715f3d5e651a02356fd01856168513a5692870cd78",
+          "app/Platform/Modules/Support/ModuleMigrationRepository.php": "f2865e1d760f5721a95543112d7a8e59cdd1483b9d84ed1f93e4891f38f8a33c",
+          "app/Platform/Modules/Support/ModuleSeeder.php": "5ec3a94c679b73fb34fda92cd58fcbda6875ff2d79628c5a674d0942db362e08",
+          "app/Platform/ControlPlane/Console/ControlMigrate.php": "41fb07642e828e622634815596b4408c1e1bdefdebd6229666c2ef37e28baf06",
+          "app/Platform/Reporting/Jobs/RunReportExport.php": "d4c51e855ed4f1b5b4ee07e6aced3104e29599616d8605eac79db99a4e4983c4",
+          "config/database.php": "6599d29fc6753a12cc8fa5656fc0f1469003c13e90ccfd434570074516188408",
+          "config/coreerp.php": "ce3c5fbaab39626044610b7586f7a346ebc4dd5439b9c6eeedccdaf83726237e",
+          "config/session.php": "b0d9dd8992d7a57c339918ca12cea26979603b1da1e20b24b57eab51e272c311",
+          "config/auth.php": "839b51b849b14513a4c8d29a7a956fce99e4334f178ba69dfe4fb8f18f8782a2",
+          "config/cache.php": "aab07c9ba924a024d9a7e7efc91bc8b312c0191b53dc368c75511c980b24153e",
+          "config/queue.php": "e66b0fb42fdb54044f1b62a6d5609396e1a334bc603afd31df51c80bb9726b6a",
+          "routes/console.php": "cecfcd5f616de04e7d32213359a145b59024060f60063e7bb552dcb29aaa2441"
+        },
+        "php_version": "8.4.27",
+        "postgres_version": "16.14",
+        "process_id": 1672
+      },
+      "lanes": {
+        "session": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "session_value": true,
+            "sessions_control_count": true,
+            "sessions_business_absent_0": true,
+            "sessions_business_absent_1": true,
+            "sessions_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        },
+        "password_reset": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "reset_token_valid": true,
+            "password_reset_tokens_control_count": true,
+            "password_reset_tokens_business_absent_0": true,
+            "password_reset_tokens_business_absent_1": true,
+            "password_reset_tokens_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        },
+        "cache": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "cache_value": true,
+            "cache_control_count": true,
+            "cache_business_absent_0": true,
+            "cache_business_absent_1": true,
+            "cache_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        },
+        "lock": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "lock_acquired": true,
+            "cache_locks_control_count": true,
+            "cache_locks_business_absent_0": true,
+            "cache_locks_business_absent_1": true,
+            "cache_locks_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        },
+        "scheduler": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "event_mutex_created": true,
+            "scheduler_mutex_created": true,
+            "cache_locks_control_count": true,
+            "cache_locks_business_absent_0": true,
+            "cache_locks_business_absent_1": true,
+            "cache_locks_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        },
+        "queue_success": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "jobs_control_count": true,
+            "jobs_business_absent_0": true,
+            "jobs_business_absent_1": true,
+            "jobs_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        },
+        "queue_failure": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "jobs_control_count": true,
+            "jobs_business_absent_0": true,
+            "jobs_business_absent_1": true,
+            "jobs_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        },
+        "batch": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "batch_pending": true,
+            "job_batches_control_count": true,
+            "job_batches_business_absent_0": true,
+            "job_batches_business_absent_1": true,
+            "job_batches_business_absent_2": true,
+            "jobs_control_count": true,
+            "jobs_business_absent_0": true,
+            "jobs_business_absent_1": true,
+            "jobs_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        }
+      }
+    },
+    "consume_warm": {
+      "metadata": {
+        "profile_sha256": "177c2cb240dff79a6ef1a103b9c76cbd72616882159280f812b7035a716c2bbc",
+        "source_hashes": {
+          "app/Platform/Environment/Support/EnvironmentConnection.php": "7ae4e4057a48d2d58b9e08266c85936a6376db2e1c43fe8c90bb1e6065041715",
+          "app/Platform/Environment/Support/ConnectionFrame.php": "07208f91df1fd33d99abcd4890b0cbeda5cf9182acb607ea75b1b20fcc62673e",
+          "app/Platform/Environment/Listeners/ResetDatabaseConnections.php": "1443c6d830cb46ee163a5d482f8efec7bd135105fd0e43f516dd97075b78bcd1",
+          "app/Platform/Database/Support/DatabasePrivileges.php": "766f34ffa55ba63ebb788982ba32c44897cc0d63e30697235e9f80ecca523c38",
+          "app/Platform/Modules/Support/CoreMigrateCommand.php": "de9a8db46c8579150aaf9f453f10ce1b393fab21a8476cc4c3d97686591e46bc",
+          "app/Platform/Modules/Support/ModuleMigrator.php": "a916c5755343aa20c121011b33375ab1becbe4355a122567e8a8a48c3aeeed1b",
+          "app/Platform/Modules/Support/ModuleManifest.php": "832cc1a5b887b75d9f3f48715f3d5e651a02356fd01856168513a5692870cd78",
+          "app/Platform/Modules/Support/ModuleMigrationRepository.php": "f2865e1d760f5721a95543112d7a8e59cdd1483b9d84ed1f93e4891f38f8a33c",
+          "app/Platform/Modules/Support/ModuleSeeder.php": "5ec3a94c679b73fb34fda92cd58fcbda6875ff2d79628c5a674d0942db362e08",
+          "app/Platform/ControlPlane/Console/ControlMigrate.php": "41fb07642e828e622634815596b4408c1e1bdefdebd6229666c2ef37e28baf06",
+          "app/Platform/Reporting/Jobs/RunReportExport.php": "d4c51e855ed4f1b5b4ee07e6aced3104e29599616d8605eac79db99a4e4983c4",
+          "config/database.php": "6599d29fc6753a12cc8fa5656fc0f1469003c13e90ccfd434570074516188408",
+          "config/coreerp.php": "ce3c5fbaab39626044610b7586f7a346ebc4dd5439b9c6eeedccdaf83726237e",
+          "config/session.php": "b0d9dd8992d7a57c339918ca12cea26979603b1da1e20b24b57eab51e272c311",
+          "config/auth.php": "839b51b849b14513a4c8d29a7a956fce99e4334f178ba69dfe4fb8f18f8782a2",
+          "config/cache.php": "aab07c9ba924a024d9a7e7efc91bc8b312c0191b53dc368c75511c980b24153e",
+          "config/queue.php": "e66b0fb42fdb54044f1b62a6d5609396e1a334bc603afd31df51c80bb9726b6a",
+          "routes/console.php": "cecfcd5f616de04e7d32213359a145b59024060f60063e7bb552dcb29aaa2441"
+        },
+        "php_version": "8.4.27",
+        "postgres_version": "16.14",
+        "process_id": 1678
+      },
+      "lanes": {
+        "session": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "session_value": true,
+            "sessions_control_count": true,
+            "sessions_business_absent_0": true,
+            "sessions_business_absent_1": true,
+            "sessions_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        },
+        "password_reset": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "reset_token_valid": true,
+            "password_reset_tokens_control_count": true,
+            "password_reset_tokens_business_absent_0": true,
+            "password_reset_tokens_business_absent_1": true,
+            "password_reset_tokens_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        },
+        "cache": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "cache_value": true,
+            "cache_control_count": true,
+            "cache_business_absent_0": true,
+            "cache_business_absent_1": true,
+            "cache_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        },
+        "lock": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "lock_contended_after_restart": true,
+            "original_lock_owner_released": true,
+            "lock_reacquired": true,
+            "cache_locks_control_count": true,
+            "cache_locks_business_absent_0": true,
+            "cache_locks_business_absent_1": true,
+            "cache_locks_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        },
+        "scheduler": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "event_mutex_survived_restart": true,
+            "scheduler_mutex_survived_restart": true,
+            "cache_locks_control_count": true,
+            "cache_locks_business_absent_0": true,
+            "cache_locks_business_absent_1": true,
+            "cache_locks_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        },
+        "queue_success": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "real_worker_completed": true,
+            "worker_business_context": true,
+            "worker_context_cleaned": true,
+            "worker_actor_cleaned": true,
+            "jobs_control_count": true,
+            "jobs_business_absent_0": true,
+            "jobs_business_absent_1": true,
+            "jobs_business_absent_2": true,
+            "failed_jobs_control_count": true,
+            "failed_jobs_business_absent_0": true,
+            "failed_jobs_business_absent_1": true,
+            "failed_jobs_business_absent_2": true
+          },
+          "identities": [
+            {
+              "database": "core_erp_cpdb02_test_environment_a",
+              "role": "cpdb02_business_runtime"
+            }
+          ],
+          "error": null
+        },
+        "queue_failure": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "real_worker_completed": true,
+            "worker_business_context": true,
+            "worker_context_cleaned": true,
+            "worker_actor_cleaned": true,
+            "jobs_control_count": true,
+            "jobs_business_absent_0": true,
+            "jobs_business_absent_1": true,
+            "jobs_business_absent_2": true,
+            "failed_jobs_control_count": true,
+            "failed_jobs_business_absent_0": true,
+            "failed_jobs_business_absent_1": true,
+            "failed_jobs_business_absent_2": true
+          },
+          "identities": [
+            {
+              "database": "core_erp_cpdb02_test_environment_b",
+              "role": "cpdb02_business_runtime"
+            }
+          ],
+          "error": null
+        },
+        "batch": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "real_worker_completed": true,
+            "worker_business_context": true,
+            "worker_context_cleaned": true,
+            "worker_actor_cleaned": true,
+            "jobs_control_count": true,
+            "jobs_business_absent_0": true,
+            "jobs_business_absent_1": true,
+            "jobs_business_absent_2": true,
+            "failed_jobs_control_count": true,
+            "failed_jobs_business_absent_0": true,
+            "failed_jobs_business_absent_1": true,
+            "failed_jobs_business_absent_2": true,
+            "batch_finished": true,
+            "job_batches_control_count": true,
+            "job_batches_business_absent_0": true,
+            "job_batches_business_absent_1": true,
+            "job_batches_business_absent_2": true
+          },
+          "identities": [
+            {
+              "database": "core_erp_cpdb02_test_environment_a",
+              "role": "cpdb02_business_runtime"
+            }
+          ],
+          "error": null
+        }
+      }
+    },
+    "produce_cold": {
+      "metadata": {
+        "profile_sha256": "177c2cb240dff79a6ef1a103b9c76cbd72616882159280f812b7035a716c2bbc",
+        "source_hashes": {
+          "app/Platform/Environment/Support/EnvironmentConnection.php": "7ae4e4057a48d2d58b9e08266c85936a6376db2e1c43fe8c90bb1e6065041715",
+          "app/Platform/Environment/Support/ConnectionFrame.php": "07208f91df1fd33d99abcd4890b0cbeda5cf9182acb607ea75b1b20fcc62673e",
+          "app/Platform/Environment/Listeners/ResetDatabaseConnections.php": "1443c6d830cb46ee163a5d482f8efec7bd135105fd0e43f516dd97075b78bcd1",
+          "app/Platform/Database/Support/DatabasePrivileges.php": "766f34ffa55ba63ebb788982ba32c44897cc0d63e30697235e9f80ecca523c38",
+          "app/Platform/Modules/Support/CoreMigrateCommand.php": "de9a8db46c8579150aaf9f453f10ce1b393fab21a8476cc4c3d97686591e46bc",
+          "app/Platform/Modules/Support/ModuleMigrator.php": "a916c5755343aa20c121011b33375ab1becbe4355a122567e8a8a48c3aeeed1b",
+          "app/Platform/Modules/Support/ModuleManifest.php": "832cc1a5b887b75d9f3f48715f3d5e651a02356fd01856168513a5692870cd78",
+          "app/Platform/Modules/Support/ModuleMigrationRepository.php": "f2865e1d760f5721a95543112d7a8e59cdd1483b9d84ed1f93e4891f38f8a33c",
+          "app/Platform/Modules/Support/ModuleSeeder.php": "5ec3a94c679b73fb34fda92cd58fcbda6875ff2d79628c5a674d0942db362e08",
+          "app/Platform/ControlPlane/Console/ControlMigrate.php": "41fb07642e828e622634815596b4408c1e1bdefdebd6229666c2ef37e28baf06",
+          "app/Platform/Reporting/Jobs/RunReportExport.php": "d4c51e855ed4f1b5b4ee07e6aced3104e29599616d8605eac79db99a4e4983c4",
+          "config/database.php": "6599d29fc6753a12cc8fa5656fc0f1469003c13e90ccfd434570074516188408",
+          "config/coreerp.php": "ce3c5fbaab39626044610b7586f7a346ebc4dd5439b9c6eeedccdaf83726237e",
+          "config/session.php": "b0d9dd8992d7a57c339918ca12cea26979603b1da1e20b24b57eab51e272c311",
+          "config/auth.php": "839b51b849b14513a4c8d29a7a956fce99e4334f178ba69dfe4fb8f18f8782a2",
+          "config/cache.php": "aab07c9ba924a024d9a7e7efc91bc8b312c0191b53dc368c75511c980b24153e",
+          "config/queue.php": "e66b0fb42fdb54044f1b62a6d5609396e1a334bc603afd31df51c80bb9726b6a",
+          "routes/console.php": "cecfcd5f616de04e7d32213359a145b59024060f60063e7bb552dcb29aaa2441"
+        },
+        "php_version": "8.4.27",
+        "postgres_version": "16.14",
+        "process_id": 1688
+      },
+      "lanes": {
+        "session": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "session_value": true,
+            "sessions_control_count": true,
+            "sessions_business_absent_0": true,
+            "sessions_business_absent_1": true,
+            "sessions_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        },
+        "password_reset": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "reset_token_valid": true,
+            "password_reset_tokens_control_count": true,
+            "password_reset_tokens_business_absent_0": true,
+            "password_reset_tokens_business_absent_1": true,
+            "password_reset_tokens_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        },
+        "cache": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "cache_value": true,
+            "cache_control_count": true,
+            "cache_business_absent_0": true,
+            "cache_business_absent_1": true,
+            "cache_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        },
+        "lock": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "lock_acquired": true,
+            "cache_locks_control_count": true,
+            "cache_locks_business_absent_0": true,
+            "cache_locks_business_absent_1": true,
+            "cache_locks_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        },
+        "scheduler": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "event_mutex_created": true,
+            "scheduler_mutex_created": true,
+            "cache_locks_control_count": true,
+            "cache_locks_business_absent_0": true,
+            "cache_locks_business_absent_1": true,
+            "cache_locks_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        },
+        "queue_success": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "jobs_control_count": true,
+            "jobs_business_absent_0": true,
+            "jobs_business_absent_1": true,
+            "jobs_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        },
+        "queue_failure": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "jobs_control_count": true,
+            "jobs_business_absent_0": true,
+            "jobs_business_absent_1": true,
+            "jobs_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        },
+        "batch": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "batch_pending": true,
+            "job_batches_control_count": true,
+            "job_batches_business_absent_0": true,
+            "job_batches_business_absent_1": true,
+            "job_batches_business_absent_2": true,
+            "jobs_control_count": true,
+            "jobs_business_absent_0": true,
+            "jobs_business_absent_1": true,
+            "jobs_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        }
+      }
+    },
+    "consume_cold": {
+      "metadata": {
+        "profile_sha256": "177c2cb240dff79a6ef1a103b9c76cbd72616882159280f812b7035a716c2bbc",
+        "source_hashes": {
+          "app/Platform/Environment/Support/EnvironmentConnection.php": "7ae4e4057a48d2d58b9e08266c85936a6376db2e1c43fe8c90bb1e6065041715",
+          "app/Platform/Environment/Support/ConnectionFrame.php": "07208f91df1fd33d99abcd4890b0cbeda5cf9182acb607ea75b1b20fcc62673e",
+          "app/Platform/Environment/Listeners/ResetDatabaseConnections.php": "1443c6d830cb46ee163a5d482f8efec7bd135105fd0e43f516dd97075b78bcd1",
+          "app/Platform/Database/Support/DatabasePrivileges.php": "766f34ffa55ba63ebb788982ba32c44897cc0d63e30697235e9f80ecca523c38",
+          "app/Platform/Modules/Support/CoreMigrateCommand.php": "de9a8db46c8579150aaf9f453f10ce1b393fab21a8476cc4c3d97686591e46bc",
+          "app/Platform/Modules/Support/ModuleMigrator.php": "a916c5755343aa20c121011b33375ab1becbe4355a122567e8a8a48c3aeeed1b",
+          "app/Platform/Modules/Support/ModuleManifest.php": "832cc1a5b887b75d9f3f48715f3d5e651a02356fd01856168513a5692870cd78",
+          "app/Platform/Modules/Support/ModuleMigrationRepository.php": "f2865e1d760f5721a95543112d7a8e59cdd1483b9d84ed1f93e4891f38f8a33c",
+          "app/Platform/Modules/Support/ModuleSeeder.php": "5ec3a94c679b73fb34fda92cd58fcbda6875ff2d79628c5a674d0942db362e08",
+          "app/Platform/ControlPlane/Console/ControlMigrate.php": "41fb07642e828e622634815596b4408c1e1bdefdebd6229666c2ef37e28baf06",
+          "app/Platform/Reporting/Jobs/RunReportExport.php": "d4c51e855ed4f1b5b4ee07e6aced3104e29599616d8605eac79db99a4e4983c4",
+          "config/database.php": "6599d29fc6753a12cc8fa5656fc0f1469003c13e90ccfd434570074516188408",
+          "config/coreerp.php": "ce3c5fbaab39626044610b7586f7a346ebc4dd5439b9c6eeedccdaf83726237e",
+          "config/session.php": "b0d9dd8992d7a57c339918ca12cea26979603b1da1e20b24b57eab51e272c311",
+          "config/auth.php": "839b51b849b14513a4c8d29a7a956fce99e4334f178ba69dfe4fb8f18f8782a2",
+          "config/cache.php": "aab07c9ba924a024d9a7e7efc91bc8b312c0191b53dc368c75511c980b24153e",
+          "config/queue.php": "e66b0fb42fdb54044f1b62a6d5609396e1a334bc603afd31df51c80bb9726b6a",
+          "routes/console.php": "cecfcd5f616de04e7d32213359a145b59024060f60063e7bb552dcb29aaa2441"
+        },
+        "php_version": "8.4.27",
+        "postgres_version": "16.14",
+        "process_id": 1694
+      },
+      "lanes": {
+        "session": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "session_value": true,
+            "sessions_control_count": true,
+            "sessions_business_absent_0": true,
+            "sessions_business_absent_1": true,
+            "sessions_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        },
+        "password_reset": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "reset_token_valid": true,
+            "password_reset_tokens_control_count": true,
+            "password_reset_tokens_business_absent_0": true,
+            "password_reset_tokens_business_absent_1": true,
+            "password_reset_tokens_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        },
+        "cache": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "cache_value": true,
+            "cache_control_count": true,
+            "cache_business_absent_0": true,
+            "cache_business_absent_1": true,
+            "cache_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        },
+        "lock": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "lock_contended_after_restart": true,
+            "original_lock_owner_released": true,
+            "lock_reacquired": true,
+            "cache_locks_control_count": true,
+            "cache_locks_business_absent_0": true,
+            "cache_locks_business_absent_1": true,
+            "cache_locks_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        },
+        "scheduler": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "event_mutex_survived_restart": true,
+            "scheduler_mutex_survived_restart": true,
+            "cache_locks_control_count": true,
+            "cache_locks_business_absent_0": true,
+            "cache_locks_business_absent_1": true,
+            "cache_locks_business_absent_2": true
+          },
+          "identities": [],
+          "error": null
+        },
+        "queue_success": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "real_worker_completed": true,
+            "worker_business_context": true,
+            "worker_context_cleaned": true,
+            "worker_actor_cleaned": true,
+            "jobs_control_count": true,
+            "jobs_business_absent_0": true,
+            "jobs_business_absent_1": true,
+            "jobs_business_absent_2": true,
+            "failed_jobs_control_count": true,
+            "failed_jobs_business_absent_0": true,
+            "failed_jobs_business_absent_1": true,
+            "failed_jobs_business_absent_2": true
+          },
+          "identities": [
+            {
+              "database": "core_erp_cpdb02_test_environment_a",
+              "role": "cpdb02_business_runtime"
+            }
+          ],
+          "error": null
+        },
+        "queue_failure": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "real_worker_completed": true,
+            "worker_business_context": true,
+            "worker_context_cleaned": true,
+            "worker_actor_cleaned": true,
+            "jobs_control_count": true,
+            "jobs_business_absent_0": true,
+            "jobs_business_absent_1": true,
+            "jobs_business_absent_2": true,
+            "failed_jobs_control_count": true,
+            "failed_jobs_business_absent_0": true,
+            "failed_jobs_business_absent_1": true,
+            "failed_jobs_business_absent_2": true
+          },
+          "identities": [
+            {
+              "database": "core_erp_cpdb02_test_environment_b",
+              "role": "cpdb02_business_runtime"
+            }
+          ],
+          "error": null
+        },
+        "batch": {
+          "status": "passed",
+          "checks": {
+            "fresh_process": true,
+            "real_worker_completed": true,
+            "worker_business_context": true,
+            "worker_context_cleaned": true,
+            "worker_actor_cleaned": true,
+            "jobs_control_count": true,
+            "jobs_business_absent_0": true,
+            "jobs_business_absent_1": true,
+            "jobs_business_absent_2": true,
+            "failed_jobs_control_count": true,
+            "failed_jobs_business_absent_0": true,
+            "failed_jobs_business_absent_1": true,
+            "failed_jobs_business_absent_2": true,
+            "batch_finished": true,
+            "job_batches_control_count": true,
+            "job_batches_business_absent_0": true,
+            "job_batches_business_absent_1": true,
+            "job_batches_business_absent_2": true
+          },
+          "identities": [
+            {
+              "database": "core_erp_cpdb02_test_environment_a",
+              "role": "cpdb02_business_runtime"
+            }
+          ],
+          "error": null
+        }
+      }
+    }
+  }
+}

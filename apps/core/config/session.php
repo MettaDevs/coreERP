@@ -73,7 +73,9 @@ return [
     |
     */
 
-    'connection' => env('SESSION_CONNECTION', env('SESSION_DRIVER', 'database') === 'redis' ? 'sessions' : null),
+    'connection' => env('SESSION_CONNECTION') ?: (env('SESSION_DRIVER', 'database') === 'redis'
+        ? 'sessions'
+        : (env('COREERP_CONTROL_CONNECTION') ?: env('DB_CONNECTION', 'sqlite'))),
 
     /*
     |--------------------------------------------------------------------------

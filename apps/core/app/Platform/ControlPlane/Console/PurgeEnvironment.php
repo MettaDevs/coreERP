@@ -7,6 +7,7 @@ namespace App\Platform\ControlPlane\Console;
 use App\Platform\ControlPlane\Console\Concerns\HoldsEnvironmentOperation;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Models\EnvironmentOperation;
+use App\Platform\Environment\Support\EnvironmentConnection;
 use Carbon\CarbonInterface;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
@@ -71,8 +72,10 @@ final class PurgeEnvironment extends Command
 
     protected $description = 'Buang database lingkungan yang masa tenggangnya sudah habis, beserta isinya';
 
-    /** Koneksi kedua ke database pusat, dipakai hanya untuk `DROP DATABASE`. */
-    private const CONNECTION_MAINTENANCE = 'environment_purge';
+    public function __construct(private readonly EnvironmentConnection $connections)
+    {
+        parent::__construct();
+    }
 
     /**
      * Tenggat kuncinya, dan ia yang paling panjang di antara operasi lingkungan.
@@ -387,24 +390,8 @@ final class PurgeEnvironment extends Command
             ));
         }
 
-        $base = $this->baseConfig();
-        $forbidden = array_filter([
-            (string) ($base['database'] ?? ''),
-            (string) config('coreerp.database'),
-        ], static fn (string $n): bool => $n !== '');
-
-        // Penjaga terakhir sebelum sesuatu yang tidak dapat dibatalkan. Sebuah baris registry yang
-        // `database_name`-nya salah isi — disunting tangan, atau ditulis jalur yang keliru — akan
-        // membuat perintah ini membuang database pusat beserta seluruh pelanggan di dalamnya.
-        if (in_array($name, $forbidden, true)) {
-            throw new RuntimeException(sprintf(
-                'Database "%s" adalah database pusat, bukan milik sebuah lingkungan; pembuangan dihentikan.',
-                $name,
-            ));
-        }
-
-        config(['database.connections.'.self::CONNECTION_MAINTENANCE => $base]);
-        DB::purge(self::CONNECTION_MAINTENANCE);
+        $this->connections->assertEnvironmentDatabase($name);
+        $maintenance = $this->connections->maintenance();
 
         try {
             // `PDO::exec`, bukan `statement()`. Yang terakhir menyiapkan pernyataannya lebih dulu,
@@ -419,13 +406,13 @@ final class PurgeEnvironment extends Command
             // `IF EXISTS` yang membuatnya aman diulang: percobaan yang mati sesudah drop tetapi
             // sebelum pencatatannya akan menemukan database itu memang sudah tidak ada, lalu
             // menyelesaikan pencatatannya.
-            DB::connection(self::CONNECTION_MAINTENANCE)
+            DB::connection($maintenance)
                 ->getPdo()
                 ->exec(sprintf('DROP DATABASE IF EXISTS "%s" WITH (FORCE)', $name));
 
             return true;
         } finally {
-            DB::purge(self::CONNECTION_MAINTENANCE);
+            DB::purge($maintenance);
         }
     }
 
@@ -477,19 +464,5 @@ final class PurgeEnvironment extends Command
         }
 
         return is_string($value) && $value !== '' ? Carbon::parse($value) : null;
-    }
-
-    /** @return array<string, mixed> */
-    private function baseConfig(): array
-    {
-        $default = (string) config('database.default');
-        $configuration = config('database.connections.'.$default);
-
-        if (! is_array($configuration)) {
-            throw new RuntimeException(sprintf('Koneksi bawaan "%s" tidak terbaca dari config.', $default));
-        }
-
-        /** @var array<string, mixed> $configuration */
-        return $configuration;
     }
 }

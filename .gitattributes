@@ -6,6 +6,9 @@
 *.md diff=markdown
 *.php diff=php
 
+apps/core/database/control-plane/baseline.sql linguist-generated=true
+apps/core/database/control-plane/baseline.metadata.json linguist-generated=true
+
 CHANGELOG.md export-ignore
 README.md export-ignore
 .github/workflows/browser-tests.yml export-ignore
