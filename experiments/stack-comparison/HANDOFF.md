@@ -69,7 +69,8 @@ Throughput seluruh native mentok ±198-217 req/s di dev1; batasnya disk (fsync W
 **Melanjutkan:**
 - Lima ulangan dasar: `~/coreerp-stack-comparison/run-s6.sh` di dev1. Ia me-ramp ulang Rust lalu menjalankan lima ulangan; ganti `--name q3` bila folder q3 sudah ada.
 - Kampanye teroptimasi: `run-o1.sh` memasang `staging-o1`. Sebelum dijalankan, isi ulang staging dari commit laptop terbaru (`git diff --name-only 2150f77f HEAD`) dan perbarui `EXPECTED` ke tree commit itu. Ia menunggu penanda `S4-DONE` di `run-s4.log`.
-- Kewajiban beres-beres tersisa: lab dan secret fixture sintetis di dev2 (`~/coreerp-stack-comparison`, `~/coreerp-dev2-*.sh`), serta folder `staging*` dan skrip `run-*.sh` di home dev1.
+- Kewajiban beres-beres tersisa: folder `staging*` dan skrip `run-*.sh` di home dev1. Lab dev2 (container, volume, image, dan `~/coreerp-stack-comparison` beserta `private/`) sudah dihapus sesi "Perbedaan disk write dev 1 dan dev 2" atas permintaan pengguna, 4 November.
+- A/B varian teroptimasi khusus Elysia dibatalkan pengguna pada 4 November: konfigurasi repo baru mengikuti setup Elysia di Cue. Pengetahuannya dicatat di CoreERP `docs/dev/39-pindah-ke-bun-elysia.md` dan skill `coreerp-bun-elysia` (branch `claude/stack-bun-elysia`).
 
 ## Stack terpilih: Bun + Elysia, 4 November
 
