@@ -70,8 +70,10 @@ def up(name: str, database: str, runtime_env: Path) -> dict:
     if variant() == "optimized":
         settings.update(OPTIMIZED)
         lab.compose("up", "-d", "--wait", "valkey")
+    # Batas berkas terbuka yang sama untuk semua kandidat. Bawaan container soft 1024: runtime Go dan Bun menaikkannya
+    # sendiri ke hard limit, Rust tidak, sehingga Rust menolak koneksi ke-±1.015 (r9n-rust-1100: 115 dial timeout).
     arguments = ["run", "-d", "--name", "coreerp-native-" + name, "--network", NETWORK, "--cpus", "2", "--memory", "1g",
-                 "-p", f"127.0.0.1:{candidate['port']}:8000"]
+                 "--ulimit", "nofile=65536:65536", "-p", f"127.0.0.1:{candidate['port']}:8000"]
     for key, value in settings.items():
         arguments += ["-e", f"{key}={value}"]
     for key in SECRETS:
@@ -103,7 +105,7 @@ def up(name: str, database: str, runtime_env: Path) -> dict:
     return {
         "candidate": name, "container": container[:12], "image": image, "image_id": inspect["Image"],
         "database": database, "base": f"http://127.0.0.1:{candidate['port']}", "settings": settings,
-        "cpus": 2, "memory": "1g", "network": NETWORK, "php_before_start": php, "variant": variant(),
+        "cpus": 2, "memory": "1g", "nofile": 65536, "network": NETWORK, "php_before_start": php, "variant": variant(),
     }
 
 
