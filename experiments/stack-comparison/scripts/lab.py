@@ -78,6 +78,8 @@ def pg_tuning(action: str) -> None:
 
 def optimized_seed(database: str, seed: Path, output: Path) -> None:
     """Seed versi teroptimasi: clone seed dasar, pasang skema versi konteks, lalu dump dengan format yang sama."""
+    # Perintah docker berjalan dari akar repo (command() memakai cwd=ROOT), jadi path relatif harus dibuat absolut.
+    output = output.resolve()
     clone(database, seed)
     schema = LAB / "infra" / "optimized-schema.sql"
     subprocess.run(["docker", "exec", "-i", DATABASE_CONTAINER, "psql", "-X", "-q", "-v", "ON_ERROR_STOP=1", "-U", "compare_admin", "-d", database],
