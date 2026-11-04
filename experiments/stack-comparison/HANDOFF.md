@@ -36,6 +36,18 @@ Diagnosis memakai `scripts/probe.py` (CPU dan socket per proses SUT, state dan w
 
 Keputusan pengguna 4 November: awal siklus disebar sepanjang satu siklus. `profile.json` kini Uniform(0,60) (12 aksi × jeda rata-rata 5 detik) dan warmup 75 detik; `load.py` mengambil nilai bawaannya dari `profile.json`. Laporan run memuat `plateau_rates`: laju baca/tulis per 10 detik di plateau dan koefisien variasinya. Pada `r7-rust-1000` CV laju tulis 0,67 (8,8 sampai 84 per detik). Hasil ramp r1 sampai r7 memakai profil lama dan tidak dicampur dengan hasil profil baru.
 
+Keputusan pengguna 4 November, diteruskan lewat sesi "Perbedaan disk write dev 1 dan dev 2" lalu dikonfirmasi langsung: cara menaikkan batas VU berikut diuji A/B **sesudah** ramp r8 dan lima ulangan selesai. Cara yang terbukti menaikkan batas dengan gate kebenaran tetap bersih (0 lintas tenant, 0 nomor ganda, 0 eskalasi hak, 0 error 5xx, oracle bersih) **wajib** dipakai pada refactor ke stack terpilih.
+
+1. Cache konteks permintaan per tenant + user + nomor versi, dibuang saat role, izin, atau keanggotaan berubah; tanpa state per permintaan yang tertinggal di worker yang hidup lama.
+2. Role rekursif diratakan menjadi tabel izin jadi yang diperbarui saat role berubah.
+3. Sesi di Valkey, bukan Postgres.
+4. PgBouncer transaction pooling.
+5. FrankenPHP worker untuk varian PHP (runtime PHP uji sudah Octane/FrankenPHP).
+6. `synchronous_commit = off` lewat `SET LOCAL` hanya untuk tulisan tidak penting (sesi, log aktivitas); posting, penomoran, dan stok tetap on.
+7. Setelan dasar Postgres (sebagian sudah: shared_buffers 1 GB dari 4 GB, max_wal_size 1 GB).
+
+Dilarang: `fsync=off`, `full_page_writes=off`, unlogged table untuk data penting. Butir 1, 2, 3, 4, dan 6 mengubah perilaku yang dijaga gate kesetaraan, jadi diterapkan ke PHP juga agar perbandingan tetap adil. Urutan uji mengikuti bottleneck yang terbukti: 6 dan 3 dulu (menghapus fsync per request), lalu 1 dan 2 bila CPU menjadi limiter berikutnya.
+
 ## Correctness selesai di dev1, 3 November 20:46 WITA
 
 Cluster uji dev1 berjalan dari compose eksperimen (`coreerp-stack-comparison`, port loopback 18640/18641). `runtime.env` di dev1 sudah LF dan `PHP_IMAGE` menunjuk ID dev1. Evidence dev1 berawalan `d1-` (PHP dan Go/Hono/Elysia) serta `d2-` (Rust sesudah perbaikan reset).
