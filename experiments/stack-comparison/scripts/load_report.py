@@ -81,6 +81,8 @@ def connection_states(run: Path, manifest: dict) -> dict:
 # Database run hampir tidak membaca disk (blks_read kecil); baca disk host di atas batas ini berasal dari proses
 # lain di server (job backup dev1, 4 November) dan mengganggu bottleneck fsync yang sedang diukur.
 HOST_READ_LIMIT_MB_S = 5
+# Run sendiri menulis 3-7 MB/s (WAL dan checkpoint); di atas batas ini ada penulis lain di disk yang sama.
+HOST_WRITE_LIMIT_MB_S = 12
 
 
 def host_io(run: Path, manifest: dict) -> dict:
@@ -105,7 +107,7 @@ def host_io(run: Path, manifest: dict) -> dict:
     iowait = [row[15] for row in rows]
     result = {"samples": len(rows), "read_mb_s_mean": round(statistics.fmean(read), 1), "read_mb_s_max": round(max(read), 1),
               "write_mb_s_mean": round(statistics.fmean(write), 1), "iowait_mean": round(statistics.fmean(iowait), 1), "iowait_max": max(iowait)}
-    result["noisy"] = result["read_mb_s_mean"] > HOST_READ_LIMIT_MB_S
+    result["noisy"] = result["read_mb_s_mean"] > HOST_READ_LIMIT_MB_S or result["write_mb_s_mean"] > HOST_WRITE_LIMIT_MB_S
     return result
 
 

@@ -15,7 +15,7 @@ import time
 
 import lab
 import native
-from load_report import HOST_READ_LIMIT_MB_S
+from load_report import HOST_READ_LIMIT_MB_S, HOST_WRITE_LIMIT_MB_S
 from sql_observer import sql, validate_database
 
 LAB = Path(__file__).resolve().parents[1]
@@ -101,7 +101,7 @@ def connections(database: str, target: Path, stop: threading.Event) -> threading
     return thread
 
 
-def wait_for_quiet_host(limit_mb_s: float, quiet_seconds: int = 30, timeout_seconds: int = 1200) -> dict:
+def wait_for_quiet_host(limit_mb_s: float, write_limit_mb_s: float, quiet_seconds: int = 30, timeout_seconds: int = 1200) -> dict:
     """Tunda start sampai baca disk host di bawah batas selama quiet_seconds berturut-turut (job backup di dev1).
     Bila tidak tenang sebelum timeout, run tetap berjalan dan laporan menilai gangguannya lewat host_io."""
     started = time.monotonic()
@@ -116,12 +116,14 @@ def wait_for_quiet_host(limit_mb_s: float, quiet_seconds: int = 30, timeout_seco
             if first:  # baris pertama vmstat adalah rata-rata sejak boot
                 first = False
                 continue
-            quiet = quiet + 1 if int(fields[8]) / 1024 < limit_mb_s else 0
+            calm = int(fields[8]) / 1024 < limit_mb_s and int(fields[9]) / 1024 < write_limit_mb_s
+            quiet = quiet + 1 if calm else 0
             if quiet >= quiet_seconds or time.monotonic() - started > timeout_seconds:
                 break
     finally:
         process.terminate()
-    return {"waited_s": round(time.monotonic() - started, 1), "quiet": quiet >= quiet_seconds, "limit_mb_s": limit_mb_s}
+    return {"waited_s": round(time.monotonic() - started, 1), "quiet": quiet >= quiet_seconds, "read_limit_mb_s": limit_mb_s,
+            "write_limit_mb_s": write_limit_mb_s}
 
 
 def database_counters(database: str) -> dict:
@@ -206,7 +208,7 @@ if __name__ == "__main__":
         manifest["sessions"] = {"file": args.sessions.name, "created_at": sessions["created_at"], "count": len(sessions["sessions"]),
                                 "rows_refreshed": int(refreshed), "dump": sessions["dump"]}
     if sys.platform != "win32":
-        manifest["host_quiet_wait"] = wait_for_quiet_host(HOST_READ_LIMIT_MB_S)
+        manifest["host_quiet_wait"] = wait_for_quiet_host(HOST_READ_LIMIT_MB_S, HOST_WRITE_LIMIT_MB_S)
     sut = start(args.candidate, args.database)
     manifest["sut"] = sut
     limits = json.loads(subprocess.run(["docker", "inspect", "coreerp-stack-comparison-database-1", "--format", "{{json .HostConfig}}"],
