@@ -2,6 +2,7 @@
 
 namespace App\Platform\Reporting\Support;
 
+use App\Platform\Environment\Support\ActiveEnvironment;
 use App\Platform\Reporting\Jobs\RunReportExport;
 use App\Platform\Retention\Support\RetentionService;
 use App\Platform\Tenant\Models\TenantMembership;
@@ -138,7 +139,9 @@ final class ExportQueue
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        RunReportExport::dispatch($membership->tenant_id, $id);
+        $environment = app()->bound(ActiveEnvironment::KEY)
+            ? app()->make(ActiveEnvironment::KEY) : null;
+        RunReportExport::dispatch($membership->tenant_id, $id, is_string($environment) ? $environment : null);
 
         return $id;
     }

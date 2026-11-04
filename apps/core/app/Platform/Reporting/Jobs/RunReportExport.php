@@ -3,6 +3,8 @@
 namespace App\Platform\Reporting\Jobs;
 
 use App\Platform\ChangeLog\Support\AuditActor;
+use App\Platform\Environment\Models\Environment;
+use App\Platform\Environment\Support\EnvironmentConnection;
 use App\Platform\Identity\Support\UserClock;
 use App\Platform\Reporting\Support\ExportQueue;
 use App\Platform\Reporting\Support\ExportStatus;
@@ -30,6 +32,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 use stdClass;
 use Throwable;
 
@@ -47,12 +50,11 @@ use Throwable;
  * Kegagalan **tetap** dicatat ke baris ekspor dan job dianggap selesai, tanpa diulang: layout
  * salah susun, data terlalu besar, hak yang dicabut, atau parameter yang ditolak module akan
  * gagal lagi dengan cara yang sama, dan pesan jelas lebih berguna daripada tiga percobaan
- * diam-diam. Kesalahan tak terduga ikut di sini: hampir selalu cacat kode, dan mengulangnya
- * hanya menggandakan laporan kesalahannya.
+ * diam-diam.
  *
  * Gangguan **sesaat** diulang sampai {@see self::tries()} percobaan dengan jeda
  * {@see self::backoff()}, padanan *Maximum No. of Attempts to Run* pada Job Queue Entry
- * Business Central. Sumbernya hanya dua:
+ * Business Central.
  *
  * - layanan PDF yang terlambat menjawab, menolak sambungan, atau menjawab 5xx/408/429
  *   ({@see RenderException::transient()}). Selama menunggu, baris kembali `queued` dan
@@ -85,10 +87,18 @@ final class RunReportExport implements ShouldQueue
     /** Jeda di atas batas waktu sebelum baris `running` dianggap ditinggal worker yang mati. */
     private const LEASE_MARGIN_SECONDS = 30;
 
+    public int $contextVersion = 0;
+
+    public ?string $environmentId = null;
+
     public function __construct(
         public readonly string $tenantId,
         public readonly string $exportId,
-    ) {}
+        ?string $environmentId = null,
+    ) {
+        $this->contextVersion = 1;
+        $this->environmentId = $environmentId;
+    }
 
     public function tries(): int
     {
@@ -102,6 +112,11 @@ final class RunReportExport implements ShouldQueue
     }
 
     public function handle(ReportCatalog $catalog, ReportSource $client, LayoutStore $layouts, RenderPipeline $pipeline, PrintIdentityStore $identities, DataOnlyWorkbook $dataOnly, ListExporter $lists): void
+    {
+        app(EnvironmentConnection::class)->runWithin($this->environment(), fn () => $this->run($catalog, $client, $layouts, $pipeline, $identities, $dataOnly, $lists));
+    }
+
+    private function run(ReportCatalog $catalog, ReportSource $client, LayoutStore $layouts, RenderPipeline $pipeline, PrintIdentityStore $identities, DataOnlyWorkbook $dataOnly, ListExporter $lists): void
     {
         $export = $this->row();
         if ($export === null || ! ExportStatus::isActive($export->status)) {
@@ -128,6 +143,18 @@ final class RunReportExport implements ShouldQueue
      * atau percobaan habis karena worker berulang kali mati di tengah jalan.
      */
     public function failed(?Throwable $exception): void
+    {
+        try {
+            $environment = $this->environment();
+        } catch (RuntimeException) {
+            Log::warning('Ekspor perlu diminta ulang karena lingkungan asal tidak dapat dipastikan.', ['tenant_id' => $this->tenantId, 'export_id' => $this->exportId]);
+
+            return;
+        }
+        app(EnvironmentConnection::class)->runWithin($environment, fn () => $this->failExport($exception));
+    }
+
+    private function failExport(?Throwable $exception): void
     {
         $export = $this->row();
         if ($export === null || ! ExportStatus::isActive($export->status)) {
@@ -299,6 +326,24 @@ final class RunReportExport implements ShouldQueue
     private function abandonedBefore(): CarbonInterface
     {
         return now()->subSeconds($this->timeout + self::LEASE_MARGIN_SECONDS);
+    }
+
+    private function environment(): ?Environment
+    {
+        if ($this->contextVersion !== 1) {
+            throw new RuntimeException('Ekspor lama perlu diminta ulang agar lingkungan asalnya dapat dipastikan.');
+        }
+        if ($this->environmentId === null) {
+            return null;
+        }
+        $environment = Environment::query()->hostedByProvider()
+            ->whereKey($this->environmentId)->where('tenant_id', $this->tenantId)
+            ->where('status', 'active')->whereNull('deleted_at')->first();
+        if (! $environment instanceof Environment) {
+            throw new RuntimeException('Lingkungan asal ekspor belum tersedia. Coba lagi setelah lingkungan aktif.');
+        }
+
+        return $environment;
     }
 
     private function row(): ?stdClass
