@@ -1,12 +1,18 @@
 # Pindah ke Bun + Elysia
 
-Pada 4 November 2026 pemilik produk memutuskan semua repo baru ditulis dengan Bun + Elysia. Repo barunya dua; nama
-dan pembagian ERP, Praktik Dokter, dan control plane di antara keduanya belum diputuskan. Selama repo baru belum
-menggantikan apa pun, CoreERP di repo ini tetap acuan perilaku: nama tabel dan kolom database tetap sama, dan respons
-HTTP repo baru diuji terhadap respons CoreERP.
+Pada 4 November 2026 pemilik produk memutuskan semua repo baru ditulis dengan Bun + Elysia. Repo barunya dua:
+
+| Repo | Isi |
+| --- | --- |
+| [operations-metta](https://github.com/MettaDevs/operations-metta) | Runtime yang dijalankan untuk klinik, di SaaS maupun on-prem: ERP, lalu Praktik Dokter |
+| [control-plane-metta](https://github.com/MettaDevs/control-plane-metta) | Onboarding, trial Praktik Dokter, tenant, lingkungan, rilis, dan agen server, dengan konsol operator internal dan portal customer yang di-deploy terpisah |
+
+Selama repo baru belum menggantikan apa pun, CoreERP di repo ini tetap acuan perilaku: nama tabel dan kolom database
+tetap sama, dan respons HTTP repo baru diuji terhadap respons CoreERP. Aturan kerja tiap repo ada di `AGENTS.md`
+masing-masing.
 
 Halaman ini mencatat apa yang sudah diukur, konfigurasi yang dipakai saat diukur, dan aturan yang wajib dibawa ke repo
-baru. Desain repo baru sendiri belum ditulis.
+baru.
 
 ## Dasar keputusan
 
@@ -126,7 +132,6 @@ ledger.
   menaikkan batas.
 - Lima ulangan pada titik batas.
 - Kapasitas di server dengan disk yang flush-nya durabel.
-- Nama dan pembagian dua repo baru.
 
 ## Sumber
 
