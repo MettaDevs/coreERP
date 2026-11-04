@@ -1,6 +1,7 @@
 // Profil pending-purchase-v1 sebagai pengguna: satu sesi nyata per VU, jeda Uniform(1,9) detik sesudah
-// setiap aksi, start siklus Uniform(0,10) sesudah jendela login. Model closed; offered load turun bila
-// server melambat. Login (bcrypt dua kali) diukur di jendela sendiri agar tidak tumpang tindih plateau.
+// setiap aksi, start siklus Uniform(0, satu siklus) sesudah jendela login sehingga fase VU tersebar rata
+// dan plateau tidak bergelombang. Model closed; offered load turun bila server melambat. Login (bcrypt
+// dua kali) diukur di jendela sendiri agar tidak tumpang tindih plateau.
 import http from 'k6/http';
 import exec from 'k6/execution';
 import { sleep } from 'k6';
@@ -11,7 +12,8 @@ const BASE = __ENV.BASE;
 const RUN_ID = __ENV.RUN_ID;
 const PASSWORD = __ENV.COMPARE_PASSWORD;
 const LOGIN = Number(__ENV.LOGIN_SECONDS || 60);
-const WARMUP = Number(__ENV.WARMUP_SECONDS || 30);
+const WARMUP = Number(__ENV.WARMUP_SECONDS || 75);
+const SPREAD = Number(__ENV.START_SPREAD_SECONDS || 60);
 const PLATEAU = Number(__ENV.PLATEAU_SECONDS || 90);
 const DRAIN = Number(__ENV.DRAIN_SECONDS || 300);
 // Fixture dimuat sekali untuk semua VU; parse per VU menghabiskan 2 GB pada 800 VU.
@@ -134,7 +136,7 @@ export default function () {
     try {
         if (account === null) login();
         if (!cycling) {
-            sleep(Math.max(0, LOGIN - elapsed()) + Math.random() * 10);
+            sleep(Math.max(0, LOGIN - elapsed()) + Math.random() * SPREAD);
             cycling = true;
         }
         cycle();

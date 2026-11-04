@@ -86,6 +86,26 @@ def counter_delta(manifest: dict) -> dict:
                     for key in after[group]} for group in after if after[group] and before.get(group)}
 
 
+def plateau_rates(arrivals: dict[tuple, int]) -> dict:
+    """Laju request per 10 detik di plateau dan koefisien variasinya. Plateau yang sefase (gelombang) terlihat
+    dari CV laju tulis yang besar; dengan awal siklus tersebar laju seharusnya hampir rata."""
+    if not arrivals:
+        return {}
+    start = min(second for _, second in arrivals)
+    result = {}
+    for kind in ("read", "write"):
+        buckets: dict[int, int] = defaultdict(int)
+        for (k, second), count in arrivals.items():
+            if k == kind:
+                buckets[(second - start) // 10] += count
+        series = [round(buckets[index] / 10, 1) for index in range(max(buckets, default=-1) + 1)]
+        full = series[:-1] if len(series) > 1 else series
+        mean = sum(full) / len(full) if full else 0
+        spread = (sum((value - mean) ** 2 for value in full) / len(full)) ** 0.5 if full else 0
+        result[kind] = {"per_second_by_10s": series, "cv": round(spread / mean, 3) if mean else None}
+    return result
+
+
 def report(run: Path) -> dict:
     profile = json.loads((LAB / "profile.json").read_text(encoding="utf-8"))
     manifest = json.loads((run / "manifest.json").read_text(encoding="utf-8"))
@@ -95,10 +115,13 @@ def report(run: Path) -> dict:
     statuses: dict[str, int] = defaultdict(int)
     session_statuses: dict[str, int] = defaultdict(int)
     cycles: dict[str, list[float]] = defaultdict(list)
+    arrivals: dict[tuple, int] = defaultdict(int)
     for row in points(run):
         metric = row["metric_name"]
         if metric == "http_req_duration":
             key = (row.get("phase"), row.get("kind"), row.get("op"))
+            if key[0] == "plateau" and key[1] in {"read", "write"}:
+                arrivals[(key[1], int(row["timestamp"]))] += 1
             if row["expected_response"] == "true":
                 latency[key].append(float(row["metric_value"]))
             else:
@@ -136,6 +159,7 @@ def report(run: Path) -> dict:
     successful = sum(len(values) for (phase, _, _), values in latency.items() if phase == "plateau")
     cpu = cpu_series(run, manifest)
     loadgen = cpu.get("coreerp-loadgen", {})
+    stationarity = plateau_rates(arrivals)
     return {
         "run_id": manifest["run_id"], "candidate": manifest["candidate"], "vus": manifest["vus"], "verdict": verdict,
         "checks": checks, "samples_sufficient": enough, "minimum_samples_per_operation": minimum,
@@ -144,7 +168,7 @@ def report(run: Path) -> dict:
         "failed_by_status": dict(statuses), "acknowledged_receipts": manifest.get("acknowledged_receipts"),
         "completed_cycles": oracle.get("acknowledged_completed"),
         "cycle_ms_with_think": summary(cycles["cycle_total"]), "cycle_ms_without_think": summary(cycles["cycle_busy"]),
-        "cpu_percent": cpu, "connections": connection_states(run, manifest), "database_delta": counter_delta(manifest),
+        "plateau_rates": stationarity, "cpu_percent": cpu, "connections": connection_states(run, manifest), "database_delta": counter_delta(manifest),
         "loadgen_saturated": bool(loadgen) and loadgen["mean"] > 0.8 * 100 * float(manifest["loadgen"]["cpus"]),
         "oracle_failures": oracle["failures"],
         "limitations": "Closed model with think time; VU count is not concurrent request count. Percentiles use nearest rank. PASS_LOW_SAMPLES means some operation had fewer samples than the profile minimum, so p99 is not claimable.",

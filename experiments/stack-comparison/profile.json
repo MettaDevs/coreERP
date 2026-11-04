@@ -30,9 +30,9 @@
   "load": {
     "model": "closed",
     "think_time": { "distribution": "uniform", "minimum_seconds": 1, "maximum_seconds": 9, "mean_seconds": 5 },
-    "initial_offset": { "distribution": "uniform", "minimum_seconds": 0, "maximum_seconds": 10 },
+    "initial_offset": { "distribution": "uniform", "minimum_seconds": 0, "maximum_seconds": 60, "basis": "Satu siklus: 12 aksi x jeda rata-rata 5 detik. Uniform(0,10) membuat semua VU sefase sehingga laju tulis berayun 3-100/s dan verdict bergantung letak plateau terhadap gelombang (r7, 4 November 2026); disebar satu siklus atas keputusan pengguna 4 November 2026." },
     "plateau_seconds": 90,
-    "warmup_seconds": 30,
+    "warmup_seconds": 75,
     "drain_seconds": 90,
     "repeats": 5,
     "candidate_order": "rotating Latin square",

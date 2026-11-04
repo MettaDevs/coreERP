@@ -24,6 +24,7 @@ K6_IMAGE = "grafana/k6:0.55.0"
 LOADGEN = "coreerp-loadgen"
 # Satu koneksi database per worker Octane; sama dengan batas 8 koneksi kandidat native di native.py.
 PHP_WORKERS = 8
+PROFILE = json.loads((LAB / "profile.json").read_text(encoding="utf-8"))["load"]
 
 
 def secret(name: str) -> str:
@@ -148,8 +149,10 @@ if __name__ == "__main__":
     parser.add_argument("--vus", required=True, type=int)
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--login", type=int, help="Jendela login detik; bawaan max(60, 0.5 x VU), jadi login tiba sekitar 4 per detik.")
-    parser.add_argument("--warmup", type=int, default=30)
-    parser.add_argument("--plateau", type=int, default=90)
+    parser.add_argument("--warmup", type=int, default=PROFILE["warmup_seconds"])
+    parser.add_argument("--start-spread", type=int, default=PROFILE["initial_offset"]["maximum_seconds"],
+                        help="Awal siklus tiap VU Uniform(0, nilai ini) sesudah jendela login.")
+    parser.add_argument("--plateau", type=int, default=PROFILE["plateau_seconds"])
     parser.add_argument("--drain", type=int, default=300)
     parser.add_argument("--loadgen-cpus", default="2")
     parser.add_argument("--fixture", type=Path, default=PRIVATE / "fixture.json")
@@ -163,7 +166,7 @@ if __name__ == "__main__":
     if out.exists():
         raise SystemExit("Folder run sudah ada; run beban tidak menimpa evidence lama.")
     out.mkdir(parents=True)
-    manifest = {"run_id": args.run_id, "candidate": args.candidate, "vus": args.vus, "phases": {"login": login_seconds, "warmup": args.warmup, "plateau": args.plateau, "drain": args.drain},
+    manifest = {"run_id": args.run_id, "candidate": args.candidate, "vus": args.vus, "phases": {"login": login_seconds, "start_spread": args.start_spread, "warmup": args.warmup, "plateau": args.plateau, "drain": args.drain},
                 "fixture": str(args.fixture), "baseline": str(args.baseline),
                 "think_time": "Uniform(1,9) s sesudah setiap aksi", "login_offset": "Uniform(0, 0.5 x jendela login) s", "initial_offset": "Uniform(0,10) s sesudah jendela login", "k6_image": K6_IMAGE,
                 "loadgen": {"cpus": args.loadgen_cpus, "memory": "2g", "network": native.NETWORK}, "host": os.uname().nodename if hasattr(os, "uname") else ""}
@@ -184,7 +187,7 @@ if __name__ == "__main__":
     command = ["docker", "run", "--rm", "--name", LOADGEN, "--network", native.NETWORK, "--cpus", args.loadgen_cpus, "--memory", "2g",
                "--user", f"{os.getuid()}:{os.getgid()}" if hasattr(os, "getuid") else "0:0", "--ulimit", "nofile=65536:65536",
                "-e", "BASE=" + sut["internal"], "-e", "RUN_ID=" + args.run_id, "-e", f"VUS={args.vus}", "-e", "COMPARE_PASSWORD",
-               "-e", f"LOGIN_SECONDS={login_seconds}", "-e", f"WARMUP_SECONDS={args.warmup}", "-e", f"PLATEAU_SECONDS={args.plateau}", "-e", f"DRAIN_SECONDS={args.drain}",
+               "-e", f"LOGIN_SECONDS={login_seconds}", "-e", f"WARMUP_SECONDS={args.warmup}", "-e", f"START_SPREAD_SECONDS={args.start_spread}", "-e", f"PLATEAU_SECONDS={args.plateau}", "-e", f"DRAIN_SECONDS={args.drain}",
                "-v", f"{LAB / 'load'}:/scripts:ro", "-v", f"{args.fixture.resolve()}:/fixture/fixture.json:ro", "-v", f"{out}:/out",
                K6_IMAGE, "run", "--quiet", "--log-format", "json", "--log-output", "file=/out/k6.log", "--out", "csv=/out/points.csv.gz", "/scripts/user-flow.js"]
     manifest["started_at"] = datetime.now(timezone.utc).isoformat()

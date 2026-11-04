@@ -4,7 +4,7 @@ Dicatat 3 November 2026, sekitar 16:22 WITA. Pengguna meminta berhenti dan menye
 
 ## Benchmark dev1, 3-4 November malam
 
-dev2 dilewati atas keputusan pengguna (CPU steal 35-37%). Load runner: `load/user-flow.js` (k6 0.55.0, satu sesi per VU, jeda Uniform(1,9) detik, start Uniform(0,10) sesudah jendela login), `scripts/load.py` (satu run, sampler cgroup/koneksi/checkpoint, oracle rekonsiliasi atas ledger), `scripts/load_report.py`, `scripts/ramp.py`. Fixture 128 tenant × 8 akun: `private/fixture-128.json`, `seed-128.dump` (`23de4f57…`), baseline `seed-128-baseline.json`. Evidence run di `private/load/<run-id>/`.
+dev2 dilewati atas keputusan pengguna (CPU steal 35-37%). Load runner: `load/user-flow.js` (k6 0.55.0, satu sesi per VU, jeda Uniform(1,9) detik, start siklus Uniform(0,60) sesudah jendela login, warmup 75 detik; sampai r7 start Uniform(0,10) dan warmup 30), `scripts/load.py` (satu run, sampler cgroup/koneksi/checkpoint, oracle rekonsiliasi atas ledger), `scripts/load_report.py`, `scripts/ramp.py`. Fixture 128 tenant × 8 akun: `private/fixture-128.json`, `seed-128.dump` (`23de4f57…`), baseline `seed-128-baseline.json`. Evidence run di `private/load/<run-id>/`.
 
 Budget: setiap SUT 2 CPU, 1 GiB, maksimal 8 koneksi database (PHP 8 worker Octane, Go/Rust pool 8, Bun dua proses reusePort pool 4). Database 4 CPU, 4 GB, shared_buffers 1 GB (nilai di `runtime.env` dev1, bawaan compose tetap ukuran laptop). Generator 2 CPU, 2 GB.
 
@@ -34,7 +34,7 @@ Diagnosis memakai `scripts/probe.py` (CPU dan socket per proses SUT, state dan w
 
 `load.py` kini mencatat `wal_write` dan `wal_sync` di penghitung run, dan `probe.py` mencatat laju commit serta fsync per detik.
 
-Keputusan terbuka untuk pengguna: profil awal siklus Uniform(0,10) di `profile.json` menghasilkan gelombang serempak di VU besar. Pilihannya mempertahankannya (mengukur ketahanan terhadap lonjakan serempak) atau menyebar awal siklus sepanjang satu siklus beserta warmup yang lebih panjang (mengukur keadaan tunak). Lima ulangan menunggu keputusan ini.
+Keputusan pengguna 4 November: awal siklus disebar sepanjang satu siklus. `profile.json` kini Uniform(0,60) (12 aksi × jeda rata-rata 5 detik) dan warmup 75 detik; `load.py` mengambil nilai bawaannya dari `profile.json`. Laporan run memuat `plateau_rates`: laju baca/tulis per 10 detik di plateau dan koefisien variasinya. Pada `r7-rust-1000` CV laju tulis 0,67 (8,8 sampai 84 per detik). Hasil ramp r1 sampai r7 memakai profil lama dan tidak dicampur dengan hasil profil baru.
 
 ## Correctness selesai di dev1, 3 November 20:46 WITA
 
