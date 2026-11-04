@@ -62,6 +62,14 @@ dev1 dipakai bersama. Job backup milik rekan pengguna (root, `/usr/local/libexec
 - `/root/AGENTS.md` dan `/root/CLAUDE.md`: catatan sementara untuk agent rekan pengguna (apa yang berjalan, cara mengecek, batas I/O, cara mencabut). Hapus sesudah pengujian.
 - Scheduler disk dev1 `mq-deadline`, jadi `ionice`/`IOWeight` tidak berefek; hanya `io.max` yang membatasi.
 
+**Perubahan di dev2, 4 November ±10:00 WIB, atas permintaan pengguna sesudah berkonsultasi dengan tim cyber security** (alat uji kerentanan milik tim itu memakai 6-7 dari 8 core dan steal CPU 26-39%):
+
+- Dihentikan dengan `systemctl stop` (bukan disable): `cue-hunt`, `muse-cycle`, `muse-hunt`, `muse-jiohunt`, `muse-priority`, `muse-priority2`, `muse-priority3`, `muse-watch`.
+- `flashdev-hermes-gateway.service` beserta skrip turunannya dibatasi 1 core lewat `CPUQuota=100%` runtime.
+- Pulihkan atau ubah lewat `~/coreerp-dev2-pause.sh resume` atau `hermes-cores N` (di home `claude` dev2).
+- Sesudahnya dev2 menganggur 87-92% dengan steal 0-2%. Tulisan kecil ber-sync 63-77/detik, lawan 70-99/detik di dev1.
+- dev2 dipakai untuk build dan smoke test fungsi varian teroptimasi, bukan pengukuran performa. Lab ada di `~/coreerp-stack-comparison`, compose project `coreerp-stack-comparison`, port 18640-18646. Fixture kecil disalin dari dev1.
+
 ## Correctness selesai di dev1, 3 November 20:46 WITA
 
 Cluster uji dev1 berjalan dari compose eksperimen (`coreerp-stack-comparison`, port loopback 18640/18641). `runtime.env` di dev1 sudah LF dan `PHP_IMAGE` menunjuk ID dev1. Evidence dev1 berawalan `d1-` (PHP dan Go/Hono/Elysia) serta `d2-` (Rust sesudah perbaikan reset).
