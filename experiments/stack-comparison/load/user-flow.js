@@ -182,20 +182,30 @@ function cycle() {
         return response;
     };
 
+    // Fase drain tidak diukur. Siklus berhenti di titik yang keadaan receipt terakhirnya sudah diakui lewat ACK,
+    // sehingga oracle tetap dapat merekonsiliasi; menyelesaikan siklus penuh hanya menambah ±60 detik per run.
+    const draining = () => phase() === 'drain';
+
     step('receipt-list', 'read', 'GET', `${receipts}?per_page=40`, null, 200);
+    if (draining()) return;
     const key = `load-${RUN_ID}-${exec.vu.idInTest}-${exec.vu.iterationInScenario}`;
     const created = step('receipt-create', 'write', 'POST', receipts, document, 201, { 'Idempotency-Key': key }).json('data');
     acknowledge(created, 'draft', []);
+    if (draining()) return;
     const shown = step('receipt-show-draft', 'read', 'GET', `${receipts}/${created.id}`, null, 200).json('data');
     const changed = step('receipt-replace-lines', 'write', 'PATCH', `${receipts}/${created.id}`, { ...document, version: shown.version }, 200).json('data');
     acknowledge(changed, 'draft', []);
+    if (draining()) return;
     step('receipt-preview', 'read', 'GET', `${receipts}/${created.id}/pratinjau-posting`, null, 200);
+    if (draining()) return;
     const completed = step('receipt-complete', 'write', 'POST', `${receipts}/${created.id}/selesaikan`, { version: changed.version }, 200).json('data');
     step('receipt-show-completed', 'read', 'GET', `${receipts}/${created.id}`, null, 200);
     const assets = step('receipt-assets', 'read', 'GET', `${receipts}/${created.id}/aset`, null, 200).json('data');
     acknowledge(completed, 'completed', assets);
+    if (draining()) return;
     step('asset-list', 'read', 'GET', `${prefix}/aset?per_page=40`, null, 200);
     for (const asset of assets) {
+        if (draining()) return;
         step('asset-show', 'read', 'GET', `${prefix}/aset/${asset.id}`, null, 200);
     }
     cycleTotal.add(Date.now() - started, { phase: phase() });
