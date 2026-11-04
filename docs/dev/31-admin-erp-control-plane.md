@@ -1,7 +1,7 @@
 # admin.erp: konsol operator
 
 ::: info Pemisahan database sedang direncanakan
-Keadaan runtime yang dijelaskan halaman ini masih database bersama. Arah target terbaru ada pada [PRD pemisahan database control plane](../todo/control-plane-database/PRD.md). Pemisahan belum diimplementasikan. Target tersebut memerlukan audit routing, transaksi, FK/query, role, dan store framework; bukan cukup mengganti konfigurasi database. Baca PRD sebelum memakai pernyataan lama tentang biaya pemisahan sebagai prosedur implementasi.
+Snapshot runtime CPDB-01 masih memakai database bersama. [CPDB-02](../todo/control-plane-database/CPDB-02.md) menyediakan koneksi, runner schema dan role yang diuji pada fixture. Cutover aplikasi belum dilakukan. Projection, transaksi dan lookup lintas batas tetap mengikuti [PRD](../todo/control-plane-database/PRD.md) dan CPDB-03..05. Mengganti config koneksi tidak menyelesaikan split.
 :::
 
 Halaman ini menjawab satu pertanyaan: **apa sebenarnya admin.erp itu, dan apa yang boleh dan tidak boleh
@@ -23,7 +23,7 @@ lewat agen, dan menyimpan setelan yang tidak boleh tinggal di `.env` server. Alu
 
 | Anggapan                                  | Yang sebenarnya                                                                                                                                                                                                           |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Konsol punya database sendiri             | Databasenya **sama persis dengan Core**, satu koneksi. Konsol tidak punya folder `database/` dan tidak boleh punya migration: dua aplikasi yang bermigrasi ke satu tabel akan saling menimpa. Skema seluruhnya milik Core |
+| Konsol mempunyai schema owner sendiri    | Source schema tetap milik Core. Combined memakai database bersama; target control terpisah memakai runner Core yang eksplisit. Console tidak mempunyai folder `database/` atau migration sendiri. |
 | Konsol menulis apa saja langsung ke tabel | Registry server klien memang ditulis langsung. Tetapi tenant, lingkungan, dan pembaruan armada **selalu lewat HTTP ke Core** — Core yang memiliki aturannya                                                               |
 | Operator adalah peran baru                | Tidak ada peran baru. Otoritasnya satu baris `provider_access.role = 'provider_admin'`, tabel yang sama yang dipakai gate Core                                                                                            |
 | Konsol memanggil server klien             | Tidak pernah. Server klien tidak dibuka dari internet; **agen yang menghubungi konsol**, dan konsol hanya menaruh operasi di antrean                                                                                      |
@@ -103,17 +103,19 @@ angka tanpa leading zero agar rilis yang diterima konsol juga diterima agen.
 ## Batas data: apa milik sisi pusat
 
 Tabel yang hanya dibaca-tulis konsol ditandai di sisi Core dengan trait
-`App\Platform\ControlPlane\OwnedByControlPlane`. Hari ini trait itu tidak melakukan apa pun — koneksi terpisah
-belum ada — dan itu memang disengaja: **batas yang mahal adalah batasnya, bukan koneksinya.** Ketika database
-konsol kelak dipisah, yang berubah hanya setelan koneksi, bukan kode yang memakai tabelnya.
+`App\Platform\ControlPlane\OwnedByControlPlane`. Pada mode split model itu membaca koneksi control yang
+eksplisit. Mode combined mempertahankan authority lokal; pemilihan environment memaku control dan pool
+bisnis agar default yang berpindah tidak memindahkan keduanya. Trait memilih lokasi storage, bukan izin tenant.
 
 Aturannya satu kalimat: **setiap tabel baru yang hanya dipakai konsol wajib punya model penanda di Core.**
 Model penandanya tersebar di folder `Models` tiap fitur `apps/core/app/Platform/` — cari `use OwnedByControlPlane`, dan penjaganya
 `apps/core/tests/Feature/Boundary/BatasPusatTest.php`. Tabel yang lupa ditandai tidak membuat satu pun test
 merah sampai seseorang memisahkan databasenya, dan pada saat itu sebabnya sudah lama terlupakan.
 
-Test konsol membangun skemanya dari folder migration Core (`tests/CoreSchema.php`). Migration baru di Core yang
-menyentuh tabel konsol karena itu langsung terasa di suite konsol — itu yang dimaksud "satu skema, dua aplikasi".
+Test konsol membangun schema combined dari migration Core (`tests/CoreSchema.php`). Source schema control
+terpisah juga tetap di Core, melalui manifest `database/control-plane/manifest.php` dan `control:migrate`.
+Console tidak mempunyai migration kedua. Target business masih transisional sampai CPDB-03; baca batas dan
+pengecualian credential pada [CPDB-02](../todo/control-plane-database/CPDB-02.md).
 
 ## Dua arah percakapan
 
@@ -314,7 +316,7 @@ jawaban tetap yang selalu cocok.
 
 ## Yang belum ada
 
-- **Database terpisah untuk sisi pusat.** Penandanya sudah berdiri, koneksinya belum.
+- **Cutover database sisi pusat.** Infrastruktur koneksi/schema/role tersedia pada CPDB-02; projection, durable operation dan acceptance CPDB-03..05 masih diperlukan.
 - **Peran operator selain `provider_admin`.** Hari ini satu peran mengerjakan segalanya.
 - **Halaman yang menampilkan jejak audit lintas situs.** Jejaknya tercatat; yang membacanya baru layar per
   situs dan SQL.

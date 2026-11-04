@@ -1,16 +1,25 @@
 <?php
 
+$databaseMode = env('COREERP_DATABASE_MODE', 'combined');
+$controlConnection = env('COREERP_CONTROL_CONNECTION');
+$businessConnection = env('COREERP_BUSINESS_CONNECTION');
+if (! in_array($databaseMode, ['combined', 'split'], true)) {
+    throw new RuntimeException('Mode database harus combined atau split.');
+}
+if ($databaseMode === 'split' && (! is_string($controlConnection) || $controlConnection === '' || ! is_string($businessConnection) || $businessConnection === '')) {
+    throw new RuntimeException('Mode split memerlukan nama koneksi control dan bisnis yang eksplisit.');
+}
+
 return [
     // Canonical official apps. Entitlements and module installations reference these IDs.
     'database' => 'core_erp',
-    /*
-     * Nama koneksi untuk tabel sisi pusat — identitas, pelanggan, daftar tenant, registry
-     * environment, akses operator. Kosong berarti "ikut koneksi bawaan", dan itulah bawaannya.
-     *
-     * On-prem kosong selamanya: di sana tidak ada sisi pusat yang terpisah, dan Core memang harus
-     * sanggup menjadi keseluruhannya. Yang membacanya trait App\Platform\ControlPlane\OwnedByControlPlane.
-     */
-    'control_connection' => env('COREERP_CONTROL_CONNECTION'),
+    // Mode combined mempertahankan authority lokal on-prem. Split belum merupakan cutover aplikasi.
+    'database_mode' => $databaseMode,
+    'control_connection' => $controlConnection,
+    'business_connection' => $businessConnection,
+    'control_migration_connection' => env('COREERP_CONTROL_MIGRATION_CONNECTION'),
+    'business_migration_connection' => env('COREERP_BUSINESS_MIGRATION_CONNECTION'),
+    'maintenance_connection' => env('COREERP_MAINTENANCE_CONNECTION'),
 
     /*
      * Domain dasar yang di bawahnya tiap lingkungan memperoleh alamatnya sendiri.

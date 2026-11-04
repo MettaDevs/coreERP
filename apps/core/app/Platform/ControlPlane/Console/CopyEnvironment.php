@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Platform\ControlPlane\Console;
 
 use App\Platform\ControlPlane\Console\Concerns\HoldsEnvironmentOperation;
+use App\Platform\Database\Support\DatabasePrivileges;
 use App\Platform\Environment\Models\Environment;
 use App\Platform\Environment\Models\EnvironmentOperation;
+use App\Platform\Environment\Support\EnvironmentConnection;
 use App\Platform\Reporting\Support\ExportStatus;
 use Illuminate\Console\Command;
 use Illuminate\Database\Connection;
@@ -78,13 +80,6 @@ use Throwable;
  * berikutnya menemukan database sasaran yang sudah berisi lalu melewati penyalinannya sama sekali
  * — pelucutan, migration, dan pemeriksaan kesehatan ketiganya aman diulang. Tidak ada satu keadaan
  * pun yang menuntut database dibuang lebih dulu, jadi perintah ini tidak pernah membuang apa pun.
- *
- * ## Tiga method yang kembar dengan `ProvisionEnvironment`
- *
- * `createDatabase`, `prepareConnection`, dan `baseConfig` di bawah adalah salinan dari perintah
- * itu. Keduanya seharusnya mengangkat ketiganya ke sebuah trait bersama — persis seperti yang
- * sudah dilakukan terhadap protokol kuncinya — dan itu pekerjaan satu sesi yang memegang kedua
- * berkasnya sekaligus. Dicatat di sini supaya duplikasinya tidak terbaca sebagai kelalaian.
  */
 final class CopyEnvironment extends Command
 {
@@ -102,14 +97,6 @@ final class CopyEnvironment extends Command
 
     /** Koneksi sementara ke database yang sedang disalin; dipakai membaca, tidak pernah menulis. */
     private const CONNECTION_SOURCE = 'environment_copy_source';
-
-    /**
-     * Koneksi kedua ke database pusat, dipakai hanya untuk `CREATE DATABASE`.
-     *
-     * PostgreSQL menolak `CREATE DATABASE` di dalam blok transaksi, dan koneksi bawaan sangat
-     * mungkin sedang berada di dalam satu — di suite test ia selalu begitu.
-     */
-    private const CONNECTION_MAINTENANCE = 'copy_maintenance';
 
     /** Nama sandbox bila operator tidak menyebutkan satu pun. */
     private const DEFAULT_NAME = 'Sandbox';
@@ -150,6 +137,11 @@ final class CopyEnvironment extends Command
 
     /** Waktu monotonik kapan tenggat boleh diperpanjang lagi. */
     private float $nextRenewalAt = 0.0;
+
+    public function __construct(private readonly EnvironmentConnection $connections)
+    {
+        parent::__construct();
+    }
 
     /**
      * Berapa lama operasi ini boleh memegang kuncinya sebelum boleh direbut.
@@ -269,6 +261,7 @@ final class CopyEnvironment extends Command
     {
         $step = 'nama-database';
         $file = null;
+        $migration = null;
 
         try {
             $databaseName = ProvisionEnvironment::databaseName($target);
@@ -279,8 +272,10 @@ final class CopyEnvironment extends Command
                 ? sprintf('  database "%s" dibuat.', $databaseName)
                 : sprintf('  database "%s" sudah ada; dilanjutkan.', $databaseName));
 
-            $this->prepareConnection(self::CONNECTION_TARGET, $databaseName);
-            $this->prepareConnection(self::CONNECTION_SOURCE, (string) $source->database_name);
+            $this->connections->prepareProvisionedDatabase($databaseName);
+            $this->connections->register(self::CONNECTION_TARGET, $databaseName);
+            $this->connections->register(self::CONNECTION_SOURCE, (string) $source->database_name);
+            $migration = $this->connections->migrationFor(self::CONNECTION_TARGET);
 
             $step = 'salin';
 
@@ -299,10 +294,11 @@ final class CopyEnvironment extends Command
                 }
 
                 $file = $this->dumpFile($target);
-                $this->runClient($this->dumpCommand((string) $source->database_name, $file), 'pg_dump');
+                $this->runClient($this->dumpCommand(self::CONNECTION_SOURCE, $file), 'pg_dump', self::CONNECTION_SOURCE);
                 $this->line(sprintf('  dump selesai (%s).', $this->humanSize((int) (filesize($file) ?: 0))));
 
-                $this->runClient($this->restoreCommand($databaseName, $file), 'pg_restore');
+                $this->laravel->make(DatabasePrivileges::class)->defaults($migration, self::CONNECTION_TARGET);
+                $this->runClient($this->restoreCommand($migration, $file), 'pg_restore', $migration);
                 $this->line('  restore selesai.');
             }
 
@@ -368,6 +364,9 @@ final class CopyEnvironment extends Command
 
             DB::purge(self::CONNECTION_TARGET);
             DB::purge(self::CONNECTION_SOURCE);
+            if (is_string($migration) && $migration !== self::CONNECTION_TARGET) {
+                DB::purge($migration);
+            }
         }
     }
 
@@ -590,13 +589,17 @@ final class CopyEnvironment extends Command
             return false;
         }
 
-        $row = DB::connection($this->maintenanceConnection())
-            ->selectOne('select pg_database_size(?) as size', [$source->database_name]);
+        $maintenance = $this->connections->maintenance();
+
+        try {
+            $row = DB::connection($maintenance)
+                ->selectOne('select pg_database_size(?) as size', [$source->database_name]);
+        } finally {
+            DB::purge($maintenance);
+        }
 
         $size = is_object($row) && property_exists($row, 'size') ? (int) $row->size : 0;
         $needed = (int) ceil($size * self::DISK_MARGIN);
-
-        DB::purge(self::CONNECTION_MAINTENANCE);
 
         if ($remaining < $needed) {
             $this->error(sprintf(
@@ -677,9 +680,9 @@ final class CopyEnvironment extends Command
     // ------------------------------------------------------------------ klien PostgreSQL
 
     /** @return list<string> */
-    private function dumpCommand(string $database, string $file): array
+    private function dumpCommand(string $connection, string $file): array
     {
-        $base = $this->baseConfig();
+        $base = $this->connections->configuration($connection);
 
         return [
             'pg_dump',
@@ -696,14 +699,14 @@ final class CopyEnvironment extends Command
             '--no-owner',
             '--no-privileges',
             '--file='.$file,
-            '--dbname='.$database,
+            '--dbname='.(string) $base['database'],
         ];
     }
 
     /** @return list<string> */
-    private function restoreCommand(string $database, string $file): array
+    private function restoreCommand(string $connection, string $file): array
     {
-        $base = $this->baseConfig();
+        $base = $this->connections->configuration($connection);
 
         return [
             'pg_restore',
@@ -718,7 +721,7 @@ final class CopyEnvironment extends Command
             // setengah terisi yang harus dibuang lebih dulu. Ia sekaligus menutup restore yang
             // "berhasil sebagian", bentuk kegagalan yang tidak berbunyi.
             '--single-transaction',
-            '--dbname='.$database,
+            '--dbname='.(string) $base['database'],
             $file,
         ];
     }
@@ -734,9 +737,9 @@ final class CopyEnvironment extends Command
      *
      * @param  list<string>  $command
      */
-    private function runClient(array $command, string $tool): void
+    private function runClient(array $command, string $tool, string $connection): void
     {
-        $process = Process::env($this->clientEnvironment())
+        $process = Process::env($this->clientEnvironment($connection))
             ->timeout(self::PROCESS_TIMEOUT_SECONDS)
             ->start($command);
 
@@ -770,11 +773,11 @@ final class CopyEnvironment extends Command
      *
      * @return array<string, string>
      */
-    private function clientEnvironment(): array
+    private function clientEnvironment(string $connection): array
     {
-        $base = $this->baseConfig();
+        $base = $this->connections->configuration($connection);
 
-        $variables = [
+        return [
             'PGPASSWORD' => (string) ($base['password'] ?? ''),
             'PGSSLMODE' => (string) ($base['sslmode'] ?? 'prefer'),
             // Klien PostgreSQL menulis pesannya mengikuti locale. Pesan galat yang bentuknya
@@ -782,7 +785,6 @@ final class CopyEnvironment extends Command
             'LC_MESSAGES' => 'C',
         ];
 
-        return array_filter($variables, static fn (string $value): bool => $value !== '');
     }
 
     /**
@@ -943,22 +945,6 @@ final class CopyEnvironment extends Command
             ->update(['status' => 'cancelled', 'cancelled_at' => now(), 'updated_at' => now()]);
     }
 
-    /**
-     * Mengosongkan antrean job yang ikut tersalin.
-     *
-     * ::: Rencananya menyebut ini gratis, dan hari ini ia tidak
-     * Tabel pelucutan di rencana menulis "Job antrean dan kredensial layanan — tidak ikut tersalin
-     * sama sekali; keduanya di sisi pusat". Itu benar untuk pembagian database yang belum berdiri:
-     * `coreerp.control_connection` masih kosong, jadi `jobs` hidup di database environment dan ikut
-     * tersalin utuh. Barisnya adalah pekerjaan produksi yang **belum** dikerjakan, dan worker
-     * sandbox akan mengerjakannya untuk kedua kalinya.
-     * :::
-     *
-     * Dihapus, bukan ditandai. Baris antrean bukan catatan siapa pun — ia instruksi yang belum
-     * dijalankan, dan tidak ada kolom yang dapat menyatakan "jangan jalankan yang ini". Larangan
-     * hapus fisik repo ini menjaga data pelanggan; ini bukan data, dan ia berada di dalam database
-     * yang baru saja lahir.
-     */
     private function disarmJobQueue(Connection $db): int
     {
         return $db->table('jobs')->delete();
@@ -981,41 +967,22 @@ final class CopyEnvironment extends Command
         return $db->table('app_service_credentials')->delete();
     }
 
-    /**
-     * Melucuti registry yang ikut tersalin ke dalam salinannya sendiri.
-     *
-     * ::: Lubang yang paling mudah terlewat, dan yang paling berbahaya
-     * `OwnedByControlPlane` hari ini tidak melakukan apa-apa: `coreerp.control_connection` kosong, jadi
-     * `environments` hidup di koneksi bawaan. Salinan sebuah produksi karena itu membawa **salinan
-     * tabel `environments` milik produksi**, dan di dalam salinan itu tertulis `kind = 'production'`
-     * dengan `outbound_allowed = true`.
-     *
-     * `ActiveEnvironment` membaca tabel itu. Begitu ada satu jalur yang menjadikan database sandbox
-     * sebagai koneksi bawaan — dan itulah persis yang dituju middleware pemilih environment —
-     * sandbox akan membaca registry miliknya sendiri, menyimpulkan bahwa ia produksi, lalu
-     * membuka seluruh sambungan keluarnya. Seluruh pelucutan di atas menjadi sia-sia oleh satu
-     * tabel yang tidak ada yang mengira ikut tersalin.
-     * :::
-     *
-     * Barisnya diturunkan menjadi sandbox, bukan dihapus. Dihapus, `ActiveEnvironment` tidak
-     * menemukan apa pun — dan "tidak tahu berarti boleh" adalah aturan yang tertulis di kelas itu,
-     * sehingga menghapusnya justru membuka sambungan keluar alih-alih menutupnya. Yang aman adalah
-     * registry yang menjawab "bukan produksi" dari sudut mana pun ia dibaca.
-     */
     private function disarmCopiedRegistry(Connection $db): int
     {
+        $schema = DB::connection($this->connections->migrationFor(self::CONNECTION_TARGET));
+
         // `environments_satu_per_jenis` menolak penurunan di bawah begitu satu tenant punya lebih
         // dari satu baris. Biasanya ia tidak ada di sini: sumber salinan selalu database lingkungan
         // sendiri, dan migration indeks itu melewati koneksi `environment_*`. Tetapi database
         // lingkungan yang pernah dimigrasi lewat koneksi bernama lain membawanya, dan penyalinannya
         // akan jatuh di tengah jalan. Registry di salinan bukan yang berwenang, jadi indeksnya yang
         // dibuang, bukan penurunannya yang dilonggarkan.
-        $db->statement('DROP INDEX IF EXISTS environments_satu_per_jenis');
+        $schema->statement('DROP INDEX IF EXISTS environments_satu_per_jenis');
 
         // Alasan yang sama untuk `environments_server_klien_hanya_produksi`: ia melarang baris server
         // klien berjenis selain produksi, dan penurunan di bawah menjadikan setiap baris sandbox.
         // Migration-nya melewati koneksi `environment_*`, jadi biasanya ia memang tidak ada di sini.
-        $db->statement('ALTER TABLE environments DROP CONSTRAINT IF EXISTS environments_server_klien_hanya_produksi');
+        $schema->statement('ALTER TABLE environments DROP CONSTRAINT IF EXISTS environments_server_klien_hanya_produksi');
 
         return $db->table('environments')
             ->where(static function (Builder $query): void {
@@ -1134,21 +1101,16 @@ final class CopyEnvironment extends Command
             throw new RuntimeException(sprintf('Nama database "%s" tidak berbentuk identifier yang aman.', $name));
         }
 
-        $base = $this->baseConfig();
-
-        if ($name === (string) ($base['database'] ?? '')) {
-            throw new RuntimeException('Nama database salinan sama dengan database pusat; penyalinan dihentikan.');
-        }
+        $this->connections->assertEnvironmentDatabase($name);
 
         if ($name === $sourceDatabase) {
             throw new RuntimeException('Nama database salinan sama dengan databasenya sumber; penyalinan dihentikan.');
         }
 
-        config(['database.connections.'.self::CONNECTION_MAINTENANCE => $base]);
-        DB::purge(self::CONNECTION_MAINTENANCE);
+        $maintenance = $this->connections->maintenance();
 
         try {
-            $connection = DB::connection(self::CONNECTION_MAINTENANCE);
+            $connection = DB::connection($maintenance);
 
             if ($connection->selectOne('select 1 from pg_database where datname = ?', [$name]) !== null) {
                 return false;
@@ -1167,28 +1129,8 @@ final class CopyEnvironment extends Command
 
             throw $e;
         } finally {
-            DB::purge(self::CONNECTION_MAINTENANCE);
+            DB::purge($maintenance);
         }
-    }
-
-    /**
-     * Mendaftarkan sebuah koneksi bernama yang menunjuk database tertentu.
-     *
-     * `url` dikosongkan karena Laravel mendahulukannya di atas `database` bila ia terisi — dan
-     * bila itu terjadi, migration dan pelucutan di atas berjalan ke database pusat.
-     *
-     * Schema tidak didirikan di sini, berbeda dengan `ProvisionEnvironment`. Dump membawa serta
-     * `CREATE SCHEMA` miliknya sendiri, dan mendirikannya lebih dulu hanya akan membuat
-     * `pg_restore` berhenti pada objek yang sudah ada.
-     */
-    private function prepareConnection(string $connection, string $database): void
-    {
-        $config = $this->baseConfig();
-        $config['database'] = $database;
-        $config['url'] = null;
-
-        config(['database.connections.'.$connection => $config]);
-        DB::purge($connection);
     }
 
     /** Acuan diambil dari hasil restore, lalu disimpan supaya retry tidak bergantung pada sumber live. */
@@ -1242,34 +1184,6 @@ final class CopyEnvironment extends Command
     private function dumpFile(Environment $target): string
     {
         return $this->dumpFolder().DIRECTORY_SEPARATOR.$target->id.'.dump';
-    }
-
-    /** @return array<string, mixed> */
-    private function baseConfig(): array
-    {
-        $default = (string) config('database.default');
-        $config = config('database.connections.'.$default);
-
-        if (! is_array($config)) {
-            throw new RuntimeException(sprintf('Koneksi bawaan "%s" tidak terbaca dari config.', $default));
-        }
-
-        /** @var array<string, mixed> $config */
-        return $config;
-    }
-
-    /**
-     * Mendaftarkan koneksi pemelihara lalu memulangkan namanya.
-     *
-     * Dipakai pemeriksaan disk, yang berjalan **sebelum** operasinya dibuka dan karena itu belum
-     * punya koneksi sasaran mana pun. Ia hanya pernah memanggil `pg_database_size`.
-     */
-    private function maintenanceConnection(): string
-    {
-        config(['database.connections.'.self::CONNECTION_MAINTENANCE => $this->baseConfig()]);
-        DB::purge(self::CONNECTION_MAINTENANCE);
-
-        return self::CONNECTION_MAINTENANCE;
     }
 
     /** Ukuran dalam satuan yang terbaca manusia; pesan disk dibaca orang yang sedang panik. */

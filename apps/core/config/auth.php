@@ -97,6 +97,7 @@ return [
     'passwords' => [
         'users' => [
             'provider' => 'users',
+            'connection' => env('DB_PASSWORD_RESET_CONNECTION') ?: (env('COREERP_CONTROL_CONNECTION') ?: env('DB_CONNECTION', 'sqlite')),
             'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
             'expire' => 60,
             'throttle' => 60,

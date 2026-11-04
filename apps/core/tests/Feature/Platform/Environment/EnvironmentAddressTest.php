@@ -296,14 +296,7 @@ class EnvironmentAddressTest extends TestCase
 
     // ------------------------------------------------------------------ pemilihan database
 
-    /**
-     * Lingkungan yang memang tinggal di database pusat tidak menggeser apa pun.
-     *
-     * Ini jalur yang dilalui seluruh perilaku hari ini — produksi lahir dengan `database_name`
-     * kosong, dan kosong berarti database bawaan. Test ini yang menjaga bahwa menyambungkan
-     * pemilih koneksi tidak mengubah satu pun permintaan yang sudah bekerja.
-     */
-    public function test_an_environment_on_the_control_plane_database_switches_nothing(): void
+    public function test_a_pooled_environment_keeps_the_business_database_and_stable_stores(): void
     {
         config(['coreerp.base_domain' => 'contoh.co.id']);
 
@@ -314,25 +307,10 @@ class EnvironmentAddressTest extends TestCase
         $this->get('http://ujialamat.contoh.co.id/login')->assertOk();
 
         $this->assertSame($before, config('database.default'));
-        $this->assertNull(config('session.connection'), 'Tidak ada yang digeser, jadi tidak ada yang perlu dipaku.');
-        $this->assertSame('', (string) config('coreerp.control_connection'));
+        $this->assertSame($before, config('session.connection'));
+        $this->assertSame($before, config('coreerp.control_connection'));
     }
 
-    /**
-     * Pemilihnya sendiri: apa yang digeser, dan apa yang justru dipaku.
-     *
-     * Diuji tanpa permintaan HTTP dan tanpa menyentuh database mana pun, dan itu bukan pemalasan
-     * melainkan satu-satunya bentuk yang bisa berjalan. Percobaan pertama membuat permintaan
-     * sungguhan ke lingkungan yang `database_name`-nya menunjuk database test ini sendiri — dan
-     * **menggantung**: koneksi kedua berada di luar transaksi milik `RefreshDatabase`, sehingga
-     * setiap query darinya menunggu kunci tabel yang dipegang transaksi itu, selamanya.
-     *
-     * Yang dijaga di sini pakuannya, bukan pergeserannya. Pergeseran tanpa pakuan adalah kegagalan
-     * yang paling sulit dibaca: sesi tidak pernah bertahan, pembatas laju login menghitung per
-     * lingkungan, dan job menunggu di tabel yang tidak dibaca siapa pun. Keempatnya dibaca Laravel
-     * lewat kunci config, bukan lewat Eloquent — jadi trait `OwnedByControlPlane` tidak menjangkau
-     * satu pun dari mereka.
-     */
     public function test_choosing_a_database_pins_every_control_plane_store(): void
     {
         config(['session.driver' => 'database']);
@@ -362,7 +340,7 @@ class EnvironmentAddressTest extends TestCase
 
         // Dipulihkan sendiri supaya test berikutnya tidak mewarisi koneksi yang digeser.
         // `useForRequest` sengaja tidak punya blok penutup — yang menutupnya berakhirnya permintaan.
-        config(['database.default' => $controlPlane, 'coreerp.control_connection' => null]);
+        app(EnvironmentConnection::class)->reset();
     }
 
     public function test_choosing_an_environment_does_not_redirect_valkey_sessions_to_postgresql(): void
@@ -376,7 +354,7 @@ class EnvironmentAddressTest extends TestCase
             $this->assertSame('sessions', config('session.connection'));
             $this->assertSame($controlPlane, config('cache.stores.database.connection'));
         } finally {
-            config(['database.default' => $controlPlane, 'coreerp.control_connection' => null]);
+            app(EnvironmentConnection::class)->reset();
         }
     }
 
@@ -395,7 +373,7 @@ class EnvironmentAddressTest extends TestCase
         $environment = $this->environment('demo', 'tersambung', 'active');
 
         $recorded = [];
-        $this->app->instance(EnvironmentConnection::class, new class($recorded) extends EnvironmentConnection
+        $chooser = new class($recorded) extends EnvironmentConnection
         {
             /** @param  array<int, string>  $recorded */
             public function __construct(private array &$recorded) {}
@@ -404,7 +382,8 @@ class EnvironmentAddressTest extends TestCase
             {
                 $this->recorded[] = $environment->id;
             }
-        });
+        };
+        $this->app->scoped(EnvironmentConnection::class, fn () => $chooser);
 
         $this->get('http://ujialamat.demo.contoh.co.id/login')->assertOk();
 

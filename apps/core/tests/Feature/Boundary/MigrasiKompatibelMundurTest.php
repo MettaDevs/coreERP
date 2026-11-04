@@ -181,12 +181,25 @@ final class MigrasiKompatibelMundurTest extends TestCase
         $this->assertNull(self::penanda('// kontrak'), 'Hanya bentuk @penanda di docblock yang dihitung.');
     }
 
+    public function test_control_migration_manifest_is_covered_by_the_rollback_guard(): void
+    {
+        $root = dirname(__DIR__, 5);
+        $files = $this->berkasMigration();
+        $paths = require $root.'/apps/core/database/control-plane/manifest.php';
+        foreach ($paths as $path) {
+            $relative = str_replace('\\', '/', substr($path, strlen($root) + 1));
+            $relative = str_replace('control-plane/../', '', $relative);
+            $this->assertArrayHasKey($relative, $files);
+        }
+    }
+
     /** @return array<string, string> jalur relatif akar repo → isi */
     private function berkasMigration(): array
     {
         $akar = dirname(__DIR__, 5);
         $pola = [
             $akar.'/apps/core/database/migrations/*.php',
+            $akar.'/apps/core/database/control-plane/migrations/*.php',
             $akar.'/modules/*/*/database/migrations/*.php',
         ];
         $hasil = [];

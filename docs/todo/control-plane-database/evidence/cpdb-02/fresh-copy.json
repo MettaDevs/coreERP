@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "checks": {
+    "fresh_dedicated_schema": true,
+    "fresh_dedicated_runtime_role": true,
+    "migration_default_restored": true,
+    "derived_migration_closed": true,
+    "full_runtime_dump": true,
+    "full_migration_restore": true,
+    "custom_schema_restored": true,
+    "source_unchanged_by_copy": true,
+    "history_preserved": true,
+    "history_sequence_read_only": true
+  }
+}

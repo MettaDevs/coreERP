@@ -249,11 +249,9 @@ final class ProvisionEnvironment extends Command
             throw new RuntimeException(sprintf('Nama database "%s" tidak berbentuk identifier yang aman.', $name));
         }
 
-        $base = $this->connections->baseConfig();
+        $this->connections->assertEnvironmentDatabase($name);
+        $base = $this->connections->configuration($this->connections->business());
 
-        // Penjaga terakhir sebelum sesuatu yang tidak bisa dibatalkan. Kalau perhitungan nama
-        // pernah menghasilkan nama database pusat, langkah berikutnya akan menjalankan seluruh
-        // migration ke atas data kerja orang.
         if ($name === (string) ($base['database'] ?? '')) {
             throw new RuntimeException('Nama database environment sama dengan database pusat; penyiapan dihentikan.');
         }
@@ -297,8 +295,9 @@ final class ProvisionEnvironment extends Command
      */
     private function prepareConnection(string $name): void
     {
+        $this->connections->prepareProvisionedDatabase($name);
         $this->connections->register(self::CONNECTION, $name);
-        $this->connections->createSchemas(self::CONNECTION);
+        $this->connections->createSchemas($this->connections->migrationFor(self::CONNECTION));
     }
 
     /**

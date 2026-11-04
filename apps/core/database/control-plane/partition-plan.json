@@ -1,0 +1,5253 @@
+{
+  "format_version": 1,
+  "source": {
+    "commit": "6b3cf5846fd4442c3e895cacf2ba58275f9dd75e",
+    "schema": "coreerp_test",
+    "server_version": "16.14",
+    "migration_count": 151,
+    "migration_sources_sha256": "c9ff09e685cc95c782d9c028d23a4b4eb09d557d48170961d8d19f3e80db82ea",
+    "catalog_sha256": "4cebf2e40587475ecbd329ce70fd5e79f729ba56e8f9c4068e5f047a407d5ad8"
+  },
+  "tables": {
+    "access_audit_events": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "membership_id": "exclude",
+        "action": "exclude",
+        "payload": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "access_audit_events_pkey": "exclude"
+      },
+      "indexes": {
+        "access_audit_events_pkey": "exclude",
+        "access_audit_events_tenant_id_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "address_books": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "name": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "deleted_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "address_books_pkey": "exclude",
+        "address_books_tenant_id_id_unique": "exclude"
+      },
+      "indexes": {
+        "address_books_name_unique": "exclude",
+        "address_books_pkey": "exclude",
+        "address_books_tenant_id_id_unique": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "analytics_dashboards": {
+      "authority": "analytics-hold",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "user_id": "exclude",
+        "name": "exclude",
+        "description": "exclude",
+        "shared": "exclude",
+        "layout": "exclude",
+        "slicers": "exclude",
+        "template_code": "exclude",
+        "template_version": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "deleted_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "analytics_dashboards_pkey": "exclude"
+      },
+      "indexes": {
+        "analytics_dashboards_owner_name_unique": "exclude",
+        "analytics_dashboards_pkey": "exclude",
+        "analytics_dashboards_shared_name_unique": "exclude",
+        "analytics_dashboards_tenant_id_shared_index": "exclude",
+        "analytics_dashboards_tenant_id_user_id_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "analytics_query_cache": {
+      "authority": "analytics-hold",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "cache_key": "exclude",
+        "dataset_code": "exclude",
+        "payload": "exclude",
+        "size_bytes": "exclude",
+        "expires_at": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "analytics_query_cache_pkey": "exclude",
+        "analytics_query_cache_tenant_id_cache_key_unique": "exclude"
+      },
+      "indexes": {
+        "analytics_query_cache_pkey": "exclude",
+        "analytics_query_cache_tenant_id_cache_key_unique": "exclude",
+        "analytics_query_cache_tenant_id_expires_at_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "analytics_query_log": {
+      "authority": "analytics-hold",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "principal": "exclude",
+        "source": "exclude",
+        "dataset_code": "exclude",
+        "dataset_version": "exclude",
+        "query_hash": "exclude",
+        "query": "exclude",
+        "status": "exclude",
+        "error_code": "exclude",
+        "duration_ms": "exclude",
+        "row_count": "exclude",
+        "truncated": "exclude",
+        "cached": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "analytics_query_log_pkey": "exclude",
+        "analytics_query_log_status_check": "exclude"
+      },
+      "indexes": {
+        "analytics_query_log_pkey": "exclude",
+        "analytics_query_log_tenant_id_created_at_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "analytics_saved_queries": {
+      "authority": "analytics-hold",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "user_id": "exclude",
+        "code": "exclude",
+        "name": "exclude",
+        "description": "exclude",
+        "shared": "exclude",
+        "dataset_code": "exclude",
+        "dataset_version": "exclude",
+        "query": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "deleted_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "analytics_saved_queries_pkey": "exclude"
+      },
+      "indexes": {
+        "analytics_saved_queries_code_unique": "exclude",
+        "analytics_saved_queries_pkey": "exclude",
+        "analytics_saved_queries_tenant_id_user_id_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "analytics_widgets": {
+      "authority": "analytics-hold",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "dashboard_id": "exclude",
+        "title": "exclude",
+        "type": "exclude",
+        "dataset_code": "exclude",
+        "dataset_version": "exclude",
+        "query": "exclude",
+        "visual": "exclude",
+        "cache_ttl_seconds": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "deleted_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "analytics_widgets_dashboard_id_foreign": "exclude",
+        "analytics_widgets_pkey": "exclude"
+      },
+      "indexes": {
+        "analytics_widgets_pkey": "exclude",
+        "analytics_widgets_tenant_id_dashboard_id_index": "exclude",
+        "analytics_widgets_tenant_id_dataset_code_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "app_data_policies": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "code": "exclude",
+        "app_id": "exclude",
+        "name": "exclude",
+        "protected_permissions": "exclude",
+        "requires_legal_entity": "exclude",
+        "requires_operating_unit": "exclude",
+        "allows_descendants": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude"
+      },
+      "constraints": {
+        "app_data_policies_app_id_foreign": "exclude",
+        "app_data_policies_pkey": "exclude"
+      },
+      "indexes": {
+        "app_data_policies_pkey": "exclude"
+      },
+      "triggers": {}
+    },
+    "app_dependencies": {
+      "authority": "catalog-release",
+      "action": "exclude",
+      "columns": {
+        "app_id": "exclude",
+        "depends_on_app_id": "exclude",
+        "version_range": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude"
+      },
+      "reason": "ERP manifest dependency snapshot; not central product metadata.",
+      "constraints": {
+        "app_dependencies_app_id_foreign": "exclude",
+        "app_dependencies_depends_on_app_id_foreign": "exclude",
+        "app_dependencies_pkey": "exclude"
+      },
+      "indexes": {
+        "app_dependencies_pkey": "exclude"
+      },
+      "triggers": {}
+    },
+    "app_entry_points": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "code": "exclude",
+        "app_id": "exclude",
+        "name": "exclude",
+        "type": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude"
+      },
+      "constraints": {
+        "app_entry_points_app_id_foreign": "exclude",
+        "app_entry_points_pkey": "exclude"
+      },
+      "indexes": {
+        "app_entry_points_pkey": "exclude"
+      },
+      "triggers": {}
+    },
+    "app_installations": {
+      "authority": "historical-inactive",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "app_placement_id": "exclude",
+        "operation": "exclude",
+        "release_version": "exclude",
+        "status": "exclude",
+        "failure_stage": "exclude",
+        "failure_message": "exclude",
+        "started_at": "exclude",
+        "finished_at": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude"
+      },
+      "constraints": {
+        "app_installations_app_placement_id_foreign": "exclude",
+        "app_installations_pkey": "exclude"
+      },
+      "indexes": {
+        "app_installations_app_placement_id_started_at_index": "exclude",
+        "app_installations_pkey": "exclude"
+      },
+      "triggers": {}
+    },
+    "app_number_sequence_references": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "app_id": "exclude",
+        "code": "exclude",
+        "name": "exclude",
+        "allowed_scopes": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "default_prefix": "exclude",
+        "default_settings": "exclude"
+      },
+      "constraints": {
+        "app_number_sequence_references_app_id_foreign": "exclude",
+        "app_number_sequence_references_code_unique": "exclude",
+        "app_number_sequence_references_pkey": "exclude"
+      },
+      "indexes": {
+        "app_number_sequence_references_code_unique": "exclude",
+        "app_number_sequence_references_pkey": "exclude"
+      },
+      "triggers": {}
+    },
+    "app_placements": {
+      "authority": "historical-inactive",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "app_id": "exclude",
+        "release_version": "exclude",
+        "profile": "exclude",
+        "placement": "exclude",
+        "artifact_status": "exclude",
+        "migration_status": "exclude",
+        "runtime_status": "exclude",
+        "ready_at": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude"
+      },
+      "constraints": {
+        "app_placements_app_id_foreign": "exclude",
+        "app_placements_app_id_placement_unique": "exclude",
+        "app_placements_pkey": "exclude"
+      },
+      "indexes": {
+        "app_placements_app_id_placement_unique": "exclude",
+        "app_placements_pkey": "exclude"
+      },
+      "triggers": {}
+    },
+    "app_releases": {
+      "authority": "historical-inactive",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "app_id": "exclude",
+        "version": "exclude",
+        "manifest_sha256": "exclude",
+        "bundle_path": "exclude",
+        "compose_file": "exclude",
+        "compose_project": "exclude",
+        "api_service": "exclude",
+        "ui_service": "exclude",
+        "database_service": "exclude",
+        "status": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "edition_image": "exclude"
+      },
+      "constraints": {
+        "app_releases_app_id_foreign": "exclude",
+        "app_releases_app_id_version_unique": "exclude",
+        "app_releases_pkey": "exclude"
+      },
+      "indexes": {
+        "app_releases_app_id_version_unique": "exclude",
+        "app_releases_pkey": "exclude"
+      },
+      "triggers": {}
+    },
+    "app_reports": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "app_id": "exclude",
+        "code": "exclude",
+        "name": "exclude",
+        "description": "exclude",
+        "permission": "exclude",
+        "parameters": "exclude",
+        "builtin_layouts": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude"
+      },
+      "constraints": {
+        "app_reports_app_id_foreign": "exclude",
+        "app_reports_code_unique": "exclude",
+        "app_reports_pkey": "exclude"
+      },
+      "indexes": {
+        "app_reports_code_unique": "exclude",
+        "app_reports_pkey": "exclude"
+      },
+      "triggers": {}
+    },
+    "app_service_credentials": {
+      "authority": "historical-inactive",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "app_id": "exclude",
+        "name": "exclude",
+        "secret_hash": "exclude",
+        "status": "exclude",
+        "last_used_at": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "tenant_id": "exclude",
+        "token_digest": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "app_service_credentials_app_id_foreign": "exclude",
+        "app_service_credentials_app_id_name_unique": "exclude",
+        "app_service_credentials_pkey": "exclude",
+        "app_service_credentials_tenant_id_foreign": "exclude"
+      },
+      "indexes": {
+        "app_service_credentials_app_id_name_unique": "exclude",
+        "app_service_credentials_app_id_status_index": "exclude",
+        "app_service_credentials_pkey": "exclude",
+        "app_service_credentials_token_digest_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "apps": {
+      "authority": "catalog-release",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "name": "keep",
+        "version": "exclude",
+        "status": "keep",
+        "database_name": "exclude",
+        "description": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "repository_url": "exclude",
+        "contract_url": "exclude",
+        "navigation": "exclude",
+        "has_ui": "exclude"
+      },
+      "reason": "Minimal central product catalog; ERP manifest/navigation/security metadata excluded.",
+      "constraints": {
+        "apps_pkey": "keep"
+      },
+      "indexes": {
+        "apps_pkey": "keep"
+      },
+      "triggers": {}
+    },
+    "automatic_role_assignment_rules": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "role_id": "exclude",
+        "position_id": "exclude",
+        "is_active": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "policy_code": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "automatic_role_assignment_rules_pkey": "exclude",
+        "automatic_role_assignment_rules_tenant_id_role_id_position_id_u": "exclude"
+      },
+      "indexes": {
+        "automatic_role_assignment_rules_pkey": "exclude",
+        "automatic_role_assignment_rules_tenant_id_index": "exclude",
+        "automatic_role_assignment_rules_tenant_id_role_id_position_id_u": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "cache": {
+      "authority": "framework-control",
+      "action": "keep",
+      "columns": {
+        "key": "keep",
+        "value": "keep",
+        "expiration": "keep"
+      },
+      "constraints": {
+        "cache_pkey": "keep"
+      },
+      "indexes": {
+        "cache_expiration_index": "keep",
+        "cache_pkey": "keep"
+      },
+      "triggers": {}
+    },
+    "cache_locks": {
+      "authority": "framework-control",
+      "action": "keep",
+      "columns": {
+        "key": "keep",
+        "owner": "keep",
+        "expiration": "keep"
+      },
+      "constraints": {
+        "cache_locks_pkey": "keep"
+      },
+      "indexes": {
+        "cache_locks_expiration_index": "keep",
+        "cache_locks_pkey": "keep"
+      },
+      "triggers": {}
+    },
+    "change_log_entries": {
+      "authority": "per-database-infrastructure",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "changed_at": "keep",
+        "table_name": "keep",
+        "record_id": "keep",
+        "field_name": "keep",
+        "change_type": "keep",
+        "old_value": "keep",
+        "new_value": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "change_log_entries_pkey": "keep",
+        "change_log_entries_type_check": "keep"
+      },
+      "indexes": {
+        "change_log_entries_pkey": "keep",
+        "change_log_entries_retention": "keep",
+        "change_log_entries_tenant_id_table_name_record_id_id_index": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "forbid_update": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "change_log_setup_fields": {
+      "authority": "per-database-infrastructure",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "table_name": "keep",
+        "field_name": "keep",
+        "field_caption": "keep",
+        "log_insertion": "keep",
+        "log_modification": "keep",
+        "log_deletion": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "change_log_setup_fields_pkey": "keep"
+      },
+      "indexes": {
+        "change_log_setup_fields_pkey": "keep",
+        "change_log_setup_fields_scope_unique": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "change_log_setup_tables": {
+      "authority": "per-database-infrastructure",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "table_name": "keep",
+        "table_caption": "keep",
+        "log_insertion": "keep",
+        "log_modification": "keep",
+        "log_deletion": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "change_log_setup_tables_mode_check": "keep",
+        "change_log_setup_tables_pkey": "keep"
+      },
+      "indexes": {
+        "change_log_setup_tables_pkey": "keep",
+        "change_log_setup_tables_scope_unique": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "clients": {
+      "authority": "control",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "legal_name": "keep",
+        "slug": "keep",
+        "status": "keep",
+        "created_at": "keep",
+        "updated_at": "keep"
+      },
+      "constraints": {
+        "clients_pkey": "keep",
+        "clients_slug_unique": "keep"
+      },
+      "indexes": {
+        "clients_pkey": "keep",
+        "clients_slug_unique": "keep"
+      },
+      "triggers": {}
+    },
+    "console_settings": {
+      "authority": "control",
+      "action": "keep",
+      "columns": {
+        "key": "keep",
+        "value": "keep",
+        "updated_at": "keep",
+        "updated_by": "keep"
+      },
+      "constraints": {
+        "console_settings_pkey": "keep",
+        "console_settings_updated_by_foreign": "keep"
+      },
+      "indexes": {
+        "console_settings_pkey": "keep"
+      },
+      "triggers": {}
+    },
+    "core_module_installations": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "tenant_id": "exclude",
+        "module_id": "exclude",
+        "version": "exclude",
+        "status": "exclude",
+        "seeded_at": "exclude",
+        "installed_at": "exclude",
+        "disabled_at": "exclude",
+        "uninstalled_at": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude"
+      },
+      "constraints": {
+        "core_module_installations_pkey": "exclude",
+        "core_module_installations_status_check": "exclude"
+      },
+      "indexes": {
+        "core_module_installations_pkey": "exclude",
+        "core_module_installations_tenant_id_status_index": "exclude"
+      },
+      "triggers": {
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "country_regions": {
+      "authority": "reference-release",
+      "action": "keep",
+      "columns": {
+        "code": "keep",
+        "iso3": "keep",
+        "name": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "phone_code": "keep",
+        "timezone": "keep",
+        "active": "keep"
+      },
+      "constraints": {
+        "country_regions_iso3_unique": "keep",
+        "country_regions_pkey": "keep"
+      },
+      "indexes": {
+        "country_regions_iso3_unique": "keep",
+        "country_regions_pkey": "keep"
+      },
+      "triggers": {}
+    },
+    "currency_precisions": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "currency_code": "exclude",
+        "amount_decimals": "exclude",
+        "unit_amount_decimals": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "currency_precisions_pkey": "exclude",
+        "currency_precisions_range_check": "exclude",
+        "currency_precisions_tenant_id_currency_code_unique": "exclude"
+      },
+      "indexes": {
+        "currency_precisions_pkey": "exclude",
+        "currency_precisions_tenant_id_currency_code_unique": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "document_attachments": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "record_type": "exclude",
+        "record_id": "exclude",
+        "line_number": "exclude",
+        "file_name": "exclude",
+        "mime_type": "exclude",
+        "size_bytes": "exclude",
+        "storage_path": "exclude",
+        "content_hash": "exclude",
+        "data_class": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "deleted_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude",
+        "kind": "exclude"
+      },
+      "constraints": {
+        "document_attachments_kind_check": "exclude",
+        "document_attachments_pkey": "exclude"
+      },
+      "indexes": {
+        "document_attachments_pkey": "exclude",
+        "document_attachments_tenant_id_record_type_record_id_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "document_notes": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "record_type": "exclude",
+        "record_id": "exclude",
+        "content": "exclude",
+        "data_class": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "deleted_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "document_notes_pkey": "exclude"
+      },
+      "indexes": {
+        "document_notes_pkey": "exclude",
+        "document_notes_tenant_id_record_type_record_id_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "electronic_addresses": {
+      "authority": "organization-address-partition",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "type": "keep",
+        "value": "keep",
+        "purpose": "keep",
+        "is_primary": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "location_id": "keep",
+        "deleted_at": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "electronic_addresses_pkey": "keep",
+        "electronic_addresses_tenant_id_foreign": "keep",
+        "electronic_addresses_tenant_id_id_unique": "keep",
+        "electronic_addresses_tenant_id_location_id_foreign": "keep"
+      },
+      "indexes": {
+        "electronic_addresses_one_primary": "keep",
+        "electronic_addresses_pkey": "keep",
+        "electronic_addresses_tenant_id_id_unique": "keep",
+        "electronic_addresses_tenant_id_location_id_index": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "environment_members": {
+      "authority": "control",
+      "action": "keep",
+      "columns": {
+        "environment_id": "keep",
+        "user_id": "keep",
+        "status": "keep",
+        "created_at": "keep",
+        "updated_at": "keep"
+      },
+      "constraints": {
+        "environment_members_environment_id_foreign": "keep",
+        "environment_members_pkey": "keep",
+        "environment_members_status_dikenal": "keep",
+        "environment_members_user_id_foreign": "keep"
+      },
+      "indexes": {
+        "environment_members_pkey": "keep",
+        "environment_members_user_id_index": "keep"
+      },
+      "triggers": {}
+    },
+    "environment_operations": {
+      "authority": "control",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "environment_id": "keep",
+        "operation": "keep",
+        "status": "keep",
+        "requested_by": "keep",
+        "source_environment_id": "keep",
+        "step": "keep",
+        "failure_message": "keep",
+        "detail": "keep",
+        "started_at": "keep",
+        "finished_at": "keep",
+        "lease_until": "keep"
+      },
+      "constraints": {
+        "environment_operations_berjalan_bertenggat": "keep",
+        "environment_operations_environment_id_foreign": "keep",
+        "environment_operations_gagal_beralasan": "keep",
+        "environment_operations_jenis_dikenal": "keep",
+        "environment_operations_pkey": "keep",
+        "environment_operations_requested_by_foreign": "keep",
+        "environment_operations_selesai_sejalan": "keep",
+        "environment_operations_status_dikenal": "keep"
+      },
+      "indexes": {
+        "environment_operations_environment_id_started_at_index": "keep",
+        "environment_operations_pkey": "keep",
+        "environment_operations_satu_berjalan": "keep",
+        "environment_operations_satu_salinan_per_sumber": "keep"
+      },
+      "triggers": {}
+    },
+    "environments": {
+      "authority": "control",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "kind": "keep",
+        "name": "keep",
+        "slug": "keep",
+        "database_name": "keep",
+        "status": "keep",
+        "source_environment_id": "keep",
+        "copied_at": "keep",
+        "expires_at": "keep",
+        "outbound_allowed": "keep",
+        "schema_migrated_at": "keep",
+        "schema_fingerprint": "keep",
+        "deleted_at": "keep",
+        "purge_after": "keep",
+        "created_by": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "purged_at": "keep",
+        "hosting": "keep"
+      },
+      "constraints": {
+        "environments_buang_sesudah_hapus_lunak": "keep",
+        "environments_created_by_foreign": "keep",
+        "environments_database_name_unique": "keep",
+        "environments_demo_berakhir": "keep",
+        "environments_hapus_berpasangan": "keep",
+        "environments_hosting_dikenal": "keep",
+        "environments_id_tenant_unik": "keep",
+        "environments_keluar_ikut_jenis": "keep",
+        "environments_kind_dikenal": "keep",
+        "environments_pkey": "keep",
+        "environments_produksi_tidak_dibuang": "keep",
+        "environments_server_klien_hanya_produksi": "keep",
+        "environments_source_environment_id_foreign": "keep",
+        "environments_status_dikenal": "keep",
+        "environments_status_hapus_sejalan": "keep",
+        "environments_sumber_hanya_sandbox": "keep",
+        "environments_tenant_id_foreign": "keep"
+      },
+      "indexes": {
+        "environments_database_name_unique": "keep",
+        "environments_id_tenant_unik": "keep",
+        "environments_pkey": "keep",
+        "environments_satu_per_jenis": "keep",
+        "environments_satu_produksi": "keep",
+        "environments_slug_per_tenant": "keep",
+        "environments_tenant_id_kind_index": "keep"
+      },
+      "triggers": {}
+    },
+    "external_identities": {
+      "authority": "control",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "user_id": "keep",
+        "issuer": "keep",
+        "subject": "keep",
+        "email_at_link": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "deleted_at": "keep"
+      },
+      "constraints": {
+        "external_identities_pkey": "keep",
+        "external_identities_user_id_foreign": "keep"
+      },
+      "indexes": {
+        "external_identities_issuer_subject_unique": "keep",
+        "external_identities_pkey": "keep",
+        "external_identities_user_id_issuer_unique": "keep"
+      },
+      "triggers": {}
+    },
+    "failed_jobs": {
+      "authority": "framework-control",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "uuid": "keep",
+        "connection": "keep",
+        "queue": "keep",
+        "payload": "keep",
+        "exception": "keep",
+        "failed_at": "keep"
+      },
+      "constraints": {
+        "failed_jobs_pkey": "keep",
+        "failed_jobs_uuid_unique": "keep"
+      },
+      "indexes": {
+        "failed_jobs_connection_queue_failed_at_index": "keep",
+        "failed_jobs_pkey": "keep",
+        "failed_jobs_uuid_unique": "keep"
+      },
+      "triggers": {}
+    },
+    "finance_posting_deliveries": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "finance_posting_id": "exclude",
+        "integration_client_id": "exclude",
+        "status": "exclude",
+        "attempts": "exclude",
+        "first_attempt_at": "exclude",
+        "last_attempt_at": "exclude",
+        "next_attempt_at": "exclude",
+        "last_status_code": "exclude",
+        "last_error": "exclude",
+        "delivered_at": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "finance_posting_deliveries_finance_posting_id_foreign": "exclude",
+        "finance_posting_deliveries_finance_posting_id_integration_clien": "exclude",
+        "finance_posting_deliveries_integration_client_id_foreign": "exclude",
+        "finance_posting_deliveries_pkey": "exclude",
+        "finance_posting_deliveries_status_check": "exclude"
+      },
+      "indexes": {
+        "finance_posting_deliveries_finance_posting_id_integration_clien": "exclude",
+        "finance_posting_deliveries_integration_client_id_status_next_at": "exclude",
+        "finance_posting_deliveries_pkey": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "finance_posting_events": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "finance_posting_id": "exclude",
+        "event": "exclude",
+        "from_status": "exclude",
+        "to_status": "exclude",
+        "integration_client_id": "exclude",
+        "user_id": "exclude",
+        "data": "exclude",
+        "created_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "finance_posting_events_finance_posting_id_foreign": "exclude",
+        "finance_posting_events_pkey": "exclude"
+      },
+      "indexes": {
+        "finance_posting_events_finance_posting_id_created_at_index": "exclude",
+        "finance_posting_events_pkey": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "finance_posting_lines": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "finance_posting_id": "exclude",
+        "line_no": "exclude",
+        "account_id": "exclude",
+        "account_external_id": "exclude",
+        "account_code": "exclude",
+        "debit": "exclude",
+        "credit": "exclude",
+        "description": "exclude",
+        "org_unit_id": "exclude",
+        "business_unit_code": "exclude",
+        "department_code": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "finance_posting_lines_finance_posting_id_foreign": "exclude",
+        "finance_posting_lines_finance_posting_id_line_no_unique": "exclude",
+        "finance_posting_lines_one_side_check": "exclude",
+        "finance_posting_lines_pkey": "exclude"
+      },
+      "indexes": {
+        "finance_posting_lines_finance_posting_id_line_no_unique": "exclude",
+        "finance_posting_lines_pkey": "exclude",
+        "finance_posting_lines_tenant_id_business_unit_code_index": "exclude",
+        "finance_posting_lines_tenant_id_department_code_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "finance_posting_settings": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "legal_entity_id": "exclude",
+        "tenant_id": "exclude",
+        "enabled": "exclude",
+        "cutover_date": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "finance_posting_settings_enabled_needs_cutover": "exclude",
+        "finance_posting_settings_pkey": "exclude",
+        "finance_posting_settings_tenant_id_legal_entity_id_foreign": "exclude"
+      },
+      "indexes": {
+        "finance_posting_settings_pkey": "exclude",
+        "finance_posting_settings_tenant_id_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "finance_postings": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "legal_entity_id": "exclude",
+        "posting_id": "exclude",
+        "posting_type": "exclude",
+        "contract_version": "exclude",
+        "source_module": "exclude",
+        "source_type": "exclude",
+        "source_number": "exclude",
+        "source_id": "exclude",
+        "currency_code": "exclude",
+        "currency_decimals": "exclude",
+        "posting_date": "exclude",
+        "document_date": "exclude",
+        "occurred_at": "exclude",
+        "published_at": "exclude",
+        "settlement_mode": "exclude",
+        "status": "exclude",
+        "manual_reason": "exclude",
+        "hold_reasons": "exclude",
+        "vendor_id": "exclude",
+        "reverses_posting_id": "exclude",
+        "adjusts_posting_id": "exclude",
+        "total_debit": "exclude",
+        "total_credit": "exclude",
+        "payload": "exclude",
+        "input": "exclude",
+        "input_hash": "exclude",
+        "external_reference": "exclude",
+        "reason_code": "exclude",
+        "reason": "exclude",
+        "acknowledged_at": "exclude",
+        "acknowledged_by_client_id": "exclude",
+        "served_count": "exclude",
+        "last_served_at": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "finance_postings_balanced_check": "exclude",
+        "finance_postings_manual_reason_check": "exclude",
+        "finance_postings_pkey": "exclude",
+        "finance_postings_posted_reference_check": "exclude",
+        "finance_postings_rejected_reason_check": "exclude",
+        "finance_postings_status_check": "exclude",
+        "finance_postings_tenant_id_legal_entity_id_foreign": "exclude",
+        "finance_postings_tenant_id_posting_id_unique": "exclude"
+      },
+      "indexes": {
+        "finance_postings_pkey": "exclude",
+        "finance_postings_tenant_id_legal_entity_id_posting_date_index": "exclude",
+        "finance_postings_tenant_id_posting_id_unique": "exclude",
+        "finance_postings_tenant_id_status_posting_date_published_at_ind": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "finance_reference_account_imports": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "legal_entity_id": "exclude",
+        "file_name": "exclude",
+        "imported_by_user_id": "exclude",
+        "status": "exclude",
+        "created_count": "exclude",
+        "updated_count": "exclude",
+        "unchanged_count": "exclude",
+        "missing_count": "exclude",
+        "rejected_count": "exclude",
+        "rejected_rows": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "finance_reference_account_imports_pkey": "exclude",
+        "finance_reference_account_imports_status_check": "exclude"
+      },
+      "indexes": {
+        "finance_reference_account_imports_pkey": "exclude",
+        "finance_reference_account_imports_tenant_id_created_at_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "finance_reference_accounts": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "legal_entity_id": "exclude",
+        "external_id": "exclude",
+        "code": "exclude",
+        "name": "exclude",
+        "type": "exclude",
+        "active": "exclude",
+        "synced_at": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "finance_reference_accounts_pkey": "exclude",
+        "finance_reference_accounts_tenant_id_legal_entity_id_foreign": "exclude",
+        "finance_reference_accounts_type_check": "exclude"
+      },
+      "indexes": {
+        "finance_reference_accounts_entity_external_unique": "exclude",
+        "finance_reference_accounts_pkey": "exclude",
+        "finance_reference_accounts_tenant_external_unique": "exclude",
+        "finance_reference_accounts_tenant_id_code_index": "exclude",
+        "finance_reference_accounts_tenant_id_legal_entity_id_active_ind": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "finance_settlement_modes": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "legal_entity_id": "exclude",
+        "mode": "exclude",
+        "effective_from": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "finance_settlement_modes_legal_entity_id_effective_from_unique": "exclude",
+        "finance_settlement_modes_mode_check": "exclude",
+        "finance_settlement_modes_pkey": "exclude",
+        "finance_settlement_modes_tenant_id_legal_entity_id_foreign": "exclude"
+      },
+      "indexes": {
+        "finance_settlement_modes_legal_entity_id_effective_from_unique": "exclude",
+        "finance_settlement_modes_pkey": "exclude",
+        "finance_settlement_modes_tenant_id_legal_entity_id_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "fiscal_calendars": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "code": "exclude",
+        "name": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "fiscal_calendars_pkey": "exclude",
+        "fiscal_calendars_tenant_id_code_unique": "exclude",
+        "fiscal_calendars_tenant_id_foreign": "exclude"
+      },
+      "indexes": {
+        "fiscal_calendars_pkey": "exclude",
+        "fiscal_calendars_tenant_id_code_unique": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "fiscal_periods": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "fiscal_year_id": "exclude",
+        "ordinal": "exclude",
+        "name": "exclude",
+        "starts_on": "exclude",
+        "ends_on": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude"
+      },
+      "constraints": {
+        "fiscal_periods_fiscal_year_id_foreign": "exclude",
+        "fiscal_periods_fiscal_year_id_ordinal_unique": "exclude",
+        "fiscal_periods_pkey": "exclude"
+      },
+      "indexes": {
+        "fiscal_periods_fiscal_year_id_ordinal_unique": "exclude",
+        "fiscal_periods_fiscal_year_id_starts_on_ends_on_index": "exclude",
+        "fiscal_periods_pkey": "exclude"
+      },
+      "triggers": {}
+    },
+    "fiscal_years": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "fiscal_calendar_id": "exclude",
+        "name": "exclude",
+        "starts_on": "exclude",
+        "ends_on": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude"
+      },
+      "constraints": {
+        "fiscal_years_fiscal_calendar_id_foreign": "exclude",
+        "fiscal_years_fiscal_calendar_id_name_unique": "exclude",
+        "fiscal_years_pkey": "exclude"
+      },
+      "indexes": {
+        "fiscal_years_fiscal_calendar_id_name_unique": "exclude",
+        "fiscal_years_fiscal_calendar_id_starts_on_ends_on_index": "exclude",
+        "fiscal_years_pkey": "exclude"
+      },
+      "triggers": {}
+    },
+    "funding_sources": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "code": "exclude",
+        "name": "exclude",
+        "active": "exclude",
+        "creation_key": "exclude",
+        "creation_payload_hash": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "deleted_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude",
+        "description": "exclude"
+      },
+      "constraints": {
+        "funding_sources_pkey": "exclude",
+        "funding_sources_tenant_id_creation_key_unique": "exclude",
+        "funding_sources_tenant_id_id_unique": "exclude"
+      },
+      "indexes": {
+        "funding_sources_active_code_unique": "exclude",
+        "funding_sources_pkey": "exclude",
+        "funding_sources_tenant_id_creation_key_unique": "exclude",
+        "funding_sources_tenant_id_id_unique": "exclude",
+        "funding_sources_tenant_id_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "hierarchy_purpose_organization_types": {
+      "authority": "organization-foundation",
+      "action": "keep",
+      "columns": {
+        "purpose_id": "keep",
+        "organization_type": "keep"
+      },
+      "constraints": {
+        "hierarchy_purpose_organization_types_pkey": "keep",
+        "hierarchy_purpose_organization_types_purpose_id_foreign": "keep"
+      },
+      "indexes": {
+        "hierarchy_purpose_organization_types_pkey": "keep"
+      },
+      "triggers": {}
+    },
+    "hierarchy_purposes": {
+      "authority": "organization-foundation",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "code": "keep",
+        "name": "keep",
+        "description": "keep",
+        "created_at": "keep",
+        "updated_at": "keep"
+      },
+      "constraints": {
+        "hierarchy_purposes_code_unique": "keep",
+        "hierarchy_purposes_pkey": "keep"
+      },
+      "indexes": {
+        "hierarchy_purposes_code_unique": "keep",
+        "hierarchy_purposes_pkey": "keep"
+      },
+      "triggers": {}
+    },
+    "integration_clients": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "name": "exclude",
+        "token_digest": "exclude",
+        "scopes": "exclude",
+        "allowed_ips": "exclude",
+        "posting_type_prefixes": "exclude",
+        "delivery_mode": "exclude",
+        "push_url": "exclude",
+        "signing_secret": "exclude",
+        "status": "exclude",
+        "last_used_at": "exclude",
+        "last_pulled_at": "exclude",
+        "revoked_at": "exclude",
+        "created_by_user_id": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "updated_by_user_id": "exclude",
+        "user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "integration_clients_mode_check": "exclude",
+        "integration_clients_pkey": "exclude",
+        "integration_clients_push_check": "exclude",
+        "integration_clients_status_check": "exclude",
+        "integration_clients_tenant_id_name_unique": "exclude"
+      },
+      "indexes": {
+        "integration_clients_pkey": "exclude",
+        "integration_clients_tenant_id_name_unique": "exclude",
+        "integration_clients_tenant_id_status_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "integration_scopes": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "code": "exclude",
+        "name": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "deleted_at": "exclude"
+      },
+      "constraints": {
+        "integration_scopes_pkey": "exclude"
+      },
+      "indexes": {
+        "integration_scopes_pkey": "exclude"
+      },
+      "triggers": {}
+    },
+    "invitation_codes": {
+      "authority": "invitation-partition",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "code_hash": "keep",
+        "created_by": "keep",
+        "expires_at": "keep",
+        "revoked_at": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "code_ciphertext": "keep",
+        "label": "keep",
+        "sso_issuer": "keep",
+        "sso_subject": "keep",
+        "sso_email_at_invite": "keep",
+        "sso_name_at_invite": "keep",
+        "sso_checked_at": "keep",
+        "sso_notified_at": "keep",
+        "sso_redeemed_at": "keep",
+        "sso_redeemed_by": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "invitation_codes_code_hash_unique": "keep",
+        "invitation_codes_created_by_foreign": "keep",
+        "invitation_codes_pkey": "keep",
+        "invitation_codes_tenant_id_foreign": "keep",
+        "undangan_sso_tertukar_hanya_bila_terikat": "keep",
+        "undangan_sso_tertukar_lengkap": "keep",
+        "undangan_sso_utuh": "keep"
+      },
+      "indexes": {
+        "invitation_codes_code_hash_unique": "keep",
+        "invitation_codes_pkey": "keep",
+        "invitation_codes_sso_issuer_sso_subject_index": "keep",
+        "undangan_sso_satu_yang_terbuka": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "invitation_data_policy_scopes": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "invitation_id": "exclude",
+        "role_id": "exclude",
+        "policy_code": "exclude",
+        "legal_entity_id": "exclude",
+        "organization_id": "exclude",
+        "hierarchy_id": "exclude",
+        "hierarchy_version_id": "exclude",
+        "include_descendants": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude"
+      },
+      "constraints": {
+        "invitation_data_policy_scopes_hierarchy_id_foreign": "exclude",
+        "invitation_data_policy_scopes_hierarchy_version_id_foreign": "exclude",
+        "invitation_data_policy_scopes_invitation_id_foreign": "exclude",
+        "invitation_data_policy_scopes_legal_entity_id_foreign": "exclude",
+        "invitation_data_policy_scopes_organization_id_foreign": "exclude",
+        "invitation_data_policy_scopes_pkey": "exclude",
+        "invitation_data_policy_scopes_policy_code_foreign": "exclude",
+        "invitation_data_policy_scopes_role_id_foreign": "exclude"
+      },
+      "indexes": {
+        "invitation_data_policy_scopes_invitation_id_role_id_policy_code": "exclude",
+        "invitation_data_policy_scopes_pkey": "exclude"
+      },
+      "triggers": {}
+    },
+    "invitation_role_assignments": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "invitation_id": "exclude",
+        "role_id": "exclude"
+      },
+      "constraints": {
+        "invitation_role_assignments_invitation_id_foreign": "exclude",
+        "invitation_role_assignments_pkey": "exclude",
+        "invitation_role_assignments_role_id_foreign": "exclude"
+      },
+      "indexes": {
+        "invitation_role_assignments_pkey": "exclude"
+      },
+      "triggers": {}
+    },
+    "job_batches": {
+      "authority": "framework-control",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "name": "keep",
+        "total_jobs": "keep",
+        "pending_jobs": "keep",
+        "failed_jobs": "keep",
+        "failed_job_ids": "keep",
+        "options": "keep",
+        "cancelled_at": "keep",
+        "created_at": "keep",
+        "finished_at": "keep"
+      },
+      "constraints": {
+        "job_batches_pkey": "keep"
+      },
+      "indexes": {
+        "job_batches_pkey": "keep"
+      },
+      "triggers": {}
+    },
+    "jobs": {
+      "authority": "framework-control",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "queue": "keep",
+        "payload": "keep",
+        "attempts": "keep",
+        "reserved_at": "keep",
+        "available_at": "keep",
+        "created_at": "keep"
+      },
+      "constraints": {
+        "jobs_pkey": "keep"
+      },
+      "indexes": {
+        "jobs_pkey": "keep",
+        "jobs_queue_index": "keep"
+      },
+      "triggers": {}
+    },
+    "legal_entities": {
+      "authority": "organization-field-partition",
+      "action": "keep",
+      "columns": {
+        "organization_id": "keep",
+        "company_code": "exclude",
+        "country_code": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "tenant_id": "keep",
+        "fiscal_calendar_id": "exclude",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "timezone": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "legal_entities_fiscal_calendar_id_foreign": "exclude",
+        "legal_entities_organization_id_foreign": "keep",
+        "legal_entities_pkey": "keep",
+        "legal_entities_tenant_id_company_code_unique": "exclude",
+        "legal_entities_tenant_id_foreign": "keep"
+      },
+      "indexes": {
+        "legal_entities_pkey": "keep",
+        "legal_entities_tenant_id_company_code_unique": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "location_purposes": {
+      "authority": "reference-release",
+      "action": "keep",
+      "columns": {
+        "code": "keep",
+        "name": "keep",
+        "sort_order": "keep",
+        "created_at": "keep",
+        "updated_at": "keep"
+      },
+      "constraints": {
+        "location_purposes_pkey": "keep"
+      },
+      "indexes": {
+        "location_purposes_pkey": "keep"
+      },
+      "triggers": {}
+    },
+    "locations": {
+      "authority": "organization-address-partition",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "name": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "deleted_at": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "version": "keep",
+        "owner_party_id": "keep"
+      },
+      "constraints": {
+        "locations_pkey": "keep",
+        "locations_tenant_id_id_unique": "keep",
+        "locations_tenant_id_owner_party_id_foreign": "keep"
+      },
+      "indexes": {
+        "locations_lookup_cursor": "keep",
+        "locations_pkey": "keep",
+        "locations_tenant_id_id_unique": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "managed_product_tenants": {
+      "authority": "control",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "product": "keep",
+        "profile": "keep",
+        "name": "keep",
+        "slug": "keep",
+        "owner_name": "keep",
+        "owner_email": "keep",
+        "idempotency_key": "keep",
+        "request_hash": "keep",
+        "release": "keep",
+        "status": "keep",
+        "public_url": "keep",
+        "failure_message": "keep",
+        "lease_until": "keep",
+        "expires_at": "keep",
+        "requested_by": "keep",
+        "retry_requested": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "deleted_at": "keep",
+        "owner_customer_id": "keep",
+        "pending_sso_revocation": "keep"
+      },
+      "constraints": {
+        "managed_product_tenants_idempotency_key_unique": "keep",
+        "managed_product_tenants_owner_customer_id_foreign": "keep",
+        "managed_product_tenants_pkey": "keep",
+        "managed_product_tenants_requested_by_foreign": "keep",
+        "managed_product_tenants_status": "keep"
+      },
+      "indexes": {
+        "managed_product_tenants_customer_product_active": "keep",
+        "managed_product_tenants_idempotency_key_unique": "keep",
+        "managed_product_tenants_pkey": "keep",
+        "managed_product_tenants_product_slug_active": "keep",
+        "managed_product_tenants_status_lease_until_index": "keep"
+      },
+      "triggers": {}
+    },
+    "migrations": {
+      "authority": "per-database-infrastructure",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "migration": "exclude",
+        "batch": "exclude"
+      },
+      "reason": "Business history stays transitional. The control runner owns control_plane_migrations.",
+      "constraints": {
+        "migrations_pkey": "exclude"
+      },
+      "indexes": {
+        "migrations_pkey": "exclude"
+      },
+      "triggers": {}
+    },
+    "number_sequence_allocations": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "sequence_id": "exclude",
+        "scope_key": "exclude",
+        "period_key": "exclude",
+        "first_number": "exclude",
+        "last_number": "exclude",
+        "next_number": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude"
+      },
+      "constraints": {
+        "number_sequence_allocations_pkey": "exclude",
+        "number_sequence_allocations_sequence_id_foreign": "exclude"
+      },
+      "indexes": {
+        "number_sequence_allocations_live": "exclude",
+        "number_sequence_allocations_pkey": "exclude",
+        "number_sequence_allocations_sequence_id_scope_key_period_key_in": "exclude"
+      },
+      "triggers": {}
+    },
+    "number_sequence_audit_events": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "sequence_id": "exclude",
+        "app_id": "exclude",
+        "user_id": "exclude",
+        "event_type": "exclude",
+        "formatted_value": "exclude",
+        "details": "exclude",
+        "occurred_at": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude"
+      },
+      "constraints": {
+        "number_sequence_audit_events_app_id_foreign": "exclude",
+        "number_sequence_audit_events_pkey": "exclude",
+        "number_sequence_audit_events_sequence_id_foreign": "exclude",
+        "number_sequence_audit_events_user_id_foreign": "exclude"
+      },
+      "indexes": {
+        "number_sequence_audit_events_pkey": "exclude",
+        "number_sequence_audit_events_sequence_id_occurred_at_index": "exclude"
+      },
+      "triggers": {}
+    },
+    "number_sequence_continuous_pool": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "sequence_id": "exclude",
+        "scope_key": "exclude",
+        "period_key": "exclude",
+        "numeric_value": "exclude",
+        "status": "exclude",
+        "reservation_id": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude"
+      },
+      "constraints": {
+        "number_sequence_continuous_pool_pkey": "exclude",
+        "number_sequence_continuous_pool_sequence_id_foreign": "exclude"
+      },
+      "indexes": {
+        "number_sequence_continuous_pool_available": "exclude",
+        "number_sequence_continuous_pool_confirmed": "exclude",
+        "number_sequence_continuous_pool_pkey": "exclude",
+        "number_sequence_continuous_pool_reservation_id_index": "exclude"
+      },
+      "triggers": {}
+    },
+    "number_sequence_counters": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "sequence_id": "exclude",
+        "scope_key": "exclude",
+        "period_key": "exclude",
+        "next_number": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude"
+      },
+      "constraints": {
+        "number_sequence_counters_pkey": "exclude",
+        "number_sequence_counters_sequence_id_foreign": "exclude",
+        "number_sequence_counters_sequence_id_scope_key_period_key_uniqu": "exclude"
+      },
+      "indexes": {
+        "number_sequence_counters_pkey": "exclude",
+        "number_sequence_counters_sequence_id_scope_key_period_key_uniqu": "exclude"
+      },
+      "triggers": {}
+    },
+    "number_sequence_issues": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "sequence_id": "exclude",
+        "app_id": "exclude",
+        "scope_key": "exclude",
+        "period_key": "exclude",
+        "numeric_value": "exclude",
+        "formatted_value": "exclude",
+        "idempotency_key": "exclude",
+        "is_manual": "exclude",
+        "issued_at": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude"
+      },
+      "constraints": {
+        "number_sequence_issues_app_id_foreign": "exclude",
+        "number_sequence_issues_formatted_unique": "exclude",
+        "number_sequence_issues_pkey": "exclude",
+        "number_sequence_issues_sequence_id_app_id_idempotency_key_uniqu": "exclude",
+        "number_sequence_issues_sequence_id_foreign": "exclude",
+        "number_sequence_issues_sequence_id_scope_key_period_key_numeric": "exclude",
+        "number_sequence_issues_value_unique": "exclude"
+      },
+      "indexes": {
+        "number_sequence_issues_formatted_unique": "exclude",
+        "number_sequence_issues_pkey": "exclude",
+        "number_sequence_issues_sequence_id_app_id_idempotency_key_uniqu": "exclude",
+        "number_sequence_issues_sequence_id_scope_key_period_key_numeric": "exclude",
+        "number_sequence_issues_value_unique": "exclude"
+      },
+      "triggers": {}
+    },
+    "number_sequence_profiles": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "code": "exclude",
+        "name": "exclude",
+        "is_continuous": "exclude",
+        "allow_manual": "exclude",
+        "preallocation_enabled": "exclude",
+        "preallocation_quantity": "exclude",
+        "segments": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude"
+      },
+      "constraints": {
+        "number_sequence_profiles_pkey": "exclude"
+      },
+      "indexes": {
+        "number_sequence_profiles_pkey": "exclude"
+      },
+      "triggers": {}
+    },
+    "number_sequence_reservations": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "sequence_id": "exclude",
+        "app_id": "exclude",
+        "scope_key": "exclude",
+        "period_key": "exclude",
+        "numeric_value": "exclude",
+        "formatted_value": "exclude",
+        "idempotency_key": "exclude",
+        "status": "exclude",
+        "expires_at": "exclude",
+        "confirmed_at": "exclude",
+        "cancelled_at": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude"
+      },
+      "constraints": {
+        "number_sequence_reservations_app_id_foreign": "exclude",
+        "number_sequence_reservations_pkey": "exclude",
+        "number_sequence_reservations_sequence_id_app_id_idempotency_key": "exclude",
+        "number_sequence_reservations_sequence_id_foreign": "exclude"
+      },
+      "indexes": {
+        "number_sequence_reservations_pkey": "exclude",
+        "number_sequence_reservations_sequence_id_app_id_idempotency_key": "exclude",
+        "number_sequence_reservations_sequence_id_status_index": "exclude",
+        "number_sequence_reservations_status_expires_at_index": "exclude"
+      },
+      "triggers": {}
+    },
+    "number_sequence_reusable_numbers": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "sequence_id": "exclude",
+        "scope_key": "exclude",
+        "period_key": "exclude",
+        "numeric_value": "exclude"
+      },
+      "constraints": {
+        "number_sequence_reusable_numbers_pkey": "exclude",
+        "number_sequence_reusable_numbers_sequence_id_foreign": "exclude"
+      },
+      "indexes": {
+        "number_sequence_reusable_numbers_pkey": "exclude"
+      },
+      "triggers": {}
+    },
+    "operating_units": {
+      "authority": "organization-foundation",
+      "action": "keep",
+      "columns": {
+        "organization_id": "keep",
+        "type": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "tenant_id": "keep",
+        "number": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "operating_units_organization_id_foreign": "keep",
+        "operating_units_pkey": "keep"
+      },
+      "indexes": {
+        "operating_units_pkey": "keep",
+        "operating_units_tenant_number_unique": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "operator_audit_events": {
+      "authority": "control",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "user_id": "keep",
+        "action": "keep",
+        "subject_type": "keep",
+        "subject_id": "keep",
+        "detail": "keep",
+        "ip_address": "keep",
+        "occurred_at": "keep"
+      },
+      "constraints": {
+        "operator_audit_events_pkey": "keep",
+        "operator_audit_events_user_id_foreign": "keep"
+      },
+      "indexes": {
+        "operator_audit_events_pkey": "keep",
+        "operator_audit_events_subject_type_subject_id_occurred_at_index": "keep",
+        "operator_audit_events_user_id_occurred_at_index": "keep"
+      },
+      "triggers": {
+        "operator_audit_events_hanya_tambah": "keep"
+      }
+    },
+    "organization_hierarchies": {
+      "authority": "organization-foundation",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "name": "keep",
+        "status": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "organization_hierarchies_pkey": "keep",
+        "organization_hierarchies_tenant_id_foreign": "keep",
+        "organization_hierarchies_tenant_id_name_unique": "keep"
+      },
+      "indexes": {
+        "organization_hierarchies_pkey": "keep",
+        "organization_hierarchies_tenant_id_name_unique": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "organization_hierarchy_closures": {
+      "authority": "hierarchy-derived",
+      "action": "keep",
+      "columns": {
+        "version_id": "keep",
+        "ancestor_organization_id": "keep",
+        "descendant_organization_id": "keep",
+        "distance": "keep"
+      },
+      "constraints": {
+        "organization_hierarchy_closures_ancestor_organization_id_foreig": "keep",
+        "organization_hierarchy_closures_descendant_organization_id_fore": "keep",
+        "organization_hierarchy_closures_pkey": "keep",
+        "organization_hierarchy_closures_version_id_foreign": "keep"
+      },
+      "indexes": {
+        "organization_hierarchy_closures_pkey": "keep"
+      },
+      "triggers": {}
+    },
+    "organization_hierarchy_nodes": {
+      "authority": "organization-foundation",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "version_id": "keep",
+        "organization_id": "keep",
+        "parent_node_id": "keep",
+        "created_at": "keep",
+        "updated_at": "keep"
+      },
+      "constraints": {
+        "organization_hierarchy_nodes_organization_id_foreign": "keep",
+        "organization_hierarchy_nodes_parent_node_id_foreign": "keep",
+        "organization_hierarchy_nodes_pkey": "keep",
+        "organization_hierarchy_nodes_version_id_foreign": "keep",
+        "organization_hierarchy_nodes_version_id_organization_id_unique": "keep"
+      },
+      "indexes": {
+        "organization_hierarchy_nodes_pkey": "keep",
+        "organization_hierarchy_nodes_version_id_organization_id_unique": "keep"
+      },
+      "triggers": {}
+    },
+    "organization_hierarchy_purposes": {
+      "authority": "organization-foundation",
+      "action": "keep",
+      "columns": {
+        "hierarchy_id": "keep",
+        "purpose_id": "keep"
+      },
+      "constraints": {
+        "organization_hierarchy_purposes_hierarchy_id_foreign": "keep",
+        "organization_hierarchy_purposes_pkey": "keep",
+        "organization_hierarchy_purposes_purpose_id_foreign": "keep"
+      },
+      "indexes": {
+        "organization_hierarchy_purposes_pkey": "keep"
+      },
+      "triggers": {}
+    },
+    "organization_hierarchy_versions": {
+      "authority": "organization-foundation",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "hierarchy_id": "keep",
+        "version_number": "keep",
+        "status": "keep",
+        "effective_from": "keep",
+        "published_at": "keep",
+        "created_at": "keep",
+        "updated_at": "keep"
+      },
+      "constraints": {
+        "organization_hierarchy_versions_hierarchy_id_foreign": "keep",
+        "organization_hierarchy_versions_hierarchy_id_version_number_uni": "keep",
+        "organization_hierarchy_versions_pkey": "keep"
+      },
+      "indexes": {
+        "organization_hierarchy_versions_hierarchy_id_version_number_uni": "keep",
+        "organization_hierarchy_versions_pkey": "keep"
+      },
+      "triggers": {}
+    },
+    "organization_parties": {
+      "authority": "organization-field-partition",
+      "action": "keep",
+      "columns": {
+        "organization_id": "keep",
+        "tenant_id": "keep",
+        "party_id": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "organization_parties_pkey": "keep",
+        "organization_parties_tenant_id_foreign": "keep",
+        "organization_parties_tenant_id_organization_id_foreign": "keep",
+        "organization_parties_tenant_id_party_id_foreign": "keep",
+        "organization_parties_tenant_id_party_id_unique": "keep"
+      },
+      "indexes": {
+        "organization_parties_pkey": "keep",
+        "organization_parties_tenant_id_party_id_unique": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "organizations": {
+      "authority": "organization-foundation",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "name": "keep",
+        "classification": "keep",
+        "status": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "organizations_pkey": "keep",
+        "organizations_tenant_id_foreign": "keep",
+        "organizations_tenant_id_id_unique": "keep"
+      },
+      "indexes": {
+        "organizations_lookup_cursor": "keep",
+        "organizations_pkey": "keep",
+        "organizations_tenant_id_id_unique": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "outbox_events": {
+      "authority": "per-database-infrastructure",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "type": "keep",
+        "payload": "keep",
+        "occurred_at": "keep",
+        "published_at": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "correlation_id": "keep",
+        "legal_entity_id": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "outbox_events_pkey": "keep"
+      },
+      "indexes": {
+        "outbox_event_correlation_index": "keep",
+        "outbox_events_pkey": "keep",
+        "outbox_events_tenant_id_index": "keep",
+        "outbox_events_type_index": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "parties": {
+      "authority": "organization-address-partition",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "type": "keep",
+        "name": "keep",
+        "search_name": "keep",
+        "status": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "version": "keep",
+        "deleted_at": "keep",
+        "number": "exclude",
+        "creation_key": "exclude",
+        "known_as": "exclude",
+        "language": "keep",
+        "personal_title": "exclude",
+        "personal_suffix": "exclude",
+        "first_name": "exclude",
+        "middle_name": "exclude",
+        "last_name": "exclude",
+        "initials": "exclude",
+        "professional_title": "exclude",
+        "professional_suffix": "exclude",
+        "gender": "exclude",
+        "marital_status": "exclude",
+        "organization_number": "keep",
+        "duns_number": "keep",
+        "abc_code": "exclude",
+        "birth_date": "exclude",
+        "anniversary_date": "exclude",
+        "number_of_children": "exclude",
+        "number_of_employees": "keep",
+        "interests": "exclude",
+        "memo": "exclude",
+        "tax_number": "keep"
+      },
+      "constraints": {
+        "parties_pkey": "keep",
+        "parties_tenant_id_foreign": "keep",
+        "parties_tenant_id_id_unique": "keep",
+        "parties_type_foreign": "keep"
+      },
+      "indexes": {
+        "parties_creation_key_unique": "exclude",
+        "parties_lookup_cursor": "keep",
+        "parties_name_text_search": "keep",
+        "parties_number_active_unique": "exclude",
+        "parties_pkey": "keep",
+        "parties_tenant_id_id_unique": "keep",
+        "parties_tenant_id_search_name_index": "keep",
+        "parties_tenant_id_status_index": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "party_address_books": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "party_id": "exclude",
+        "address_book_id": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "deleted_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "party_address_books_pkey": "exclude",
+        "party_address_books_tenant_id_address_book_id_foreign": "exclude",
+        "party_address_books_tenant_id_party_id_foreign": "exclude"
+      },
+      "indexes": {
+        "party_address_books_active_unique": "exclude",
+        "party_address_books_pkey": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "party_location_purposes": {
+      "authority": "organization-address-partition",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "party_location_id": "keep",
+        "purpose_code": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "deleted_at": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "party_location_purposes_pkey": "keep",
+        "party_location_purposes_purpose_code_foreign": "keep",
+        "party_location_purposes_tenant_id_id_unique": "keep",
+        "party_location_purposes_tenant_id_party_location_id_foreign": "keep"
+      },
+      "indexes": {
+        "party_location_purposes_one_each": "keep",
+        "party_location_purposes_pkey": "keep",
+        "party_location_purposes_tenant_id_id_unique": "keep",
+        "party_location_purposes_tenant_id_party_location_id_index": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "party_locations": {
+      "authority": "organization-address-partition",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "party_id": "keep",
+        "is_primary": "keep",
+        "valid_from": "keep",
+        "valid_to": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "location_id": "keep",
+        "deleted_at": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "party_locations_pkey": "keep",
+        "party_locations_tenant_id_foreign": "keep",
+        "party_locations_tenant_id_id_unique": "keep",
+        "party_locations_tenant_id_location_id_foreign": "keep",
+        "party_locations_tenant_id_party_id_foreign": "keep"
+      },
+      "indexes": {
+        "party_locations_one_link": "keep",
+        "party_locations_one_primary": "keep",
+        "party_locations_pkey": "keep",
+        "party_locations_tenant_id_id_unique": "keep",
+        "party_locations_tenant_id_location_id_index": "keep",
+        "party_locations_tenant_id_party_id_index": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "party_reference_values": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "category": "exclude",
+        "code": "exclude",
+        "name": "exclude"
+      },
+      "constraints": {
+        "party_reference_values_pkey": "exclude"
+      },
+      "indexes": {
+        "party_reference_values_pkey": "exclude"
+      },
+      "triggers": {}
+    },
+    "party_relationship_types": {
+      "authority": "reference-release",
+      "action": "keep",
+      "columns": {
+        "code": "keep",
+        "name": "keep",
+        "inverse_name": "keep",
+        "from_type": "keep",
+        "to_type": "keep"
+      },
+      "constraints": {
+        "party_relationship_types_pkey": "keep"
+      },
+      "indexes": {
+        "party_relationship_types_pkey": "keep"
+      },
+      "triggers": {}
+    },
+    "party_relationships": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "from_party_id": "exclude",
+        "to_party_id": "exclude",
+        "relationship_type_code": "exclude",
+        "valid_from": "exclude",
+        "valid_to": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "deleted_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "party_relationships_dates": "exclude",
+        "party_relationships_distinct_parties": "exclude",
+        "party_relationships_pkey": "exclude",
+        "party_relationships_relationship_type_code_foreign": "exclude",
+        "party_relationships_tenant_id_from_party_id_foreign": "exclude",
+        "party_relationships_tenant_id_to_party_id_foreign": "exclude"
+      },
+      "indexes": {
+        "party_relationships_active_unique": "exclude",
+        "party_relationships_pkey": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "party_role_registrations": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "party_id": "exclude",
+        "role_code": "exclude",
+        "legal_entity_id": "exclude",
+        "owning_app_id": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "party_role_registrations_pkey": "exclude",
+        "party_role_registrations_tenant_id_foreign": "exclude",
+        "party_role_registrations_tenant_id_legal_entity_id_foreign": "exclude",
+        "party_role_registrations_tenant_id_party_id_foreign": "exclude",
+        "party_role_unique": "exclude"
+      },
+      "indexes": {
+        "party_role_registrations_pkey": "exclude",
+        "party_role_registrations_tenant_id_role_code_index": "exclude",
+        "party_role_unique": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "party_types": {
+      "authority": "reference-release",
+      "action": "keep",
+      "columns": {
+        "code": "keep",
+        "name": "keep",
+        "created_at": "keep",
+        "updated_at": "keep"
+      },
+      "constraints": {
+        "party_types_pkey": "keep"
+      },
+      "indexes": {
+        "party_types_pkey": "keep"
+      },
+      "triggers": {}
+    },
+    "passkeys": {
+      "authority": "control",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "user_id": "keep",
+        "name": "keep",
+        "credential_id": "keep",
+        "credential": "keep",
+        "last_used_at": "keep",
+        "created_at": "keep",
+        "updated_at": "keep"
+      },
+      "constraints": {
+        "passkeys_credential_id_unique": "keep",
+        "passkeys_pkey": "keep",
+        "passkeys_user_id_foreign": "keep"
+      },
+      "indexes": {
+        "passkeys_credential_id_unique": "keep",
+        "passkeys_pkey": "keep",
+        "passkeys_user_id_index": "keep"
+      },
+      "triggers": {}
+    },
+    "password_reset_tokens": {
+      "authority": "framework-control",
+      "action": "keep",
+      "columns": {
+        "email": "keep",
+        "token": "keep",
+        "created_at": "keep"
+      },
+      "constraints": {
+        "password_reset_tokens_pkey": "keep"
+      },
+      "indexes": {
+        "password_reset_tokens_pkey": "keep"
+      },
+      "triggers": {}
+    },
+    "permissions": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "code": "exclude",
+        "app_id": "exclude",
+        "entry_point_code": "exclude",
+        "access_level": "exclude",
+        "name": "exclude",
+        "description": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude"
+      },
+      "constraints": {
+        "permissions_app_id_foreign": "exclude",
+        "permissions_entry_point_code_foreign": "exclude",
+        "permissions_pkey": "exclude"
+      },
+      "indexes": {
+        "permissions_pkey": "exclude"
+      },
+      "triggers": {}
+    },
+    "planning_years": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "legal_entity_id": "exclude",
+        "year": "exclude",
+        "active": "exclude",
+        "creation_key": "exclude",
+        "creation_payload_hash": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "deleted_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "planning_years_company_id_unique": "exclude",
+        "planning_years_pkey": "exclude",
+        "planning_years_tenant_id_creation_key_unique": "exclude",
+        "planning_years_tenant_id_legal_entity_id_foreign": "exclude"
+      },
+      "indexes": {
+        "planning_years_active_year_unique": "exclude",
+        "planning_years_company_id_unique": "exclude",
+        "planning_years_pkey": "exclude",
+        "planning_years_tenant_id_creation_key_unique": "exclude",
+        "planning_years_tenant_id_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "postal_addresses": {
+      "authority": "organization-address-partition",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "location_id": "keep",
+        "country_region_code": "keep",
+        "province": "keep",
+        "city": "keep",
+        "district": "keep",
+        "street": "keep",
+        "building": "keep",
+        "postbox": "keep",
+        "postal_code": "keep",
+        "formatted": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "version": "keep",
+        "village": "keep",
+        "rt": "keep",
+        "rw": "keep",
+        "province_id": "keep",
+        "regency_id": "keep",
+        "district_id": "keep",
+        "village_id": "keep",
+        "postal_code_id": "keep"
+      },
+      "constraints": {
+        "postal_addresses_country_region_code_foreign": "keep",
+        "postal_addresses_district_id_foreign": "keep",
+        "postal_addresses_pkey": "keep",
+        "postal_addresses_postal_code_id_foreign": "keep",
+        "postal_addresses_province_id_foreign": "keep",
+        "postal_addresses_regency_id_foreign": "keep",
+        "postal_addresses_tenant_id_foreign": "keep",
+        "postal_addresses_tenant_id_id_unique": "keep",
+        "postal_addresses_tenant_id_location_id_foreign": "keep",
+        "postal_addresses_tenant_id_location_id_unique": "keep",
+        "postal_addresses_village_id_foreign": "keep"
+      },
+      "indexes": {
+        "postal_addresses_pkey": "keep",
+        "postal_addresses_tenant_id_id_unique": "keep",
+        "postal_addresses_tenant_id_location_id_index": "keep",
+        "postal_addresses_tenant_id_location_id_unique": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "print_identities": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "organization_id": "exclude",
+        "display_name": "exclude",
+        "parent_lines": "exclude",
+        "tax_id": "exclude",
+        "registration_id": "exclude",
+        "footer_text": "exclude",
+        "logos": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "print_identities_organization_id_foreign": "exclude",
+        "print_identities_organization_id_unique": "exclude",
+        "print_identities_pkey": "exclude",
+        "print_identities_tenant_id_foreign": "exclude"
+      },
+      "indexes": {
+        "print_identities_organization_id_unique": "exclude",
+        "print_identities_pkey": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "product_auth_attempts": {
+      "authority": "control",
+      "action": "keep",
+      "columns": {
+        "state_hash": "keep",
+        "id": "keep",
+        "browser_challenge": "keep",
+        "nonce": "keep",
+        "code_verifier": "keep",
+        "expires_at": "keep",
+        "consumed_at": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "deleted_at": "keep"
+      },
+      "constraints": {
+        "product_auth_attempts_id_unique": "keep",
+        "product_auth_attempts_pkey": "keep"
+      },
+      "indexes": {
+        "product_auth_attempts_id_unique": "keep",
+        "product_auth_attempts_pkey": "keep"
+      },
+      "triggers": {}
+    },
+    "product_customer_sessions": {
+      "authority": "control",
+      "action": "keep",
+      "columns": {
+        "token_hash": "keep",
+        "customer_id": "keep",
+        "expires_at": "keep",
+        "revoked_at": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "deleted_at": "keep"
+      },
+      "constraints": {
+        "product_customer_sessions_customer_id_foreign": "keep",
+        "product_customer_sessions_pkey": "keep"
+      },
+      "indexes": {
+        "product_customer_sessions_customer_id_expires_at_index": "keep",
+        "product_customer_sessions_pkey": "keep"
+      },
+      "triggers": {}
+    },
+    "product_customers": {
+      "authority": "control",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "identity_hash": "keep",
+        "issuer": "keep",
+        "subject": "keep",
+        "name": "keep",
+        "email": "keep",
+        "verified_email": "keep",
+        "email_verified_at": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "deleted_at": "keep",
+        "user_id": "exclude"
+      },
+      "constraints": {
+        "product_customers_identity_hash_unique": "keep",
+        "product_customers_pkey": "keep",
+        "product_customers_user_id_foreign": "exclude"
+      },
+      "indexes": {
+        "product_customers_identity_hash_unique": "keep",
+        "product_customers_pkey": "keep",
+        "product_customers_verified_email_active": "keep"
+      },
+      "triggers": {}
+    },
+    "product_email_challenges": {
+      "authority": "control",
+      "action": "keep",
+      "columns": {
+        "token_hash": "keep",
+        "customer_id": "keep",
+        "email": "keep",
+        "expires_at": "keep",
+        "consumed_at": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "deleted_at": "keep"
+      },
+      "constraints": {
+        "product_email_challenges_customer_id_foreign": "keep",
+        "product_email_challenges_pkey": "keep"
+      },
+      "indexes": {
+        "product_email_challenges_customer_id_created_at_index": "keep",
+        "product_email_challenges_pkey": "keep"
+      },
+      "triggers": {}
+    },
+    "provider_access": {
+      "authority": "control",
+      "action": "keep",
+      "columns": {
+        "user_id": "keep",
+        "role": "keep",
+        "created_at": "keep",
+        "updated_at": "keep"
+      },
+      "constraints": {
+        "provider_access_pkey": "keep",
+        "provider_access_user_id_foreign": "keep"
+      },
+      "indexes": {
+        "provider_access_pkey": "keep"
+      },
+      "triggers": {}
+    },
+    "ref_address_parameters": {
+      "authority": "reference-release",
+      "action": "keep",
+      "columns": {
+        "country_code": "keep",
+        "use_province": "keep",
+        "use_regency": "keep",
+        "use_district": "keep",
+        "use_village": "keep",
+        "use_rt_rw": "keep",
+        "use_postal_code": "keep",
+        "use_building": "keep",
+        "address_format": "keep",
+        "created_at": "keep",
+        "updated_at": "keep"
+      },
+      "constraints": {
+        "ref_address_parameters_country_code_foreign": "keep",
+        "ref_address_parameters_pkey": "keep"
+      },
+      "indexes": {
+        "ref_address_parameters_pkey": "keep"
+      },
+      "triggers": {}
+    },
+    "ref_administrative_division_external_codes": {
+      "authority": "reference-release",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "division_id": "keep",
+        "system": "keep",
+        "external_code": "keep",
+        "description": "keep",
+        "status": "keep",
+        "created_at": "keep",
+        "updated_at": "keep"
+      },
+      "constraints": {
+        "ref_administrative_division_external_codes_pkey": "keep",
+        "unique_division_sys_code": "keep"
+      },
+      "indexes": {
+        "ref_administrative_division_external_codes_division_id_index": "keep",
+        "ref_administrative_division_external_codes_pkey": "keep",
+        "ref_administrative_division_external_codes_system_index": "keep",
+        "unique_division_sys_code": "keep"
+      },
+      "triggers": {}
+    },
+    "ref_administrative_division_timezones": {
+      "authority": "reference-release",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "division_type": "keep",
+        "division_id": "keep",
+        "timezone": "keep",
+        "is_default": "keep",
+        "status": "keep",
+        "created_at": "keep",
+        "updated_at": "keep"
+      },
+      "constraints": {
+        "ref_administrative_division_timezones_pkey": "keep",
+        "ref_div_tz_unique": "keep"
+      },
+      "indexes": {
+        "ref_administrative_division_timezones_division_type_division_id": "keep",
+        "ref_administrative_division_timezones_pkey": "keep",
+        "ref_div_tz_unique": "keep"
+      },
+      "triggers": {}
+    },
+    "ref_administrative_division_translations": {
+      "authority": "reference-release",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "division_id": "keep",
+        "locale": "keep",
+        "name": "keep",
+        "description": "keep",
+        "created_at": "keep",
+        "updated_at": "keep"
+      },
+      "constraints": {
+        "ref_administrative_division_translations_pkey": "keep",
+        "unique_division_locale": "keep"
+      },
+      "indexes": {
+        "ref_administrative_division_translations_division_id_index": "keep",
+        "ref_administrative_division_translations_locale_index": "keep",
+        "ref_administrative_division_translations_pkey": "keep",
+        "unique_division_locale": "keep"
+      },
+      "triggers": {}
+    },
+    "ref_administrative_divisions": {
+      "authority": "reference-release",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "country_id": "keep",
+        "parent_id": "keep",
+        "level": "keep",
+        "type": "keep",
+        "official_code": "keep",
+        "name": "keep",
+        "status": "keep",
+        "lineage": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "display_code": "keep"
+      },
+      "constraints": {
+        "ref_administrative_divisions_country_id_foreign": "keep",
+        "ref_administrative_divisions_parent_id_foreign": "keep",
+        "ref_administrative_divisions_pkey": "keep",
+        "unique_country_level_code": "keep"
+      },
+      "indexes": {
+        "ref_administrative_divisions_country_id_index": "keep",
+        "ref_administrative_divisions_display_code_index": "keep",
+        "ref_administrative_divisions_level_index": "keep",
+        "ref_administrative_divisions_official_code_index": "keep",
+        "ref_administrative_divisions_parent_id_index": "keep",
+        "ref_administrative_divisions_pkey": "keep",
+        "ref_administrative_divisions_status_index": "keep",
+        "ref_administrative_divisions_type_index": "keep",
+        "unique_country_level_code": "keep"
+      },
+      "triggers": {}
+    },
+    "ref_buildings": {
+      "authority": "tenant-address-reference-partition",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "village_id": "keep",
+        "street_id": "keep",
+        "name": "keep",
+        "unit": "keep",
+        "floor": "keep",
+        "block": "keep",
+        "active": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "postal_code": "keep",
+        "postal_code_id": "keep",
+        "override_postal_code": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "ref_buildings_pkey": "keep",
+        "ref_buildings_postal_code_id_foreign": "keep",
+        "ref_buildings_street_id_foreign": "keep",
+        "ref_buildings_village_id_foreign": "keep"
+      },
+      "indexes": {
+        "ref_buildings_pkey": "keep",
+        "ref_buildings_tenant_id_index": "keep",
+        "ref_buildings_village_id_name_index": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "ref_countries": {
+      "authority": "reference-release",
+      "action": "exclude",
+      "columns": {
+        "code": "exclude",
+        "iso3": "exclude",
+        "name": "exclude",
+        "phone_code": "exclude",
+        "active": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "timezone": "exclude"
+      },
+      "reason": "Historical rollback table; country_regions is the active country authority.",
+      "constraints": {
+        "ref_countries_pkey": "exclude"
+      },
+      "indexes": {
+        "ref_countries_pkey": "exclude"
+      },
+      "triggers": {}
+    },
+    "ref_country_hierarchy_levels": {
+      "authority": "reference-release",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "country_code": "keep",
+        "level": "keep",
+        "level_code": "keep",
+        "level_name": "keep",
+        "description": "keep",
+        "created_at": "keep",
+        "updated_at": "keep"
+      },
+      "constraints": {
+        "ref_country_hier_level_unique": "keep",
+        "ref_country_hierarchy_levels_country_code_foreign": "keep",
+        "ref_country_hierarchy_levels_pkey": "keep"
+      },
+      "indexes": {
+        "ref_country_hier_level_unique": "keep",
+        "ref_country_hierarchy_levels_country_code_level_code_index": "keep",
+        "ref_country_hierarchy_levels_pkey": "keep"
+      },
+      "triggers": {}
+    },
+    "ref_districts": {
+      "authority": "tenant-address-reference-partition",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "regency_id": "keep",
+        "code": "keep",
+        "name": "keep",
+        "active": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "display_code": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "ref_districts_pkey": "keep",
+        "ref_districts_reg_code_unique": "keep",
+        "ref_districts_regency_id_foreign": "keep"
+      },
+      "indexes": {
+        "ref_districts_display_code_index": "keep",
+        "ref_districts_pkey": "keep",
+        "ref_districts_reg_code_unique": "keep",
+        "ref_districts_regency_id_code_index": "keep",
+        "ref_districts_tenant_id_index": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "ref_group_of_houses": {
+      "authority": "tenant-address-reference-partition",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "village_id": "keep",
+        "code": "keep",
+        "name": "keep",
+        "status": "keep",
+        "active": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "postal_code": "keep",
+        "postal_code_id": "keep",
+        "override_postal_code": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "ref_group_of_houses_pkey": "keep",
+        "ref_group_of_houses_postal_code_id_foreign": "keep",
+        "ref_group_of_houses_village_id_foreign": "keep"
+      },
+      "indexes": {
+        "ref_group_of_houses_pkey": "keep",
+        "ref_group_of_houses_tenant_id_index": "keep",
+        "ref_group_of_houses_village_id_name_index": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "ref_land_plots": {
+      "authority": "tenant-address-reference-partition",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "village_id": "keep",
+        "street_id": "keep",
+        "group_of_houses_id": "keep",
+        "plot_number": "keep",
+        "name": "keep",
+        "status": "keep",
+        "active": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "postal_code": "keep",
+        "postal_code_id": "keep",
+        "override_postal_code": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "ref_land_plots_group_of_houses_id_foreign": "keep",
+        "ref_land_plots_pkey": "keep",
+        "ref_land_plots_postal_code_id_foreign": "keep",
+        "ref_land_plots_street_id_foreign": "keep",
+        "ref_land_plots_village_id_foreign": "keep"
+      },
+      "indexes": {
+        "ref_land_plots_pkey": "keep",
+        "ref_land_plots_tenant_id_index": "keep",
+        "ref_land_plots_village_id_plot_number_index": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "ref_postal_codes": {
+      "authority": "tenant-address-reference-partition",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "country_code": "keep",
+        "postal_code": "keep",
+        "province_id": "keep",
+        "regency_id": "keep",
+        "district_id": "keep",
+        "village_id": "keep",
+        "active": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "area_name": "keep",
+        "source": "keep",
+        "source_reference": "keep",
+        "status": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "ref_postal_codes_country_code_foreign": "keep",
+        "ref_postal_codes_district_id_foreign": "keep",
+        "ref_postal_codes_pkey": "keep",
+        "ref_postal_codes_province_id_foreign": "keep",
+        "ref_postal_codes_regency_id_foreign": "keep",
+        "ref_postal_codes_village_id_foreign": "keep",
+        "uq_postal_codes_country_code_village": "keep"
+      },
+      "indexes": {
+        "idx_postal_codes_district_id": "keep",
+        "idx_postal_codes_province_id": "keep",
+        "idx_postal_codes_regency_id": "keep",
+        "idx_postal_codes_village_id": "keep",
+        "ref_postal_codes_pkey": "keep",
+        "ref_postal_codes_postal_code_index": "keep",
+        "ref_postal_codes_tenant_id_index": "keep",
+        "uq_postal_codes_country_code_village": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "ref_provinces": {
+      "authority": "tenant-address-reference-partition",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "country_code": "keep",
+        "code": "keep",
+        "name": "keep",
+        "active": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "timezone": "keep",
+        "intrastat": "keep",
+        "it_state_code": "keep",
+        "state_code": "keep",
+        "default_state": "keep",
+        "union_territory": "keep",
+        "display_code": "keep",
+        "description": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "ref_provinces_country_code_foreign": "keep",
+        "ref_provinces_pkey": "keep"
+      },
+      "indexes": {
+        "ref_provinces_country_code_code_index": "keep",
+        "ref_provinces_display_code_index": "keep",
+        "ref_provinces_pkey": "keep",
+        "ref_provinces_tenant_id_index": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "ref_regencies": {
+      "authority": "tenant-address-reference-partition",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "province_id": "keep",
+        "code": "keep",
+        "name": "keep",
+        "type": "keep",
+        "active": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "it_county_code": "keep",
+        "es_county_code": "keep",
+        "display_code": "keep",
+        "description": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "ref_regencies_pkey": "keep",
+        "ref_regencies_prov_code_unique": "keep",
+        "ref_regencies_province_id_foreign": "keep"
+      },
+      "indexes": {
+        "ref_regencies_display_code_index": "keep",
+        "ref_regencies_pkey": "keep",
+        "ref_regencies_prov_code_unique": "keep",
+        "ref_regencies_province_id_code_index": "keep",
+        "ref_regencies_tenant_id_index": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "ref_streets": {
+      "authority": "tenant-address-reference-partition",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "village_id": "keep",
+        "rt": "keep",
+        "rw": "keep",
+        "name": "keep",
+        "active": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "postal_code": "keep",
+        "postal_code_id": "keep",
+        "override_postal_code": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "ref_streets_pkey": "keep",
+        "ref_streets_postal_code_id_foreign": "keep",
+        "ref_streets_village_id_foreign": "keep"
+      },
+      "indexes": {
+        "ref_streets_pkey": "keep",
+        "ref_streets_tenant_id_index": "keep",
+        "ref_streets_village_id_rt_rw_index": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "ref_villages": {
+      "authority": "tenant-address-reference-partition",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "district_id": "keep",
+        "code": "keep",
+        "name": "keep",
+        "type": "keep",
+        "postal_code": "keep",
+        "active": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "display_code": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "ref_villages_dist_code_unique": "keep",
+        "ref_villages_district_id_foreign": "keep",
+        "ref_villages_pkey": "keep"
+      },
+      "indexes": {
+        "idx_villages_district_code": "keep",
+        "idx_villages_district_type": "keep",
+        "idx_villages_postal_code": "keep",
+        "ref_villages_display_code_index": "keep",
+        "ref_villages_dist_code_unique": "keep",
+        "ref_villages_district_id_code_index": "keep",
+        "ref_villages_pkey": "keep",
+        "ref_villages_postal_code_index": "keep",
+        "ref_villages_tenant_id_index": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "report_exports": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "membership_id": "exclude",
+        "user_id": "exclude",
+        "legal_entity_id": "exclude",
+        "org_unit_id": "exclude",
+        "app_id": "exclude",
+        "report_code": "exclude",
+        "report_name": "exclude",
+        "layout_ref": "exclude",
+        "layout_name": "exclude",
+        "format": "exclude",
+        "parameters": "exclude",
+        "status": "exclude",
+        "progress": "exclude",
+        "row_count": "exclude",
+        "file_path": "exclude",
+        "file_name": "exclude",
+        "file_mime": "exclude",
+        "file_size": "exclude",
+        "failure_message": "exclude",
+        "started_at": "exclude",
+        "finished_at": "exclude",
+        "expires_at": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude",
+        "kind": "exclude"
+      },
+      "constraints": {
+        "report_exports_pkey": "exclude"
+      },
+      "indexes": {
+        "report_exports_expires_at_index": "exclude",
+        "report_exports_pkey": "exclude",
+        "report_exports_tenant_id_index": "exclude",
+        "report_exports_tenant_id_user_id_created_at_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "report_last_used_options": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "user_id": "exclude",
+        "report_code": "exclude",
+        "parameters": "exclude",
+        "format": "exclude",
+        "layout_ref": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "deleted_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "report_last_used_options_pkey": "exclude"
+      },
+      "indexes": {
+        "report_last_used_options_pkey": "exclude",
+        "report_last_used_options_user_report_unique": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "report_layout_defaults": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "legal_entity_id": "exclude",
+        "scope_key": "exclude",
+        "report_code": "exclude",
+        "layout_ref": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "report_layout_defaults_pkey": "exclude",
+        "report_layout_defaults_tenant_id_report_code_scope_key_unique": "exclude"
+      },
+      "indexes": {
+        "report_layout_defaults_pkey": "exclude",
+        "report_layout_defaults_tenant_id_index": "exclude",
+        "report_layout_defaults_tenant_id_report_code_scope_key_unique": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "report_layouts": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "legal_entity_id": "exclude",
+        "report_code": "exclude",
+        "name": "exclude",
+        "description": "exclude",
+        "format": "exclude",
+        "file_path": "exclude",
+        "file_size": "exclude",
+        "created_by_user_id": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "report_layouts_pkey": "exclude"
+      },
+      "indexes": {
+        "report_layouts_pkey": "exclude",
+        "report_layouts_tenant_id_index": "exclude",
+        "report_layouts_tenant_id_report_code_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "report_presets": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "user_id": "exclude",
+        "report_code": "exclude",
+        "name": "exclude",
+        "shared": "exclude",
+        "parameters": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "deleted_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "report_presets_pkey": "exclude"
+      },
+      "indexes": {
+        "report_presets_owner_name_unique": "exclude",
+        "report_presets_pkey": "exclude",
+        "report_presets_shared_name_unique": "exclude",
+        "report_presets_tenant_id_report_code_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "retention_policy_log_entries": {
+      "authority": "per-database-infrastructure",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "policy_code": "keep",
+        "deleted_count": "keep",
+        "cutoff_at": "keep",
+        "status": "keep",
+        "message": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "retention_policy_log_entries_pkey": "keep",
+        "retention_policy_log_entries_status_check": "keep"
+      },
+      "indexes": {
+        "retention_policy_log_entries_pkey": "keep",
+        "retention_policy_log_entries_tenant_id_created_at_index": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "retention_policy_setups": {
+      "authority": "per-database-infrastructure",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "policy_code": "keep",
+        "enabled": "keep",
+        "retention_days": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "retention_policy_setups_pkey": "keep",
+        "retention_policy_setups_tenant_id_policy_code_unique": "keep"
+      },
+      "indexes": {
+        "retention_policy_setups_pkey": "keep",
+        "retention_policy_setups_tenant_id_policy_code_unique": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "role_assignment_data_policy_scopes": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "role_assignment_id": "exclude",
+        "policy_code": "exclude",
+        "legal_entity_id": "exclude",
+        "organization_id": "exclude",
+        "hierarchy_id": "exclude",
+        "hierarchy_version_id": "exclude",
+        "include_descendants": "exclude",
+        "valid_from": "exclude",
+        "valid_until": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "role_assignment_data_policy_scopes_hierarchy_id_foreign": "exclude",
+        "role_assignment_data_policy_scopes_hierarchy_version_id_foreign": "exclude",
+        "role_assignment_data_policy_scopes_legal_entity_id_foreign": "exclude",
+        "role_assignment_data_policy_scopes_organization_id_foreign": "exclude",
+        "role_assignment_data_policy_scopes_pkey": "exclude",
+        "role_assignment_data_policy_scopes_policy_code_foreign": "exclude",
+        "role_assignment_data_policy_scopes_role_assignment_id_foreign": "exclude"
+      },
+      "indexes": {
+        "role_assignment_data_policy_scopes_pkey": "exclude",
+        "role_assignment_data_policy_scopes_role_assignment_id_policy_co": "exclude",
+        "role_assignment_data_policy_scopes_tenant_id_index": "exclude",
+        "role_assignment_data_policy_scopes_tenant_id_policy_code_valid_": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "role_assignments": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "membership_id": "exclude",
+        "role_id": "exclude",
+        "source": "exclude",
+        "status": "exclude",
+        "valid_from": "exclude",
+        "valid_until": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "source_reference": "exclude"
+      },
+      "constraints": {
+        "role_assignment_source_unique": "exclude",
+        "role_assignments_membership_id_foreign": "exclude",
+        "role_assignments_membership_id_role_id_source_unique": "exclude",
+        "role_assignments_pkey": "exclude",
+        "role_assignments_role_id_foreign": "exclude"
+      },
+      "indexes": {
+        "role_assignment_source_unique": "exclude",
+        "role_assignments_membership_id_role_id_source_unique": "exclude",
+        "role_assignments_pkey": "exclude"
+      },
+      "triggers": {
+        "log_change": "exclude"
+      }
+    },
+    "roles": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "name": "exclude",
+        "is_active": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "is_owner": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "roles_pkey": "exclude",
+        "roles_tenant_id_foreign": "exclude",
+        "roles_tenant_id_id_unique": "exclude",
+        "roles_tenant_id_name_unique": "exclude"
+      },
+      "indexes": {
+        "roles_pkey": "exclude",
+        "roles_satu_owner_per_tenant": "exclude",
+        "roles_tenant_id_id_unique": "exclude",
+        "roles_tenant_id_name_unique": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "security_duties": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "code": "exclude",
+        "app_id": "exclude",
+        "name": "exclude",
+        "description": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "tenant_id": "exclude",
+        "source": "exclude",
+        "status": "exclude",
+        "published_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "security_duties_app_id_foreign": "exclude",
+        "security_duties_pkey": "exclude",
+        "security_duties_tenant_id_foreign": "exclude"
+      },
+      "indexes": {
+        "security_duties_pkey": "exclude",
+        "security_duties_tenant_id_source_status_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "security_duty_privileges": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "duty_code": "exclude",
+        "privilege_code": "exclude"
+      },
+      "constraints": {
+        "security_duty_privileges_duty_code_foreign": "exclude",
+        "security_duty_privileges_pkey": "exclude",
+        "security_duty_privileges_privilege_code_foreign": "exclude"
+      },
+      "indexes": {
+        "security_duty_privileges_pkey": "exclude"
+      },
+      "triggers": {
+        "log_change": "exclude"
+      }
+    },
+    "security_privilege_permissions": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "privilege_code": "exclude",
+        "permission_code": "exclude"
+      },
+      "constraints": {
+        "security_privilege_permissions_permission_code_foreign": "exclude",
+        "security_privilege_permissions_pkey": "exclude",
+        "security_privilege_permissions_privilege_code_foreign": "exclude"
+      },
+      "indexes": {
+        "security_privilege_permissions_pkey": "exclude"
+      },
+      "triggers": {
+        "log_change": "exclude"
+      }
+    },
+    "security_privileges": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "code": "exclude",
+        "app_id": "exclude",
+        "name": "exclude",
+        "description": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "tenant_id": "exclude",
+        "source": "exclude",
+        "status": "exclude",
+        "published_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "security_privileges_app_id_foreign": "exclude",
+        "security_privileges_pkey": "exclude",
+        "security_privileges_tenant_id_foreign": "exclude"
+      },
+      "indexes": {
+        "security_privileges_pkey": "exclude",
+        "security_privileges_tenant_id_source_status_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "security_role_children": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "tenant_id": "exclude",
+        "parent_role_id": "exclude",
+        "child_role_id": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "security_role_children_pkey": "exclude",
+        "security_role_children_tenant_id_child_role_id_foreign": "exclude",
+        "security_role_children_tenant_id_foreign": "exclude",
+        "security_role_children_tenant_id_parent_role_id_foreign": "exclude"
+      },
+      "indexes": {
+        "security_role_children_child_role_id_index": "exclude",
+        "security_role_children_pkey": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "security_role_duties": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "role_id": "exclude",
+        "duty_code": "exclude"
+      },
+      "constraints": {
+        "security_role_duties_duty_code_foreign": "exclude",
+        "security_role_duties_pkey": "exclude",
+        "security_role_duties_role_id_foreign": "exclude"
+      },
+      "indexes": {
+        "security_role_duties_pkey": "exclude"
+      },
+      "triggers": {
+        "log_change": "exclude"
+      }
+    },
+    "sessions": {
+      "authority": "framework-control",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "user_id": "keep",
+        "ip_address": "keep",
+        "user_agent": "keep",
+        "payload": "keep",
+        "last_activity": "keep"
+      },
+      "constraints": {
+        "sessions_pkey": "keep"
+      },
+      "indexes": {
+        "sessions_last_activity_index": "keep",
+        "sessions_pkey": "keep",
+        "sessions_user_id_index": "keep"
+      },
+      "triggers": {}
+    },
+    "site_enrollment_tokens": {
+      "authority": "control",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "site_id": "keep",
+        "token_hash": "keep",
+        "expires_at": "keep",
+        "used_at": "keep",
+        "created_by": "keep",
+        "created_at": "keep",
+        "updated_at": "keep"
+      },
+      "constraints": {
+        "site_enrollment_tokens_created_by_foreign": "keep",
+        "site_enrollment_tokens_pkey": "keep",
+        "site_enrollment_tokens_site_id_foreign": "keep",
+        "site_enrollment_tokens_token_hash_unique": "keep"
+      },
+      "indexes": {
+        "site_enrollment_tokens_pkey": "keep",
+        "site_enrollment_tokens_site_id_created_at_index": "keep",
+        "site_enrollment_tokens_token_hash_unique": "keep"
+      },
+      "triggers": {}
+    },
+    "site_operations": {
+      "authority": "control",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "site_id": "keep",
+        "operation": "keep",
+        "parameters": "keep",
+        "status": "keep",
+        "requested_by": "keep",
+        "step": "keep",
+        "failure_message": "keep",
+        "requested_at": "keep",
+        "expires_at": "keep",
+        "started_at": "keep",
+        "lease_until": "keep",
+        "finished_at": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "registry_robot_id": "keep",
+        "registry_robot_name": "keep"
+      },
+      "constraints": {
+        "site_operations_berjalan_bertenggat": "keep",
+        "site_operations_gagal_beralasan": "keep",
+        "site_operations_hash_sandi_hanya_saat_terbuka": "keep",
+        "site_operations_jenis_dikenal": "keep",
+        "site_operations_pkey": "keep",
+        "site_operations_requested_by_foreign": "keep",
+        "site_operations_robot_berpasangan": "keep",
+        "site_operations_robot_hanya_penarik": "keep",
+        "site_operations_selesai_sejalan": "keep",
+        "site_operations_site_id_foreign": "keep",
+        "site_operations_status_dikenal": "keep"
+      },
+      "indexes": {
+        "site_operations_pkey": "keep",
+        "site_operations_robot_tersisa": "keep",
+        "site_operations_satu_berjalan": "keep",
+        "site_operations_satu_permintaan_per_jenis": "keep",
+        "site_operations_site_id_requested_at_index": "keep"
+      },
+      "triggers": {}
+    },
+    "site_releases": {
+      "authority": "control",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "edition": "keep",
+        "release": "keep",
+        "image": "keep",
+        "digest": "keep",
+        "manifest": "keep",
+        "compose": "keep",
+        "update_script": "keep",
+        "checksums": "keep",
+        "signature": "keep",
+        "created_at": "keep",
+        "updated_at": "keep"
+      },
+      "constraints": {
+        "site_releases_edition_release_unique": "keep",
+        "site_releases_pkey": "keep"
+      },
+      "indexes": {
+        "site_releases_edition_release_unique": "keep",
+        "site_releases_pkey": "keep"
+      },
+      "triggers": {}
+    },
+    "site_reports": {
+      "authority": "control",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "site_id": "keep",
+        "payload": "keep",
+        "payload_hash": "keep",
+        "reported_at": "keep",
+        "received_at": "keep",
+        "created_at": "keep",
+        "updated_at": "keep"
+      },
+      "constraints": {
+        "site_reports_pkey": "keep",
+        "site_reports_site_id_foreign": "keep"
+      },
+      "indexes": {
+        "site_reports_pkey": "keep",
+        "site_reports_site_id_received_at_index": "keep"
+      },
+      "triggers": {}
+    },
+    "sites": {
+      "authority": "control",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "name": "keep",
+        "profile": "keep",
+        "edition": "keep",
+        "address": "keep",
+        "update_window_start": "keep",
+        "update_window_end": "keep",
+        "timezone": "keep",
+        "public_key": "keep",
+        "enrolled_at": "keep",
+        "revoked_at": "keep",
+        "reported_edition": "keep",
+        "reported_release": "keep",
+        "reported_digest": "keep",
+        "last_seen_at": "keep",
+        "last_report": "keep",
+        "created_by": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "environment_id": "keep",
+        "license_issued_at": "keep",
+        "license_valid_until": "keep",
+        "license_suspended_at": "keep",
+        "server_address": "keep",
+        "last_seen_ip": "keep",
+        "dns_record_id": "keep",
+        "dns_name": "keep",
+        "dns_target": "keep",
+        "dns_synced_at": "keep",
+        "license_perpetual": "keep",
+        "license_valid_days": "keep",
+        "license_renew_before_days": "keep",
+        "license_issued_perpetual": "keep"
+      },
+      "constraints": {
+        "sites_alamat_server_polos": "keep",
+        "sites_created_by_foreign": "keep",
+        "sites_dns_berpasangan": "keep",
+        "sites_jendela_berpasangan": "keep",
+        "sites_kunci_berpasangan": "keep",
+        "sites_lingkungan_milik_tenant_yang_sama": "keep",
+        "sites_lisensi_berpasangan": "keep",
+        "sites_masa_lisensi_masuk_akal": "keep",
+        "sites_pkey": "keep",
+        "sites_profil_dikenal": "keep",
+        "sites_tenant_id_foreign": "keep",
+        "sites_tenant_id_name_unique": "keep"
+      },
+      "indexes": {
+        "sites_pkey": "keep",
+        "sites_satu_per_lingkungan": "keep",
+        "sites_tenant_id_name_unique": "keep"
+      },
+      "triggers": {}
+    },
+    "sod_conflicts": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "membership_id": "exclude",
+        "sod_rule_id": "exclude",
+        "status": "exclude",
+        "mitigation_note": "exclude",
+        "approved_by_membership_id": "exclude",
+        "approved_at": "exclude",
+        "valid_until": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "sod_conflicts_approved_by_membership_id_foreign": "exclude",
+        "sod_conflicts_membership_id_foreign": "exclude",
+        "sod_conflicts_membership_id_sod_rule_id_unique": "exclude",
+        "sod_conflicts_pkey": "exclude",
+        "sod_conflicts_sod_rule_id_foreign": "exclude",
+        "sod_conflicts_tenant_id_foreign": "exclude"
+      },
+      "indexes": {
+        "sod_conflicts_membership_id_sod_rule_id_unique": "exclude",
+        "sod_conflicts_pkey": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "sod_rules": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "first_duty_code": "exclude",
+        "second_duty_code": "exclude",
+        "severity": "exclude",
+        "risk": "exclude",
+        "allows_mitigation": "exclude",
+        "is_active": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "sod_rules_pkey": "exclude",
+        "sod_rules_tenant_id_first_duty_code_second_duty_code_unique": "exclude",
+        "sod_rules_tenant_id_foreign": "exclude"
+      },
+      "indexes": {
+        "sod_rules_pkey": "exclude",
+        "sod_rules_tenant_id_first_duty_code_second_duty_code_unique": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "sso_login_attempts": {
+      "authority": "control",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "state_hash": "keep",
+        "browser_secret_hash": "keep",
+        "nonce": "keep",
+        "code_verifier": "keep",
+        "tenant_id": "keep",
+        "environment_id": "keep",
+        "return_origin": "keep",
+        "redirect_uri": "keep",
+        "user_id": "keep",
+        "link_user_id": "keep",
+        "subject": "keep",
+        "subject_email": "keep",
+        "handoff_token_hash": "keep",
+        "expires_at": "keep",
+        "completed_at": "keep",
+        "consumed_at": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "invitation_id": "keep"
+      },
+      "constraints": {
+        "sso_login_attempts_environment_id_foreign": "keep",
+        "sso_login_attempts_handoff_token_hash_unique": "keep",
+        "sso_login_attempts_link_user_id_foreign": "keep",
+        "sso_login_attempts_pkey": "keep",
+        "sso_login_attempts_state_hash_unique": "keep",
+        "sso_login_attempts_tenant_id_foreign": "keep",
+        "sso_login_attempts_user_id_foreign": "keep"
+      },
+      "indexes": {
+        "sso_login_attempts_handoff_token_hash_unique": "keep",
+        "sso_login_attempts_invitation_id_index": "keep",
+        "sso_login_attempts_pkey": "keep",
+        "sso_login_attempts_state_hash_unique": "keep"
+      },
+      "triggers": {}
+    },
+    "tenant_app_entitlements": {
+      "authority": "control",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "app_id": "keep",
+        "status": "keep",
+        "starts_at": "keep",
+        "ends_at": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "created_by_user_id": "keep",
+        "updated_by_user_id": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "tenant_app_entitlements_app_id_foreign": "keep",
+        "tenant_app_entitlements_pkey": "keep",
+        "tenant_app_entitlements_tenant_id_app_id_unique": "keep",
+        "tenant_app_entitlements_tenant_id_foreign": "keep"
+      },
+      "indexes": {
+        "tenant_app_entitlements_pkey": "keep",
+        "tenant_app_entitlements_tenant_id_app_id_unique": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep",
+        "log_change": "keep",
+        "stamp_audit_actor": "keep"
+      }
+    },
+    "tenant_creation_requests": {
+      "authority": "control-incremental-pf01",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "actor_scope": "exclude",
+        "idempotency_key": "exclude",
+        "request_hash": "exclude",
+        "actor_user_id": "exclude",
+        "principal_id": "exclude",
+        "tenant_id": "exclude",
+        "membership_id": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "deleted_at": "exclude"
+      },
+      "reason": "PF-01 incremental migration is applied from its original file after the baseline.",
+      "constraints": {
+        "tenant_creation_actor_request_unique": "exclude",
+        "tenant_creation_requests_actor_user_id_foreign": "exclude",
+        "tenant_creation_requests_membership_id_foreign": "exclude",
+        "tenant_creation_requests_pkey": "exclude",
+        "tenant_creation_requests_principal_id_foreign": "exclude",
+        "tenant_creation_requests_tenant_id_foreign": "exclude"
+      },
+      "indexes": {
+        "tenant_creation_actor_request_unique": "exclude",
+        "tenant_creation_requests_pkey": "exclude"
+      },
+      "triggers": {}
+    },
+    "tenant_deployments": {
+      "authority": "historical-inactive",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "profile": "exclude",
+        "placement": "exclude",
+        "status": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "tenant_deployments_pkey": "exclude",
+        "tenant_deployments_tenant_id_foreign": "exclude",
+        "tenant_deployments_tenant_id_unique": "exclude"
+      },
+      "indexes": {
+        "tenant_deployments_pkey": "exclude",
+        "tenant_deployments_placement_status_index": "exclude",
+        "tenant_deployments_tenant_id_unique": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "tenant_identity_providers": {
+      "authority": "control",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "mode": "keep",
+        "protokol": "keep",
+        "setelan": "keep",
+        "domain_email": "keep",
+        "aktif": "keep",
+        "created_at": "keep",
+        "updated_at": "keep"
+      },
+      "constraints": {
+        "tenant_identity_providers_pkey": "keep",
+        "tenant_identity_providers_tenant_id_foreign": "keep",
+        "tenant_identity_providers_tenant_id_unique": "keep",
+        "tenant_idp_aktif_bukan_lokal": "keep",
+        "tenant_idp_mode_dikenal": "keep",
+        "tenant_idp_protokol_dikenal": "keep",
+        "tenant_idp_sendiri_berprotokol": "keep"
+      },
+      "indexes": {
+        "tenant_identity_providers_pkey": "keep",
+        "tenant_identity_providers_tenant_id_unique": "keep"
+      },
+      "triggers": {}
+    },
+    "tenant_memberships": {
+      "authority": "control",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "tenant_id": "keep",
+        "user_id": "keep",
+        "status": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "version": "keep"
+      },
+      "constraints": {
+        "tenant_memberships_pkey": "keep",
+        "tenant_memberships_tenant_id_foreign": "keep",
+        "tenant_memberships_tenant_id_user_id_unique": "keep",
+        "tenant_memberships_user_id_foreign": "keep"
+      },
+      "indexes": {
+        "tenant_memberships_pkey": "keep",
+        "tenant_memberships_tenant_id_user_id_unique": "keep"
+      },
+      "triggers": {
+        "bump_row_version": "keep"
+      }
+    },
+    "tenant_number_sequences": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "reference_id": "exclude",
+        "profile_code": "exclude",
+        "scope_type": "exclude",
+        "status": "exclude",
+        "is_continuous": "exclude",
+        "allow_manual": "exclude",
+        "preallocation_enabled": "exclude",
+        "preallocation_quantity": "exclude",
+        "minimum_number": "exclude",
+        "maximum_number": "exclude",
+        "segments": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "reset_period": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude",
+        "allow_automatic": "exclude"
+      },
+      "constraints": {
+        "tenant_number_sequences_pkey": "exclude",
+        "tenant_number_sequences_profile_code_foreign": "exclude",
+        "tenant_number_sequences_reference_id_foreign": "exclude",
+        "tenant_number_sequences_tenant_id_foreign": "exclude",
+        "tenant_number_sequences_tenant_id_reference_id_unique": "exclude"
+      },
+      "indexes": {
+        "tenant_number_sequences_pkey": "exclude",
+        "tenant_number_sequences_tenant_id_reference_id_unique": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "tenants": {
+      "authority": "control",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "client_id": "keep",
+        "name": "keep",
+        "slug": "keep",
+        "status": "keep",
+        "created_at": "keep",
+        "updated_at": "keep"
+      },
+      "constraints": {
+        "tenants_client_id_foreign": "keep",
+        "tenants_pkey": "keep",
+        "tenants_slug_unique": "keep"
+      },
+      "indexes": {
+        "tenants_pkey": "keep",
+        "tenants_slug_unique": "keep"
+      },
+      "triggers": {}
+    },
+    "time_zones": {
+      "authority": "reference-release",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "iana_name": "keep",
+        "display_name": "keep",
+        "utc_offset": "keep",
+        "country_code": "keep",
+        "is_default": "keep",
+        "active": "keep",
+        "created_at": "keep",
+        "updated_at": "keep"
+      },
+      "constraints": {
+        "time_zones_country_code_foreign": "keep",
+        "time_zones_pkey": "keep"
+      },
+      "indexes": {
+        "time_zones_country_code_index": "keep",
+        "time_zones_iana_name_index": "keep",
+        "time_zones_pkey": "keep"
+      },
+      "triggers": {}
+    },
+    "units_of_measure": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "uom_class_id": "exclude",
+        "uom_system_id": "exclude",
+        "code": "exclude",
+        "name": "exclude",
+        "symbol": "exclude",
+        "decimal_places": "exclude",
+        "active": "exclude",
+        "deleted_at": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "units_of_measure_pkey": "exclude",
+        "units_of_measure_tenant_id_id_unique": "exclude",
+        "units_of_measure_tenant_id_uom_class_id_foreign": "exclude",
+        "units_of_measure_tenant_id_uom_system_id_foreign": "exclude"
+      },
+      "indexes": {
+        "units_of_measure_pkey": "exclude",
+        "units_of_measure_tenant_id_code_unique": "exclude",
+        "units_of_measure_tenant_id_id_unique": "exclude",
+        "units_of_measure_tenant_id_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "uom_classes": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "code": "exclude",
+        "name": "exclude",
+        "active": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "uom_classes_pkey": "exclude",
+        "uom_classes_tenant_id_code_unique": "exclude",
+        "uom_classes_tenant_id_id_unique": "exclude"
+      },
+      "indexes": {
+        "uom_classes_pkey": "exclude",
+        "uom_classes_tenant_id_code_unique": "exclude",
+        "uom_classes_tenant_id_id_unique": "exclude",
+        "uom_classes_tenant_id_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "uom_conversions": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "from_unit_id": "exclude",
+        "to_unit_id": "exclude",
+        "factor": "exclude",
+        "offset": "exclude",
+        "rounding_scale": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "uom_conversions_pkey": "exclude",
+        "uom_conversions_tenant_id_from_unit_id_foreign": "exclude",
+        "uom_conversions_tenant_id_from_unit_id_to_unit_id_unique": "exclude",
+        "uom_conversions_tenant_id_to_unit_id_foreign": "exclude"
+      },
+      "indexes": {
+        "uom_conversions_pkey": "exclude",
+        "uom_conversions_tenant_id_from_unit_id_to_unit_id_unique": "exclude",
+        "uom_conversions_tenant_id_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "uom_external_codes": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "unit_id": "exclude",
+        "scheme": "exclude",
+        "code": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "uom_external_codes_pkey": "exclude",
+        "uom_external_codes_tenant_id_scheme_code_unique": "exclude",
+        "uom_external_codes_tenant_id_unit_id_foreign": "exclude"
+      },
+      "indexes": {
+        "uom_external_codes_pkey": "exclude",
+        "uom_external_codes_tenant_id_index": "exclude",
+        "uom_external_codes_tenant_id_scheme_code_unique": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "uom_systems": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "code": "exclude",
+        "name": "exclude",
+        "active": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "uom_systems_pkey": "exclude",
+        "uom_systems_tenant_id_code_unique": "exclude",
+        "uom_systems_tenant_id_id_unique": "exclude"
+      },
+      "indexes": {
+        "uom_systems_pkey": "exclude",
+        "uom_systems_tenant_id_code_unique": "exclude",
+        "uom_systems_tenant_id_id_unique": "exclude",
+        "uom_systems_tenant_id_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "uom_translations": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "unit_id": "exclude",
+        "locale": "exclude",
+        "name": "exclude",
+        "description": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "uom_translations_pkey": "exclude",
+        "uom_translations_tenant_id_unit_id_foreign": "exclude",
+        "uom_translations_tenant_id_unit_id_locale_unique": "exclude"
+      },
+      "indexes": {
+        "uom_translations_pkey": "exclude",
+        "uom_translations_tenant_id_index": "exclude",
+        "uom_translations_tenant_id_unit_id_locale_unique": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "users": {
+      "authority": "control",
+      "action": "keep",
+      "columns": {
+        "id": "keep",
+        "name": "keep",
+        "email": "keep",
+        "email_verified_at": "keep",
+        "password": "keep",
+        "remember_token": "keep",
+        "created_at": "keep",
+        "updated_at": "keep",
+        "two_factor_secret": "keep",
+        "two_factor_recovery_codes": "keep",
+        "two_factor_confirmed_at": "keep",
+        "last_login_at": "keep",
+        "must_change_password": "keep",
+        "account_type": "keep",
+        "timezone": "keep"
+      },
+      "constraints": {
+        "users_account_type_check": "keep",
+        "users_email_unique": "keep",
+        "users_pkey": "keep"
+      },
+      "indexes": {
+        "users_email_unique": "keep",
+        "users_pkey": "keep"
+      },
+      "triggers": {}
+    },
+    "vendors": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "legal_entity_id": "exclude",
+        "party_id": "exclude",
+        "number": "exclude",
+        "tax_number": "exclude",
+        "status": "exclude",
+        "creation_key": "exclude",
+        "created_by_user_id": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude",
+        "payment_priority": "exclude"
+      },
+      "constraints": {
+        "vendors_pkey": "exclude",
+        "vendors_status_check": "exclude",
+        "vendors_tenant_id_creation_key_unique": "exclude",
+        "vendors_tenant_id_legal_entity_id_foreign": "exclude",
+        "vendors_tenant_id_legal_entity_id_number_unique": "exclude",
+        "vendors_tenant_id_legal_entity_id_party_id_unique": "exclude",
+        "vendors_tenant_id_party_id_foreign": "exclude"
+      },
+      "indexes": {
+        "vendors_number_text_search": "exclude",
+        "vendors_pkey": "exclude",
+        "vendors_tax_number_text_search": "exclude",
+        "vendors_tenant_id_creation_key_unique": "exclude",
+        "vendors_tenant_id_legal_entity_id_number_unique": "exclude",
+        "vendors_tenant_id_legal_entity_id_party_id_unique": "exclude",
+        "vendors_tenant_id_updated_at_index": "exclude",
+        "vendors_tenant_number_unique": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "workflow_configuration_versions": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "configuration_id": "exclude",
+        "version": "exclude",
+        "status": "exclude",
+        "effective_from": "exclude",
+        "published_at": "exclude",
+        "published_by_user_id": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude"
+      },
+      "constraints": {
+        "workflow_configuration_versions_configuration_id_foreign": "exclude",
+        "workflow_configuration_versions_configuration_id_version_unique": "exclude",
+        "workflow_configuration_versions_pkey": "exclude"
+      },
+      "indexes": {
+        "workflow_configuration_versions_configuration_id_version_unique": "exclude",
+        "workflow_configuration_versions_pkey": "exclude"
+      },
+      "triggers": {}
+    },
+    "workflow_configurations": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "workflow_type_id": "exclude",
+        "name": "exclude",
+        "enabled": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "legal_entity_id": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "workflow_configurations_pkey": "exclude",
+        "workflow_configurations_tenant_id_workflow_type_id_name_unique": "exclude",
+        "workflow_configurations_workflow_type_id_foreign": "exclude"
+      },
+      "indexes": {
+        "workflow_configuration_scope_index": "exclude",
+        "workflow_configurations_pkey": "exclude",
+        "workflow_configurations_tenant_id_index": "exclude",
+        "workflow_configurations_tenant_id_workflow_type_id_name_unique": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "workflow_elements": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "version_id": "exclude",
+        "key": "exclude",
+        "kind": "exclude",
+        "label": "exclude",
+        "configuration": "exclude",
+        "position_x": "exclude",
+        "position_y": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude"
+      },
+      "constraints": {
+        "workflow_elements_pkey": "exclude",
+        "workflow_elements_version_id_foreign": "exclude",
+        "workflow_elements_version_id_key_unique": "exclude"
+      },
+      "indexes": {
+        "workflow_elements_pkey": "exclude",
+        "workflow_elements_version_id_key_unique": "exclude"
+      },
+      "triggers": {}
+    },
+    "workflow_history": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "instance_id": "exclude",
+        "event_type": "exclude",
+        "actor_membership_id": "exclude",
+        "details": "exclude",
+        "occurred_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "workflow_history_instance_id_foreign": "exclude",
+        "workflow_history_pkey": "exclude"
+      },
+      "indexes": {
+        "workflow_history_pkey": "exclude",
+        "workflow_history_tenant_id_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "workflow_instances": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "workflow_type_id": "exclude",
+        "configuration_version_id": "exclude",
+        "source_document_type": "exclude",
+        "source_document_id": "exclude",
+        "idempotency_key": "exclude",
+        "decision_context": "exclude",
+        "status": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "initiator_membership_id": "exclude",
+        "correlation_id": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "workflow_instances_configuration_version_id_foreign": "exclude",
+        "workflow_instances_pkey": "exclude",
+        "workflow_instances_tenant_id_workflow_type_id_idempotency_key_u": "exclude",
+        "workflow_instances_workflow_type_id_foreign": "exclude"
+      },
+      "indexes": {
+        "workflow_instance_correlation_index": "exclude",
+        "workflow_instances_pkey": "exclude",
+        "workflow_instances_tenant_id_index": "exclude",
+        "workflow_instances_tenant_id_workflow_type_id_idempotency_key_u": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "workflow_parameters": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "code": "exclude",
+        "value": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "workflow_parameters_pkey": "exclude",
+        "workflow_parameters_tenant_id_code_unique": "exclude",
+        "workflow_parameters_tenant_id_foreign": "exclude"
+      },
+      "indexes": {
+        "workflow_parameters_pkey": "exclude",
+        "workflow_parameters_tenant_id_code_unique": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "workflow_transitions": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "version_id": "exclude",
+        "from_element_id": "exclude",
+        "to_element_id": "exclude",
+        "outcome": "exclude",
+        "condition": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude"
+      },
+      "constraints": {
+        "workflow_transitions_pkey": "exclude",
+        "workflow_transitions_version_id_foreign": "exclude",
+        "workflow_transitions_version_id_from_element_id_to_element_id_o": "exclude"
+      },
+      "indexes": {
+        "workflow_transitions_pkey": "exclude",
+        "workflow_transitions_version_id_from_element_id_to_element_id_o": "exclude"
+      },
+      "triggers": {}
+    },
+    "workflow_types": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "app_id": "exclude",
+        "code": "exclude",
+        "name": "exclude",
+        "decision_context_schema": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "scope": "exclude"
+      },
+      "constraints": {
+        "workflow_types_app_id_foreign": "exclude",
+        "workflow_types_code_unique": "exclude",
+        "workflow_types_pkey": "exclude"
+      },
+      "indexes": {
+        "workflow_types_code_unique": "exclude",
+        "workflow_types_pkey": "exclude"
+      },
+      "triggers": {}
+    },
+    "workflow_work_items": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "instance_id": "exclude",
+        "element_id": "exclude",
+        "assigned_membership_id": "exclude",
+        "status": "exclude",
+        "due_at": "exclude",
+        "completed_at": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude",
+        "review_url": "exclude",
+        "email_notified_at": "exclude",
+        "email_next_attempt_at": "exclude",
+        "email_attempts": "exclude",
+        "email_last_error": "exclude"
+      },
+      "constraints": {
+        "workflow_work_items_instance_id_foreign": "exclude",
+        "workflow_work_items_pkey": "exclude"
+      },
+      "indexes": {
+        "workflow_work_items_inbox_index": "exclude",
+        "workflow_work_items_pkey": "exclude",
+        "workflow_work_items_tenant_id_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "working_time_calendar_days": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "working_time_calendar_id": "exclude",
+        "date": "exclude",
+        "day_of_week": "exclude",
+        "control": "exclude",
+        "closed_for_pickup": "exclude",
+        "hours": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "working_time_calendar_days_pkey": "exclude",
+        "working_time_calendar_days_working_time_calendar_id_date_unique": "exclude",
+        "working_time_calendar_days_working_time_calendar_id_foreign": "exclude"
+      },
+      "indexes": {
+        "working_time_calendar_days_pkey": "exclude",
+        "working_time_calendar_days_tenant_id_working_time_calendar_id_d": "exclude",
+        "working_time_calendar_days_working_time_calendar_id_date_unique": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "working_time_calendar_lines": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "working_time_calendar_day_id": "exclude",
+        "from_time": "exclude",
+        "to_time": "exclude",
+        "efficiency": "exclude",
+        "property": "exclude",
+        "hours": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "working_time_calendar_lines_pkey": "exclude",
+        "working_time_calendar_lines_working_time_calendar_day_id_foreig": "exclude"
+      },
+      "indexes": {
+        "working_time_calendar_lines_pkey": "exclude",
+        "working_time_calendar_lines_tenant_id_index": "exclude",
+        "working_time_calendar_lines_working_time_calendar_day_id_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "working_time_calendars": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "legal_entity_id": "exclude",
+        "code": "exclude",
+        "name": "exclude",
+        "description": "exclude",
+        "base_calendar_id": "exclude",
+        "standard_work_hours": "exclude",
+        "is_active": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "deleted_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "working_time_calendars_base_calendar_id_foreign": "exclude",
+        "working_time_calendars_legal_entity_id_foreign": "exclude",
+        "working_time_calendars_pkey": "exclude",
+        "working_time_calendars_tenant_id_id_unique": "exclude"
+      },
+      "indexes": {
+        "working_time_calendars_base_calendar_id_index": "exclude",
+        "working_time_calendars_code_unique": "exclude",
+        "working_time_calendars_pkey": "exclude",
+        "working_time_calendars_tenant_id_id_unique": "exclude",
+        "working_time_calendars_tenant_id_index": "exclude",
+        "working_time_calendars_tenant_id_legal_entity_id_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "working_time_lines": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "working_time_template_id": "exclude",
+        "day_of_week": "exclude",
+        "from_time": "exclude",
+        "to_time": "exclude",
+        "efficiency": "exclude",
+        "property": "exclude",
+        "closed_for_pickup": "exclude",
+        "hours": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "working_time_lines_pkey": "exclude",
+        "working_time_lines_tenant_id_foreign": "exclude",
+        "working_time_lines_working_time_template_id_foreign": "exclude"
+      },
+      "indexes": {
+        "working_time_lines_pkey": "exclude",
+        "working_time_lines_working_time_template_id_day_of_week_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    },
+    "working_time_templates": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "legal_entity_id": "exclude",
+        "code": "exclude",
+        "name": "exclude",
+        "description": "exclude",
+        "is_active": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "deleted_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "working_time_templates_legal_entity_id_foreign": "exclude",
+        "working_time_templates_pkey": "exclude",
+        "working_time_templates_tenant_id_foreign": "exclude"
+      },
+      "indexes": {
+        "working_time_templates_pkey": "exclude",
+        "working_time_templates_tenant_id_legal_entity_id_index": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
+      }
+    }
+  },
+  "routines": {
+    "coreerp_bump_row_version()": {
+      "action": "keep"
+    },
+    "coreerp_forbid_change_log_update()": {
+      "action": "keep"
+    },
+    "coreerp_log_change()": {
+      "action": "replace",
+      "source": "routines/coreerp_log_change.sql",
+      "reason": "Control-local audit has no dependency on ERP security tables."
+    },
+    "coreerp_stamp_audit_actor()": {
+      "action": "keep"
+    },
+    "operator_audit_events_tolak_ubah()": {
+      "action": "keep"
+    }
+  },
+  "sequences": {
+    "change_log_entries_id_seq": "keep",
+    "failed_jobs_id_seq": "keep",
+    "jobs_id_seq": "keep",
+    "migrations_id_seq": "exclude",
+    "passkeys_id_seq": "keep",
+    "tenant_app_entitlements_id_seq": "keep",
+    "users_id_seq": "keep"
+  },
+  "types": []
+}

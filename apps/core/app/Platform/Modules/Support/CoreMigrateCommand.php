@@ -4,12 +4,26 @@ declare(strict_types=1);
 
 namespace App\Platform\Modules\Support;
 
+use App\Platform\Database\Support\DatabasePrivileges;
+use App\Platform\Environment\Support\EnvironmentConnection;
 use Illuminate\Database\Console\Migrations\MigrateCommand;
+use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 final class CoreMigrateCommand extends MigrateCommand
 {
     public function handle(): int
     {
+        $connections = $this->laravel->make(EnvironmentConnection::class);
+        $runtime = (string) ($this->option('database') ?: $connections->business());
+        try {
+            $migration = $connections->migrationFor($runtime);
+        } catch (RuntimeException $failure) {
+            $this->components->error($failure->getMessage());
+
+            return self::FAILURE;
+        }
+
         if ($this->option('path')) {
             $paths = $this->getMigrationPaths();
             $paths = array_merge($paths, $this->migrator->getMigrationFiles($paths));
@@ -35,7 +49,29 @@ final class CoreMigrateCommand extends MigrateCommand
             }
         }
 
-        return parent::handle();
+        if (! $this->confirmToProceed()) {
+            return self::FAILURE;
+        }
+        $this->input->setOption('force', true);
+        $this->input->setOption('database', $migration);
+        try {
+            if (! $this->option('pretend') && $migration !== $runtime) {
+                $privileges = $this->laravel->make(DatabasePrivileges::class);
+                $privileges->prepare($migration, $runtime);
+                $repository = $this->migrator->getRepository();
+                $repository->setSource($migration);
+                DB::connection($migration)->transaction(function () use ($repository, $privileges, $migration, $runtime): void {
+                    if (! $repository->repositoryExists()) {
+                        $repository->createRepository();
+                    }
+                    $privileges->protectHistory($migration, $runtime, 'migrations');
+                });
+            }
+
+            return parent::handle();
+        } finally {
+            $connections->releaseMigrationFor($runtime);
+        }
     }
 
     private function resolvedPath(string $path): ?string
