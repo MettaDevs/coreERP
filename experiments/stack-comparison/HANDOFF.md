@@ -48,6 +48,19 @@ Keputusan pengguna 4 November, diteruskan lewat sesi "Perbedaan disk write dev 1
 
 Dilarang: `fsync=off`, `full_page_writes=off`, unlogged table untuk data penting. Butir 1, 2, 3, 4, dan 6 mengubah perilaku yang dijaga gate kesetaraan, jadi diterapkan ke PHP juga agar perbandingan tetap adil. Urutan uji mengikuti bottleneck yang terbukti: 6 dan 3 dulu (menghapus fsync per request), lalu 1 dan 2 bila CPU menjadi limiter berikutnya.
 
+## Gangguan I/O di dev1 dan perubahan di luar folder eksperimen, 4 November
+
+dev1 dipakai bersama. Job backup milik rekan pengguna (root, `/usr/local/libexec/metta-backup/registry-drill.py` dari sesi SSH, plus timer `metta-*`) membaca disk 18-220 MB/s selama `r8n-go-900` dan `r8n-rust-1000`. Database run sendiri hampir tidak membaca disk. Penanganannya:
+
+- `load_report.py`: `host_io` dari vmstat plateau. Gagal latensi saat baca disk host rata-rata di atas 5 MiB/s berarti `INCONCLUSIVE_HOST_IO`; pelanggaran kebenaran tetap FAIL. `r8n-go-900` dan `r8n-rust-1000` kini INCONCLUSIVE_HOST_IO dan diukur ulang di mode sesi.
+- `load.py` menunggu baca disk host di bawah 5 MiB/s selama 30 detik sebelum start (paling lama 20 menit). `ramp.py` dan `repeat.py` mengulang run INCONCLUSIVE_HOST_IO sampai dua kali dengan clone baru.
+
+**Perubahan di dev1 di luar folder eksperimen, wajib dibereskan sesudah pengujian:**
+
+- Atas keputusan pengguna, batas I/O runtime 4 MB/s baca dan tulis di `/dev/vda` untuk `user-0.slice` dan unit `metta-native-upload`, `metta-native-pg-backup`, `metta-native-config-backup`, `metta-jowhost-backup-metrics`. Pasang/cabut lewat `~/coreerp-stack-comparison/io-limit.sh apply|revert`. Pencabutan otomatis terjadwal pukul 22:00 WIB lewat `coreerp-io-limit-revert.timer` (transient). Cabut lebih awal begitu pengujian selesai.
+- `/root/AGENTS.md` dan `/root/CLAUDE.md`: catatan sementara untuk agent rekan pengguna (apa yang berjalan, cara mengecek, batas I/O, cara mencabut). Hapus sesudah pengujian.
+- Scheduler disk dev1 `mq-deadline`, jadi `ionice`/`IOWeight` tidak berefek; hanya `io.max` yang membatasi.
+
 ## Correctness selesai di dev1, 3 November 20:46 WITA
 
 Cluster uji dev1 berjalan dari compose eksperimen (`coreerp-stack-comparison`, port loopback 18640/18641). `runtime.env` di dev1 sudah LF dan `PHP_IMAGE` menunjuk ID dev1. Evidence dev1 berawalan `d1-` (PHP dan Go/Hono/Elysia) serta `d2-` (Rust sesudah perbaikan reset).
