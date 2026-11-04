@@ -54,6 +54,7 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=Path, default=PRIVATE / "seed-128.dump")
     parser.add_argument("--fixture", type=Path, default=PRIVATE / "fixture-128.json")
     parser.add_argument("--baseline", type=Path, default=PRIVATE / "seed-128-baseline.json")
+    parser.add_argument("--prepared", type=Path, help="Folder scripts/sessions.py: <stack>.dump, -sessions.json, -baseline.json per stack.")
     args = parser.parse_args()
     plan = points(args.points)
     candidates = list(plan)
@@ -67,9 +68,13 @@ if __name__ == "__main__":
             for vus in steps:
                 db = database(f"{args.name}{repeat + 1}", candidate, plan[candidate].index(vus))
                 run_id = f"{args.name}-{candidate}-{vus}-{repeat + 1}"
-                cloned = run("lab.py", "clone", "--database", db, "--seed", str(args.seed))
+                seed, baseline, extra = args.seed, args.baseline, []
+                if args.prepared:
+                    seed, baseline = args.prepared / f"{candidate}.dump", args.prepared / f"{candidate}-baseline.json"
+                    extra = ["--sessions", str(args.prepared / f"{candidate}-sessions.json")]
+                cloned = run("lab.py", "clone", "--database", db, "--seed", str(seed))
                 result = run("load.py", "--candidate", candidate, "--database", db, "--vus", str(vus), "--run-id", run_id,
-                             "--fixture", str(args.fixture), "--baseline", str(args.baseline)) if cloned.returncode == 0 else cloned
+                             "--fixture", str(args.fixture), "--baseline", str(baseline), *extra) if cloned.returncode == 0 else cloned
                 report_path = PRIVATE / "load" / run_id / "report.json"
                 report = json.loads(report_path.read_text(encoding="utf-8")) if report_path.exists() else {"verdict": "ERROR"}
                 verdict = "INCONCLUSIVE_LOADGEN" if report.get("loadgen_saturated") else report["verdict"]

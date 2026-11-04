@@ -157,19 +157,30 @@ if __name__ == "__main__":
     parser.add_argument("--loadgen-cpus", default="2")
     parser.add_argument("--fixture", type=Path, default=PRIVATE / "fixture.json")
     parser.add_argument("--baseline", type=Path, default=PRIVATE / "seed-baseline.json")
+    parser.add_argument("--sessions", type=Path, help="Cookie sesi dari scripts/sessions.py; pengguna dianggap sudah login dan jendela login nol.")
     args = parser.parse_args()
     validate_database(args.database)
     if sql(f"SELECT count(*) FROM pg_database WHERE datname='{args.database}';") != "1":
         raise SystemExit("Database run belum ada; buat clone dulu agar run tidak berjalan terhadap database kosong.")
-    login_seconds = args.login or max(60, math.ceil(0.5 * args.vus))
+    sessions = json.loads(args.sessions.read_text(encoding="utf-8")) if args.sessions else None
+    if sessions is not None and sessions["candidate"] != args.candidate:
+        raise SystemExit(f"Sesi dibuat oleh {sessions['candidate']}, bukan {args.candidate}.")
+    login_seconds = 0 if sessions is not None else args.login or max(60, math.ceil(0.5 * args.vus))
     out = PRIVATE / "load" / args.run_id
     if out.exists():
         raise SystemExit("Folder run sudah ada; run beban tidak menimpa evidence lama.")
     out.mkdir(parents=True)
     manifest = {"run_id": args.run_id, "candidate": args.candidate, "vus": args.vus, "phases": {"login": login_seconds, "start_spread": args.start_spread, "warmup": args.warmup, "plateau": args.plateau, "drain": args.drain},
                 "fixture": str(args.fixture), "baseline": str(args.baseline),
-                "think_time": "Uniform(1,9) s sesudah setiap aksi", "login_offset": "Uniform(0, 0.5 x jendela login) s", "initial_offset": "Uniform(0,10) s sesudah jendela login", "k6_image": K6_IMAGE,
+                "think_time": "Uniform(1,9) s sesudah setiap aksi",
+                "login_offset": "sesi siap pakai, tanpa login" if sessions is not None else "Uniform(0, 0.5 x jendela login) s",
+                "initial_offset": f"Uniform(0,{args.start_spread}) s sesudah jendela login", "k6_image": K6_IMAGE,
                 "loadgen": {"cpus": args.loadgen_cpus, "memory": "2g", "network": native.NETWORK}, "host": os.uname().nodename if hasattr(os, "uname") else ""}
+    if sessions is not None:
+        # Dump sesi berumur lebih tua dari lifetime 120 menit; aktivitas terakhir disegarkan di clone run ini saja.
+        refreshed = sql("WITH s AS (UPDATE sessions SET last_activity = extract(epoch FROM now())::int RETURNING 1) SELECT count(*) FROM s;", args.database)
+        manifest["sessions"] = {"file": args.sessions.name, "created_at": sessions["created_at"], "count": len(sessions["sessions"]),
+                                "rows_refreshed": int(refreshed), "dump": sessions["dump"]}
     sut = start(args.candidate, args.database)
     manifest["sut"] = sut
     limits = json.loads(subprocess.run(["docker", "inspect", "coreerp-stack-comparison-database-1", "--format", "{{json .HostConfig}}"],
@@ -189,6 +200,7 @@ if __name__ == "__main__":
                "-e", "BASE=" + sut["internal"], "-e", "RUN_ID=" + args.run_id, "-e", f"VUS={args.vus}", "-e", "COMPARE_PASSWORD",
                "-e", f"LOGIN_SECONDS={login_seconds}", "-e", f"WARMUP_SECONDS={args.warmup}", "-e", f"START_SPREAD_SECONDS={args.start_spread}", "-e", f"PLATEAU_SECONDS={args.plateau}", "-e", f"DRAIN_SECONDS={args.drain}",
                "-v", f"{LAB / 'load'}:/scripts:ro", "-v", f"{args.fixture.resolve()}:/fixture/fixture.json:ro", "-v", f"{out}:/out",
+               *(["-e", "SESSIONS_FILE=1", "-v", f"{args.sessions.resolve()}:/fixture/sessions.json:ro"] if sessions is not None else []),
                K6_IMAGE, "run", "--quiet", "--log-format", "json", "--log-output", "file=/out/k6.log", "--out", "csv=/out/points.csv.gz", "/scripts/user-flow.js"]
     manifest["started_at"] = datetime.now(timezone.utc).isoformat()
     try:

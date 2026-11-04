@@ -1,7 +1,9 @@
 // Profil pending-purchase-v1 sebagai pengguna: satu sesi nyata per VU, jeda Uniform(1,9) detik sesudah
 // setiap aksi, start siklus Uniform(0, satu siklus) sesudah jendela login sehingga fase VU tersebar rata
 // dan plateau tidak bergelombang. Model closed; offered load turun bila server melambat. Login (bcrypt
-// dua kali) diukur di jendela sendiri agar tidak tumpang tindih plateau.
+// dua kali) diukur di jendela sendiri agar tidak tumpang tindih plateau. Dengan SESSIONS_FILE, setiap VU
+// memakai sesi yang sudah dibuat stack itu sendiri (scripts/sessions.py): pengguna dianggap sudah berada
+// di dalam sistem dan jendela login nol.
 import http from 'k6/http';
 import exec from 'k6/execution';
 import { sleep } from 'k6';
@@ -21,6 +23,7 @@ const fixtureFile = '/fixture/fixture.json';
 const accounts = new SharedArray('accounts', () => JSON.parse(open(fixtureFile)).accounts);
 const tenants = new SharedArray('tenants', () => JSON.parse(open(fixtureFile)).tenants.map((tenant) => ({ tenant_id: tenant.tenant_id, receipt_body: tenant.receipt_body })));
 const moduleId = new SharedArray('module', () => [JSON.parse(open(fixtureFile)).module_id])[0];
+const sessions = __ENV.SESSIONS_FILE ? new SharedArray('sessions', () => JSON.parse(open('/fixture/sessions.json')).sessions) : null;
 const prefix = `${BASE}/api/modules/${moduleId}/v1`;
 
 export const options = {
@@ -46,6 +49,7 @@ let accountIndex = -1;
 let document = null;
 let cycling = false;
 let loginAttempted = false;
+let sessionAdopted = false;
 
 function elapsed() {
     return (Date.now() - exec.scenario.startTime) / 1000;
@@ -122,19 +126,38 @@ function login() {
         legal_entity_id: candidate.legal_entity_id,
         org_unit_id: candidate.department_id,
     }, 200);
+    adopt(index);
+}
+
+function adopt(index) {
     accountIndex = index;
-    account = candidate;
+    account = accounts[index];
     if (document === null) {
         for (let position = 0; position < tenants.length && document === null; position++) {
             const tenant = tenants[position];
-            if (tenant.tenant_id === candidate.tenant_id) document = tenant.receipt_body;
+            if (tenant.tenant_id === account.tenant_id) document = tenant.receipt_body;
         }
     }
 }
 
+function resume() {
+    // Sesi yang ditolak tidak dipakai ulang; VU itu login biasa dan tercatat sebagai login.
+    sessionAdopted = true;
+    const index = (exec.vu.idInTest - 1) % accounts.length;
+    const entry = sessions[index];
+    if (entry.index !== index || entry.user_id !== accounts[index].user_id) throw new Error(`session ${index} tidak cocok dengan fixture`);
+    const jar = http.cookieJar();
+    for (const name of Object.keys(entry.cookies)) jar.set(BASE, name, entry.cookies[name]);
+    loginAttempted = true;
+    adopt(index);
+}
+
 export default function () {
     try {
-        if (account === null) login();
+        if (account === null) {
+            if (sessions !== null && !sessionAdopted) resume();
+            else login();
+        }
         if (!cycling) {
             sleep(Math.max(0, LOGIN - elapsed()) + Math.random() * SPREAD);
             cycling = true;

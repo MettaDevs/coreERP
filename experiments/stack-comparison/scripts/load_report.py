@@ -168,7 +168,7 @@ def report(run: Path) -> dict:
         "failed_by_status": dict(statuses), "acknowledged_receipts": manifest.get("acknowledged_receipts"),
         "completed_cycles": oracle.get("acknowledged_completed"),
         "cycle_ms_with_think": summary(cycles["cycle_total"]), "cycle_ms_without_think": summary(cycles["cycle_busy"]),
-        "plateau_rates": stationarity, "cpu_percent": cpu, "connections": connection_states(run, manifest), "database_delta": counter_delta(manifest),
+        "sessions_prepared": manifest.get("sessions") is not None, "plateau_rates": stationarity, "cpu_percent": cpu, "connections": connection_states(run, manifest), "database_delta": counter_delta(manifest),
         "loadgen_saturated": bool(loadgen) and loadgen["mean"] > 0.8 * 100 * float(manifest["loadgen"]["cpus"]),
         "oracle_failures": oracle["failures"],
         "limitations": "Closed model with think time; VU count is not concurrent request count. Percentiles use nearest rank. PASS_LOW_SAMPLES means some operation had fewer samples than the profile minimum, so p99 is not claimable.",
