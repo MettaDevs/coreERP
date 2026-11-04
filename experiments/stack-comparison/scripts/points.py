@@ -19,6 +19,7 @@ PRIVATE = Path(__file__).resolve().parents[1] / "private"
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("ramps", nargs="+", help="Nama ramp, misalnya r9n r9b r9p")
+    parser.add_argument("--exclude", nargs="*", default=[], help="run_id yang tidak sah sebagai bukti batas (alasan dicatat pemanggil).")
     args = parser.parse_args()
     runs: dict[str, list[dict]] = defaultdict(list)
     stopped: dict[str, list] = defaultdict(list)
@@ -28,7 +29,7 @@ def main() -> int:
             print(f"{name}: ringkasan ramp tidak ada", file=sys.stderr)
             continue
         for candidate, state in json.loads(path.read_text(encoding="utf-8"))["candidates"].items():
-            runs[candidate].extend(state["runs"])
+            runs[candidate].extend(entry for entry in state["runs"] if entry["run_id"] not in args.exclude)
             if state["stopped"]:
                 stopped[candidate].append(state["stopped"])
     points, problems = [], []
@@ -53,6 +54,8 @@ def main() -> int:
         steps = [vus for vus in (last_pass, first_fail) if vus is not None]
         if steps:
             points.append(f"{candidate}={','.join(map(str, steps))}")
+    for run_id in args.exclude:
+        problems.append(f"{run_id}: dikecualikan")
     for problem in problems:
         print(problem, file=sys.stderr)
     print(" ".join(points))
