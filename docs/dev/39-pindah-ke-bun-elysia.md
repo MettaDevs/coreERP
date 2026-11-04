@@ -135,5 +135,5 @@ ledger.
   implementasi TypeScript di `native/typescript/`, rancangan varian teroptimasi di `optimized.md` dan
   `infra/optimized-schema.sql`, serta jejak keputusan di `HANDOFF.md` dan `.audit/native-stack/decisions.tsv`.
 - Hasil setiap run ada di folder `private/load/` eksperimen itu, di dev1 dan di Cue. Folder itu tidak masuk repo.
-- Alur layar, permintaan, dan data CoreERP dalam bentuk yang tidak terikat bahasa pemrograman ada di
-  [artifact design system](https://claude.ai/artifact/67fEJNECSNBaNo2G4SJse2).
+- Alur layar, permintaan, dan data CoreERP dalam bentuk yang tidak terikat bahasa pemrograman, beserta daftar periksa
+  sebelum sebuah module boleh disebut sudah pindah, ada di [design system netral-stack](../design-system/).

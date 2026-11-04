@@ -14,7 +14,9 @@ changing anything below. This skill only lists what an agent gets wrong without 
 
 ## CoreERP stays the reference
 
-The new code is a port, not a redesign. Table and column names stay 1:1 with CoreERP. A ported flow is finished only
+The new code is a port, not a redesign. Screen, request, and data flows are described without any framework in
+`docs/design-system/`, including the fidelity checklist in `04-pemeriksaan-kesetiaan.md`. Table and column names stay
+1:1 with CoreERP. A ported flow is finished only
 when its HTTP responses, SQL writes, and SQL oracle results match CoreERP for the same input, including revocation,
 rollback, and throttle cases. Differences found in CoreERP are reported to the owner to decide whether to copy or fix
 them; never fix them silently.
