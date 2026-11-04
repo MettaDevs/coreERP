@@ -31,6 +31,11 @@ CANDIDATES = {
                "environment": {"HOST": "0.0.0.0", "PORT": "8000", "DB_POOL_SIZE": str(8 // BUN_PROCESSES)}},
     "rust": {"image": "coreerp-native-rust:local", "port": 18643, "command": [],
              "environment": {"BIND_HOST": "0.0.0.0", "PORT": "8000", "DB_POOL": "8"}},
+    # Kandidat Elysia yang sudah dipindah ke repo operations-metta; dipakai untuk membuktikan pemindahannya
+    # tidak mengubah perilaku.
+    "operations": {"image": "operations-metta:local", "port": 18647,
+                   "command": ["sh", "-c", f"for i in $(seq {BUN_PROCESSES}); do bun dist/main.js & done; wait"],
+                   "environment": {"HOST": "0.0.0.0", "PORT": "8000", "DB_POOL_SIZE": str(8 // BUN_PROCESSES)}},
 }
 SECRETS = ["DB_PASSWORD", "APP_KEY"]
 # Varian teroptimasi (optimized.md): image yang sama, saklar lewat environment.
@@ -96,7 +101,7 @@ def up(name: str, database: str, runtime_env: Path) -> dict:
             raise SystemExit("Kandidat tidak menjawab HTTP dalam 30 detik:\n" + logs.stdout + logs.stderr)
         time.sleep(0.25)
     # Dua proses Bun berbagi port lewat reusePort; satu respons belum membuktikan proses kedua siap.
-    expected = BUN_PROCESSES if name in {"hono", "elysia"} else 1
+    expected = BUN_PROCESSES if name in {"hono", "elysia", "operations"} else 1
     while expected > 1 and listening(container) < expected:
         if time.monotonic() > deadline:
             raise SystemExit(f"Hanya sebagian proses {name} yang siap dalam 30 detik.")
