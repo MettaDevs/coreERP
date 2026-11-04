@@ -24,6 +24,7 @@ use Illuminate\Support\Carbon;
  * @property ?string $failure_message
  * @property ?array<string, mixed> $detail
  * @property Carbon $started_at
+ * @property ?Carbon $lease_until
  * @property ?Carbon $finished_at
  */
 class EnvironmentOperation extends Model
@@ -54,6 +55,7 @@ class EnvironmentOperation extends Model
             'detail' => 'array',
             'started_at' => 'datetime',
             'finished_at' => 'datetime',
+            'lease_until' => 'datetime',
         ];
     }
 

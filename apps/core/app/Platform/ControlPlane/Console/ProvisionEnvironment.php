@@ -117,6 +117,12 @@ final class ProvisionEnvironment extends Command
             return self::FAILURE;
         }
 
+        if ($environment->source_environment_id !== null) {
+            $this->error('Lingkungan ini berasal dari salinan. Lanjutkan penyalinannya, bukan penyiapan database baru.');
+
+            return self::FAILURE;
+        }
+
         if (! in_array($environment->status, self::ALLOWED_STATUSES, true)) {
             $this->error(sprintf(
                 'Environment "%s" berstatus %s. Yang boleh disiapkan hanya %s — menyiapkan ulang '
@@ -323,9 +329,7 @@ final class ProvisionEnvironment extends Command
      */
     private function markFailed(Environment $environment, EnvironmentOperation $operation, string $step, Throwable $e): void
     {
-        $this->closeOperationAsFailed($operation, $step, $e);
-
-        $environment->update(['status' => 'degraded']);
+        $this->closeOperationAsFailed($operation, $step, $e, 'degraded');
     }
 
     /** Mengubah sepotong slug menjadi bagian identifier yang sah, tanpa membuatnya unik. */

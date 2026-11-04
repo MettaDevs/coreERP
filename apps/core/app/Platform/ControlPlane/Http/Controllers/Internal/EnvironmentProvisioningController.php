@@ -63,6 +63,10 @@ final class EnvironmentProvisioningController extends Controller
             ], 409);
         }
 
+        if ($environment->source_environment_id !== null) {
+            return response()->json(['message' => 'Lingkungan ini berasal dari salinan. Lanjutkan penyalinannya agar pembersihan salinan dan pemeriksaannya tetap dijalankan.'], 409);
+        }
+
         if (! in_array($environment->status, ['provisioning', 'degraded'], true)) {
             // 409, bukan 422. Permintaannya tidak salah bentuk — ia datang ke keadaan yang salah,
             // dan itu keadaan yang bisa berubah sendiri sebelum orangnya menekan tombol.
