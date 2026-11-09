@@ -2,9 +2,9 @@
 
 Daftar periksa untuk membuktikan bahwa implementasi di stack lain berperilaku sama dengan sistem ini. Sebuah module belum dianggap pindah hanya karena layarnya tampil atau test fungsionalnya lulus.
 
-## Database tetap 1:1
+## Database
 
-- [ ] Skema dipakai apa adanya: nama tabel, kolom, index (termasuk index unik parsial `WHERE deleted_at IS NULL`), constraint, dan trigger tidak diubah.
+- [ ] Skema dipakai apa adanya: nama tabel, kolom, index (termasuk index unik parsial `WHERE deleted_at IS NULL`), constraint, dan trigger tidak diubah, kecuali perubahan yang membuatnya lebih baik. Perubahan itu alasannya tertulis, dikerjakan lewat migration, dan pemetaan nama lama ke nama baru tercatat di harness kesetaraan (keputusan pemilik produk 9 November 2026).
 - [ ] Setiap koneksi yang menulis memasang `coreerp.user_id` lalu meresetnya bersama `coreerp.change_log` sebelum koneksi dipakai ulang. Dibuktikan dengan dua permintaan berurutan dari pengguna berbeda pada koneksi yang sama: `created_by_user_id`/`updated_by_user_id` dan `change_log_entries` mencatat pelaku yang benar.
 - [ ] `version` naik lewat trigger, bukan dihitung aplikasi; klaim versi memakai `UPDATE … WHERE version = n`.
 - [ ] Tidak ada `DELETE` baru pada data bisnis; Delete mengisi `deleted_at`.

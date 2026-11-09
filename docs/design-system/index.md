@@ -1,6 +1,6 @@
 # Design system netral-stack
 
-Folder ini menggambarkan CoreERP tanpa terikat PHP, React, atau framework lain: nilai tampilan (token), bentuk dan perilaku setiap komponen, dan alur dari layar sampai database. Gunanya untuk menilai dan, bila jadi, menjalankan perpindahan ke stack lain. Implementasi baru dianggap setia bila menghasilkan tampilan dan perilaku yang sama serta membaca dan menulis skema database yang sama persis; yang boleh berbeda hanya cara stack itu menanganinya.
+Folder ini menggambarkan CoreERP tanpa terikat PHP, React, atau framework lain: nilai tampilan (token), bentuk dan perilaku setiap komponen, dan alur dari layar sampai database. Gunanya untuk menilai dan, bila jadi, menjalankan perpindahan ke stack lain. Implementasi baru dianggap setia bila menghasilkan tampilan dan perilaku yang sama serta membaca dan menulis skema database yang sama; yang boleh berbeda adalah cara stack itu menanganinya dan perubahan skema yang membuatnya lebih baik, bila dikerjakan menurut [pemeriksaan kesetiaan](/design-system/04-pemeriksaan-kesetiaan).
 
 ## Isi folder
 
