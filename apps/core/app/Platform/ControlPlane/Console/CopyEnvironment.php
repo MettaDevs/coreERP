@@ -87,7 +87,8 @@ final class CopyEnvironment extends Command
 
     protected $signature = 'environment:copy
         {source : Id baris environments produksi yang disalin}
-        {--name= : Nama lingkungan sandbox yang lahir dari salinan ini}';
+        {--name= : Nama lingkungan sandbox yang lahir dari salinan ini}
+        {--requested-by= : Id operator yang meminta penyalinan}';
 
     protected $description = 'Salin sebuah lingkungan produksi menjadi sandbox baru, lalu lucuti salinannya';
 
@@ -278,7 +279,9 @@ final class CopyEnvironment extends Command
 
             $step = 'salin';
 
-            if ($this->alreadyRestored()) {
+            $alreadyRestored = $this->alreadyRestored();
+
+            if ($alreadyRestored) {
                 $this->line('  database sasaran sudah berisi salinan dari percobaan sebelumnya; dump dilewati.');
             } else {
                 if (! self::clientsAvailable()) {
@@ -299,6 +302,8 @@ final class CopyEnvironment extends Command
                 $this->line('  restore selesai.');
             }
 
+            $expectedModules = $this->snapshotModuleCount($target, $operation, $databaseName, $alreadyRestored);
+
             $step = 'lucuti';
             $disarmed = $this->disarm();
             $this->reportDisarm($disarmed);
@@ -311,7 +316,7 @@ final class CopyEnvironment extends Command
             }
 
             $step = 'periksa-kesehatan';
-            $fingerprint = $this->checkHealth();
+            $fingerprint = $this->checkHealth($expectedModules);
 
             $step = 'aktifkan';
             $target->update([
@@ -327,7 +332,7 @@ final class CopyEnvironment extends Command
                 'step' => $step,
                 'finished_at' => now(),
                 'lease_until' => null,
-                'detail' => ['database' => $databaseName, 'sidik' => $fingerprint, 'dilucuti' => $disarmed],
+                'detail' => array_merge($operation->detail ?? [], ['database' => $databaseName, 'sidik' => $fingerprint, 'dilucuti' => $disarmed]),
             ]);
 
             $this->info(sprintf(
@@ -339,8 +344,7 @@ final class CopyEnvironment extends Command
 
             return self::SUCCESS;
         } catch (Throwable $e) {
-            $this->closeOperationAsFailed($operation, $step, $e);
-            $target->update(['status' => 'degraded']);
+            $this->closeOperationAsFailed($operation, $step, $e, 'degraded');
 
             $this->error(sprintf('Penyalinan berhenti di langkah "%s": %s', $step, $e->getMessage()));
             $this->line(sprintf(
@@ -556,22 +560,7 @@ final class CopyEnvironment extends Command
             return false;
         }
 
-        $running->update([
-            'status' => 'failed',
-            'finished_at' => now(),
-            'lease_until' => null,
-            'failure_message' => sprintf(
-                'Tenggatnya habis pada %s tanpa pernah ditutup — prosesnya berhenti tanpa sempat '
-                .'melaporkan apa pun. Penyalinan berikutnya dari sumber yang sama mengambil alih, '
-                .'dan langkah terakhir yang sempat tercapai adalah "%s".',
-                (string) $running->getOriginal('lease_until'),
-                $running->step ?? 'tidak tercatat',
-            ),
-        ]);
-
-        $this->warn(sprintf('Penyalinan %s yang tenggatnya sudah lewat ditandai gagal dan diambil alih.', $running->id));
-
-        return true;
+        return $this->retireExpiredOperation($running);
     }
 
     /**
@@ -814,7 +803,11 @@ final class CopyEnvironment extends Command
         }
 
         $this->nextRenewalAt = $now + self::LEASE_RENEWAL_SECONDS;
-        $this->operation->update(['lease_until' => now()->addMinutes($this->operationLeaseMinutes())]);
+        $changed = EnvironmentOperation::query()->whereKey($this->operation->id)->where('status', 'running')
+            ->update(['lease_until' => now()->addMinutes($this->operationLeaseMinutes())]);
+        if ($changed === 0) {
+            throw new RuntimeException('Penyalinan dihentikan karena operasinya sudah diambil alih atau ditutup.');
+        }
     }
 
     // ------------------------------------------------------------------ pelucutan
@@ -1018,16 +1011,14 @@ final class CopyEnvironment extends Command
      * migration yang berjalan di sela keduanya dapat menyisipkan baris baru — dan pemeriksaan yang
      * berhenti sebelum langkah terakhir hanya membuktikan keadaan yang sudah tidak berlaku.
      *
-     * Pemeriksaan modul terpasang berjalan ke arah sebaliknya dari yang lain: ia menuntut baris
-     * **ada**. Sandbox tanpa module terpasang bukan salinan melainkan database kosong yang
-     * kebetulan bermigrasi, dan kegagalan restore yang sunyi terlihat persis seperti itu.
+     * Jumlah pemasangan module harus tetap sesuai hasil restore. Acuan ini disimpan sebelum
+     * pelucutan; perubahan production sesudah snapshot bukan bukti bahwa salinannya rusak.
      *
      * @return string sidik skema salinannya
      */
-    private function checkHealth(): string
+    private function checkHealth(int $expectedModules): string
     {
         $target = DB::connection(self::CONNECTION_TARGET);
-        $source = DB::connection(self::CONNECTION_SOURCE);
 
         $remaining = [
             'event yang belum terbit' => $target->table('outbox_events')->whereNull('published_at')->count(),
@@ -1052,14 +1043,13 @@ final class CopyEnvironment extends Command
             }
         }
 
-        $installedInSource = $source->table('core_module_installations')->count();
         $installedInCopy = $target->table('core_module_installations')->count();
 
-        if ($installedInCopy !== $installedInSource) {
+        if ($installedInCopy !== $expectedModules) {
             throw new RuntimeException(sprintf(
-                'Sumber punya %d catatan pemasangan module dan salinannya %d. Catatan pemasangan '
-                .'tidak pernah disentuh penyalinan ini, jadi selisihnya berarti restorenya tidak utuh.',
-                $installedInSource,
+                'Snapshot hasil restore punya %d catatan pemasangan module, tetapi sekarang salinannya %d. '
+                .'Catatan pemasangan berubah selama penyiapan salinan.',
+                $expectedModules,
                 $installedInCopy,
             ));
         }
@@ -1141,6 +1131,35 @@ final class CopyEnvironment extends Command
         } finally {
             DB::purge($maintenance);
         }
+    }
+
+    /** Acuan diambil dari hasil restore, lalu disimpan supaya retry tidak bergantung pada sumber live. */
+    private function snapshotModuleCount(Environment $target, EnvironmentOperation $operation, string $databaseName, bool $alreadyRestored): int
+    {
+        $expected = null;
+
+        if ($alreadyRestored) {
+            $previous = EnvironmentOperation::query()
+                ->where('environment_id', $target->id)
+                ->where('operation', 'copy')
+                ->where('id', '!=', $operation->id)
+                ->where('detail->database', $databaseName)
+                ->whereNotNull('detail->snapshot_module_count')
+                ->orderByDesc('id')
+                ->first(['detail']);
+            $value = $previous->detail['snapshot_module_count'] ?? null;
+
+            if (is_int($value)) {
+                $expected = $value;
+            }
+        }
+
+        // Restore satu transaksi menjamin penandanya lengkap atau tidak ada. Ini juga jalur
+        // pemulihan bila proses mati sesudah restore tetapi sebelum acuan sempat dicatat.
+        $expected ??= DB::connection(self::CONNECTION_TARGET)->table('core_module_installations')->count();
+        $operation->update(['detail' => ['database' => $databaseName, 'snapshot_module_count' => $expected]]);
+
+        return $expected;
     }
 
     /**

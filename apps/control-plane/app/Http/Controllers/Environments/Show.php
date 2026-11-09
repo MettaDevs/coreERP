@@ -45,6 +45,10 @@ class Show extends Controller
         $onClientServer = $row->hosting === 'client_server';
 
         $moduleResult = function () use ($onClientServer, $modules, $row): array {
+            if ($row->source_environment_id !== null && $row->status !== 'active') {
+                return ['items' => [], 'error' => null];
+            }
+
             return once(function () use ($onClientServer, $modules, $row): array {
                 try {
                     return ['items' => $onClientServer ? [] : $modules($row), 'error' => null];
@@ -71,10 +75,56 @@ class Show extends Controller
             // sini supaya tombolnya tidak pernah muncul untuk keadaan yang akan ditolak Core —
             // tombol yang selalu terlihat lalu selalu gagal melatih orang mengabaikan pesannya.
             // Lingkungan di server klien lahir `provisioning` dan Core menolak menyiapkannya.
-            'canProvision' => fn (): bool => ! $onClientServer && in_array($row->status, ['provisioning', 'degraded'], true),
+            'copyState' => fn (): ?array => $this->copyState($row),
+            'canProvision' => fn (): bool => ! $onClientServer && $row->source_environment_id === null && in_array($row->status, ['provisioning', 'degraded'], true),
             'serverClient' => fn (): ?array => $row->runsOnClientServer() ? $this->serverClient($row, $operations) : null,
             'installCommand' => fn (): ?array => $this->installCommand($request),
         ]);
+    }
+
+    /** @return array{sourceId:string,targetId:?string,name:string,canRequest:bool,pending:bool,status:string,reason:?string}|null */
+    private function copyState(Environment $row): ?array
+    {
+        if ($row->kind === 'production') {
+            $source = $row;
+            $target = Environment::query()->where('tenant_id', $row->tenant_id)->where('kind', 'sandbox')->whereNull('deleted_at')->first();
+        } elseif ($row->kind === 'sandbox' && $row->source_environment_id !== null) {
+            $source = Environment::query()->whereKey($row->source_environment_id)->where('tenant_id', $row->tenant_id)->whereNull('deleted_at')->first();
+            $target = $row;
+        } else {
+            return null;
+        }
+
+        $reason = null;
+        if (! $source instanceof Environment || $source->kind !== 'production' || $source->status !== 'active'
+            || $source->hosting !== 'provider' || $source->database_name === null) {
+            $reason = 'Penyalinan memerlukan production aktif di server kita dengan database sendiri.';
+        } elseif ($target instanceof Environment && $target->source_environment_id !== $source->id) {
+            $reason = 'Tenant sudah punya sandbox lain. Penyalinan tidak menimpanya.';
+        } elseif ($target?->status === 'active') {
+            $reason = 'Sandbox sudah aktif. Penyalinan tidak menimpa sandbox yang sedang dipakai.';
+        }
+        $operation = $target instanceof Environment
+            ? EnvironmentOperation::query()->where('environment_id', $target->id)->where('operation', 'copy')->latest('id')->first()
+            : null;
+        $expired = $operation?->status === 'running' && $operation->lease_until !== null && $operation->lease_until->isPast();
+        $pending = ($target?->status === 'copying' || $operation?->status === 'running') && ! $expired;
+        $status = match (true) {
+            $target?->status === 'active' => 'Sandbox aktif',
+            $expired => 'Penyalinan terhenti',
+            $pending && $operation?->status === 'running' => 'Sedang menyalin',
+            $pending => 'Menunggu giliran',
+            $target?->status === 'degraded' => 'Penyalinan perlu dilanjutkan',
+            default => 'Sandbox dari production belum dibuat',
+        };
+
+        return [
+            'sourceId' => $source->id ?? (string) $row->source_environment_id,
+            'targetId' => $target?->id, 'name' => $target->name ?? '',
+            'canRequest' => $reason === null && ! $pending,
+            'pending' => $pending, 'status' => $status,
+            'reason' => $reason ?? ($target?->status === 'degraded' ? $operation?->failure_message : null),
+        ];
     }
 
     /** @return array{version: ?string, error: ?string} */

@@ -264,8 +264,6 @@ final class UpgradeEnvironments extends Command
 
             return 'succeeded';
         } catch (Throwable $e) {
-            $this->closeOperationAsFailed($operation, $step, $e);
-
             /*
              * `maintenance`, bukan `degraded`, dan bukan pula dibiarkan `active`.
              *
@@ -274,7 +272,7 @@ final class UpgradeEnvironments extends Command
              * menyebut sebabnya. Yang benar berhenti melayani, dengan 503 yang menyebut bahwa
              * tempatnya ada dan sedang tidak melayani.
              */
-            $environment->update(['status' => 'maintenance']);
+            $this->closeOperationAsFailed($operation, $step, $e, 'maintenance');
 
             $this->error(sprintf('  gagal di langkah "%s": %s', $step, $e->getMessage()));
 
