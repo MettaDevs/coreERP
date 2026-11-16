@@ -1,7 +1,7 @@
 import { Button } from '@apperp/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@apperp/ui/card';
 import { Head, router, usePage } from '@inertiajs/react';
-import { RotateCcw, Upload } from 'lucide-react';
+import { RotateCcw, Save, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import Heading from '@/components/heading';
@@ -9,21 +9,38 @@ import { useSaveFeedback } from '@/hooks/use-save-feedback';
 import { apiJson } from '@/lib/core-api';
 import type { BreadcrumbItem } from '@/types/navigation';
 
-type Props = { hasCustomLogo: boolean; canManage: boolean };
+type HeaderColors = { from: string; to: string };
+
+type Props = {
+    hasCustomLogo: boolean;
+    headerColors: HeaderColors | null;
+    canManage: boolean;
+};
+
+const DEFAULT_HEADER_COLORS: HeaderColors = { from: '#2a84c1', to: '#e3f0fa' };
 
 /**
  * Logo aplikasi milik tenant: satu gambar yang menggantikan logo bawaan di header, di tab
- * peramban, dan pada pratinjau ketika alamat aplikasi dibagikan.
+ * peramban, dan pada pratinjau ketika alamat aplikasi dibagikan. Di sini juga warna header,
+ * karena keduanya sama-sama tampilan milik tenant di bagian atas aplikasi.
  */
-export default function AppLogoSettings({ hasCustomLogo, canManage }: Props) {
+export default function AppLogoSettings({
+    hasCustomLogo,
+    headerColors,
+    canManage,
+}: Props) {
     const { branding } = usePage().props;
     const { scopeRef, clear, report } = useSaveFeedback<HTMLElement>();
     const fileInput = useRef<HTMLInputElement>(null);
     const [busy, setBusy] = useState(false);
+    const [colors, setColors] = useState<HeaderColors>(
+        headerColors ?? DEFAULT_HEADER_COLORS,
+    );
 
     const send = async (
-        method: 'POST' | 'DELETE',
-        body: FormData | undefined,
+        url: string,
+        method: 'POST' | 'PUT' | 'DELETE',
+        body: FormData | string | undefined,
         done: string,
         failed: string,
     ) => {
@@ -31,7 +48,7 @@ export default function AppLogoSettings({ hasCustomLogo, canManage }: Props) {
         clear();
 
         try {
-            await apiJson('/api/v1/app-logo', { method, body });
+            await apiJson(url, { method, body });
             toast.success(done);
             router.reload();
         } catch (caught) {
@@ -53,6 +70,7 @@ export default function AppLogoSettings({ hasCustomLogo, canManage }: Props) {
         const body = new FormData();
         body.append('file', file);
         void send(
+            '/api/v1/app-logo',
             'POST',
             body,
             'Logo aplikasi diganti.',
@@ -114,6 +132,7 @@ export default function AppLogoSettings({ hasCustomLogo, canManage }: Props) {
                                         disabled={busy}
                                         onClick={() =>
                                             void send(
+                                                '/api/v1/app-logo',
                                                 'DELETE',
                                                 undefined,
                                                 'Logo bawaan dipakai kembali.',
@@ -129,6 +148,96 @@ export default function AppLogoSettings({ hasCustomLogo, canManage }: Props) {
                                     PNG atau JPG, paling besar 512 KB. Gambar
                                     persegi tampil paling rapi di tab browser.
                                 </p>
+                            </div>
+                        ) : null}
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>
+                            {headerColors
+                                ? 'Warna header Anda'
+                                : 'Warna header bawaan sedang dipakai'}
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-col gap-4">
+                        <div
+                            aria-hidden
+                            className="h-10 w-full rounded border"
+                            style={{
+                                backgroundImage: `linear-gradient(to right, ${colors.from}, ${colors.to})`,
+                            }}
+                        />
+                        {canManage ? (
+                            <div className="flex flex-wrap items-end gap-4">
+                                {(
+                                    [
+                                        ['from', 'Warna kiri'],
+                                        ['to', 'Warna kanan'],
+                                    ] as const
+                                ).map(([key, label]) => (
+                                    <label
+                                        key={key}
+                                        className="flex flex-col gap-1.5 text-sm"
+                                    >
+                                        {label}
+                                        <span className="flex items-center gap-2">
+                                            <input
+                                                type="color"
+                                                value={colors[key]}
+                                                disabled={busy}
+                                                onChange={(event) =>
+                                                    setColors((current) => ({
+                                                        ...current,
+                                                        [key]: event.target
+                                                            .value,
+                                                    }))
+                                                }
+                                                className="h-9 w-12 cursor-pointer rounded border bg-background p-1"
+                                            />
+                                            <span className="font-mono text-muted-foreground">
+                                                {colors[key]}
+                                            </span>
+                                        </span>
+                                    </label>
+                                ))}
+                                <div className="flex flex-wrap gap-2">
+                                    <Button
+                                        type="button"
+                                        disabled={busy}
+                                        onClick={() =>
+                                            void send(
+                                                '/api/v1/app-header-colors',
+                                                'PUT',
+                                                JSON.stringify(colors),
+                                                'Warna header disimpan.',
+                                                'Warna header belum dapat disimpan.',
+                                            )
+                                        }
+                                    >
+                                        <Save data-icon="inline-start" />
+                                        Simpan warna
+                                    </Button>
+                                    {headerColors ? (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            disabled={busy}
+                                            onClick={() =>
+                                                void send(
+                                                    '/api/v1/app-header-colors',
+                                                    'DELETE',
+                                                    undefined,
+                                                    'Warna header bawaan dipakai kembali.',
+                                                    'Warna header belum dapat dikembalikan.',
+                                                )
+                                            }
+                                        >
+                                            <RotateCcw data-icon="inline-start" />
+                                            Pakai warna bawaan
+                                        </Button>
+                                    ) : null}
+                                </div>
                             </div>
                         ) : null}
                     </CardContent>

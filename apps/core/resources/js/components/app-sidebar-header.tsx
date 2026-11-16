@@ -10,6 +10,7 @@ import { SidebarTrigger } from '@apperp/ui/sidebar';
 import { Link, usePage } from '@inertiajs/react';
 import { Command, Moon, Search, Sun } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { AppCommandPalette } from '@/components/app-command-palette';
 import AppLogoIcon from '@/components/app-logo-icon';
 import { ExportTray } from '@/components/export-tray';
@@ -27,7 +28,8 @@ export function AppSidebarHeader({
 }: {
     isScrolled?: boolean;
 }) {
-    const { auth } = usePage().props;
+    const { auth, branding } = usePage().props;
+    const headerColors = branding?.header_colors ?? null;
     const [commandOpen, setCommandOpen] = useState(false);
     const { resolvedAppearance, updateAppearance } = useAppearance();
 
@@ -49,7 +51,17 @@ export function AppSidebarHeader({
             className={cn(
                 'sticky top-0 z-20 min-h-12 shrink-0 border-b bg-background transition-[border-radius,box-shadow] duration-200',
                 isScrolled ? 'rounded-none shadow-sm' : 'rounded-t-2xl',
+                // Warna milik tenant hanya di tema terang: ujung gradien yang terang membuat ikon
+                // tema gelap tidak terbaca.
+                headerColors && 'bg-(image:--header-gradient) dark:bg-none',
             )}
+            style={
+                headerColors
+                    ? ({
+                          '--header-gradient': `linear-gradient(to right, ${headerColors.from}, ${headerColors.to})`,
+                      } as CSSProperties)
+                    : undefined
+            }
         >
             <div className="flex min-h-12 min-w-0 flex-wrap items-center gap-2 px-3 py-1.5 sm:gap-3 sm:px-4">
                 <SidebarTrigger className="shrink-0 md:hidden" />

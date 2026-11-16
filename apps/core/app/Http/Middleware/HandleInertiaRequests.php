@@ -63,7 +63,10 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'productVersion' => config('app.product_version'),
             // Logo aplikasi yang berlaku di alamat ini; tamu ikut menerimanya karena halaman masuk menampilkannya.
-            'branding' => fn (): array => ['logo_url' => app(AppBranding::class)->logoUrl($request)],
+            'branding' => fn (): array => [
+                'logo_url' => app(AppBranding::class)->logoUrl($request),
+                'header_colors' => app(AppBranding::class)->headerColors($request),
+            ],
             /*
              * Lingkungan yang sedang dilayani, dan HANYA ketika ia bukan produksi.
              *

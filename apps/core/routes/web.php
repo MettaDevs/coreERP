@@ -440,6 +440,8 @@ Route::middleware(['auth'])->group(function () {
         Route::post('finance-postings/{financePosting}/mark-manual', [FinancePostingMonitorController::class, 'markManual'])->middleware('throttle:30,1')->name('finance-postings.mark-manual');
         Route::post('app-logo', [AppBrandingController::class, 'store'])->middleware(['throttle:20,1', CoreSecurityCatalog::gate(CoreSecurityCatalog::ORGANIZATION_UPDATE)])->name('app-logo.store');
         Route::delete('app-logo', [AppBrandingController::class, 'destroy'])->middleware(['throttle:20,1', CoreSecurityCatalog::gate(CoreSecurityCatalog::ORGANIZATION_UPDATE)])->name('app-logo.destroy');
+        Route::put('app-header-colors', [AppBrandingController::class, 'updateHeaderColors'])->middleware(['throttle:20,1', CoreSecurityCatalog::gate(CoreSecurityCatalog::ORGANIZATION_UPDATE)])->name('app-header-colors.update');
+        Route::delete('app-header-colors', [AppBrandingController::class, 'destroyHeaderColors'])->middleware(['throttle:20,1', CoreSecurityCatalog::gate(CoreSecurityCatalog::ORGANIZATION_UPDATE)])->name('app-header-colors.destroy');
         Route::get('organizations/{organization}/print-identity', [PrintIdentityController::class, 'show'])->name('organizations.print-identity.show');
         Route::put('organizations/{organization}/print-identity', [PrintIdentityController::class, 'update'])->name('organizations.print-identity.update');
         Route::post('organizations/{organization}/print-identity/logos', [PrintIdentityController::class, 'storeLogo'])->name('organizations.print-identity.logos.store');
