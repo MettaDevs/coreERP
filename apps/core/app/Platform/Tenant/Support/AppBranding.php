@@ -52,6 +52,35 @@ class AppBranding
             : '/'.self::DEFAULT_LOGO;
     }
 
+    /**
+     * Gradien header yang berlaku, atau null untuk header bawaan.
+     *
+     * @return array{from: string, to: string}|null
+     */
+    public function headerColors(Request $request): ?array
+    {
+        $branding = $this->current($request);
+
+        return $branding?->header_color_from === null || $branding->header_color_to === null
+            ? null
+            : ['from' => $branding->header_color_from, 'to' => $branding->header_color_to];
+    }
+
+    public function saveHeaderColors(string $tenantId, string $from, string $to): TenantBranding
+    {
+        $branding = TenantBranding::query()->updateOrCreate(['tenant_id' => $tenantId], [
+            'header_color_from' => mb_strtolower($from),
+            'header_color_to' => mb_strtolower($to),
+        ]);
+
+        return $this->rows[$tenantId] = $branding;
+    }
+
+    public function removeHeaderColors(string $tenantId): void
+    {
+        $this->forTenant($tenantId)?->update(['header_color_from' => null, 'header_color_to' => null]);
+    }
+
     public function hasCustomLogo(Request $request): bool
     {
         return (bool) $this->current($request)?->logo_path;

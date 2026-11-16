@@ -30,6 +30,7 @@ class AppBrandingController extends Controller
 
         return Inertia::render('platform/tenant/app-logo', [
             'hasCustomLogo' => (bool) $this->branding->forTenant((string) $membership->tenant_id)?->logo_path,
+            'headerColors' => $this->branding->headerColors($request),
             'canManage' => $membership->hasCorePermission(CoreSecurityCatalog::ORGANIZATION_UPDATE),
         ]);
     }
@@ -66,5 +67,28 @@ class AppBrandingController extends Controller
         $this->branding->removeLogo((string) $membership->tenant_id);
 
         return response()->json(['data' => ['logo_url' => '/'.AppBranding::DEFAULT_LOGO]]);
+    }
+
+    public function updateHeaderColors(Request $request): JsonResponse
+    {
+        $membership = $this->currentMembership($request);
+        $validated = $request->validate([
+            'from' => ['required', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'to' => ['required', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
+        ], [
+            'from.regex' => 'Warna kiri harus berbentuk #RRGGBB.',
+            'to.regex' => 'Warna kanan harus berbentuk #RRGGBB.',
+        ]);
+        $branding = $this->branding->saveHeaderColors((string) $membership->tenant_id, $validated['from'], $validated['to']);
+
+        return response()->json(['data' => ['from' => $branding->header_color_from, 'to' => $branding->header_color_to]]);
+    }
+
+    public function destroyHeaderColors(Request $request): JsonResponse
+    {
+        $membership = $this->currentMembership($request);
+        $this->branding->removeHeaderColors((string) $membership->tenant_id);
+
+        return response()->json(['data' => null]);
     }
 }

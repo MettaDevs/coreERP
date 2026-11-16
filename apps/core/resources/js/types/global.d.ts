@@ -13,7 +13,10 @@ declare module '@inertiajs/core' {
         sharedPageProps: {
             name: string;
             productVersion: string | null;
-            branding: { logo_url: string };
+            branding: {
+                logo_url: string;
+                header_colors: { from: string; to: string } | null;
+            };
             auth: Auth;
             entitledProducts: EntitledProduct[];
             launchableProducts: LaunchableProduct[];

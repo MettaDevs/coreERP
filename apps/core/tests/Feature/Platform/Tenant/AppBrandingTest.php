@@ -74,6 +74,35 @@ class AppBrandingTest extends TestCase
         $this->get('/app-logo')->assertRedirect('/brand/coreerp-logo.png');
     }
 
+    public function test_header_colors_are_shared_with_every_page_and_can_return_to_the_default(): void
+    {
+        $this->actingAs($this->owner)->get('/dashboard')
+            ->assertInertia(fn ($page) => $page->where('branding.header_colors', null));
+
+        $this->putJson('/api/v1/app-header-colors', ['from' => '#2A84C1', 'to' => '#E3F0FA'])
+            ->assertOk()->assertJsonPath('data.from', '#2a84c1')->assertJsonPath('data.to', '#e3f0fa');
+        $this->get('/dashboard')->assertInertia(fn ($page) => $page
+            ->where('branding.header_colors', ['from' => '#2a84c1', 'to' => '#e3f0fa']));
+
+        $this->deleteJson('/api/v1/app-header-colors')->assertOk();
+        $this->assertSame(1, DB::table('tenant_brandings')->count());
+        $this->get('/dashboard')->assertInertia(fn ($page) => $page->where('branding.header_colors', null));
+    }
+
+    public function test_header_colors_must_be_hex_and_members_without_permission_are_refused(): void
+    {
+        $this->actingAs($this->owner)
+            ->putJson('/api/v1/app-header-colors', ['from' => 'red;background:url(x)', 'to' => '#e3f0fa'])
+            ->assertStatus(422)->assertJsonValidationErrors('from');
+
+        $member = User::factory()->create();
+        $this->owner->activeMembership()->tenant->memberships()->create(['user_id' => $member->id, 'status' => 'active']);
+        $this->actingAs($member)
+            ->putJson('/api/v1/app-header-colors', ['from' => '#2a84c1', 'to' => '#e3f0fa'])
+            ->assertForbidden();
+        $this->assertSame(0, DB::table('tenant_brandings')->count());
+    }
+
     public function test_only_png_and_jpeg_are_accepted_and_members_without_permission_are_refused(): void
     {
         $this->actingAs($this->owner)
