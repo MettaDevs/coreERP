@@ -4,8 +4,8 @@
     "commit": "6b3cf5846fd4442c3e895cacf2ba58275f9dd75e",
     "schema": "coreerp_test",
     "server_version": "16.14",
-    "migration_count": 151,
-    "migration_sources_sha256": "c9ff09e685cc95c782d9c028d23a4b4eb09d557d48170961d8d19f3e80db82ea",
+    "migration_count": 152,
+    "migration_sources_sha256": "8a07e6f34ec62be3adbe42023a6adfddd5afff96cd3db6893a956d038e968148",
     "catalog_sha256": "4cebf2e40587475ecbd329ce70fd5e79f729ba56e8f9c4068e5f047a407d5ad8"
   },
   "tables": {
@@ -4295,6 +4295,35 @@
         "bump_row_version": "keep",
         "log_change": "keep",
         "stamp_audit_actor": "keep"
+      }
+    },
+    "tenant_brandings": {
+      "authority": "erp-business",
+      "action": "exclude",
+      "columns": {
+        "id": "exclude",
+        "tenant_id": "exclude",
+        "logo_path": "exclude",
+        "logo_mime": "exclude",
+        "logo_hash": "exclude",
+        "created_at": "exclude",
+        "updated_at": "exclude",
+        "created_by_user_id": "exclude",
+        "updated_by_user_id": "exclude",
+        "version": "exclude"
+      },
+      "constraints": {
+        "tenant_brandings_pkey": "exclude",
+        "tenant_brandings_tenant_id_unique": "exclude"
+      },
+      "indexes": {
+        "tenant_brandings_pkey": "exclude",
+        "tenant_brandings_tenant_id_unique": "exclude"
+      },
+      "triggers": {
+        "bump_row_version": "exclude",
+        "log_change": "exclude",
+        "stamp_audit_actor": "exclude"
       }
     },
     "tenant_creation_requests": {
