@@ -45,6 +45,7 @@ use App\Platform\Reporting\Http\Controllers\ReportExportController;
 use App\Platform\Reporting\Http\Controllers\ReportLayoutController;
 use App\Platform\Reporting\Http\Controllers\ReportOptionController;
 use App\Platform\Retention\Http\Controllers\RetentionController;
+use App\Platform\Tenant\Http\Controllers\AppBrandingController;
 use App\Platform\Tenant\Http\Controllers\BusinessRegistrationController;
 use App\Platform\Tenant\Http\Controllers\InvitationLandingController;
 use App\Platform\Tenant\Http\Controllers\InvitationRedemptionController;
@@ -141,6 +142,9 @@ Route::post('sso/backchannel-logout', SsoBackchannelLogoutController::class)
     ->middleware('throttle:60,1')
     ->name('sso.backchannel-logout');
 
+// Logo aplikasi dilayani tanpa login: halaman masuk dan pratinjau link memintanya sebelum ada sesi.
+Route::get('app-logo', [AppBrandingController::class, 'show'])->middleware('throttle:120,1')->name('app-logo');
+
 Route::middleware('guest')->group(function () {
     Route::post('api/v1/business-registrations', [BusinessRegistrationController::class, 'store'])
         ->middleware('throttle:'.config('coreerp.registration_rate_limit', 5).',1')
@@ -227,6 +231,7 @@ Route::middleware(['auth'])->group(function () {
     // Lihat docs/todo/buku-alamat-global/.
 
     // Laporan cetak/ekspor untuk semua app; lihat docs/dev/23-document-rendering.md.
+    Route::get('settings/app-logo', [AppBrandingController::class, 'page'])->name('app-logo.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::ORGANIZATION_READ));
     Route::get('settings/report-layouts', [ReportLayoutController::class, 'page'])->name('report-layouts.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REPORT_LAYOUT_READ));
     Route::get('reports/exports', [ReportExportController::class, 'page'])->name('report-exports.index');
     Route::get('settings/units-of-measure', [UnitOfMeasureController::class, 'index'])->name('units-of-measure.index')->middleware(CoreSecurityCatalog::gate(CoreSecurityCatalog::REFERENCE_DATA_READ));
@@ -433,6 +438,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('finance-postings/{financePosting}', [FinancePostingMonitorController::class, 'show'])->name('finance-postings.show');
         Route::post('finance-postings/{financePosting}/revalidate', [FinancePostingMonitorController::class, 'revalidate'])->middleware('throttle:30,1')->name('finance-postings.revalidate');
         Route::post('finance-postings/{financePosting}/mark-manual', [FinancePostingMonitorController::class, 'markManual'])->middleware('throttle:30,1')->name('finance-postings.mark-manual');
+        Route::post('app-logo', [AppBrandingController::class, 'store'])->middleware(['throttle:20,1', CoreSecurityCatalog::gate(CoreSecurityCatalog::ORGANIZATION_UPDATE)])->name('app-logo.store');
+        Route::delete('app-logo', [AppBrandingController::class, 'destroy'])->middleware(['throttle:20,1', CoreSecurityCatalog::gate(CoreSecurityCatalog::ORGANIZATION_UPDATE)])->name('app-logo.destroy');
         Route::get('organizations/{organization}/print-identity', [PrintIdentityController::class, 'show'])->name('organizations.print-identity.show');
         Route::put('organizations/{organization}/print-identity', [PrintIdentityController::class, 'update'])->name('organizations.print-identity.update');
         Route::post('organizations/{organization}/print-identity/logos', [PrintIdentityController::class, 'storeLogo'])->name('organizations.print-identity.logos.store');

@@ -11,6 +11,7 @@ use App\Platform\License\Support\SiteLicense;
 use App\Platform\Modules\Models\CoreApp;
 use App\Platform\Modules\Support\LaunchableAppCatalog;
 use App\Platform\Tenant\Models\TenantMembership;
+use App\Platform\Tenant\Support\AppBranding;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -61,6 +62,8 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'name' => config('app.name'),
             'productVersion' => config('app.product_version'),
+            // Logo aplikasi yang berlaku di alamat ini; tamu ikut menerimanya karena halaman masuk menampilkannya.
+            'branding' => fn (): array => ['logo_url' => app(AppBranding::class)->logoUrl($request)],
             /*
              * Lingkungan yang sedang dilayani, dan HANYA ketika ia bukan produksi.
              *
