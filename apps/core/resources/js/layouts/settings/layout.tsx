@@ -36,6 +36,11 @@ const sidebarNavItems: NavItem[] = [
         icon: null,
     },
     {
+        title: 'Logo aplikasi',
+        href: '/settings/app-logo',
+        icon: null,
+    },
+    {
         title: 'Layout laporan',
         href: '/settings/report-layouts',
         icon: null,

@@ -17,6 +17,7 @@ import {
     ListChecks,
     Hash,
     History,
+    Image,
     Map,
     Plug,
     Ruler,
@@ -274,6 +275,12 @@ export function useShellNavigation() {
                         icon: Map,
                         href: '/settings/address-setup',
                         permission: 'core.reference-data.read',
+                    },
+                    {
+                        label: 'Logo aplikasi',
+                        icon: Image,
+                        href: '/settings/app-logo',
+                        permission: 'core.organization.read',
                     },
                     {
                         label: 'Layout laporan',

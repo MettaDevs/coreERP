@@ -31,8 +31,20 @@
             }
         </style>
 
-        <link rel="icon" href="/favicon.png" type="image/png">
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+        {{--
+            Logo pengganti milik tenant menggantikan ikon tab sekaligus gambar pratinjau link.
+            Tanpa pengganti, ikon bawaan tetap berkas statis seperti sebelumnya. `og:image` wajib
+            alamat lengkap: aplikasi pesan mengambilnya dari luar, tanpa tahu alamat halaman ini.
+        --}}
+        @php
+            $appLogo = $page['props']['branding']['logo_url'] ?? '/brand/coreerp-logo.png';
+            $customLogo = str_starts_with($appLogo, '/app-logo');
+        @endphp
+        <link rel="icon" href="{{ $customLogo ? $appLogo : '/favicon.png' }}">
+        <link rel="apple-touch-icon" href="{{ $customLogo ? $appLogo : '/apple-touch-icon.png' }}">
+        <meta property="og:type" content="website">
+        <meta property="og:title" content="{{ config('app.name', 'CoreERP') }}">
+        <meta property="og:image" content="{{ url($appLogo) }}">
 
         {{--
             Tidak ada `@fonts` di sini, dan itu pasangan dari tidak adanya blok `fonts`
