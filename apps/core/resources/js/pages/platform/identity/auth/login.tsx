@@ -12,8 +12,13 @@ import TextLink from '@/components/text-link';
 /* @chisel-registration */
 import { register } from '@/routes';
 /* @end-chisel-registration */
+import { join } from '@/routes';
 import { store } from '@/routes/login';
 import { request } from '@/routes/password';
+
+// Tautan pendaftaran mandiri disembunyikan; client baru dibuat operator dari admin.erp.
+// Rute dan halaman registrasi tetap ada. Ubah ke true untuk menampilkannya lagi.
+const SHOW_SELF_REGISTRATION = false;
 
 type Props = {
     status?: string;
@@ -147,11 +152,20 @@ export default function Login({
                         </div>
 
                         {/* @chisel-registration */}
-                        <div className="text-center text-sm text-muted-foreground">
-                            Belum punya akun?{' '}
-                            <TextLink href={register()}>Daftar</TextLink>
-                        </div>
+                        {SHOW_SELF_REGISTRATION && (
+                            <div className="text-center text-sm text-muted-foreground">
+                                Belum punya akun?{' '}
+                                <TextLink href={register()}>Daftar</TextLink>
+                            </div>
+                        )}
                         {/* @end-chisel-registration */}
+
+                        <div className="text-center text-sm text-muted-foreground">
+                            Punya kode undangan?{' '}
+                            <TextLink href={join()} data-test="join-link">
+                                JOIN
+                            </TextLink>
+                        </div>
                     </>
                 )}
             </Form>
